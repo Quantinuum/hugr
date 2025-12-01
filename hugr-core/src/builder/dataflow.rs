@@ -471,12 +471,10 @@ pub(crate) mod test {
         endo_sig, inout_sig,
     };
     use crate::extension::SignatureError;
-    use crate::extension::prelude::Noop;
-    use crate::extension::prelude::{bool_t, qb_t, usize_t};
-    use crate::hugr::linking::NodeLinkingDirective;
+    use crate::extension::prelude::{Noop, bool_t, qb_t, usize_t};
+    use crate::hugr::linking::{NameLinkingPolicy, NodeLinkingDirective, OnMultiDefn};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::ops::{FuncDecl, FuncDefn, OpParent, OpTag, OpTrait, Value, handle::NodeHandle};
-
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
     use crate::types::{EdgeKind, FuncValueType, RowVariable, Signature, Type, TypeBound, TypeRV};
@@ -729,7 +727,7 @@ pub(crate) mod test {
     }
 
     #[rstest]
-    fn add_hugr_link_nodes(
+    fn add_link_hugr_by_node(
         #[values(false, true)] replace: bool,
         #[values(true, false)] view: bool,
     ) {
@@ -783,6 +781,48 @@ pub(crate) mod test {
             expected_decl_names.push(ins_decl_name)
         }
         assert_eq!(decl_names, expected_decl_names);
+    }
+
+    #[test]
+    fn add_link_hugr() {
+        let to_insert = {
+            let mut dfb = DFGBuilder::new(endo_sig(vec![usize_t(); 2])).unwrap();
+            let mut mb = dfb.module_root_builder();
+            let fb = mb
+                .define_function_vis("foo", endo_sig(usize_t()), Visibility::Public)
+                .unwrap();
+            let ins = fb.input_wires();
+            let func = fb.finish_with_outputs(ins).unwrap();
+            let [in1, in2] = dfb.input_wires_arr();
+            let [out1] = dfb.call(func.handle(), &[], [in1]).unwrap().outputs_arr();
+            let [out2] = dfb.call(func.handle(), &[], [in2]).unwrap().outputs_arr();
+            dfb.finish_hugr_with_outputs([out1, out2]).unwrap()
+        };
+        let mut dfb = DFGBuilder::new(inout_sig(usize_t(), vec![usize_t(); 2])).unwrap();
+        let [in1] = dfb.input_wires_arr();
+        let pol = NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget);
+        let [out1, out2] = dfb
+            .add_link_view_with_wires(&to_insert, &pol, [in1, in1])
+            .unwrap()
+            .outputs_arr();
+        assert!({
+            let h = dfb.hugr();
+            h.children(h.module_root())
+                .skip(1)
+                .exactly_one()
+                .is_ok_and(|n| h.static_targets(n).unwrap().count() == 2)
+        });
+        let [out3, out4] = dfb
+            .add_link_hugr_with_wires(to_insert, &pol, [out1, out2])
+            .unwrap()
+            .outputs_arr();
+        let h = dfb.finish_hugr_with_outputs([out3, out4]).unwrap();
+        assert!(
+            h.children(h.module_root())
+                .skip(1)
+                .exactly_one()
+                .is_ok_and(|n| h.static_targets(n).unwrap().count() == 4)
+        );
     }
 
     #[test]

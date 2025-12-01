@@ -1,6 +1,6 @@
 use crate::extension::prelude::MakeTuple;
 use crate::hugr::hugrmut::InsertionResult;
-use crate::hugr::linking::{HugrLinking, NodeLinkingDirective};
+use crate::hugr::linking::{HugrLinking, NameLinkingPolicy, NodeLinkingDirective};
 use crate::hugr::views::HugrView;
 use crate::hugr::{NodeMetadata, ValidationError};
 use crate::ops::{self, OpTag, OpTrait, OpType, Tag, TailLoop};
@@ -102,7 +102,8 @@ pub trait Container {
 
     /// Insert a copy of a HUGR as a child of the container.
     /// (Only the portion below the entrypoint will be inserted, with any incoming
-    /// edges broken; see [Dataflow::add_link_view_by_node_with_wires])
+    /// edges broken; see [Dataflow::add_link_view_by_node_with_wires] or
+    /// [Dataflow::add_link_view_with_wires] for alternatives that can preserve these.)
     fn add_hugr_view<H: HugrView>(&mut self, child: &H) -> InsertionResult<H::Node, Node> {
         let parent = self.container_node();
         self.hugr_mut().insert_from_view(parent, child)
@@ -231,6 +232,31 @@ pub trait Dataflow: Container {
         self.add_hugr_region_with_wires(hugr, region, input_wires)
     }
 
+    /// Insert a hugr-defined op to the sibling graph, wiring up the `input_wires` to its
+    /// incoming ports, and linking in module-children if specified.
+    ///
+    /// Inserts the entrypoint-subtree of the HUGR into the current region as a new op,
+    /// to which `input_wires` are connected; other module children are added according
+    /// to the policy.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when adding the
+    /// node or in linking.
+    fn add_link_hugr_with_wires(
+        &mut self,
+        hugr: Hugr,
+        policy: &NameLinkingPolicy,
+        input_wires: impl IntoIterator<Item = Wire>,
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+        let parent = self.container_node();
+        let node = self
+            .hugr_mut()
+            .insert_link_hugr(parent, hugr, policy)?
+            .inserted_entrypoint;
+        wire_ins_return_outs(input_wires, node, self)
+    }
+
     /// Insert a hugr-defined op to the sibling graph, wiring up the
     /// `input_wires` to the incoming ports of the resulting root node.
     ///
@@ -274,7 +300,8 @@ pub trait Dataflow: Container {
     /// Copy a hugr's entrypoint-subtree (only) into the sibling graph, wiring up the
     /// `input_wires` to the incoming ports of the node that was the entrypoint.
     /// (Note that any wires from outside the entrypoint-subtree are disconnected in the copy;
-    /// see [Self::add_link_view_by_node_with_wires] for an alternative.)
+    /// see [Self::add_link_view_by_node_with_wires] or [Self::add_link_view_with_wires] for
+    /// alternatives that can preserve these.)
     ///
     /// # Errors
     ///
@@ -286,6 +313,32 @@ pub trait Dataflow: Container {
         input_wires: impl IntoIterator<Item = Wire>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let node = self.add_hugr_view(hugr).inserted_entrypoint;
+        wire_ins_return_outs(input_wires, node, self)
+    }
+
+    /// Insert a hugr-defined op to the sibling graph, wiring up the `input_wires` to its
+    /// incoming ports, and linking in module-children if specified.
+    ///
+    /// Inserts the entrypoint-subtree of the HUGR into the current region as a new op,
+    /// to which `input_wires` are connected; other module children are added according
+    /// to the policy.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error if there is an error when adding the
+    /// node or in linking.
+    fn add_link_view_with_wires(
+        &mut self,
+        hugr: &impl HugrView,
+        policy: &NameLinkingPolicy,
+        input_wires: impl IntoIterator<Item = Wire>,
+    ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
+        let parent = self.container_node();
+        let insertion = self
+            .hugr_mut()
+            .insert_link_from_view(parent, hugr, policy)
+            .map_err(|ins_err| BuildError::HugrViewInsertionError(ins_err.to_string()))?;
+        let node = insertion.node_map[&hugr.entrypoint()];
         wire_ins_return_outs(input_wires, node, self)
     }
 
