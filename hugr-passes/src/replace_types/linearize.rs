@@ -374,10 +374,11 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::builder::{
-        BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-        inout_sig,
+        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        HugrBuilder, inout_sig,
     };
 
+    use hugr_core::Visibility;
     use hugr_core::extension::prelude::{option_type, qb_t, usize_t};
     use hugr_core::extension::simple_op::MakeExtensionOp;
     use hugr_core::extension::{
@@ -810,8 +811,8 @@ mod test {
         assert_eq!(copy_sig.input[2..], copy_sig.output[1..]);
     }
 
-    #[test]
-    fn call_ok_except_in_array() {
+    #[rstest]
+    fn call_in_array(#[values(true, false)] use_linking: bool) {
         let (e, _) = ext_lowerer();
         let lin_ct = e.get_type(LIN_T).unwrap().instantiate([]).unwrap();
         let lin_t: Type = lin_ct.clone().into();
@@ -821,7 +822,11 @@ mod test {
         let discard_fn = {
             let mut mb = dfb.module_root_builder();
             let mut fb = mb
-                .define_function("drop", Signature::new(lin_t.clone(), type_row![]))
+                .define_function_vis(
+                    "drop",
+                    Signature::new(lin_t.clone(), type_row![]),
+                    Visibility::Public,
+                )
                 .unwrap();
             let ins = fb.input_wires();
             fb.add_dataflow_op(
@@ -835,15 +840,41 @@ mod test {
         let backup = dfb.finish_hugr().unwrap();
 
         let mut lower_discard_to_call = ReplaceTypes::default();
-        lower_discard_to_call
-            .linearizer_mut()
-            .register_simple(
-                lin_ct.clone(),
-                NodeTemplate::Call(backup.entrypoint(), vec![]), // Arbitrary, unused
-                NodeTemplate::Call(discard_fn, vec![]),
-            )
-            .unwrap();
-
+        if use_linking {
+            lower_discard_to_call
+                .linearizer_mut()
+                .register_simple(
+                    lin_ct.clone(),
+                    NodeTemplate::CompoundOp(Box::new({
+                        // Not a valid Hugr, but won't be used
+                        std::mem::take(
+                            DFGBuilder::new(inout_sig(lin_t.clone(), vec![lin_t.clone(); 2]))
+                                .unwrap()
+                                .hugr_mut(),
+                        )
+                    })),
+                    NodeTemplate::linked_hugr({
+                        let mut dfb = DFGBuilder::new(inout_sig(lin_t.clone(), vec![])).unwrap();
+                        let drop_fn = dfb
+                            .module_root_builder()
+                            .declare("drop", inout_sig(lin_t.clone(), vec![]).into())
+                            .unwrap();
+                        let ins = dfb.input_wires();
+                        let call = dfb.call(&drop_fn, &[], ins).unwrap();
+                        dfb.finish_hugr_with_outputs(call.outputs()).unwrap()
+                    }),
+                )
+                .unwrap();
+        } else {
+            lower_discard_to_call
+                .linearizer_mut()
+                .register_simple(
+                    lin_ct.clone(),
+                    NodeTemplate::Call(backup.entrypoint(), vec![]), // Arbitrary, unused
+                    NodeTemplate::Call(discard_fn, vec![]),
+                )
+                .unwrap();
+        };
         // Ok to lower usize_t to lin_t and call that function
         {
             let mut lowerer = lower_discard_to_call.clone();
@@ -853,25 +884,33 @@ mod test {
             assert_eq!(h.output_neighbours(discard_fn).count(), 1);
         }
 
-        // But if we lower usize_t to array<lin_t>, the call will fail.
+        // Now lower usize_t to array<lin_t>
         lower_discard_to_call.set_replace_type(
             usize_t().as_extension().unwrap().clone(),
             value_array_type(4, lin_ct.into()),
         );
-        let r = lower_discard_to_call.run(&mut backup.clone());
-        // Note the error (or success) can be quite fragile, according to what the `discard_fn`
-        // Node points at in the (hidden here) inner Hugr built by the array linearization helper.
-        if let Err(ReplaceTypesError::LinearizeError(LinearizeError::NestedTemplateError(
-            nested_t,
-            build_err,
-        ))) = r
-        {
-            assert_eq!(*nested_t, lin_t);
-            assert!(matches!(
-                *build_err, BuildError::NodeNotFound { node } if node == discard_fn
-            ));
+        let mut h = backup.clone();
+        let r = lower_discard_to_call.run(&mut h);
+        if use_linking {
+            r.unwrap();
+            h.validate().unwrap();
         } else {
-            panic!("Expected error");
+            // Without linking, we cannot build the call to discard an array<lin_t> because the
+            // call would be inside a nested Hugr (hidden here, built by the array linearization
+            // helper) that does not define "drop". However the error (or success) can be quite
+            // fragile, according to what the `discard_fn`Node points at in the nested Hugr.
+            if let Err(ReplaceTypesError::LinearizeError(LinearizeError::NestedTemplateError(
+                nested_t,
+                build_err,
+            ))) = r
+            {
+                assert_eq!(*nested_t, lin_t);
+                assert!(matches!(
+                    *build_err, BuildError::NodeNotFound { node } if node == discard_fn
+                ));
+            } else {
+                panic!("Expected error");
+            }
         }
     }
 
