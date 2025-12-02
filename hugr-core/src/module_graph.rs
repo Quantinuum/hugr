@@ -74,30 +74,21 @@ impl<N: HugrNode> ModuleGraph<N> {
             node_to_g.insert(hugr.entrypoint(), g.add_node(StaticNode::NonFuncEntrypoint));
         }
         for (func, cg_node) in &node_to_g {
-            traverse(hugr, *cg_node, *func, &mut g, &node_to_g);
-        }
-        fn traverse<N: HugrNode>(
-            h: &impl HugrView<Node = N>,
-            enclosing_func: petgraph::graph::NodeIndex<u32>,
-            node: N, // Nonstrict-descendant of `enclosing_func``
-            g: &mut Graph<StaticNode<N>, StaticEdge<N>>,
-            node_to_g: &HashMap<N, petgraph::graph::NodeIndex<u32>>,
-        ) {
-            for ch in h.children(node) {
-                traverse(h, enclosing_func, ch, g, node_to_g);
-                let weight = match h.get_optype(ch) {
-                    OpType::Call(_) => StaticEdge::Call(ch),
-                    OpType::LoadFunction(_) => StaticEdge::LoadFunction(ch),
-                    OpType::LoadConstant(_) => StaticEdge::LoadConstant(ch),
+            for n in hugr.descendants(*func) {
+                let weight = match hugr.get_optype(n) {
+                    OpType::Call(_) => StaticEdge::Call(n),
+                    OpType::LoadFunction(_) => StaticEdge::LoadFunction(n),
+                    OpType::LoadConstant(_) => StaticEdge::LoadConstant(n),
                     _ => continue,
                 };
-                if let Some(target) = h.static_source(ch) {
-                    if h.get_parent(target) == Some(h.module_root()) {
-                        g.add_edge(enclosing_func, node_to_g[&target], weight);
+                if let Some(target) = hugr.static_source(n) {
+                    if hugr.get_parent(target) == Some(hugr.module_root()) {
+                        g.add_edge(*cg_node, node_to_g[&target], weight);
                     } else {
+                        // Local constant (only global constants are in the graph)
                         assert!(!node_to_g.contains_key(&target));
-                        assert!(h.get_optype(ch).is_load_constant());
-                        assert!(h.get_optype(target).is_const());
+                        assert!(hugr.get_optype(n).is_load_constant());
+                        assert!(hugr.get_optype(target).is_const());
                     }
                 }
             }
@@ -212,10 +203,7 @@ mod test {
     }
 
     #[rstest]
-    #[should_panic]
-    #[case(true)]
-    #[case(false)]
-    fn entrypoint(#[case] single_node: bool) {
+    fn entrypoint(#[values(true, false)] single_node: bool) {
         let mut dfb = DFGBuilder::new(endo_sig(usize_t())).unwrap();
         let called = dfb
             .module_root_builder()
