@@ -5,7 +5,7 @@ use crate::{HugrView, Node, core::HugrNode, ops::OpType};
 use petgraph::{Graph, visit::EdgeRef};
 
 /// Weight for an edge in a [`ModuleGraph`]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum StaticEdge<N = Node> {
     /// Edge corresponds to a [Call](OpType::Call) node (specified) in the Hugr
@@ -17,7 +17,7 @@ pub enum StaticEdge<N = Node> {
 }
 
 /// Weight for a petgraph-node in a [`ModuleGraph`]
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[non_exhaustive]
 pub enum StaticNode<N = Node> {
     /// petgraph-node corresponds to a [`FuncDecl`](OpType::FuncDecl) node (specified) in the Hugr
@@ -158,11 +158,14 @@ impl<N: HugrNode> ModuleGraph<N> {
 #[cfg(test)]
 mod test {
     use itertools::Itertools as _;
+    use rstest::rstest;
 
     use crate::builder::{
-        Container, Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder, endo_sig, inout_sig,
+        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
+        ModuleBuilder, endo_sig, inout_sig,
     };
     use crate::extension::prelude::{ConstUsize, usize_t};
+    use crate::hugr::hugrmut::HugrMut;
     use crate::ops::{Value, handle::NodeHandle};
 
     use super::*;
@@ -206,5 +209,44 @@ mod test {
             mg.in_edges(cst.node()).collect_vec(),
             [(&StaticNode::FuncDefn(caller.node()), &load_const_edge,)]
         );
+    }
+
+    #[rstest]
+    #[should_panic]
+    #[case(true)]
+    #[case(false)]
+    fn entrypoint(#[case] single_node: bool) {
+        let mut dfb = DFGBuilder::new(endo_sig(usize_t())).unwrap();
+        let called = dfb
+            .module_root_builder()
+            .declare("called", endo_sig(usize_t()).into())
+            .unwrap();
+        let ins = dfb.input_wires();
+        let call = dfb.call(&called, &[], ins).unwrap();
+        let mut h = dfb.finish_hugr_with_outputs(call.outputs()).unwrap();
+        let main = h.get_parent(h.entrypoint()).unwrap();
+        if single_node {
+            h.set_entrypoint(call.node());
+        }
+
+        let mg = ModuleGraph::new(&h);
+        let mut in_edges: HashMap<_, _> = mg.in_edges(called.node()).collect();
+        assert_eq!(
+            in_edges.remove(&StaticNode::NonFuncEntrypoint),
+            Some(&StaticEdge::Call(call.node()))
+        );
+        assert_eq!(
+            in_edges.into_iter().collect_vec(),
+            vec![(&StaticNode::FuncDefn(main), &StaticEdge::Call(call.node()))]
+        );
+        for n in [h.entrypoint(), main] {
+            assert_eq!(
+                mg.out_edges(n).collect_vec(),
+                vec![(
+                    &StaticEdge::Call(call.node()),
+                    &StaticNode::FuncDecl(called.node())
+                )]
+            );
+        }
     }
 }
