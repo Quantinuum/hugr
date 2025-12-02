@@ -51,6 +51,10 @@ pub enum NodeTemplate {
     /// Other children of the Hugr reachable from the entrypoint will also be inserted
     /// according to the specified linking policy.
     LinkedHugr(Box<Hugr>, NameLinkingPolicy),
+    #[deprecated(
+        note = "Use LinkedHugr with Call entrypoint and FuncDecl",
+        since = "0.24.4"
+    )]
     /// A Call to an existing function.
     Call(Node, Vec<TypeArg>),
 }
@@ -90,6 +94,7 @@ impl NodeTemplate {
             NodeTemplate::LinkedHugr(h, pol) => {
                 Ok(hugr.insert_link_hugr(parent, *h, &pol)?.inserted_entrypoint)
             }
+            #[expect(deprecated)] // remove together
             NodeTemplate::Call(target, type_args) => {
                 let c = call(hugr, target, type_args)?;
                 let tgt_port = c.called_function_port();
@@ -110,6 +115,7 @@ impl NodeTemplate {
             NodeTemplate::SingleOp(opty) => dfb.add_dataflow_op(opty, inputs),
             NodeTemplate::CompoundOp(h) => dfb.add_hugr_with_wires(*h, inputs),
             NodeTemplate::LinkedHugr(h, pol) => dfb.add_link_hugr_with_wires(*h, &pol, inputs),
+            #[expect(deprecated)] // remove together
             // Really we should check whether func points at a FuncDecl or FuncDefn and create
             // the appropriate variety of FuncID but it doesn't matter for the purpose of making a Call.
             NodeTemplate::Call(func, type_args) => {
@@ -145,6 +151,7 @@ impl NodeTemplate {
                 }
                 (root_opty, static_source, static_inport)
             }
+            #[expect(deprecated)] // remove together
             NodeTemplate::Call(func, type_args) => {
                 let c = call(hugr, func, type_args)?;
                 let called_func_port = c.called_function_port();
@@ -170,6 +177,7 @@ impl NodeTemplate {
             NodeTemplate::SingleOp(op_type) => op_type,
             NodeTemplate::CompoundOp(hugr) => hugr.entrypoint_optype(),
             NodeTemplate::LinkedHugr(hugr, _) => hugr.entrypoint_optype(),
+            #[expect(deprecated)] // remove together, perhaps refactor to return just Signature
             NodeTemplate::Call(_, _) => return Ok(()), // no way to tell
         }
         .dataflow_signature();
@@ -1399,6 +1407,7 @@ mod test {
                 h.set_entrypoint(call.node());
                 NodeTemplate::linked_hugr(h)
             } else {
+                #[expect(deprecated)] // remove use_linking==false case
                 NodeTemplate::Call(read_func, args.to_owned())
             }))
         });

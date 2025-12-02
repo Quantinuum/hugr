@@ -866,6 +866,7 @@ mod test {
                 )
                 .unwrap();
         } else {
+            #[expect(deprecated)] // Remove use_linking==false case along with NodeTemplate::Call
             lower_discard_to_call
                 .linearizer_mut()
                 .register_simple(
