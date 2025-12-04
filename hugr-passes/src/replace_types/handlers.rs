@@ -22,8 +22,8 @@ use hugr_core::std_extensions::collections::borrow_array::{
 };
 use hugr_core::std_extensions::collections::list::ListValue;
 use hugr_core::std_extensions::collections::value_array::ValueArray;
-use hugr_core::{type_row, Visibility};
-use hugr_core::types::{SumType, Transformable, Type, TypeArg};
+use hugr_core::types::{PolyFuncType, SumType, Transformable, Type, TypeArg, TypeBound};
+use hugr_core::{Visibility, type_row};
 use itertools::Itertools;
 
 use crate::mangle_name;
@@ -109,6 +109,10 @@ pub(super) fn discard_to_unit_func_name(t: &Type) -> String {
     mangle_name("__discard", &[t.clone().into()])
 }
 
+fn copy_scan_func_name(t: &Type, num_new: u64) -> String {
+    mangle_name("__copy_scan", &[t.clone().into(), num_new.into()])
+}
+
 /// Handler for copying/discarding arrays if their elements have become linear.
 ///
 /// Generic over the concrete array implementation.
@@ -136,7 +140,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
                         .define_function_vis(
                             discard_to_unit_func_name(ty),
                             inout_sig(ty.clone(), Type::UNIT),
-                            Visibility::Public
+                            Visibility::Public,
                         )
                         .unwrap();
                     let [to_discard] = fb.input_wires_arr();
@@ -175,14 +179,27 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     let option_ty = Type::from(option_sty.clone());
     let arrays_of_none = {
         let fn_none = {
-            let mut dfb = DFGBuilder::new(inout_sig(vec![], option_ty.clone())).unwrap();
-            let none = dfb
-                .add_dataflow_op(Tag::new(0, vec![type_row![], ty.clone().into()]), [])
+            let mut mb = dfb.module_root_builder();
+            let tv = Type::new_var_use(0, TypeBound::Linear);
+            let mut fb = mb
+                .define_function_vis(
+                    "__mk_none",
+                    PolyFuncType::new(
+                        [TypeBound::Linear.into()],
+                        inout_sig(vec![], Type::from(option_type(tv.clone()))),
+                    ),
+                    Visibility::Public,
+                )
                 .unwrap();
-            dfb.finish_hugr_with_outputs(none.outputs()).unwrap()
+            let none = fb
+                .add_dataflow_op(Tag::new(0, vec![type_row![], tv.into()]), [])
+                .unwrap();
+            fb.finish_with_outputs(none.outputs()).unwrap()
         };
         let repeats = vec![GenericArrayRepeat::<AK>::new(option_ty.clone(), *n); num_new];
-        let fn_none = dfb.add_load_value(Value::function(fn_none).unwrap());
+        let fn_none = dfb
+            .load_func(fn_none.handle(), &[ty.clone().into()])
+            .unwrap();
         repeats
             .into_iter()
             .map(|rpt| {
@@ -199,18 +216,25 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     let copy_elem = {
         let mut io = vec![ty.clone(), i64_t.clone()];
         io.extend(vec![option_array.clone(); num_new]);
-        let mut dfb = DFGBuilder::new(endo_sig(io)).unwrap();
-        let mut inputs = dfb.input_wires();
+        let mut mb = dfb.module_root_builder();
+        let mut fb = mb
+            .define_function_vis(
+                copy_scan_func_name(ty, num_new as _),
+                endo_sig(io),
+                Visibility::Public,
+            )
+            .unwrap();
+        let mut inputs = fb.input_wires();
         let elem = inputs.next().unwrap();
         let idx = inputs.next().unwrap();
         let opt_arrays = inputs.collect::<Vec<_>>();
-        let [idx_usz] = dfb
+        let [idx_usz] = fb
             .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [idx])
             .unwrap()
             .outputs_arr();
         let mut copies = lin
             .copy_discard_op(ty, num_outports)?
-            .add(&mut dfb, [elem])
+            .add(&mut fb, [elem])
             .map_err(|e| LinearizeError::NestedTemplateError(Box::new(ty.clone()), Box::new(e)))?
             .outputs();
         let copy0 = copies.next().unwrap(); // We'll return this directly
@@ -225,32 +249,32 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             .into_iter()
             .zip_eq(copies)
             .map(|(opt_array, copy1)| {
-                let [tag] = dfb
+                let [tag] = fb
                     .add_dataflow_op(Tag::new(1, vec![type_row![], ty.clone().into()]), [copy1])
                     .unwrap()
                     .outputs_arr();
-                let [set_result] = dfb
+                let [set_result] = fb
                     .add_dataflow_op(set_op.clone(), [opt_array, idx_usz, tag])
                     .unwrap()
                     .outputs_arr();
                 // set should always be successful
-                let [none, opt_array] = dfb
+                let [none, opt_array] = fb
                     .build_unwrap_sum(1, either_st.clone(), set_result)
                     .unwrap();
                 //the removed element is an option, which should always be none (and thus discardable)
-                let [] = dfb
+                let [] = fb
                     .build_unwrap_sum(0, SumType::new_option(ty.clone()), none)
                     .unwrap();
                 opt_array
             })
-            .collect::<Vec<_>>(); // stop borrowing dfb
+            .collect::<Vec<_>>(); // stop borrowing fb
 
-        let cst1 = dfb.add_load_value(ConstInt::new_u(6, 1).unwrap());
-        let [new_idx] = dfb
+        let cst1 = fb.add_load_value(ConstInt::new_u(6, 1).unwrap());
+        let [new_idx] = fb
             .add_dataflow_op(IntOpDef::iadd.with_log_width(6), [idx, cst1])
             .unwrap()
             .outputs_arr();
-        dfb.finish_hugr_with_outputs([copy0, new_idx].into_iter().chain(opt_arrays))
+        fb.finish_with_outputs([copy0, new_idx].into_iter().chain(opt_arrays))
             .unwrap()
     };
     let [in_array] = dfb.input_wires_arr();
@@ -263,7 +287,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         *n,
     );
 
-    let copy_elem = dfb.add_load_value(Value::function(copy_elem).unwrap());
+    let copy_elem = dfb.load_func(copy_elem.handle(), &[]).unwrap();
     let cst0 = dfb.add_load_value(ConstInt::new_u(6, 0).unwrap());
 
     let mut outs = dfb
@@ -281,15 +305,29 @@ pub fn linearize_generic_array<AK: ArrayKind>(
 
     //3. Scan each array-of-options, 'unwrapping' each element into a non-option
     let unwrap_elem = {
-        let mut dfb =
-            DFGBuilder::new(inout_sig(Type::from(option_ty.clone()), ty.clone())).unwrap();
-        let [opt] = dfb.input_wires_arr();
-        let [val] = dfb.build_unwrap_sum(1, option_sty.clone(), opt).unwrap();
-        dfb.finish_hugr_with_outputs([val]).unwrap()
+        let mut mb = dfb.module_root_builder();
+        let tv = Type::new_var_use(0, TypeBound::Linear);
+        let mut fb = mb
+            .define_function_vis(
+                "__unwrap",
+                PolyFuncType::new(
+                    [TypeBound::Linear.into()],
+                    inout_sig(Type::from(option_type(tv.clone())), tv.clone()),
+                ),
+                Visibility::Public,
+            )
+            .unwrap();
+        let [opt] = fb.input_wires_arr();
+        let [val] = fb
+            .build_unwrap_sum(1, SumType::new_option(tv), opt)
+            .unwrap();
+        fb.finish_with_outputs([val]).unwrap()
     };
 
-    let unwrap_scan = GenericArrayScan::<AK>::new(option_ty.clone(), ty.clone(), vec![], *n);
-    let unwrap_elem = dfb.add_load_value(Value::function(unwrap_elem).unwrap());
+    let unwrap_scan = GenericArrayScan::<AK>::new(option_ty, ty.clone(), vec![], *n);
+    let unwrap_elem = dfb
+        .load_func(unwrap_elem.handle(), &[ty.clone().into()])
+        .unwrap();
 
     let out_arrays = std::iter::once(out_array1)
         .chain(opt_arrays.map(|opt_array| {
@@ -301,9 +339,10 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         }))
         .collect::<Vec<_>>();
 
-    Ok(NodeTemplate::CompoundOp(Box::new(
-        dfb.finish_hugr_with_outputs(out_arrays).unwrap(),
-    )))
+    Ok(NodeTemplate::LinkedHugr(
+        Box::new(dfb.finish_hugr_with_outputs(out_arrays).unwrap()),
+        NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseNew),
+    ))
 }
 
 /// Handler for copying/discarding value arrays if their elements have become linear.
