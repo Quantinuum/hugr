@@ -374,8 +374,7 @@ mod test {
     use std::sync::Arc;
 
     use hugr_core::builder::{
-        BuildError, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
-        HugrBuilder, inout_sig,
+        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, inout_sig,
     };
 
     use hugr_core::Visibility;
@@ -400,7 +399,7 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::replace_types::handlers::linearize_value_array;
+    use crate::replace_types::handlers::{discard_to_unit_func_name, linearize_value_array};
     use crate::replace_types::{LinearizeError, Linearizer, NodeTemplate, ReplaceTypesError};
     use crate::{ComposablePass, ReplaceTypes};
 
@@ -896,22 +895,32 @@ mod test {
             r.unwrap();
             h.validate().unwrap();
         } else {
-            // Without linking, we cannot build the call to discard an array<lin_t> because the
-            // call would be inside a nested Hugr (hidden here, built by the array linearization
-            // helper) that does not define "drop". However the error (or success) can be quite
-            // fragile, according to what the `discard_fn`Node points at in the nested Hugr.
-            if let Err(ReplaceTypesError::LinearizeError(LinearizeError::NestedTemplateError(
-                nested_t,
-                build_err,
-            ))) = r
-            {
-                assert_eq!(*nested_t, lin_t);
-                assert!(matches!(
-                    *build_err, BuildError::NodeNotFound { node } if node == discard_fn
-                ));
-            } else {
-                panic!("Expected error");
-            }
+            // Without linking, the Call node to the function discarding the array<lin_t> is
+            // inside a nested Hugr (hidden here, built by the array linearization helper)
+            // that does not define "drop".
+            // So, we might expect a LinearizeError in building that nested Hugr.
+            // However, by (bad) luck the target Node of the call identifies,
+            // in the nested Hugr, the Lin->() function being built, which makes
+            // a legal Hugr (the unit outport can have zero edges).
+            // Of course this would loop forever at runtime!
+            r.unwrap();
+            h.validate().unwrap();
+            let disc_func_name = discard_to_unit_func_name(&lin_t);
+            let disc = h
+                .children(h.module_root())
+                .find(|n| {
+                    h.get_optype(*n)
+                        .as_func_defn()
+                        .is_some_and(|fd| fd.func_name() == &disc_func_name)
+                })
+                .unwrap();
+            let call = h
+                .descendants(disc)
+                .filter(|n| h.get_optype(*n).is_call())
+                .exactly_one()
+                .ok()
+                .unwrap();
+            assert_eq!(h.static_source(call), Some(disc)); // Ooops.
         }
     }
 

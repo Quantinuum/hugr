@@ -2,9 +2,11 @@
 //! and [`DelegatingLinearizer::register_callback`](super::DelegatingLinearizer::register_callback)
 
 use hugr_core::builder::{
-    DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer, endo_sig, inout_sig,
+    DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, SubContainer, endo_sig,
+    inout_sig,
 };
 use hugr_core::extension::prelude::{UnwrapBuilder, option_type};
+use hugr_core::hugr::linking::{NameLinkingPolicy, OnMultiDefn};
 use hugr_core::ops::constant::CustomConst;
 use hugr_core::ops::{OpTrait, OpType, Tag};
 use hugr_core::ops::{Value, constant::OpaqueValue};
@@ -20,9 +22,11 @@ use hugr_core::std_extensions::collections::borrow_array::{
 };
 use hugr_core::std_extensions::collections::list::ListValue;
 use hugr_core::std_extensions::collections::value_array::ValueArray;
-use hugr_core::type_row;
+use hugr_core::{type_row, Visibility};
 use hugr_core::types::{SumType, Transformable, Type, TypeArg};
 use itertools::Itertools;
+
+use crate::mangle_name;
 
 use super::{
     CallbackHandler, LinearizeError, Linearizer, NodeTemplate, ReplaceTypes, ReplaceTypesError,
@@ -101,6 +105,10 @@ pub fn value_array_const(
     generic_array_const::<ValueArray>(val, repl)
 }
 
+pub(super) fn discard_to_unit_func_name(t: &Type) -> String {
+    mangle_name("__discard", &[t.clone().into()])
+}
+
 /// Handler for copying/discarding arrays if their elements have become linear.
 ///
 /// Generic over the concrete array implementation.
@@ -115,35 +123,42 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         panic!("Illegal TypeArgs to array: {args:?}")
     };
     if num_outports == 0 {
-        // "Simple" discard - first map each element to unit (via type-specific discard):
-        let map_fn = {
-            let mut dfb = DFGBuilder::new(inout_sig(ty.clone(), Type::UNIT)).unwrap();
-            let [to_discard] = dfb.input_wires_arr();
-            lin.copy_discard_op(ty, 0)?
-                .add(&mut dfb, [to_discard])
-                .map_err(|e| {
-                    LinearizeError::NestedTemplateError(Box::new(ty.clone()), Box::new(e))
-                })?;
-            let ret = dfb.add_load_value(Value::unary_unit_sum());
-            dfb.finish_hugr_with_outputs([ret]).unwrap()
-        };
-        // Now array.scan that over the input array to get an array of unit (which can be discarded)
+        // "Simple" discard
         let array_scan = GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n);
         let in_type = AK::ty(*n, ty.clone());
-        return Ok(NodeTemplate::CompoundOp(Box::new({
-            let mut dfb = DFGBuilder::new(inout_sig(in_type, type_row![])).unwrap();
-            let [in_array] = dfb.input_wires_arr();
-            let map_fn = dfb.add_load_value(Value::Function {
-                hugr: Box::new(map_fn),
-            });
-            // scan has one output, an array of unit, so just ignore/discard that
-            let unit_arr = dfb
-                .add_dataflow_op(array_scan, [in_array, map_fn])
-                .unwrap()
-                .out_wire(0);
-            AK::build_discard(&mut dfb, Type::UNIT, *n, unit_arr).unwrap();
-            dfb.finish_hugr_with_outputs([]).unwrap()
-        })));
+        return Ok(NodeTemplate::LinkedHugr(
+            Box::new({
+                let mut dfb = DFGBuilder::new(inout_sig(in_type, type_row![])).unwrap();
+                // first map each element to unit (via type-specific discard):
+                let map_fn = {
+                    let mut mb = dfb.module_root_builder();
+                    let mut fb = mb
+                        .define_function_vis(
+                            discard_to_unit_func_name(ty),
+                            inout_sig(ty.clone(), Type::UNIT),
+                            Visibility::Public
+                        )
+                        .unwrap();
+                    let [to_discard] = fb.input_wires_arr();
+                    let disc = lin.copy_discard_op(ty, 0)?;
+                    disc.add(&mut fb, [to_discard]).map_err(|e| {
+                        LinearizeError::NestedTemplateError(Box::new(ty.clone()), Box::new(e))
+                    })?;
+                    let ret = fb.add_load_value(Value::unary_unit_sum());
+                    fb.finish_with_outputs([ret]).unwrap()
+                };
+                let [in_array] = dfb.input_wires_arr();
+                let map_fn = dfb.load_func(map_fn.handle(), &[]).unwrap();
+                // Now array.scan that over the input array to get an array of unit (which can be discarded)
+                let unit_arr = dfb
+                    .add_dataflow_op(array_scan, [in_array, map_fn])
+                    .unwrap()
+                    .out_wire(0);
+                AK::build_discard(&mut dfb, Type::UNIT, *n, unit_arr).unwrap();
+                dfb.finish_hugr_with_outputs([]).unwrap()
+            }),
+            NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseNew),
+        ));
     }
     // The num_outports>1 case will simplify, and unify with the previous, when we have a
     // more general ArrayScan https://github.com/CQCL/hugr/issues/2041. In the meantime:
