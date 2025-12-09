@@ -22,7 +22,12 @@ bench = false
 hugr-core = { path = "../hugr-core", version = "0.24.3" }
 portgraph = { workspace = true }
 ascent = { version = "0.8.0" }
-derive_more = { workspace = true, features = ["display", "error", "from"] }
+derive_more = { workspace = true, features = [
+    "add_assign",
+    "display",
+    "error",
+    "from",
+] }
 itertools = { workspace = true }
 pastey = { workspace = true }
 thiserror = { workspace = true }
