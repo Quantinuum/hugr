@@ -934,6 +934,14 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             )
         return mapping
 
+    def _overwrite_hugr(self, new_hugr: Hugr) -> None:
+        """Modify a Hugr in place by replacing contents with those from a new Hugr."""
+        self.module_root = new_hugr.module_root
+        self.entrypoint = new_hugr.entrypoint
+        self._nodes = new_hugr._nodes
+        self._links = new_hugr._links
+        self._free_nodes = new_hugr._free_nodes
+
     def _to_serial(self) -> SerialHugr:
         """Serialize the HUGR."""
 
@@ -1105,6 +1113,19 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             ValueError: If the envelope does not contain exactly one module.
         """
         return read_envelope_hugr_str(envelope)
+
+    @staticmethod
+    def from_model(module: model.Module) -> Hugr:
+        """Import from the hugr model format."""
+        from hugr.model.load import ModelImport
+
+        loader = ModelImport(module=module)
+        for i, node in enumerate(module.root.children):
+            loader.import_node_in_module(node, i)
+        loader.link_ports()
+        loader.link_static_ports()
+        loader.add_module_metadata()
+        return loader.hugr
 
     def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
         """Serialize the HUGR into an envelope byte string.
