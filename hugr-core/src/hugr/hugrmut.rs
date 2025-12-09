@@ -3,7 +3,8 @@
 use std::collections::{BTreeMap, HashMap, VecDeque};
 use std::sync::Arc;
 
-use portgraph::{LinkMut, PortMut, PortView, SecondaryMap};
+use itertools::Itertools;
+use portgraph::{LinkMut, LinkView, MultiMut, PortMut, PortView, SecondaryMap};
 
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
@@ -164,6 +165,21 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// If the node is not in the graph, or if the port is invalid.
     fn disconnect(&mut self, node: Self::Node, port: impl Into<Port>);
+
+    /// Disconnects the edges between two ports.
+    ///
+    /// If the ports are connected by multiple edges, all of them are disconnected.
+    ///
+    /// # Panics
+    ///
+    /// If either node is not in the graph, or if the ports are invalid.
+    fn disconnect_edge(
+        &mut self,
+        src: Self::Node,
+        src_port: impl Into<OutgoingPort>,
+        dst: Self::Node,
+        dst_port: impl Into<IncomingPort>,
+    );
 
     /// Adds a non-dataflow edge between two nodes. The kind is given by the
     /// operation's [`OpTrait::other_input`] or [`OpTrait::other_output`].
@@ -529,6 +545,41 @@ impl HugrMut for Hugr {
             .port_index(node.into_portgraph(), offset)
             .expect("The port should exist at this point.");
         self.graph.unlink_port(port);
+    }
+
+    fn disconnect_edge(
+        &mut self,
+        src: Self::Node,
+        src_port: impl Into<OutgoingPort>,
+        dst: Self::Node,
+        dst_port: impl Into<IncomingPort>,
+    ) {
+        let src_port = src_port.into();
+        let dst_port = dst_port.into();
+        panic_invalid_port(self, src, src_port);
+        panic_invalid_port(self, dst, dst_port);
+        let src_offset = Port::from(src_port).pg_offset();
+        let dst_offset = Port::from(dst_port).pg_offset();
+
+        let src_pg_port = self
+            .graph
+            .port_index(src.into_portgraph(), src_offset)
+            .expect("The port should exist at this point.");
+        let dst_pg_port = self
+            .graph
+            .port_index(dst.into_portgraph(), dst_offset)
+            .expect("The port should exist at this point.");
+
+        // Filter the edges connected to `src_port` so we only disconnect the
+        // ones connected to `dst_port`.
+        let links = self
+            .graph
+            .port_links(src_pg_port)
+            .filter(|(_, dst_subport)| dst_subport.port() == dst_pg_port)
+            .collect_vec();
+        for (src_subport, _dst_subport) in links {
+            self.graph.unlink_subport(src_subport);
+        }
     }
 
     fn add_other_edge(&mut self, src: Node, dst: Node) -> (OutgoingPort, IncomingPort) {
@@ -972,5 +1023,32 @@ pub(super) mod test {
         );
         // Here the error is detected in building `nodes` from `roots` so before any mutation
         assert_eq!(h, backup);
+    }
+
+    #[rstest]
+    fn test_disconnect() {
+        let mut hugr = Hugr::new();
+
+        let [node1, node2, node3] = (0..3)
+            .map(|_| {
+                let node = hugr.add_node(Input::new(vec![]).into());
+                hugr.set_num_ports(node, 2, 2);
+                node
+            })
+            .collect_array()
+            .unwrap();
+
+        hugr.connect(node1, 0, node2, 0);
+        hugr.connect(node1, 0, node3, 0);
+        hugr.connect(node1, 1, node2, 0);
+        assert_eq!(hugr.num_edges(), 3);
+
+        hugr.disconnect(node1, OutgoingPort::from(0));
+        assert_eq!(hugr.num_edges(), 1);
+
+        hugr.connect(node1, 0, node2, 0);
+        hugr.connect(node1, 0, node3, 0);
+        hugr.disconnect_edge(node1, 0, node2, 0);
+        assert_eq!(hugr.num_edges(), 2);
     }
 }
