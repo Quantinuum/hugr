@@ -178,10 +178,14 @@ pub enum BuildError {
         node: Node,
     },
 
-    /// From [Dataflow::add_link_hugr_by_node_with_wires]
-    // TODO consider renaming to (Hugr?)NodeLinkingError?
+    /// Deprecated: [Self::HugrNodeLinkingError] is emitted instead
+    #[deprecated(note = "No longer emitted; HugrNodeLinkingError used instead")]
     #[error{"In inserting Hugr: {0}"}]
-    HugrInsertionError(#[from] NodeLinkingError<Node, Node>),
+    HugrInsertionError(NodeLinkingError<Node, Node>),
+
+    /// From [Dataflow::add_link_hugr_by_node_with_wires]
+    #[error("In inserting Hugr: {0}")]
+    HugrNodeLinkingError(#[from] NodeLinkingError<Node, Node>),
 
     /// From [Dataflow::add_link_hugr_with_wires].
     #[error{"In linking Hugr: {0}"}]
