@@ -840,7 +840,6 @@ mod test {
     };
     use hugr_core::extension::simple_op::MakeOpDef;
     use hugr_core::extension::{TypeDefBound, Version, simple_op::MakeExtensionOp};
-    use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::hugr::{IdentList, ValidationError};
     use hugr_core::ops::constant::{CustomConst, OpaqueValue};
     use hugr_core::ops::{self, ExtensionOp, OpTrait, OpType, Tag, Value};
@@ -1328,18 +1327,9 @@ mod test {
             .instantiate([Type::new_extension(inner.clone()).into()])
             .unwrap();
         let mut dfb = DFGBuilder::new(inout_sig(vec![outer.into(), i64_t()], usize_t())).unwrap();
-        let [outer, idx] = dfb.input_wires_arr();
-        let [inner] = dfb
-            .add_dataflow_op(read_op(&e, inner.clone().into()), [outer, idx])
-            .unwrap()
-            .outputs_arr();
-        let res = dfb
-            .add_dataflow_op(read_op(&e, usize_t()), [inner, idx])
-            .unwrap();
-        let mut h = dfb.finish_hugr_with_outputs(res.outputs()).unwrap();
-        let read_func = h
-            .insert_hugr(
-                h.entrypoint(),
+        let read_func = dfb
+            .module_root_builder()
+            .add_hugr(
                 lowered_read(Type::new_var_use(0, TypeBound::Copyable), |sig| {
                     FunctionBuilder::new(
                         "lowered_read",
@@ -1350,21 +1340,29 @@ mod test {
                 .unwrap(),
             )
             .inserted_entrypoint;
+        let [outer, idx] = dfb.input_wires_arr();
+        let [inner] = dfb
+            .add_dataflow_op(read_op(&e, inner.clone().into()), [outer, idx])
+            .unwrap()
+            .outputs_arr();
+        let res = dfb
+            .add_dataflow_op(read_op(&e, usize_t()), [inner, idx])
+            .unwrap();
+        let mut h = dfb.finish_hugr_with_outputs(res.outputs()).unwrap();
 
         let mut lw = lowerer(&e);
         lw.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, _| {
             Ok(Some(NodeTemplate::Call(read_func, args.to_owned())))
         });
         lw.run(&mut h).unwrap();
+        h.validate().unwrap();
 
         assert_eq!(h.output_neighbours(read_func).count(), 2);
-        let ext_op_names = h
-            .entry_descendants()
-            .filter_map(|n| h.get_optype(n).as_extension_op())
-            .map(hugr_core::ops::ExtensionOp::unqualified_id)
-            .sorted()
-            .collect_vec();
-        assert_eq!(ext_op_names, ["get", "itousize", "panic",]);
+        assert_eq!(
+            h.entry_descendants()
+                .find(|n| h.get_optype(*n).is_extension_op()),
+            None
+        );
     }
 
     #[test]

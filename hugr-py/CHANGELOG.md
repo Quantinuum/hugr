@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-py-v0.14.3...hugr-py-v0.14.4) (2025-11-26)
+
+
+### Bug Fixes
+
+* set hugr field of `PassResult` correctly ([#2715](https://github.com/CQCL/hugr/issues/2715)) ([4abedab](https://github.com/CQCL/hugr/commit/4abedabfd9015e79cfbe84ca2d369ec2175f9492))
+
+## [0.14.3](https://github.com/CQCL/hugr/compare/hugr-py-v0.14.2...hugr-py-v0.14.3) (2025-11-24)
+
+
+### Features
+
+* Make `ComposablePass.__call__` return a Hugr ([#2697](https://github.com/CQCL/hugr/issues/2697)) ([dbf8c8e](https://github.com/CQCL/hugr/commit/dbf8c8e6fe72febd709921c10283fddc1f257983))
+* Result type for ComposablePasses ([#2703](https://github.com/CQCL/hugr/issues/2703)) ([b8df28e](https://github.com/CQCL/hugr/commit/b8df28e5b89eb3130d12e5cf429d642be3514e63))
+
 ## [0.14.2](https://github.com/CQCL/hugr/compare/hugr-py-v0.14.1...hugr-py-v0.14.2) (2025-11-13)
 
 

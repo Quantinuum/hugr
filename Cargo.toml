@@ -18,8 +18,8 @@ default-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
 [workspace.package]
 rust-version = "1.85"
 edition = "2024"
-homepage = "https://github.com/CQCL/hugr"
-repository = "https://github.com/CQCL/hugr"
+homepage = "https://github.com/quantinuum/hugr"
+repository = "https://github.com/quantinuum/hugr"
 license = "Apache-2.0"
 # authors
 
@@ -41,20 +41,20 @@ too_long_first_doc_paragraph = "warn"
 
 [workspace.dependencies]
 anyhow = "1.0.100"
-insta = { version = "1.43.2" }
+insta = { version = "1.44.3" }
 bitvec = "1.0.1"
 capnp = "0.23.0"
 cgmath = "0.18.0"
 cool_asserts = "2.0.3"
 delegate = "0.13.5"
-derive_more = "2.0.1"
+derive_more = "2.1.0"
 downcast-rs = "2.0.2"
 enum_dispatch = "0.3.11"
 html-escape = "0.2.13"
 itertools = "0.14.0"
 jsonschema = "0.35.0"
 num-rational = "0.4.1"
-pastey = "0.1.1"
+pastey = "0.2.0"
 proptest = "1.9.0"
 proptest-derive = "0.7.0"
 regex = "1.12.2"
