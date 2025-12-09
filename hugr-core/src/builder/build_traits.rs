@@ -235,9 +235,9 @@ pub trait Dataflow: Container {
     /// Insert a hugr-defined op to the sibling graph, wiring up the `input_wires` to its
     /// incoming ports, and linking in module-children if specified.
     ///
-    /// Inserts the entrypoint-subtree of the HUGR into the current region as a new op,
-    /// to which `input_wires` are connected; other module children are added according
-    /// to the policy.
+    /// Inserts the entrypoint-subtree of the HUGR into the current region, wiring up
+    /// the `input_wires` to the incoming ports of the node that was the entrypoint.
+    /// Other module children are added according to `policy`.
     ///
     /// # Errors
     ///
@@ -319,9 +319,9 @@ pub trait Dataflow: Container {
     /// Insert a hugr-defined op to the sibling graph, wiring up the `input_wires` to its
     /// incoming ports, and linking in module-children if specified.
     ///
-    /// Inserts the entrypoint-subtree of the HUGR into the current region as a new op,
-    /// to which `input_wires` are connected; other module children are added according
-    /// to the policy.
+    /// Inserts the entrypoint-subtree of the HUGR into the current region, wiring up
+    /// the `input_wires` to the incoming ports of the node that was the entrypoint.
+    /// Other module children are added according to `policy`.
     ///
     /// # Errors
     ///
