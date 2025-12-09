@@ -351,6 +351,9 @@ class Extension(Value):
         type = cast(model.Term, self.typ.to_model())
         json = sops.CustomConst(c=self.name, v=self.val).model_dump_json()
         return model.Apply("compat.const_json", [type, model.Literal(json)])
+    
+    def __str__(self) -> str:
+        return f"{self.name}({self.val})"
 
 
 class ExtensionValue(Value, Protocol):
