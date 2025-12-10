@@ -700,27 +700,14 @@ flowchart
 #### Panic
 
 - Any operation may panic, e.g. integer divide when denominator is
-  zero
+  zero.
 - Panicking aborts the current graph, and recursively the container
   node also panics, etc.
 - Nodes that are independent of the panicking node may have executed
   or not, at the discretion of the runtime/compiler.
 - If there are multiple nodes that may panic where neither has
-  dependences on the other (including Order edges), it is at the
-  discretion of the compiler as to which one panics first
-
-#### `ErrorType`
-
-- A type which operations can use to indicate an error occurred.
-
-#### Catch
-
-- At some point we expect to add a first-order `catch` node, somewhat
-  like a DFG-node. This contains a DSG, and (like a DFG node) has
-  inputs matching the child DSG; but one output, of type
-  `Sum(#O,#(ErrorType))` where O is the outputs of the child DSG.
-- It is also possible to define a higher-order `catch` operation in an
-  extension, taking a graph argument.
+  dependencies on the other (including Order edges), it is at the
+  discretion of the compiler as to which one panics first.
 
 ### Extensible metadata
 
@@ -1601,7 +1588,7 @@ so must be supported by all third-party tooling.
 
 `qubit`: a linear (non-copyable) qubit type.
 
-`error`: error type. See [`ErrorType`](#errortype).
+`error`: an error type, which operations use to indicate that an error occurred.
 
 ### Operations
 
