@@ -170,7 +170,8 @@ The sequences of incoming and outgoing port types (carried on `Value` edges) of 
 Note that the locality is not fixed or even specified by the signature.
 
 A source port with a `CopyableType` may have any number of edges associated with
-it (including zero, which means "discard"). Any other port
+it (including zero, which means "discard"). A target port for a `ControlFlow`
+edge may also have any number of `ControlFlow` edges associated with it. Any other port
 must have exactly one edge associated with it. This captures the property of
 linear types that the value is used exactly once.
 
