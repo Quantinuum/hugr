@@ -58,10 +58,19 @@ To compile and test the code, run:
 
 ```bash
 just test
-# or, to test only the rust code or the python code
-just test rust
-just test python
 ```
+or, to test only the rust code or the python code:
+```bash
+just test-rust
+just test-python
+```
+or, to try a specific test:
+```bash
+just test-rust -k test_name
+just test-python -k test_name
+```
+
+
 
 Run the rust benchmarks with:
 
