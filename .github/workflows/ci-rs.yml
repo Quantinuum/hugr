@@ -221,7 +221,7 @@ jobs:
         id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.85"
+          toolchain: "1.89"
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -240,7 +240,7 @@ jobs:
           cargo binstall cargo-minimal-versions --force
       - name: Pin transitive dependencies not compatible with our MSRV
         # Add new dependencies as needed if the check fails due to
-        # "package `XXX` cannot be built because it requires rustc YYY or newer, while the currently active rustc version is 1.85.0"
+        # "package `XXX` cannot be built because it requires rustc YYY or newer, while the currently active rustc version is 1.89.0"
         run: |
           # rm Cargo.lock
           # cargo add -p hugr half@2.4.1

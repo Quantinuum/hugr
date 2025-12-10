@@ -29,7 +29,7 @@ shell by setting up [direnv](https://devenv.sh/automatic-shell-activation/).
 To setup the environment manually you will need:
 
 - Just: <https://just.systems/>
-- Rust `>=1.85`: <https://www.rust-lang.org/tools/install>
+- Rust `>=1.89`: <https://www.rust-lang.org/tools/install>
 - cargo-nextest: <https://nexte.st/docs/installation/pre-built-binaries/>
 - uv `>=0.7`: <https://docs.astral.sh/uv/getting-started/installation>
 - Optional: capnproto `>=1.0`: <https://capnproto.org/install.html>
