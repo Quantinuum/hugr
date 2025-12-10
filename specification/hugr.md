@@ -1588,15 +1588,15 @@ so must be supported by all third-party tooling.
 
 `qubit`: a linear (non-copyable) qubit type.
 
-`error`: an error type, which operations use to indicate that an error occurred.
+`error`: an error type which operations use to indicate that an error occurred.
 
 ### Operations
 
-| Name              | Inputs           | Outputs       | Meaning                                                           |
-|-------------------|------------------|---------------|------------------------------------------------------------------ |
-| `print`           | `string`         | -             | Append the string to the program's output stream[^1] (atomically) |
-| `new_array<N, T>` | `T` x N          | `array<N, T>` | Create an array from all the inputs                               |
-| `panic`           | `ErrorType`, ... | ...           | Immediately end execution and pass contents of error to context. Inputs following the `ErrorType`, and all outputs, are arbitrary; these only exist so that structural constraints such as linearity can be satisfied. |
+| Name              | Inputs       | Outputs       | Meaning                                                           |
+|-------------------|--------------|---------------|------------------------------------------------------------------ |
+| `print`           | `string`     | -             | Append the string to the program's output stream[^1] (atomically) |
+| `new_array<N, T>` | `T` x N      | `array<N, T>` | Create an array from all the inputs                               |
+| `panic`           | `error`, ... | ...           | Immediately end execution and pass contents of error to context. Inputs following the `error`, and all outputs, are arbitrary; these only exist so that structural constraints such as linearity can be satisfied. |
 
 [^1] The existence of an output stream, and the processing of it either during
 or after program execution, is runtime-dependent. If no output stream exists
@@ -1663,14 +1663,14 @@ This extension defines operations on the integer types.
 
 Casts:
 
-| Name                   | Inputs   | Outputs                  | Meaning                                                                                      |
-| ---------------------- | -------- | ------------------------ | -------------------------------------------------------------------------------------------- |
-| `iwiden_u<M,N>`( \* )  | `int<M>` | `int<N>`                 | widen an unsigned integer to a wider one with the same value (where M \<= N)                 |
-| `iwiden_s<M,N>`( \* )  | `int<M>` | `int<N>`                 | widen a signed integer to a wider one with the same value (where M \<= N)                    |
-| `inarrow_u<M,N>`( \* ) | `int<M>` | `Sum(#(int<N>), #(ErrorType))` | narrow an unsigned integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N) |
-| `inarrow_s<M,N>`( \* ) | `int<M>` | `Sum(#(int<N>), #(ErrorType))` | narrow a signed integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N)    |
-| `itobool` ( \* )       | `int<1>` | `bool`                   | convert to `bool` (1 is true, 0 is false)                                                    |
-| `ifrombool` ( \* )     | `bool`   | `int<1>`                 | convert from `bool` (1 is true, 0 is false)                                                  |
+| Name                   | Inputs   | Outputs                    | Meaning                                                                                      |
+| ---------------------- | -------- |----------------------------| -------------------------------------------------------------------------------------------- |
+| `iwiden_u<M,N>`( \* )  | `int<M>` | `int<N>`                   | widen an unsigned integer to a wider one with the same value (where M \<= N)                 |
+| `iwiden_s<M,N>`( \* )  | `int<M>` | `int<N>`                   | widen a signed integer to a wider one with the same value (where M \<= N)                    |
+| `inarrow_u<M,N>`( \* ) | `int<M>` | `Sum(#(int<N>), #(error))` | narrow an unsigned integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N) |
+| `inarrow_s<M,N>`( \* ) | `int<M>` | `Sum(#(int<N>), #(error))` | narrow a signed integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N)    |
+| `itobool` ( \* )       | `int<1>` | `bool`                     | convert to `bool` (1 is true, 0 is false)                                                    |
+| `ifrombool` ( \* )     | `bool`   | `int<1>`                   | convert from `bool` (1 is true, 0 is false)                                                  |
 
 Comparisons:
 
@@ -1689,39 +1689,39 @@ Comparisons:
 
 Other operations:
 
-| Name                         | Inputs             | Outputs                                | Meaning                                                                                                                                                      |
-|------------------------------|--------------------|----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `imax_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | maximum of unsigned integers                                                                                                                                 |
-| `imax_s<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | maximum of signed integers                                                                                                                                   |
-| `imin_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | minimum of unsigned integers                                                                                                                                 |
-| `imin_s<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | minimum of signed integers                                                                                                                                   |
-| `iadd<N>`                    | `int<N>`, `int<N>` | `int<N>`                               | addition modulo 2^N (signed and unsigned versions are the same op)                                                                                           |
-| `isub<N>`                    | `int<N>`, `int<N>` | `int<N>`                               | subtraction modulo 2^N (signed and unsigned versions are the same op)                                                                                        |
-| `ineg<N>`                    | `int<N>`           | `int<N>`                               | negation modulo 2^N (signed and unsigned versions are the same op)                                                                                           |
-| `imul<N>`                    | `int<N>`, `int<N>` | `int<N>`                               | multiplication modulo 2^N (signed and unsigned versions are the same op)                                                                                     |
-| `idivmod_checked_u<N>`( \* ) | `int<N>`, `int<N>` | `Sum(#(int<N>, int<N>), #(ErrorType))` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^N, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 is an error)                                   |
-| `idivmod_u<N>`               | `int<N>`, `int<N>` | `(int<N>, int<N>)`                     | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^N, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 will call panic)                               |
-| `idivmod_checked_s<N>`( \* ) | `int<N>`, `int<N>` | `Sum(#(int<N>, int<N>), #(ErrorType))` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^N, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 is an error)     |
-| `idivmod_s<N>`( \* )         | `int<N>`, `int<N>` | `(int<N>, int<N>)`                     | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^N, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 will call panic) |
-| `idiv_checked_u<N>` ( \* )   | `int<N>`, `int<N>` | `Sum(#(int<N>),#( ErrorType))`         | as `idivmod_checked_u` but discarding the second output                                                                                                      |
-| `idiv_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | as `idivmod_u` but discarding the second output                                                                                                              |
-| `imod_checked_u<N>` ( \* )   | `int<N>`, `int<N>` | `Sum(#(int<N>), #(ErrorType))`         | as `idivmod_checked_u` but discarding the first output                                                                                                       |
-| `imod_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | as `idivmod_u` but discarding the first output                                                                                                               |
-| `idiv_checked_s<N>`( \* )    | `int<N>`, `int<N>` | `Sum(#(int<N>), #(ErrorType))`         | as `idivmod_checked_s` but discarding the second output                                                                                                      |
-| `idiv_s<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | as `idivmod_s` but discarding the second output                                                                                                              |
-| `imod_checked_s<N>`( \* )    | `int<N>`, `int<N>` | `Sum(#(int<N>), #(ErrorType))`         | as `idivmod_checked_s` but discarding the first output                                                                                                       |
-| `imod_s<N>`                  | `int<N>`, `int<M>` | `int<M>`                               | as `idivmod_s` but discarding the first output                                                                                                               |
-| `iabs<N>`                    | `int<N>`           | `int<N>`                               | convert signed to unsigned by taking absolute value                                                                                                          |
-| `iand<N>`                    | `int<N>`, `int<N>` | `int<N>`                               | bitwise AND                                                                                                                                                  |
-| `ior<N>`                     | `int<N>`, `int<N>` | `int<N>`                               | bitwise OR                                                                                                                                                   |
-| `ixor<N>`                    | `int<N>`, `int<N>` | `int<N>`                               | bitwise XOR                                                                                                                                                  |
-| `inot<N>`                    | `int<N>`           | `int<N>`                               | bitwise NOT                                                                                                                                                  |
-| `ishl<N>`( \* )              | `int<N>`, `int<N>` | `int<N>`                               | shift first input left by k bits where k is unsigned interpretation of second input (leftmost bits dropped, rightmost bits set to zero)                      |
-| `ishr<N>`( \* )              | `int<N>`, `int<N>` | `int<N>`                               | shift first input right by k bits where k is unsigned interpretation of second input (rightmost bits dropped, leftmost bits set to zero)                     |
-| `irotl<N>`( \* )             | `int<N>`, `int<N>` | `int<N>`                               | rotate first input left by k bits where k is unsigned interpretation of second input (leftmost bits replace rightmost bits)                                  |
-| `irotr<N>`( \* )             | `int<N>`, `int<N>` | `int<N>`                               | rotate first input right by k bits where k is unsigned interpretation of second input (rightmost bits replace leftmost bits)                                 |
-| `itostring_u<N>`             | `int<N>`           | `string`                               | decimal string representation of unsigned integer                                                                                                            |
-| `itostring_s<N>`             | `int<N>`           | `string`                               | decimal string representation of signed integer                                                                                                              |
+| Name                         | Inputs             | Outputs                            | Meaning                                                                                                                                                      |
+|------------------------------|--------------------|------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `imax_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | maximum of unsigned integers                                                                                                                                 |
+| `imax_s<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | maximum of signed integers                                                                                                                                   |
+| `imin_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | minimum of unsigned integers                                                                                                                                 |
+| `imin_s<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | minimum of signed integers                                                                                                                                   |
+| `iadd<N>`                    | `int<N>`, `int<N>` | `int<N>`                           | addition modulo 2^N (signed and unsigned versions are the same op)                                                                                           |
+| `isub<N>`                    | `int<N>`, `int<N>` | `int<N>`                           | subtraction modulo 2^N (signed and unsigned versions are the same op)                                                                                        |
+| `ineg<N>`                    | `int<N>`           | `int<N>`                           | negation modulo 2^N (signed and unsigned versions are the same op)                                                                                           |
+| `imul<N>`                    | `int<N>`, `int<N>` | `int<N>`                           | multiplication modulo 2^N (signed and unsigned versions are the same op)                                                                                     |
+| `idivmod_checked_u<N>`( \* ) | `int<N>`, `int<N>` | `Sum(#(int<N>, int<N>), #(error))` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^N, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 is an error)                                   |
+| `idivmod_u<N>`               | `int<N>`, `int<N>` | `(int<N>, int<N>)`                 | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^N, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 will call panic)                               |
+| `idivmod_checked_s<N>`( \* ) | `int<N>`, `int<N>` | `Sum(#(int<N>, int<N>), #(error))` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^N, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 is an error)     |
+| `idivmod_s<N>`( \* )         | `int<N>`, `int<N>` | `(int<N>, int<N>)`                 | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^N, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 will call panic) |
+| `idiv_checked_u<N>` ( \* )   | `int<N>`, `int<N>` | `Sum(#(int<N>), #(error))`         | as `idivmod_checked_u` but discarding the second output                                                                                                      |
+| `idiv_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | as `idivmod_u` but discarding the second output                                                                                                              |
+| `imod_checked_u<N>` ( \* )   | `int<N>`, `int<N>` | `Sum(#(int<N>), #(error))`         | as `idivmod_checked_u` but discarding the first output                                                                                                       |
+| `imod_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | as `idivmod_u` but discarding the first output                                                                                                               |
+| `idiv_checked_s<N>`( \* )    | `int<N>`, `int<N>` | `Sum(#(int<N>), #(error))`         | as `idivmod_checked_s` but discarding the second output                                                                                                      |
+| `idiv_s<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | as `idivmod_s` but discarding the second output                                                                                                              |
+| `imod_checked_s<N>`( \* )    | `int<N>`, `int<N>` | `Sum(#(int<N>), #(error))`         | as `idivmod_checked_s` but discarding the first output                                                                                                       |
+| `imod_s<N>`                  | `int<N>`, `int<M>` | `int<M>`                           | as `idivmod_s` but discarding the first output                                                                                                               |
+| `iabs<N>`                    | `int<N>`           | `int<N>`                           | convert signed to unsigned by taking absolute value                                                                                                          |
+| `iand<N>`                    | `int<N>`, `int<N>` | `int<N>`                           | bitwise AND                                                                                                                                                  |
+| `ior<N>`                     | `int<N>`, `int<N>` | `int<N>`                           | bitwise OR                                                                                                                                                   |
+| `ixor<N>`                    | `int<N>`, `int<N>` | `int<N>`                           | bitwise XOR                                                                                                                                                  |
+| `inot<N>`                    | `int<N>`           | `int<N>`                           | bitwise NOT                                                                                                                                                  |
+| `ishl<N>`( \* )              | `int<N>`, `int<N>` | `int<N>`                           | shift first input left by k bits where k is unsigned interpretation of second input (leftmost bits dropped, rightmost bits set to zero)                      |
+| `ishr<N>`( \* )              | `int<N>`, `int<N>` | `int<N>`                           | shift first input right by k bits where k is unsigned interpretation of second input (rightmost bits dropped, leftmost bits set to zero)                     |
+| `irotl<N>`( \* )             | `int<N>`, `int<N>` | `int<N>`                           | rotate first input left by k bits where k is unsigned interpretation of second input (leftmost bits replace rightmost bits)                                  |
+| `irotr<N>`( \* )             | `int<N>`, `int<N>` | `int<N>`                           | rotate first input right by k bits where k is unsigned interpretation of second input (rightmost bits replace leftmost bits)                                 |
+| `itostring_u<N>`             | `int<N>`           | `string`                           | decimal string representation of unsigned integer                                                                                                            |
+| `itostring_s<N>`             | `int<N>`           | `string`                           | decimal string representation of signed integer                                                                                                              |
 
 
 #### `arithmetic.float.types`
@@ -1766,14 +1766,14 @@ implementation-dependent.
 
 Conversions between integers and floats:
 
-| Name           | Inputs    | Outputs                  | Meaning               |
-| -------------- | --------- | ------------------------ | --------------------- |
-| `trunc_u<N>`   | `float64` | `Sum(#(int<N>), #(ErrorType))` | float to unsigned int, rounding towards zero. Returns an error when the float is non-finite. |
-| `trunc_s<N>`   | `float64` | `Sum(#(int<N>), #(ErrorType))` | float to signed int, rounding towards zero. Returns an error when the float is non-finite. |
-| `convert_u<N>` | `int<N>`  | `float64`                | unsigned int to float |
-| `convert_s<N>` | `int<N>`  | `float64`                | signed int to float   |
-| `bytecast_int64_to_float64` | `int<6>`  | `float64`   | reinterpret an int64 as a float64 based on its bytes, with the same endianness. |
-| `bytecast_float64_to_int64` | `float64` | `int64`     | reinterpret an float64 as an int based on its bytes, with the same endianness. |
+| Name           | Inputs    | Outputs                    | Meaning               |
+| -------------- | --------- |----------------------------| --------------------- |
+| `trunc_u<N>`   | `float64` | `Sum(#(int<N>), #(error))` | float to unsigned int, rounding towards zero. Returns an error when the float is non-finite. |
+| `trunc_s<N>`   | `float64` | `Sum(#(int<N>), #(error))` | float to signed int, rounding towards zero. Returns an error when the float is non-finite. |
+| `convert_u<N>` | `int<N>`  | `float64`                  | unsigned int to float |
+| `convert_s<N>` | `int<N>`  | `float64`                  | signed int to float   |
+| `bytecast_int64_to_float64` | `int<6>`  | `float64`     | reinterpret an int64 as a float64 based on its bytes, with the same endianness. |
+| `bytecast_float64_to_int64` | `float64` | `int64`       | reinterpret an float64 as an int based on its bytes, with the same endianness. |
 
 ## Glossary
 
