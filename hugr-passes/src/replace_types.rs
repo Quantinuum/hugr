@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use handlers::list_const;
-use hugr_core::hugr::linking::NameLinkingPolicy;
+use hugr_core::hugr::linking::{HugrLinking, NameLinkingPolicy};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::list::list_type_def;
 use hugr_core::std_extensions::collections::value_array::value_array_type_def;
@@ -14,7 +14,7 @@ use thiserror::Error;
 
 use hugr_core::builder::{BuildError, BuildHandle, Dataflow};
 use hugr_core::extension::{ExtensionId, OpDef, SignatureError, TypeDef};
-use hugr_core::hugr::{hugrmut::HugrMut, linking::HugrLinking};
+use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::ops::constant::{OpaqueValue, Sum};
 use hugr_core::ops::handle::{DataflowOpID, FuncID};
 use hugr_core::ops::{
