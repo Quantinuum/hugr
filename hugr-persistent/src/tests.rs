@@ -577,11 +577,11 @@ mod serial {
     fn remove_encoder_version(str: &mut String) {
         // Remove encoder version information for consistent test output
         let encoder_pattern = r#""encoder":"hugr-rs v"#;
-        if let Some(start) = str.find(encoder_pattern) {
-            if let Some(end) = str[start..].find(r#"","#) {
-                let end = start + end + 2; // +2 for the `",` part
-                str.replace_range(start..end, "");
-            }
+        if let Some(start) = str.find(encoder_pattern)
+            && let Some(end) = str[start..].find(r#"","#)
+        {
+            let end = start + end + 2; // +2 for the `",` part
+            str.replace_range(start..end, "");
         }
     }
 

@@ -188,10 +188,10 @@ impl OpType {
 
         // Constant port
         let static_kind = self.static_port_kind(dir);
-        if port.index() == port_count {
-            if let Some(kind) = static_kind {
-                return Some(kind);
-            }
+        if port.index() == port_count
+            && let Some(kind) = static_kind
+        {
+            return Some(kind);
         }
 
         // Non-dataflow ports
