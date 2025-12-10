@@ -187,31 +187,9 @@ macro_rules! impl_serde_as_string_envelope {
                         $crate::Hugr::load_str(value, Some(extensions))
                             .map_err(serde::de::Error::custom)
                     }
-
-                    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-                    where
-                        A: serde::de::MapAccess<'vis>,
-                    {
-                        // Backwards compatibility: If the encoded value is not a
-                        // string, we may have a legacy HUGR serde structure instead. In that
-                        // case, we can add an envelope header and try again.
-                        //
-                        // TODO: Remove this fallback in 0.21.0
-                        let deserializer = serde::de::value::MapAccessDeserializer::new(map);
-                        #[expect(deprecated)]
-                        let mut hugr =
-                            $crate::hugr::serialize::serde_deserialize_hugr(deserializer)
-                                .map_err(serde::de::Error::custom)?;
-
-                        let extensions: &$crate::extension::ExtensionRegistry = $extension_reg;
-                        hugr.resolve_extension_defs(extensions)
-                            .map_err(serde::de::Error::custom)?;
-                        Ok(hugr)
-                    }
                 }
 
-                // TODO: Go back to `deserialize_str` once the fallback is removed.
-                deserializer.deserialize_any(Helper)
+                deserializer.deserialize_str(Helper)
             }
         }
 
@@ -383,31 +361,9 @@ macro_rules! impl_serde_as_binary_envelope {
                                 .map_err(|e| serde::de::Error::custom(format!("{e:?}")))
                         }
                     }
-
-                    fn visit_map<A>(self, map: A) -> Result<Self::Value, A::Error>
-                    where
-                        A: serde::de::MapAccess<'vis>,
-                    {
-                        // Backwards compatibility: If the encoded value is not a
-                        // string, we may have a legacy HUGR serde structure instead. In that
-                        // case, we can add an envelope header and try again.
-                        //
-                        // TODO: Remove this fallback in a breaking change
-                        let deserializer = serde::de::value::MapAccessDeserializer::new(map);
-                        #[expect(deprecated)]
-                        let mut hugr =
-                            $crate::hugr::serialize::serde_deserialize_hugr(deserializer)
-                                .map_err(serde::de::Error::custom)?;
-
-                        let extensions: &$crate::extension::ExtensionRegistry = $extension_reg;
-                        hugr.resolve_extension_defs(extensions)
-                            .map_err(serde::de::Error::custom)?;
-                        Ok(hugr)
-                    }
                 }
 
-                // TODO: Go back to `deserialize_str` once the fallback is removed.
-                deserializer.deserialize_any(Helper)
+                deserializer.deserialize_str(Helper)
             }
         }
 
