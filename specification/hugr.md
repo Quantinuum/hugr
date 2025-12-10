@@ -157,7 +157,7 @@ EdgeKind ::= Value(Locality, AnyType)
              | Hierarchy | Order | ControlFlow
 ```
 
-Note that a port is associated with a node and zero or more Dataflow edges.
+Note that a port is associated with a node and zero or more Dataflow or `ControlFlow` edges.
 Incoming ports are associated with exactly one edge, or many `ControlFlow` edges.
 All Dataflow edges associated with a port have the same type; thus a port has a
 well defined type, matching that of its adjoining edges. The incoming and
