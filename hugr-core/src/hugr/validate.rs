@@ -345,16 +345,15 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if let Some(second_child) = first_two_children
                 .next()
                 .map(|child| self.hugr.get_optype(child))
+                && !flags.allowed_second_child.is_superset(second_child.tag())
             {
-                if !flags.allowed_second_child.is_superset(second_child.tag()) {
-                    return Err(ValidationError::InvalidInitialChild {
-                        parent: node,
-                        parent_optype: Box::new(op_type.clone()),
-                        optype: Box::new(second_child.clone()),
-                        expected: flags.allowed_second_child,
-                        position: "second",
-                    });
-                }
+                return Err(ValidationError::InvalidInitialChild {
+                    parent: node,
+                    parent_optype: Box::new(op_type.clone()),
+                    optype: Box::new(second_child.clone()),
+                    expected: flags.allowed_second_child,
+                    position: "second",
+                });
             }
             // Additional validations running over the full list of children optypes
             let children_optypes = all_children.map(|c| (c, self.hugr.get_optype(c)));

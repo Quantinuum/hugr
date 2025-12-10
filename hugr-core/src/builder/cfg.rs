@@ -375,10 +375,10 @@ impl BlockBuilder<Hugr> {
 
         // We only support blocks where all the possible `sum_rows` branches have the same types,
         // as that lets us branch it directly to an exit node.
-        if let Some(row) = sum_rows.first() {
-            if sum_rows.iter().skip(1).any(|r2| row != r2) {
-                return Err(BuildError::BasicBlockTooComplex);
-            }
+        if let Some(row) = sum_rows.first()
+            && sum_rows.iter().skip(1).any(|r2| row != r2)
+        {
+            return Err(BuildError::BasicBlockTooComplex);
         }
         let cfg_outputs = sum_rows.first().cloned().unwrap_or_default();
         let cfg_outputs = cfg_outputs.extend(other_outputs.as_slice());

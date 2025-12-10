@@ -30,10 +30,10 @@ pub fn inline_acyclic<H: HugrMut>(
     let all_funcs_in_cycles = tarjan_scc(g)
         .into_iter()
         .flat_map(|mut ns| {
-            if let Ok(n) = ns.iter().exactly_one() {
-                if g.edges_connecting(*n, *n).next().is_none() {
-                    ns.clear(); // Single-node SCC has no self edge, so discard
-                }
+            if let Ok(n) = ns.iter().exactly_one()
+                && g.edges_connecting(*n, *n).next().is_none()
+            {
+                ns.clear(); // Single-node SCC has no self edge, so discard
             }
             ns.into_iter().map(|n| {
                 let StaticNode::FuncDefn(fd) = g.node_weight(n).unwrap() else {
@@ -49,13 +49,13 @@ pub fn inline_acyclic<H: HugrMut>(
         .collect();
     let mut q = VecDeque::from([h.entrypoint()]);
     while let Some(n) = q.pop_front() {
-        if h.get_optype(n).is_call() {
-            if let Some(t) = h.static_source(n) {
-                if target_funcs.contains(&t) && call_predicate(h, n) {
-                    // We've already checked all error conditions
-                    h.apply_patch(InlineCall::new(n)).unwrap();
-                }
-            }
+        if h.get_optype(n).is_call()
+            && let Some(t) = h.static_source(n)
+            && target_funcs.contains(&t)
+            && call_predicate(h, n)
+        {
+            // We've already checked all error conditions
+            h.apply_patch(InlineCall::new(n)).unwrap();
         }
         // Traverse children - including any resulting from turning Call into DFG
         q.extend(h.children(n));

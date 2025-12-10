@@ -626,10 +626,10 @@ impl TermVar {
     /// the [`TypeBound`] of the individual types it might stand for.
     #[must_use]
     pub fn bound_if_row_var(&self) -> Option<TypeBound> {
-        if let Term::ListType(item_type) = &*self.cached_decl {
-            if let Term::RuntimeType(b) = **item_type {
-                return Some(b);
-            }
+        if let Term::ListType(item_type) = &*self.cached_decl
+            && let Term::RuntimeType(b) = **item_type
+        {
+            return Some(b);
         }
         None
     }
@@ -647,12 +647,11 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::List(elems), Term::ListType(item_type)) => {
             elems.iter().try_for_each(|term| {
                 // Also allow elements that are RowVars if fitting into a List of Types
-                if let (Term::Variable(v), Term::RuntimeType(param_bound)) = (term, &**item_type) {
-                    if v.bound_if_row_var()
+                if let (Term::Variable(v), Term::RuntimeType(param_bound)) = (term, &**item_type)
+                    && v.bound_if_row_var()
                         .is_some_and(|arg_bound| param_bound.contains(arg_bound))
-                    {
-                        return Ok(());
-                    }
+                {
+                    return Ok(());
                 }
                 check_term_type(term, item_type)
             })

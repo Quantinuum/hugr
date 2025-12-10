@@ -518,12 +518,12 @@ impl<T: Copy + Clone + PartialEq + Eq + Hash> EdgeClassifier<T> {
             bs.concat(brs);
         }
         // Add capping backedge
-        if let Some(min1dfs) = min_dfs_target[1] {
-            if min1dfs < n_dfs {
-                bs.push(Bracket::Capping(min1dfs, n));
-                // mark capping edge to be removed when we return out to the other end
-                self.capping_edges.entry(min1dfs).or_default().push(n);
-            }
+        if let Some(min1dfs) = min_dfs_target[1]
+            && min1dfs < n_dfs
+        {
+            bs.push(Bracket::Capping(min1dfs, n));
+            // mark capping edge to be removed when we return out to the other end
+            self.capping_edges.entry(min1dfs).or_default().push(n);
         }
 
         let parent_edge = tree.dfs_parents.get(&n);
