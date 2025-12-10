@@ -80,7 +80,7 @@ impl NamedSchema {
         strs.extend(errors.flat_map(|error| {
             [
                 format!("Validation error: {error}"),
-                format!("Instance path: {}", error.instance_path),
+                format!("Instance path: {}", error.instance_path()),
             ]
         }));
         strs.push("Serialization test failed.".to_string());
