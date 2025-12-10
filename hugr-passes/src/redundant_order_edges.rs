@@ -107,7 +107,7 @@ impl RedundantOrderEdgesPass {
 
             // Collect the order edges originating from this node that do not lead to a node with children.
             //
-            // The later may be necessary for keeping external edges valid.
+            // The latter may be necessary for keeping external edges valid.
             let new_edges = match op.other_output_port() {
                 Some(out_order_port) => hugr
                     .linked_inputs(node, out_order_port)
@@ -189,7 +189,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RedundantOrderEdgesPass {
 
 #[cfg(test)]
 mod tests {
-    use hugr_core::builder::{Dataflow, DataflowHugr, FunctionBuilder};
+    use hugr_core::builder::{Dataflow, DataflowHugr, FunctionBuilder, SubContainer};
     use hugr_core::extension::prelude::{Noop, bool_t};
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::types::Signature;
@@ -199,7 +199,7 @@ mod tests {
     /// Construct a simple hugr with a bunch of noops
     ///
     /// ```
-    /// input -> noop1 --> noop2 --> noop3
+    /// input -> noop1 --> noop2 --> noop3 -> nested_op
     ///       |
     ///       v
     ///       noop4 --> noop5 --> output
@@ -210,10 +210,12 @@ mod tests {
     /// - noop1 -> output
     /// - noop4 -> noop3
     /// - noop5 -> noop2
+    /// - noop3 -> nested_op
     ///
     /// After running the pass, only the following order edges should remain:
     /// - noop1 -> output
     /// - noop5 -> noop2
+    /// - noop3 -> nested_op
     #[test]
     fn test_redundant_order_edges() {
         let mut hugr = FunctionBuilder::new("f", Signature::new_endo(vec![bool_t()])).unwrap();
@@ -232,19 +234,23 @@ mod tests {
         let noop5 = hugr
             .add_dataflow_op(op.clone(), [noop4.out_wire(0)])
             .unwrap();
+        let nested_op = hugr
+            .dfg_builder(Signature::new(vec![bool_t()], vec![]), [noop5.out_wire(0)])
+            .unwrap()
+            .finish_sub_container()
+            .unwrap();
 
         // Set the order edges as described in the test description.
-        hugr.set_order(&input, &noop1);
+        hugr.set_order(&input, &noop2);
         hugr.set_order(&noop1, &output);
         hugr.set_order(&noop4, &noop3);
         hugr.set_order(&noop5, &noop2);
+        hugr.set_order(&noop3, &nested_op.node());
 
         let mut hugr = hugr.finish_hugr_with_outputs([noop5.out_wire(0)]).unwrap();
-        println!("{}", hugr.mermaid_string());
 
         // Run the pass
         let result = RedundantOrderEdgesPass::new().run(&mut hugr).unwrap();
-        println!("after removals\n\n{}", hugr.mermaid_string());
         assert_eq!(result.edges_removed, 2);
 
         // Check that we removed the correct order edges.
@@ -260,6 +266,10 @@ mod tests {
         assert_eq!(
             hugr.single_linked_input(noop5.node(), order_out),
             Some((noop2.node(), order_in))
+        );
+        assert_eq!(
+            hugr.single_linked_input(noop3.node(), order_out),
+            Some((nested_op.node(), order_in))
         );
     }
 }
