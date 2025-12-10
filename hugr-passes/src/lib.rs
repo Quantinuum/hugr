@@ -20,6 +20,7 @@ pub use linearize_array::LinearizeArrayPass;
 pub mod lower;
 mod monomorphize;
 pub mod normalize_cfgs;
+pub mod redundant_order_edges;
 pub mod untuple;
 
 /// Merge basic blocks. Subset of [normalize_cfgs], use the latter.
