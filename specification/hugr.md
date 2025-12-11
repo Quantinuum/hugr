@@ -631,7 +631,7 @@ analysis required to move computations out of a CFG-node into
 Conditional- and TailLoop-nodes). Note that such conversion could be
 done for only a subpart of the HUGR at a time.
 
-The following CFG is equivalent to the previous example. In this diagram:
+The following CFG is equivalent to the CFG example above. In this diagram:
 
 - the thick arrow from "angle source" to "F" is an `Ext` edge (from an
   ancestral DFG into the CFG's entry block);
