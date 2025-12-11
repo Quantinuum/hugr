@@ -892,7 +892,7 @@ pub(super) mod test {
 
         impl Metadata for MetaSelf {
             const KEY: &'static str = "meta_self";
-            type Type = MetaSelf;
+            type Type<'hugr> = MetaSelf;
         }
 
         assert_eq!(hugr.get_metadata::<MetaString>(root), None);

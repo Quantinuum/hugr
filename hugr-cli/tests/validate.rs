@@ -8,6 +8,9 @@ use assert_cmd::Command;
 use assert_fs::{NamedTempFile, fixture::FileWriteStr};
 use hugr::builder::{DFGBuilder, DataflowSubContainer, ModuleBuilder};
 use hugr::envelope::EnvelopeConfig;
+use hugr::envelope::description::GeneratorDesc;
+use hugr::extension::Version;
+use hugr::metadata;
 use hugr::package::Package;
 use hugr::types::Type;
 use hugr::{
@@ -22,7 +25,6 @@ use hugr_cli::CliArgs;
 use hugr_cli::validate::VALID_PRINT;
 use predicates::{prelude::*, str::contains};
 use rstest::{fixture, rstest};
-use serde_json::json;
 
 #[fixture]
 fn cmd() -> Command {
@@ -214,10 +216,9 @@ fn invalid_hugr_with_generator() -> Vec<u8> {
     // Create an invalid HUGR (missing outputs in a dataflow)
     let df = DFGBuilder::new(Signature::new_endo(vec![qb_t()])).unwrap();
     let mut bad_hugr = df.hugr().clone(); // Missing outputs makes this invalid
-    bad_hugr.set_metadata(
+    bad_hugr.set_metadata::<metadata::HugrGenerator>(
         bad_hugr.module_root(),
-        hugr::envelope::GENERATOR_KEY,
-        json!({"name": "test-generator", "version": "1.0.1"}),
+        GeneratorDesc::new("test-generator", Version::new(1, 0, 1)),
     );
     // Create envelope with a specific generator
     let envelope_config = EnvelopeConfig::binary();

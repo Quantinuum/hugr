@@ -106,7 +106,7 @@ pub trait HugrView: HugrInternals {
     /// For a non type-safe accessor use [`HugrView::get_metadata_any`] instead.
     #[inline]
     fn get_metadata<M: Metadata>(&self, node: Self::Node) -> Option<<M as Metadata>::Type<'_>> {
-        self.get_metadata_any(node, &<M as Metadata>::KEY)
+        self.get_metadata_any(node, <M as Metadata>::KEY)
             .and_then(|value| <<M as Metadata>::Type<'_> as Deserialize>::deserialize(value).ok())
     }
 

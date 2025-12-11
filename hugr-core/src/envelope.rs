@@ -266,7 +266,6 @@ pub(crate) mod test {
     use crate::hugr::HugrMut;
     use crate::hugr::test::check_hugr_equality;
     use crate::std_extensions::STD_REG;
-    use serde_json::json;
     use std::sync::Arc;
     /// Returns an `ExtensionRegistry` with the extensions from both
     /// sets. Avoids cloning if the first one already contains all
@@ -400,6 +399,8 @@ pub(crate) mod test {
     #[case::simple(simple_package())]
     fn test_check_breaking_extensions(#[case] mut package: Package) {
         // extension with major version 0
+
+        use crate::envelope::description::ExtensionDesc;
         let test_ext_v0 =
             Extension::new(ExtensionId::new_unchecked("test-v0"), Version::new(0, 2, 3));
         //  extension with major version > 0
