@@ -407,7 +407,7 @@ with inputs the same as the CFG-node; the second child is an
 The remaining children are either `DFB`s or [scoped definitions](#scoped-definitions).
 
 The first output of the graph contained in a `DFB` has type
-`Sum(\#t(0),...,#t(n-1))`, where the node has `n` successors, and the
+`Sum(#t(0),...,#t(n-1))`, where the node has `n` successors, and the
 remaining outputs are a row `#x`. `#t(i)` with `#x` appended matches the
 inputs of successor `i`.
 
