@@ -5,12 +5,11 @@
 //! the core and model to converge incrementally.
 use std::sync::Arc;
 
+use crate::envelope::description::GeneratorDesc;
+use crate::metadata::{self, Metadata};
 use crate::{
     Direction, Hugr, HugrView, Node, Port,
-    envelope::{
-        GENERATOR_KEY, USED_EXTENSIONS_KEY,
-        description::{ExtensionDesc, ModuleDesc},
-    },
+    envelope::description::{ExtensionDesc, ModuleDesc},
     extension::{
         ExtensionId, ExtensionRegistry, SignatureError, resolution::ExtensionResolutionError,
     },
@@ -200,7 +199,7 @@ pub fn import_package(
 
 /// Get the name of the generator from the metadata of the module.
 /// If no generator is found, `None` is returned.
-fn get_generator(ctx: &Context<'_>) -> Option<String> {
+fn get_generator(ctx: &Context<'_>) -> Option<GeneratorDesc> {
     ctx.module
         .get_region(ctx.module.root)
         .map(|r| r.meta.iter())
@@ -209,7 +208,7 @@ fn get_generator(ctx: &Context<'_>) -> Option<String> {
         .find_map(|meta| {
             let (name, json_val) = ctx.decode_json_meta(*meta).ok()??;
 
-            (name == GENERATOR_KEY).then_some(crate::envelope::format_generator(&json_val))
+            (name == metadata::HugrGenerator::KEY).then_some(serde_json::from_value(json_val).ok()?)
         })
 }
 
@@ -222,7 +221,7 @@ fn get_used_exts(ctx: &Context<'_>) -> Option<Vec<ExtensionDesc>> {
         .find_map(|meta| {
             let (name, json_val) = ctx.decode_json_meta(*meta).ok()??;
 
-            (name == USED_EXTENSIONS_KEY)
+            (name == metadata::HugrUsedExtensions::KEY)
                 .then(|| serde_json::from_value(json_val).ok())
                 .flatten()
         })
