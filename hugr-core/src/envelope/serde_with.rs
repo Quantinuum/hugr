@@ -519,11 +519,11 @@ mod test {
     #[case::bin_pkg_text_hugr(BinaryPkg::default(), decode::<TextHugr>, true)]
     #[case::bin_hugr_text_pkg(BinaryHugr::default(), decode::<TextPkg>, true)]
     #[case::bin_hugr_text_hugr(BinaryHugr::default(), decode::<TextHugr>, true)]
-    // We can read old hugrs into hugrs, but not packages
+    // We cannot read old hugrs as envelopes
     #[case::legacy_hugr_text_pkg(LegacyHugr::default(), decode::<TextPkg>, true)]
-    #[case::legacy_hugr_text_hugr(LegacyHugr::default(), decode::<TextHugr>, false)]
+    #[case::legacy_hugr_text_hugr(LegacyHugr::default(), decode::<TextHugr>, true)]
     #[case::legacy_hugr_bin_pkg(LegacyHugr::default(), decode::<BinaryPkg>, true)]
-    #[case::legacy_hugr_bin_hugr(LegacyHugr::default(), decode::<BinaryHugr>, false)]
+    #[case::legacy_hugr_bin_hugr(LegacyHugr::default(), decode::<BinaryHugr>, true)]
     // Decoding any new format as legacy hugr always fails
     #[case::text_pkg_legacy_hugr(TextPkg::default(), decode::<LegacyHugr>, true)]
     #[case::text_hugr_legacy_hugr(TextHugr::default(), decode::<LegacyHugr>, true)]
