@@ -12,23 +12,6 @@ use crate::ops::{NamedOp, OpType};
 use crate::types::EdgeKind;
 use crate::{Hugr, HugrView, Node};
 
-/// Reduced configuration for rendering a HUGR graph.
-///
-/// Additional options are available in the [`MermaidFormatter`] struct.
-#[derive(Copy, Clone, Debug, PartialEq, Eq, Hash)]
-#[non_exhaustive]
-#[deprecated(note = "Use `MermaidFormatter` instead", since = "0.20.2")]
-pub struct RenderConfig<N = Node> {
-    /// Show the node index in the graph nodes.
-    pub node_indices: bool,
-    /// Show port offsets in the graph edges.
-    pub port_offsets_in_edges: bool,
-    /// Show type labels on edges.
-    pub type_labels_in_edges: bool,
-    /// A node to highlight as the graph entrypoint.
-    pub entrypoint: Option<N>,
-}
-
 /// Configuration for rendering a HUGR graph.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MermaidFormatter<'h, H: HugrInternals + ?Sized = Hugr> {
@@ -45,23 +28,6 @@ pub struct MermaidFormatter<'h, H: HugrInternals + ?Sized = Hugr> {
 }
 
 impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
-    /// Create a new [`MermaidFormatter`] from a [`RenderConfig`].
-    #[expect(deprecated)]
-    pub fn from_render_config(config: RenderConfig<H::Node>, hugr: &'h H) -> Self {
-        let node_labels = if config.node_indices {
-            NodeLabel::Numeric
-        } else {
-            NodeLabel::None
-        };
-        Self {
-            hugr,
-            node_labels,
-            port_offsets_in_edges: config.port_offsets_in_edges,
-            type_labels_in_edges: config.type_labels_in_edges,
-            entrypoint: config.entrypoint,
-        }
-    }
-
     /// Create a new [`MermaidFormatter`] for the given [`Hugr`].
     pub fn new(hugr: &'h H) -> Self {
         Self {
@@ -155,24 +121,6 @@ pub enum UnsupportedRenderConfig {
     CustomNodeLabels,
 }
 
-#[expect(deprecated)]
-impl<'h, H: HugrInternals + ?Sized> TryFrom<MermaidFormatter<'h, H>> for RenderConfig<H::Node> {
-    type Error = UnsupportedRenderConfig;
-
-    fn try_from(value: MermaidFormatter<'h, H>) -> Result<Self, Self::Error> {
-        if matches!(value.node_labels, NodeLabel::Custom(_)) {
-            return Err(UnsupportedRenderConfig::CustomNodeLabels);
-        }
-        let node_indices = matches!(value.node_labels, NodeLabel::Numeric);
-        Ok(Self {
-            node_indices,
-            port_offsets_in_edges: value.port_offsets_in_edges,
-            type_labels_in_edges: value.type_labels_in_edges,
-            entrypoint: value.entrypoint,
-        })
-    }
-}
-
 macro_rules! impl_mermaid_formatter_from {
     ($t:ty, $($lifetime:tt)?) => {
         impl<'h, $($lifetime,)? H: HugrView> From<MermaidFormatter<'h, $t>> for MermaidFormatter<'h, H> {
@@ -233,18 +181,6 @@ pub enum NodeLabel<N: HugrNode = Node> {
     Numeric,
     /// Display the labels corresponding to the node indices.
     Custom(HashMap<N, String>),
-}
-
-#[expect(deprecated)]
-impl<N> Default for RenderConfig<N> {
-    fn default() -> Self {
-        Self {
-            node_indices: true,
-            port_offsets_in_edges: true,
-            type_labels_in_edges: true,
-            entrypoint: None,
-        }
-    }
 }
 
 /// Formatter method to compute a node style.
@@ -406,16 +342,5 @@ mod tests {
             .mermaid_format()
             .with_node_labels(NodeLabel::Custom(node_labels));
         insta::assert_snapshot!(h.mermaid_string_with_formatter(config));
-    }
-
-    #[test]
-    fn convert_full_render_config_to_render_config() {
-        let h = simple_dfg_hugr();
-        let config: MermaidFormatter =
-            MermaidFormatter::new(&h).with_node_labels(NodeLabel::Custom(HashMap::new()));
-        #[expect(deprecated)]
-        {
-            assert!(RenderConfig::try_from(config).is_err());
-        }
     }
 }

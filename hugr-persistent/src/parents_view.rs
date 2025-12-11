@@ -199,8 +199,7 @@ impl HugrView for ParentsView<'_> {
         unimplemented!()
     }
 
-    #[expect(deprecated)]
-    fn mermaid_string_with_config(&self, _config: render::RenderConfig<Self::Node>) -> String {
+    fn mermaid_string_with_formatter(&self, _: render::MermaidFormatter<Self>) -> String {
         unimplemented!()
     }
 

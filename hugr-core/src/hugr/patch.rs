@@ -37,14 +37,6 @@ pub trait PatchVerification {
     /// error.
     fn verify(&self, h: &impl HugrView<Node = Self::Node>) -> Result<(), Self::Error>;
 
-    /// The nodes invalidated by the rewrite. Deprecated: implement
-    /// [PatchVerification::invalidated_nodes] instead. The default returns the empty
-    /// iterator; this should be fine as there are no external calls.
-    #[deprecated(note = "Use/implement invalidated_nodes instead", since = "0.20.2")]
-    fn invalidation_set(&self) -> impl Iterator<Item = Self::Node> {
-        std::iter::empty()
-    }
-
     /// Returns the nodes removed or altered by the rewrite. Modifying any of these
     /// nodes will invalidate the rewrite.
     ///
@@ -53,11 +45,7 @@ pub trait PatchVerification {
     fn invalidated_nodes(
         &self,
         h: &impl HugrView<Node = Self::Node>,
-    ) -> impl Iterator<Item = Self::Node> {
-        let _ = h;
-        #[expect(deprecated)]
-        self.invalidation_set()
-    }
+    ) -> impl Iterator<Item = Self::Node>;
 }
 
 /// A patch that can be applied to a mutable Hugr of type `H`.

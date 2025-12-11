@@ -13,7 +13,7 @@ use hugr_core::{
         internal::HugrInternals,
         views::{
             ExtractionResult,
-            render::{self, MermaidFormatter, NodeLabel},
+            render::{MermaidFormatter, NodeLabel},
         },
     },
     ops::{OpTag, OpTrait, OpType},
@@ -269,11 +269,6 @@ impl HugrView for PersistentHugr {
     fn all_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone {
         self.all_node_ports(node)
             .flat_map(move |port| self.linked_ports(node, port).map(|(opp_node, _)| opp_node))
-    }
-
-    #[expect(deprecated)]
-    fn mermaid_string_with_config(&self, config: render::RenderConfig<Self::Node>) -> String {
-        self.mermaid_string_with_formatter(MermaidFormatter::from_render_config(config, self))
     }
 
     fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String {
