@@ -8,9 +8,10 @@ use portgraph::{LinkMut, LinkView, MultiMut, PortMut, PortView, SecondaryMap};
 
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
+use crate::hugr::Patch;
 use crate::hugr::views::SiblingSubgraph;
 use crate::hugr::{HugrView, Node, OpType};
-use crate::hugr::{NodeMetadata, Patch};
+use crate::metadata::{Metadata, RawMetadataValue};
 use crate::ops::OpTrait;
 use crate::types::Substitution;
 use crate::{Extension, Hugr, IncomingPort, OutgoingPort, Port, PortIndex};
@@ -61,26 +62,59 @@ pub trait HugrMut: HugrMutInternals {
     /// # Panics
     ///
     /// If the node is not in the graph.
-    fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut NodeMetadata;
+    fn get_metadata_any_mut(
+        &mut self,
+        node: Self::Node,
+        key: impl AsRef<str>,
+    ) -> &mut RawMetadataValue;
 
     /// Sets a metadata value associated with a node.
+    ///
+    /// For a non type-safe accessor use [`HugrMut::get_metadata_any_mut`] instead.
     ///
     /// # Panics
     ///
     /// If the node is not in the graph.
-    fn set_metadata(
+    #[inline]
+    fn set_metadata<M: Metadata>(&mut self, node: Self::Node, metadata: <M as Metadata>::Type<'_>) {
+        let raw_value = serde_json::to_value(metadata).unwrap();
+        self.set_metadata_any(node, M::KEY, raw_value);
+    }
+
+    /// Sets a metadata value associated with a node.
+    ///
+    /// When possible, prefer using the type-safe accessor [`HugrMut::set_metadata`] instead.
+    ///
+    /// # Panics
+    ///
+    /// If the node is not in the graph.
+    fn set_metadata_any(
         &mut self,
         node: Self::Node,
         key: impl AsRef<str>,
-        metadata: impl Into<NodeMetadata>,
+        metadata: impl Into<RawMetadataValue>,
     );
 
     /// Remove a metadata entry associated with a node.
     ///
+    /// If the [`Metadata`] type is not known, use [`HugrMut::remove_metadata_any`] instead.
+    ///
     /// # Panics
     ///
     /// If the node is not in the graph.
-    fn remove_metadata(&mut self, node: Self::Node, key: impl AsRef<str>);
+    #[inline]
+    fn remove_metadata<M: Metadata>(&mut self, node: Self::Node) {
+        self.remove_metadata_any(node, <M as Metadata>::KEY);
+    }
+
+    /// Remove a metadata entry associated with a node.
+    ///
+    /// When removing a known [`Metadata`] type, use [`HugrMut::remove_metadata`] instead.
+    ///
+    /// # Panics
+    ///
+    /// If the node is not in the graph.
+    fn remove_metadata_any(&mut self, node: Self::Node, key: impl AsRef<str>);
 
     /// Add a node to the graph with a parent in the hierarchy.
     ///
@@ -451,24 +485,31 @@ impl HugrMut for Hugr {
         self.entrypoint = root.into_portgraph();
     }
 
-    fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut NodeMetadata {
+    #[inline]
+    fn get_metadata_any_mut(
+        &mut self,
+        node: Self::Node,
+        key: impl AsRef<str>,
+    ) -> &mut RawMetadataValue {
         panic_invalid_node(self, node);
         self.node_metadata_map_mut(node)
             .entry(key.as_ref())
             .or_insert(serde_json::Value::Null)
     }
 
-    fn set_metadata(
+    #[inline]
+    fn set_metadata_any(
         &mut self,
         node: Self::Node,
         key: impl AsRef<str>,
-        metadata: impl Into<NodeMetadata>,
+        metadata: impl Into<RawMetadataValue>,
     ) {
-        let entry = self.get_metadata_mut(node, key);
+        let entry = self.get_metadata_any_mut(node, key);
         *entry = metadata.into();
     }
 
-    fn remove_metadata(&mut self, node: Self::Node, key: impl AsRef<str>) {
+    #[inline]
+    fn remove_metadata_any(&mut self, node: Self::Node, key: impl AsRef<str>) {
         panic_invalid_node(self, node);
         let node_meta = self.node_metadata_map_mut(node);
         node_meta.remove(key.as_ref());
@@ -838,16 +879,36 @@ pub(super) mod test {
         // Create the root module definition
         let root: Node = hugr.entrypoint();
 
-        assert_eq!(hugr.get_metadata(root, "meta"), None);
+        struct MetaString;
+        impl Metadata for MetaString {
+            const KEY: &'static str = "meta_string";
+            type Type<'hugr> = &'hugr str;
+        }
 
-        *hugr.get_metadata_mut(root, "meta") = "test".into();
-        assert_eq!(hugr.get_metadata(root, "meta"), Some(&"test".into()));
+        #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+        struct MetaSelf {
+            pub value: usize,
+        }
 
-        hugr.set_metadata(root, "meta", "new");
-        assert_eq!(hugr.get_metadata(root, "meta"), Some(&"new".into()));
+        impl Metadata for MetaSelf {
+            const KEY: &'static str = "meta_self";
+            type Type = MetaSelf;
+        }
 
-        hugr.remove_metadata(root, "meta");
-        assert_eq!(hugr.get_metadata(root, "meta"), None);
+        assert_eq!(hugr.get_metadata::<MetaString>(root), None);
+        *hugr.get_metadata_any_mut(root, MetaString::KEY) = "test".into();
+        assert_eq!(hugr.get_metadata::<MetaString>(root), Some("test"));
+        hugr.set_metadata::<MetaString>(root, "new");
+        assert_eq!(hugr.get_metadata::<MetaString>(root), Some("new"));
+
+        hugr.set_metadata::<MetaSelf>(root, MetaSelf { value: 1 });
+        assert_eq!(
+            hugr.get_metadata::<MetaSelf>(root),
+            Some(MetaSelf { value: 1 })
+        );
+
+        hugr.remove_metadata::<MetaSelf>(root);
+        assert_eq!(hugr.get_metadata::<MetaSelf>(root), None);
     }
 
     #[test]

@@ -14,7 +14,8 @@ use crate::{
     extension::{
         ExtensionId, ExtensionRegistry, SignatureError, resolution::ExtensionResolutionError,
     },
-    hugr::{HugrMut, NodeMetadata},
+    hugr::HugrMut,
+    metadata::RawMetadataValue,
     ops::{
         AliasDecl, AliasDefn, CFG, Call, CallIndirect, Case, Conditional, Const, DFG,
         DataflowBlock, ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType,
@@ -371,7 +372,7 @@ impl<'a> Context<'a> {
     ) -> Result<(), ImportErrorInner> {
         // Import the JSON metadata
         if let Some((name, json_value)) = self.decode_json_meta(meta_item)? {
-            self.hugr.set_metadata(node, name, json_value);
+            self.hugr.set_metadata_any(node, name, json_value);
         }
 
         // Set the entrypoint
@@ -408,12 +409,13 @@ impl<'a> Context<'a> {
                     ));
                 };
 
-                let json_value: NodeMetadata = serde_json::from_str(json_str).map_err(|_| {
-                    error_invalid!(
-                        "failed to parse JSON string for `{}` metadata",
-                        model::COMPAT_CONST_JSON
-                    )
-                })?;
+                let json_value: RawMetadataValue =
+                    serde_json::from_str(json_str).map_err(|_| {
+                        error_invalid!(
+                            "failed to parse JSON string for `{}` metadata",
+                            model::COMPAT_CONST_JSON
+                        )
+                    })?;
                 Some((name.to_owned(), json_value))
             } else {
                 None

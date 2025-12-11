@@ -72,7 +72,8 @@ impl<H: HugrView> HugrView for Rerooted<H> {
                 fn module_root(&self) -> Self::Node;
                 fn contains_node(&self, node: Self::Node) -> bool;
                 fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
-                fn get_metadata(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&crate::hugr::NodeMetadata>;
+                fn get_metadata<M: crate::metadata::Metadata>(&self, node: Self::Node) -> Option<<M as crate::metadata::Metadata>::Type<'_>>;
+                fn get_metadata_any(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&crate::metadata::RawMetadataValue>;
                 fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType;
                 fn num_nodes(&self) -> usize;
                 fn num_edges(&self) -> usize;
@@ -125,9 +126,11 @@ impl<H: HugrMut> HugrMut for Rerooted<H> {
 
     delegate::delegate! {
         to (&mut self.hugr) {
-                fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut crate::hugr::NodeMetadata;
-                fn set_metadata(&mut self, node: Self::Node, key: impl AsRef<str>, metadata: impl Into<crate::hugr::NodeMetadata>);
-                fn remove_metadata(&mut self, node: Self::Node, key: impl AsRef<str>);
+                fn get_metadata_any_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut crate::metadata::RawMetadataValue;
+                fn set_metadata<M: crate::metadata::Metadata>(&mut self, node: Self::Node, metadata: <M as crate::metadata::Metadata>::Type<'_>);
+                fn set_metadata_any(&mut self, node: Self::Node, key: impl AsRef<str>, metadata: impl Into<crate::metadata::RawMetadataValue>);
+                fn remove_metadata<M: crate::metadata::Metadata>(&mut self, node: Self::Node);
+                fn remove_metadata_any(&mut self, node: Self::Node, key: impl AsRef<str>);
                 fn add_node_with_parent(&mut self, parent: Self::Node, op: impl Into<crate::ops::OpType>) -> Self::Node;
                 fn add_node_before(&mut self, sibling: Self::Node, nodetype: impl Into<crate::ops::OpType>) -> Self::Node;
                 fn add_node_after(&mut self, sibling: Self::Node, op: impl Into<crate::ops::OpType>) -> Self::Node;
