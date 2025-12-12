@@ -161,7 +161,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
                 AK::build_discard(&mut dfb, Type::UNIT, *n, unit_arr).unwrap();
                 dfb.finish_hugr_with_outputs([]).unwrap()
             }),
-            NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseNew),
+            NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseSource),
         ));
     }
     // The num_outports>1 case will simplify, and unify with the previous, when we have a
@@ -341,7 +341,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
 
     Ok(NodeTemplate::LinkedHugr(
         Box::new(dfb.finish_hugr_with_outputs(out_arrays).unwrap()),
-        NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseNew),
+        NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseSource),
     ))
 }
 
