@@ -1,8 +1,9 @@
 use crate::extension::prelude::MakeTuple;
+use crate::hugr::ValidationError;
 use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::linking::{HugrLinking, NameLinkingPolicy, NodeLinkingDirective};
 use crate::hugr::views::HugrView;
-use crate::hugr::{NodeMetadata, ValidationError};
+use crate::metadata::Metadata;
 use crate::ops::{self, OpTag, OpTrait, OpType, Tag, TailLoop};
 use crate::utils::collect_array;
 use crate::{Extension, IncomingPort, Node, OutgoingPort};
@@ -110,22 +111,17 @@ pub trait Container {
     }
 
     /// Add metadata to the container node.
-    fn set_metadata(&mut self, key: impl AsRef<str>, meta: impl Into<NodeMetadata>) {
+    fn set_metadata<M: Metadata>(&mut self, meta: <M as Metadata>::Type<'_>) {
         let parent = self.container_node();
         // Implementor's container_node() should be a valid node
-        self.hugr_mut().set_metadata(parent, key, meta);
+        self.hugr_mut().set_metadata::<M>(parent, meta);
     }
 
     /// Add metadata to a child node.
     ///
     /// Returns an error if the specified `child` is not a child of this container
-    fn set_child_metadata(
-        &mut self,
-        child: Node,
-        key: impl AsRef<str>,
-        meta: impl Into<NodeMetadata>,
-    ) {
-        self.hugr_mut().set_metadata(child, key, meta);
+    fn set_child_metadata<M: Metadata>(&mut self, child: Node, meta: <M as Metadata>::Type<'_>) {
+        self.hugr_mut().set_metadata::<M>(child, meta);
     }
 
     /// Add an extension to the set of extensions used by the hugr.
