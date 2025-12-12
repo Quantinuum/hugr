@@ -1588,14 +1588,14 @@ so must be supported by all third-party tooling.
 
 `qubit`: a linear (non-copyable) qubit type.
 
-`error`: an error type which operations use to indicate that an error occurred.
+`error`: an error type which operations use as a variant of sum to indicate when an error may occur. See [Arithmetic Extensions](#arithmetic-extensions) for some examples.
 
 ### Operations
 
-| Name              | Inputs       | Outputs       | Meaning                                                           |
-|-------------------|--------------|---------------|------------------------------------------------------------------ |
-| `print`           | `string`     | -             | Append the string to the program's output stream[^1] (atomically) |
-| `new_array<N, T>` | `T` x N      | `array<N, T>` | Create an array from all the inputs                               |
+| Name              | Inputs       | Outputs       | Meaning                                                                                                                                                                                                            |
+|-------------------|--------------|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `print`           | `string`     | -             | Append the string to the program's output stream[^1] (atomically)                                                                                                                                                  |
+| `new_array<N, T>` | `T` x N      | `array<N, T>` | Create an array from all the inputs.                                                                                                                                                                               |
 | `panic`           | `error`, ... | ...           | Immediately end execution and pass contents of error to context. Inputs following the `error`, and all outputs, are arbitrary; these only exist so that structural constraints such as linearity can be satisfied. |
 
 [^1] The existence of an output stream, and the processing of it either during
