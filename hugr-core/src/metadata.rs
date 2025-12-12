@@ -1,4 +1,27 @@
 //! Type-safe metadata definition for hugr nodes.
+//!
+//! See [HugrView::get_metadata][crate::hugr::HugrView::get_metadata] and
+//! [HugrMut::set_metadata][crate::hugr::HugrMut::set_metadata] for more
+//! information on how to use this API.
+//!
+//! # Examples
+//!
+//! ```
+//! use hugr::hugr::{Hugr, HugrView};
+//! use hugr::hugr::hugrmut::HugrMut;
+//! use hugr::metadata::Metadata;
+//!
+//! struct SomeMetadata;
+//! impl Metadata for SomeMetadata {
+//!     type Type<'hugr> = &'hugr str;
+//!     const KEY: &'static str = "custom.metadata";
+//! }
+//!
+//! let mut hugr = Hugr::new();
+//! hugr.set_metadata::<SomeMetadata>(hugr.module_root(), "payload");
+//! let payload = hugr.get_metadata::<SomeMetadata>(hugr.module_root());
+//! assert_eq!(payload, Some("payload"));
+//! ```
 
 /// Arbitrary metadata entry for a node.
 ///
