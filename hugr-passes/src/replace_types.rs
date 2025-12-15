@@ -846,7 +846,9 @@ mod test {
     use hugr_core::std_extensions::collections::array::{
         self, Array, ArrayKind, ArrayOpDef, GenericArrayValue, array_type, array_type_def,
     };
-    use hugr_core::std_extensions::collections::borrow_array::{BArrayValue, borrow_array_type};
+    use hugr_core::std_extensions::collections::borrow_array::{
+        BArrayValue, BorrowArray, borrow_array_type,
+    };
     use hugr_core::std_extensions::collections::list::{
         ListOp, ListOpInst, ListValue, list_type, list_type_def,
     };
@@ -1282,7 +1284,7 @@ mod test {
     #[rstest]
     #[case(&[], Array)]
     #[case(&[3], Array)]
-    #[case(&[5,7,11,13,17,19], Array)]
+    #[case(&[5,7,11,13,17,19], BorrowArray)]
     fn array_const<AK: ArrayKind>(#[case] vals: &[u64], #[case] _kind: AK)
     where
         GenericArrayValue<AK>: CustomConst,
