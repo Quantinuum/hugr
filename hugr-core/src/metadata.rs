@@ -52,7 +52,7 @@ impl Metadata for HugrGenerator {
 
 /// Metadata storing the list of extensions required to define the Hugr.
 ///
-/// This list may contain additional extensions that are not longer present in
+/// This list may contain additional extensions that are no longer present in
 /// the Hugr.
 ///
 /// This value is only valid when set at the module root node.
