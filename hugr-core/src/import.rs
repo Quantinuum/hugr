@@ -5,7 +5,6 @@
 //! the core and model to converge incrementally.
 use std::sync::Arc;
 
-use crate::envelope::description::GeneratorDesc;
 use crate::metadata::{self, Metadata};
 use crate::{
     Direction, Hugr, HugrView, Node, Port,
@@ -199,7 +198,7 @@ pub fn import_package(
 
 /// Get the name of the generator from the metadata of the module.
 /// If no generator is found, `None` is returned.
-fn get_generator(ctx: &Context<'_>) -> Option<GeneratorDesc> {
+fn get_generator(ctx: &Context<'_>) -> Option<String> {
     ctx.module
         .get_region(ctx.module.root)
         .map(|r| r.meta.iter())
@@ -208,7 +207,8 @@ fn get_generator(ctx: &Context<'_>) -> Option<GeneratorDesc> {
         .find_map(|meta| {
             let (name, json_val) = ctx.decode_json_meta(*meta).ok()??;
 
-            (name == metadata::HugrGenerator::KEY).then_some(serde_json::from_value(json_val).ok()?)
+            (name == metadata::HugrGenerator::KEY)
+                .then_some(crate::envelope::format_generator(&json_val))
         })
 }
 

@@ -40,13 +40,15 @@ pub trait Metadata {
 
 // -------- Core metadata entries
 
-/// Metadata storing the name of the generator that produced the Hugr envelope.
+/// Metadata storing the generator that produced the Hugr envelope.
+///
+/// Use [`envelope::format_generator`][crate::envelope::format_generator] to decode this value into a string.
 ///
 /// This value is only valid when set at the module root node.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct HugrGenerator;
 impl Metadata for HugrGenerator {
-    type Type<'hugr> = crate::envelope::description::GeneratorDesc;
+    type Type<'hugr> = serde_json::Value;
     const KEY: &'static str = "core.generator";
 }
 

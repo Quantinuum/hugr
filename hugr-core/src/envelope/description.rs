@@ -1,6 +1,4 @@
 //! Description of the contents of a HUGR envelope used for debugging and error reporting.
-use std::collections::HashMap;
-
 use crate::envelope::HugrUsedExtensions;
 use crate::metadata;
 use crate::{
@@ -162,130 +160,6 @@ impl<E: AsRef<crate::Extension>> From<&E> for ExtensionDesc {
     }
 }
 
-/// Description of the generator that defined the module.
-///
-/// These are stored at the module root node metadata under the [`crate::metadata::HugrGenerator`] entry.
-#[derive(derive_more::Display, Debug, Clone, PartialEq)]
-pub enum GeneratorDesc {
-    /// Generator with a name and optional version.
-    #[display("{}", if let Some(version) = version {
-        format!("{name}-v{version}")
-    } else {
-        name.to_string()
-    })]
-    Structured {
-        /// Name of the generator.
-        name: String,
-        /// Version of the generator.
-        version: Option<Version>,
-    },
-    /// Arbitrary string describing the generator.
-    #[display("{description}")]
-    Flat {
-        /// Single string describing the generator.
-        description: String,
-    },
-}
-
-impl serde::Serialize for GeneratorDesc {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-
-impl GeneratorDesc {
-    /// Create a new generator description from a string.
-    pub fn new(name: impl ToString, version: impl Into<Version>) -> Self {
-        Self::Structured {
-            name: name.to_string(),
-            version: Some(version.into()),
-        }
-    }
-
-    /// Create a new generator description without a version.
-    pub fn new_unversioned(name: impl ToString) -> Self {
-        Self::Structured {
-            name: name.to_string(),
-            version: None,
-        }
-    }
-}
-
-impl<'de> serde::de::Deserialize<'de> for GeneratorDesc {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        struct Helper;
-        impl<'vis> serde::de::Visitor<'vis> for Helper {
-            type Value = GeneratorDesc;
-
-            fn expecting(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-                formatter.write_str("a string-encoded envelope")
-            }
-
-            fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
-            where
-                E: serde::de::Error,
-            {
-                let value = value.to_string();
-                if let Some((name, version)) = value.split_once("-v")
-                    && let Some(version) = version.parse::<Version>().ok()
-                {
-                    return Ok(GeneratorDesc::Structured {
-                        name: name.to_string(),
-                        version: Some(version),
-                    });
-                };
-
-                Ok(GeneratorDesc::Flat {
-                    description: value.to_string(),
-                })
-            }
-
-            fn visit_map<A>(self, mut map: A) -> Result<Self::Value, A::Error>
-            where
-                A: serde::de::MapAccess<'vis>,
-            {
-                let values: HashMap<String, serde_json::Value> = std::iter::from_fn(|| {
-                    let key = map.next_key::<String>().ok()??;
-                    let value = map.next_value::<serde_json::Value>().ok()?;
-                    Some((key, value))
-                })
-                .collect();
-
-                let name = values
-                    .get("name")
-                    .and_then(|n| n.as_str())
-                    .map(ToString::to_string);
-                let version = values
-                    .get("version")
-                    .and_then(|v| v.as_str())
-                    .and_then(|s| s.parse::<Version>().ok());
-
-                if let Some(name) = name
-                    && values.len() == (version.is_some() as usize + 1)
-                {
-                    Ok(GeneratorDesc::Structured { name, version })
-                } else {
-                    // Just encode it as a dictionary
-                    Ok(GeneratorDesc::Flat {
-                        description: values
-                            .into_iter()
-                            .map(|(k, v)| format!("{k}: {v}"))
-                            .join("\n"),
-                    })
-                }
-            }
-        }
-
-        deserializer.deserialize_any(Helper)
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, schemars::JsonSchema)]
 /// Description of the entrypoint of a module.
 pub struct Entrypoint {
@@ -370,8 +244,8 @@ impl ModuleDesc {
     }
 
     /// Sets the generator for the module.
-    pub fn set_generator(&mut self, generator: impl ToString) {
-        self.generator = Some(generator.to_string());
+    pub fn set_generator(&mut self, generator: impl Into<String>) {
+        self.generator = Some(generator.into());
     }
 
     /// Sets the extensions used by the generator in the module metadata.
@@ -419,7 +293,7 @@ impl ModuleDesc {
     /// Loads the generator from the HUGR metadata.
     pub(crate) fn load_generator(&mut self, hugr: &impl HugrView) {
         if let Some(val) = hugr.get_metadata::<metadata::HugrGenerator>(hugr.module_root()) {
-            self.set_generator(val);
+            self.set_generator(super::format_generator(&val));
         }
     }
 
