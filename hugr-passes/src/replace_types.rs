@@ -846,11 +846,9 @@ mod test {
     use hugr_core::std_extensions::collections::array::{
         self, Array, ArrayKind, ArrayOpDef, GenericArrayValue, array_type, array_type_def,
     };
-    use hugr_core::std_extensions::collections::borrow_array::{
-        BArrayOp, BArrayOpDef, BArrayValue, borrow_array_type,
-    };
+    use hugr_core::std_extensions::collections::borrow_array::{BArrayValue, borrow_array_type};
     use hugr_core::std_extensions::collections::list::{
-        ListOp, ListValue, list_type, list_type_def,
+        ListOp, ListOpInst, ListValue, list_type, list_type_def,
     };
     use hugr_core::types::{
         EdgeKind, PolyFuncType, Signature, SumType, Term, Type, TypeArg, TypeBound, TypeRow,
@@ -926,7 +924,7 @@ mod test {
         new: impl Fn(Signature) -> Result<T, BuildError>,
     ) -> T {
         let mut dfb = new(Signature::new(
-            vec![borrow_array_type(64, elem_ty.clone()), i64_t()],
+            vec![list_type(elem_ty.clone()), i64_t()],
             elem_ty.clone(),
         ))
         .unwrap();
@@ -935,9 +933,12 @@ mod test {
             .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [idx])
             .unwrap()
             .outputs_arr();
-        let [opt, _] = dfb
+        let [opt] = dfb
             .add_dataflow_op(
-                BArrayOpDef::get.to_concrete(elem_ty.clone(), 64),
+                ListOp::get
+                    .with_type(elem_ty.clone())
+                    .to_extension_op()
+                    .unwrap(),
                 [val, idx],
             )
             .unwrap()
@@ -955,7 +956,7 @@ mod test {
         lw.set_replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
         lw.set_replace_parametrized_type(
             pv,
-            Box::new(|args: &[TypeArg]| Some(borrow_array_type(64, just_elem_type(args).clone()))),
+            Box::new(|args: &[TypeArg]| Some(list_type(just_elem_type(args).clone()))),
         );
         lw.set_replace_op(
             &read_op(ext, bool_t()),
@@ -1087,12 +1088,11 @@ mod test {
             ["get", "itousize", "panic"]
         );
         // The PackedVec<PackedVec<bool>> becomes an array<i64>
-        let [array_get] = ext_ops
+        let array_gets = ext_ops
             .into_iter()
-            .filter_map(|e| BArrayOp::from_extension_op(e).ok())
-            .collect_array()
-            .unwrap();
-        assert_eq!(array_get, BArrayOpDef::get.to_concrete(i64_t(), 64));
+            .filter_map(|e| ListOpInst::from_extension_op(e).ok())
+            .collect_vec();
+        assert_eq!(array_gets, [ListOp::get.with_type(i64_t())]);
     }
 
     #[test]
@@ -1385,7 +1385,7 @@ mod test {
         let ep = h.entrypoint();
         lowerer.set_regions(vec![h.entrypoint()]);
         assert!(lowerer.run(&mut h).unwrap());
-        let v_u = borrow_array_type(64, usize_t());
+        let v_u = list_type(usize_t());
         assert_eq!(h.signature(ep).unwrap().as_ref(), &endo_sig(v_u.clone()));
         assert_eq!(h.num_nodes(), h.num_nodes());
         let [f_in, _] = h.get_io(h.get_parent(ep).unwrap()).unwrap();
@@ -1469,7 +1469,7 @@ mod test {
         );
 
         // Arrays of 64 bools should thus be transformed into PackedVec<bool> and then to int64s
-        // Arrays of 64 non-bools should thus become PackedVec<T> and then back to Array<64, T>
+        // Arrays of 64 non-bools should thus become PackedVec<T> and thus List<T>
         let a64 = |t| array_type(64, t);
         let opt = |t| Type::from(option_type(t));
         let mut dfb = DFGBuilder::new(Signature::new(
