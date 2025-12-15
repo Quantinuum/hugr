@@ -461,7 +461,6 @@ impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
 pub(crate) mod test {
     use cool_asserts::assert_matches;
     use rstest::rstest;
-    use serde_json::json;
     use std::collections::HashMap;
 
     use crate::builder::build_traits::DataflowHugr;
@@ -474,6 +473,7 @@ pub(crate) mod test {
     use crate::extension::prelude::{Noop, bool_t, qb_t, usize_t};
     use crate::hugr::linking::{NameLinkingPolicy, NodeLinkingDirective, OnMultiDefn};
     use crate::hugr::validate::InterGraphEdgeError;
+    use crate::metadata::Metadata;
     use crate::ops::{FuncDecl, FuncDefn, OpParent, OpTag, OpTrait, Value, handle::NodeHandle};
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
@@ -696,10 +696,22 @@ pub(crate) mod test {
 
     #[test]
     fn add_hugr() -> Result<(), BuildError> {
+        struct XIntMetadata;
+        impl Metadata for XIntMetadata {
+            type Type<'hugr> = u32;
+            const KEY: &'static str = "x";
+        }
+
+        struct XStringMetadata;
+        impl Metadata for XStringMetadata {
+            type Type<'hugr> = &'hugr str;
+            const KEY: &'static str = "x";
+        }
+
         // Create a simple DFG
         let mut dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()]))?;
         let [i1] = dfg_builder.input_wires_arr();
-        dfg_builder.set_metadata("x", 42);
+        dfg_builder.set_metadata::<XIntMetadata>(42);
         let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
 
         // Create a module, and insert the DFG into it
@@ -712,16 +724,16 @@ pub(crate) mod test {
             let [i1] = f_build.input_wires_arr();
             let dfg = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
             let f = f_build.finish_with_outputs([dfg.out_wire(0)])?;
-            module_builder.set_child_metadata(f.node(), "x", "hi");
+            module_builder.set_child_metadata::<XStringMetadata>(f.node(), "hi");
             (dfg.node(), f.node())
         };
 
         let hugr = module_builder.finish_hugr()?;
         assert_eq!(hugr.entry_descendants().count(), 7);
 
-        assert_eq!(hugr.get_metadata(hugr.entrypoint(), "x"), None);
-        assert_eq!(hugr.get_metadata(dfg_node, "x").cloned(), Some(json!(42)));
-        assert_eq!(hugr.get_metadata(f_node, "x").cloned(), Some(json!("hi")));
+        assert_eq!(hugr.get_metadata::<XIntMetadata>(hugr.entrypoint()), None);
+        assert_eq!(hugr.get_metadata::<XIntMetadata>(dfg_node), Some(42));
+        assert_eq!(hugr.get_metadata::<XStringMetadata>(f_node), Some("hi"));
 
         Ok(())
     }

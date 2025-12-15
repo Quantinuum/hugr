@@ -1,7 +1,9 @@
 //! Description of the contents of a HUGR envelope used for debugging and error reporting.
+use crate::envelope::HugrUsedExtensions;
+use crate::metadata;
 use crate::{
     HugrView, Node,
-    envelope::{EnvelopeHeader, USED_EXTENSIONS_KEY},
+    envelope::EnvelopeHeader,
     ops::{DataflowOpTrait, OpType},
 };
 use itertools::Itertools;
@@ -118,6 +120,8 @@ impl PackageDesc {
 }
 
 /// High level description of an extension.
+///
+/// These are stored at the module root node metadata under the [`crate::metadata::HugrUsedExtensions`] entry.
 #[derive(
     derive_more::Display,
     Debug,
@@ -288,8 +292,8 @@ impl ModuleDesc {
 
     /// Loads the generator from the HUGR metadata.
     pub(crate) fn load_generator(&mut self, hugr: &impl HugrView) {
-        if let Some(val) = hugr.get_metadata(hugr.module_root(), crate::envelope::GENERATOR_KEY) {
-            self.set_generator(super::format_generator(val));
+        if let Some(val) = hugr.get_metadata::<metadata::HugrGenerator>(hugr.module_root()) {
+            self.set_generator(super::format_generator(&val));
         }
     }
 
@@ -298,11 +302,9 @@ impl ModuleDesc {
         &mut self,
         hugr: &impl HugrView,
     ) -> Result<(), serde_json::Error> {
-        let Some(exts) = hugr.get_metadata(hugr.module_root(), USED_EXTENSIONS_KEY) else {
+        let Some(used_exts) = hugr.get_metadata::<HugrUsedExtensions>(hugr.module_root()) else {
             return Ok(()); // No used extensions metadata, nothing to check
         };
-        let used_exts: Vec<ExtensionDesc> = serde_json::from_value(exts.clone())?;
-
         self.set_used_extensions_generator(used_exts);
         Ok(())
     }
