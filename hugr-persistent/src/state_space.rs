@@ -6,7 +6,6 @@ use std::{
     rc::Rc,
 };
 
-use derive_more::From;
 use hugr_core::{Hugr, Node};
 use itertools::Itertools;
 use relrc::Registry;
@@ -53,7 +52,7 @@ mod hidden {
     /// This is a "unnamable" type: we do not expose this struct publicly in our
     /// API, but we can still use it in public trait bounds (see
     /// [`Resolver`](crate::resolver::Resolver)).
-    #[derive(Debug, Clone, From)]
+    #[derive(Debug, Clone, derive_more::From)]
     pub enum CommitData {
         Base(Hugr),
         Replacement(PersistentReplacement),

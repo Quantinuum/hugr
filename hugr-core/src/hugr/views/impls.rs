@@ -29,7 +29,8 @@ macro_rules! hugr_view_methods {
                 fn module_root(&self) -> Self::Node;
                 fn contains_node(&self, node: Self::Node) -> bool;
                 fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
-                fn get_metadata(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&crate::hugr::NodeMetadata>;
+                fn get_metadata<M: crate::metadata::Metadata>(&self, node: Self::Node) -> Option<<M as crate::metadata::Metadata>::Type<'_>>;
+                fn get_metadata_any(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&crate::metadata::RawMetadataValue>;
                 fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType;
                 fn num_nodes(&self) -> usize;
                 fn num_edges(&self) -> usize;
@@ -101,9 +102,11 @@ macro_rules! hugr_mut_methods {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
                 fn set_entrypoint(&mut self, root: Self::Node);
-                fn get_metadata_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut crate::hugr::NodeMetadata;
-                fn set_metadata(&mut self, node: Self::Node, key: impl AsRef<str>, metadata: impl Into<crate::hugr::NodeMetadata>);
-                fn remove_metadata(&mut self, node: Self::Node, key: impl AsRef<str>);
+                fn get_metadata_any_mut(&mut self, node: Self::Node, key: impl AsRef<str>) -> &mut crate::metadata::RawMetadataValue;
+                fn set_metadata<M: crate::metadata::Metadata>(&mut self, node: Self::Node, metadata: <M as crate::metadata::Metadata>::Type<'_>);
+                fn set_metadata_any(&mut self, node: Self::Node, key: impl AsRef<str>, metadata: impl Into<crate::metadata::RawMetadataValue>);
+                fn remove_metadata<M: crate::metadata::Metadata>(&mut self, node: Self::Node);
+                fn remove_metadata_any(&mut self, node: Self::Node, key: impl AsRef<str>);
                 fn add_node_with_parent(&mut self, parent: Self::Node, op: impl Into<crate::ops::OpType>) -> Self::Node;
                 fn add_node_before(&mut self, sibling: Self::Node, nodetype: impl Into<crate::ops::OpType>) -> Self::Node;
                 fn add_node_after(&mut self, sibling: Self::Node, op: impl Into<crate::ops::OpType>) -> Self::Node;
@@ -112,6 +115,7 @@ macro_rules! hugr_mut_methods {
                 fn copy_descendants(&mut self, root: Self::Node, new_parent: Self::Node, subst: Option<crate::types::Substitution>) -> std::collections::BTreeMap<Self::Node, Self::Node>;
                 fn connect(&mut self, src: Self::Node, src_port: impl Into<crate::OutgoingPort>, dst: Self::Node, dst_port: impl Into<crate::IncomingPort>);
                 fn disconnect(&mut self, node: Self::Node, port: impl Into<crate::Port>);
+                fn disconnect_edge(&mut self, src: Self::Node, src_port: impl Into<crate::OutgoingPort>, dst: Self::Node, dst_port: impl Into<crate::IncomingPort>);
                 fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (crate::OutgoingPort, crate::IncomingPort);
                 fn insert_forest(&mut self, other: crate::Hugr, roots: impl IntoIterator<Item=(crate::Node, Self::Node)>) -> InsertForestResult<crate::Node, Self::Node>;
                 fn insert_view_forest<Other: crate::hugr::HugrView>(&mut self, other: &Other, nodes: impl Iterator<Item=Other::Node> + Clone, roots: impl IntoIterator<Item=(Other::Node, Self::Node)>) -> InsertForestResult<Other::Node, Self::Node>;

@@ -49,6 +49,8 @@ pub mod serde_with;
 pub use header::{EnvelopeConfig, EnvelopeFormat, EnvelopeHeader, MAGIC_NUMBERS, ZstdConfig};
 pub use package_json::PackageEncodingError;
 
+pub use crate::metadata::{HugrGenerator, HugrUsedExtensions};
+
 use crate::Hugr;
 use crate::envelope::description::PackageDesc;
 use crate::envelope::header::HeaderError;
@@ -62,14 +64,6 @@ use thiserror::Error;
 
 #[allow(unused_imports)]
 use itertools::Itertools as _;
-
-// TODO centralise all core metadata keys in one place.
-// https://github.com/CQCL/hugr/issues/2651
-
-/// Key used to store the name of the generator that produced the envelope.
-pub const GENERATOR_KEY: &str = "core.generator";
-/// Key used to store the list of used extensions in the metadata of a HUGR.
-pub const USED_EXTENSIONS_KEY: &str = "core.used_extensions";
 
 /// Format a generator value from the metadata.
 pub fn format_generator(json_val: &serde_json::Value) -> String {
@@ -297,7 +291,6 @@ pub(crate) mod test {
     use crate::hugr::HugrMut;
     use crate::hugr::test::check_hugr_equality;
     use crate::std_extensions::STD_REG;
-    use serde_json::json;
     use std::sync::Arc;
     /// Returns an `ExtensionRegistry` with the extensions from both
     /// sets. Avoids cloning if the first one already contains all
@@ -431,6 +424,8 @@ pub(crate) mod test {
     #[case::simple(simple_package())]
     fn test_check_breaking_extensions(#[case] mut package: Package) {
         // extension with major version 0
+
+        use crate::envelope::description::ExtensionDesc;
         let test_ext_v0 =
             Extension::new(ExtensionId::new_unchecked("test-v0"), Version::new(0, 2, 3));
         //  extension with major version > 0
@@ -446,18 +441,18 @@ pub(crate) mod test {
         assert_matches!(check(&hugr, &registry), Ok(()));
 
         // Matching version for v0 - should pass
-        let used_exts = json!([{ "name": "test-v0", "version": "0.2.3" }]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![ExtensionDesc::new("test-v0", Version::new(0, 2, 3))];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(check(&hugr, &registry), Ok(()));
 
         // Matching major/minor but lower patch for v0 - should pass
-        let used_exts = json!([{ "name": "test-v0", "version": "0.2.2" }]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![ExtensionDesc::new("test-v0", Version::new(0, 2, 2))];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(check(&hugr, &registry), Ok(()));
 
         //Different minor version for v0 - should fail
-        let used_exts = json!([{ "name": "test-v0", "version": "0.3.3" }]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![ExtensionDesc::new("test-v0", Version::new(0, 3, 3))];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(
             check(&hugr, &registry),
             Err(ExtensionBreakingError::ExtensionVersionMismatch(ExtensionVersionMismatch {
@@ -473,8 +468,8 @@ pub(crate) mod test {
         );
 
         // Different major version for v0 - should fail
-        let used_exts = json!([{ "name": "test-v0", "version": "1.2.3" }]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![ExtensionDesc::new("test-v0", Version::new(1, 2, 3))];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(
             check(&hugr, &registry),
             Err(ExtensionBreakingError::ExtensionVersionMismatch(ExtensionVersionMismatch {
@@ -485,8 +480,8 @@ pub(crate) mod test {
         );
 
         // Higher patch version for v0 - should fail
-        let used_exts = json!([{ "name": "test-v0", "version": "0.2.4" }]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![ExtensionDesc::new("test-v0", Version::new(0, 2, 4))];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(
             check(&hugr, &registry),
             Err(ExtensionBreakingError::ExtensionVersionMismatch(ExtensionVersionMismatch {
@@ -497,23 +492,23 @@ pub(crate) mod test {
         );
 
         // Matching version for v1 - should pass
-        let used_exts = json!([{ "name": "test-v1", "version": "1.2.3" }]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![ExtensionDesc::new("test-v1", Version::new(1, 2, 3))];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(check(&hugr, &registry), Ok(()));
 
         // Lower minor version for v1 - should pass
-        let used_exts = json!([{ "name": "test-v1", "version": "1.1.0" }]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![ExtensionDesc::new("test-v1", Version::new(1, 1, 0))];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(check(&hugr, &registry), Ok(()));
 
         // Lower patch for v1 - should pass
-        let used_exts = json!([{ "name": "test-v1", "version": "1.2.2" }]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![ExtensionDesc::new("test-v1", Version::new(1, 2, 2))];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(check(&hugr, &registry), Ok(()));
 
         // Different major version for v1 - should fail
-        let used_exts = json!([{ "name": "test-v1", "version": "2.2.3" }]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![ExtensionDesc::new("test-v1", Version::new(2, 2, 3))];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(
             check(&hugr, &registry),
             Err(ExtensionBreakingError::ExtensionVersionMismatch(ExtensionVersionMismatch {
@@ -524,8 +519,8 @@ pub(crate) mod test {
         );
 
         // Higher minor version for v1 - should fail
-        let used_exts = json!([{ "name": "test-v1", "version": "1.3.0" }]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![ExtensionDesc::new("test-v1", Version::new(1, 3, 0))];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(
             check(&hugr, &registry),
             Err(ExtensionBreakingError::ExtensionVersionMismatch(ExtensionVersionMismatch {
@@ -536,8 +531,8 @@ pub(crate) mod test {
         );
 
         // Higher patch version for v1 - should fail
-        let used_exts = json!([{ "name": "test-v1", "version": "1.2.4" }]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![ExtensionDesc::new("test-v1", Version::new(1, 2, 4))];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(
             check(&hugr, &registry),
             Err(ExtensionBreakingError::ExtensionVersionMismatch(ExtensionVersionMismatch {
@@ -548,16 +543,16 @@ pub(crate) mod test {
         );
 
         // Non-registered extension - should pass
-        let used_exts = json!([{ "name": "unknown", "version": "1.0.0" }]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![ExtensionDesc::new("unknown", Version::new(1, 0, 0))];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(check(&hugr, &registry), Ok(()));
 
         // Multiple extensions - one mismatch should fail
-        let used_exts = json!([
-            { "name": "unknown", "version": "1.0.0" },
-            { "name": "test-v1", "version": "2.0.0" }
-        ]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![
+            ExtensionDesc::new("unknown", Version::new(1, 0, 0)),
+            ExtensionDesc::new("test-v1", Version::new(2, 0, 0)),
+        ];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(
             check(&hugr, &registry),
             Err(ExtensionBreakingError::ExtensionVersionMismatch(ExtensionVersionMismatch {
@@ -567,23 +562,12 @@ pub(crate) mod test {
             })) if name == "test-v1" && registered == Version::new(1, 2, 3) && used == Version::new(2, 0, 0)
         );
 
-        // Invalid metadata format - should fail with deserialization error
-        hugr.set_metadata(
-            hugr.module_root(),
-            USED_EXTENSIONS_KEY,
-            json!("not an array"),
-        );
-        assert_matches!(
-            check(&hugr, &registry),
-            Err(ExtensionBreakingError::Deserialization(_))
-        );
-
         //  Multiple extensions with all compatible versions - should pass
-        let used_exts = json!([
-            { "name": "test-v0", "version": "0.2.2" },
-            { "name": "test-v1", "version": "1.1.9" }
-        ]);
-        hugr.set_metadata(hugr.module_root(), USED_EXTENSIONS_KEY, used_exts);
+        let used_exts = vec![
+            ExtensionDesc::new("test-v0", Version::new(0, 2, 2)),
+            ExtensionDesc::new("test-v1", Version::new(1, 1, 9)),
+        ];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(check(&hugr, &registry), Ok(()));
     }
 }

@@ -32,6 +32,7 @@ use crate::extension::resolution::{
     resolve_op_types_extensions,
 };
 use crate::extension::{EMPTY_REG, ExtensionRegistry, ExtensionSet};
+use crate::metadata::RawMetadataValue;
 use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
 pub use crate::ops::{DEFAULT_OPTYPE, OpType};
 use crate::package::Package;
@@ -82,13 +83,8 @@ impl AsMut<Hugr> for Hugr {
     }
 }
 
-/// Arbitrary metadata entry for a node.
-///
-/// Each entry is associated to a string key.
-pub type NodeMetadata = serde_json::Value;
-
 /// The container of all the metadata entries for a node.
-pub type NodeMetadataMap = serde_json::Map<String, NodeMetadata>;
+pub type NodeMetadataMap = serde_json::Map<String, RawMetadataValue>;
 
 /// Public API for HUGRs.
 impl Hugr {

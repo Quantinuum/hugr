@@ -381,11 +381,11 @@ mod test {
 
     use ops::OpType;
 
-    use crate::Node;
     use crate::extension::ExtensionRegistry;
     use crate::extension::resolution::resolve_op_extensions;
     use crate::std_extensions::STD_REG;
     use crate::std_extensions::arithmetic::conversions::{self};
+    use crate::types::Type;
     use crate::{
         Extension,
         extension::{
@@ -395,6 +395,7 @@ mod test {
         std_extensions::arithmetic::int_types::INT_TYPES,
         types::FuncValueType,
     };
+    use crate::{Node, OutgoingPort};
 
     use super::*;
 
@@ -415,12 +416,22 @@ mod test {
         assert_eq!(op.name(), "OpaqueOp:res.op");
         assert_eq!(op.args(), &[usize_t().into()]);
         assert_eq!(op.signature().as_ref(), &sig);
+
+        let optype: OpType = op.into();
+        assert_eq!(
+            optype.value_input_ports().collect_vec(),
+            vec![IncomingPort::from(0)]
+        );
+        assert_eq!(
+            optype.value_output_ports().collect_vec(),
+            vec![OutgoingPort::from(0)]
+        );
     }
 
     #[test]
     fn resolve_opaque_op() {
         let registry = &STD_REG;
-        let i0 = &INT_TYPES[0];
+        let i0: &Type = &INT_TYPES[0];
         let opaque = OpaqueOp::new(
             conversions::EXTENSION_ID,
             "itobool",

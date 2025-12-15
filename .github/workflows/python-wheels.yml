@@ -68,7 +68,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --profile release-py --strip --out ../dist
-          sccache: 'true'
+          sccache: "true"
           manylinux: auto
           working-directory: ${{ env.MODULE_DIR }}
       - name: Build free-threaded wheels
@@ -76,7 +76,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --profile release-py --strip --out ../dist -i python3.13t
-          sccache: 'true'
+          sccache: "true"
           manylinux: auto
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload wheels
@@ -110,7 +110,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --profile release-py --strip --out ../dist
-          sccache: 'true'
+          sccache: "true"
           manylinux: musllinux_1_2
           working-directory: ${{ env.MODULE_DIR }}
       - name: Build free-threaded wheels
@@ -118,7 +118,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --profile release-py --strip --out ../dist -i python3.13t
-          sccache: 'true'
+          sccache: "true"
           manylinux: musllinux_1_2
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload wheels
@@ -149,7 +149,7 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --profile release-py --strip --out ../dist
-          sccache: 'true'
+          sccache: "true"
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload wheels
         uses: actions/upload-artifact@v5
@@ -164,7 +164,7 @@ jobs:
     strategy:
       matrix:
         platform:
-          - runner: macos-13
+          - runner: macos-15-intel
             target: x86_64
           - runner: macos-14
             target: aarch64
@@ -178,14 +178,14 @@ jobs:
         with:
           target: ${{ matrix.platform.target }}
           args: --profile release-py --strip --out ../dist --find-interpreter
-          sccache: 'true'
+          sccache: "true"
           working-directory: ${{ env.MODULE_DIR }}
       - name: Build free-threaded wheels
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
           args: --profile release-py --strip --out ../dist -i python3.13t
-          sccache: 'true'
+          sccache: "true"
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload wheels
         uses: actions/upload-artifact@v5
@@ -228,7 +228,7 @@ jobs:
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v3
         with:
-          subject-path: 'wheels-*/*'
+          subject-path: "wheels-*/*"
       - name: Publish to PyPI
         uses: PyO3/maturin-action@v1
         env:

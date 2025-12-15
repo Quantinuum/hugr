@@ -5,16 +5,15 @@
 //! the core and model to converge incrementally.
 use std::sync::Arc;
 
+use crate::metadata::{self, Metadata};
 use crate::{
     Direction, Hugr, HugrView, Node, Port,
-    envelope::{
-        GENERATOR_KEY, USED_EXTENSIONS_KEY,
-        description::{ExtensionDesc, ModuleDesc},
-    },
+    envelope::description::{ExtensionDesc, ModuleDesc},
     extension::{
         ExtensionId, ExtensionRegistry, SignatureError, resolution::ExtensionResolutionError,
     },
-    hugr::{HugrMut, NodeMetadata},
+    hugr::HugrMut,
+    metadata::RawMetadataValue,
     ops::{
         AliasDecl, AliasDefn, CFG, Call, CallIndirect, Case, Conditional, Const, DFG,
         DataflowBlock, ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType,
@@ -208,7 +207,8 @@ fn get_generator(ctx: &Context<'_>) -> Option<String> {
         .find_map(|meta| {
             let (name, json_val) = ctx.decode_json_meta(*meta).ok()??;
 
-            (name == GENERATOR_KEY).then_some(crate::envelope::format_generator(&json_val))
+            (name == metadata::HugrGenerator::KEY)
+                .then_some(crate::envelope::format_generator(&json_val))
         })
 }
 
@@ -221,7 +221,7 @@ fn get_used_exts(ctx: &Context<'_>) -> Option<Vec<ExtensionDesc>> {
         .find_map(|meta| {
             let (name, json_val) = ctx.decode_json_meta(*meta).ok()??;
 
-            (name == USED_EXTENSIONS_KEY)
+            (name == metadata::HugrUsedExtensions::KEY)
                 .then(|| serde_json::from_value(json_val).ok())
                 .flatten()
         })
@@ -371,7 +371,7 @@ impl<'a> Context<'a> {
     ) -> Result<(), ImportErrorInner> {
         // Import the JSON metadata
         if let Some((name, json_value)) = self.decode_json_meta(meta_item)? {
-            self.hugr.set_metadata(node, name, json_value);
+            self.hugr.set_metadata_any(node, name, json_value);
         }
 
         // Set the entrypoint
@@ -408,12 +408,13 @@ impl<'a> Context<'a> {
                     ));
                 };
 
-                let json_value: NodeMetadata = serde_json::from_str(json_str).map_err(|_| {
-                    error_invalid!(
-                        "failed to parse JSON string for `{}` metadata",
-                        model::COMPAT_CONST_JSON
-                    )
-                })?;
+                let json_value: RawMetadataValue =
+                    serde_json::from_str(json_str).map_err(|_| {
+                        error_invalid!(
+                            "failed to parse JSON string for `{}` metadata",
+                            model::COMPAT_CONST_JSON
+                        )
+                    })?;
                 Some((name.to_owned(), json_value))
             } else {
                 None
