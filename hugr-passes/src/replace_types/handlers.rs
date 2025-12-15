@@ -19,7 +19,6 @@ use hugr_core::std_extensions::collections::borrow_array::{
     BArrayClone, BArrayDiscard, BArrayOpBuilder, BorrowArray, borrow_array_type,
 };
 use hugr_core::std_extensions::collections::list::ListValue;
-use hugr_core::std_extensions::collections::value_array::ValueArray;
 use hugr_core::type_row;
 use hugr_core::types::{SumType, Transformable, Type, TypeArg};
 use itertools::Itertools;
@@ -87,18 +86,6 @@ pub fn array_const(
     repl: &ReplaceTypes,
 ) -> Result<Option<Value>, ReplaceTypesError> {
     generic_array_const::<Array>(val, repl)
-}
-
-/// Handler for [`VArrayValue`] constants that recursively
-/// [`ReplaceTypes::change_value`]s the elements of the list.
-/// Included in [`ReplaceTypes::default`].
-///
-/// [`VArrayValue`]: hugr_core::std_extensions::collections::value_array::VArrayValue
-pub fn value_array_const(
-    val: &OpaqueValue,
-    repl: &ReplaceTypes,
-) -> Result<Option<Value>, ReplaceTypesError> {
-    generic_array_const::<ValueArray>(val, repl)
 }
 
 /// Handler for copying/discarding arrays if their elements have become linear.
@@ -289,18 +276,6 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     Ok(NodeTemplate::CompoundOp(Box::new(
         dfb.finish_hugr_with_outputs(out_arrays).unwrap(),
     )))
-}
-
-/// Handler for copying/discarding value arrays if their elements have become linear.
-/// Included in [`ReplaceTypes::default`] and [`DelegatingLinearizer::default`].
-///
-/// [`DelegatingLinearizer::default`]: super::DelegatingLinearizer::default
-pub fn linearize_value_array(
-    args: &[TypeArg],
-    num_outports: usize,
-    lin: &CallbackHandler,
-) -> Result<NodeTemplate, LinearizeError> {
-    linearize_generic_array::<ValueArray>(args, num_outports, lin)
 }
 
 /// Handler for copying and discarding of arrays. Only works if the elements are copyable, or
