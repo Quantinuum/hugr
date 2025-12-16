@@ -1089,7 +1089,7 @@ mod test {
                 .collect_vec(),
             ["get", "itousize", "panic"]
         );
-        // The PackedVec<PackedVec<bool>> becomes an array<i64>
+        // The PackedVec<PackedVec<bool>> becomes a list<i64>
         let array_gets = ext_ops
             .into_iter()
             .filter_map(|e| ListOpInst::from_extension_op(e).ok())
@@ -1121,7 +1121,7 @@ mod test {
 
         let mut lowerer = ReplaceTypes::default();
 
-        // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or i64_t
+        // 1. Lower List<T> to BArray<10, T> UNLESS T is usize_t() or i64_t
         lowerer.set_replace_parametrized_type(list_type_def(), |args| {
             let ty = just_elem_type(args);
             (![usize_t(), i64_t()].contains(ty)).then_some(borrow_array_type(10, ty.clone()))
@@ -1167,7 +1167,7 @@ mod test {
             assert_eq!(cst.get_type(), Type::new_sum(vec![list_type(i64_t()); 2]));
         }
 
-        // 3. Lower all List<T> to Array<4,T>
+        // 3. Lower all List<T> to BArray<4,T>
         let mut h = backup;
         lowerer.set_replace_parametrized_type(
             list_type_def(),
