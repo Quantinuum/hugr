@@ -264,20 +264,26 @@ impl<'de> serde::de::Deserialize<'de> for GeneratorDesc {
                 let version = values
                     .get("version")
                     .and_then(|v| v.as_str())
-                    .and_then(|s| s.parse::<Version>().ok());
+                    .map(|v| v.parse::<Version>());
+                let other_fields = values.keys().any(|k| k != "name" && k != "version");
 
-                if let Some(name) = name
-                    && values.len() == (version.is_some() as usize + 1)
-                {
-                    Ok(GeneratorDesc::Structured { name, version })
-                } else {
-                    // Just encode it as a dictionary
-                    Ok(GeneratorDesc::Flat {
+                match (other_fields, name, version) {
+                    (false, Some(name), Some(Ok(version))) => Ok(GeneratorDesc::Structured {
+                        name,
+                        version: Some(version),
+                    }),
+                    (false, Some(name), None) => Ok(GeneratorDesc::Structured {
+                        name,
+                        version: None,
+                    }),
+                    // If the map does not have a name and optionally a version, or if it includes anything else,
+                    // or if the version cannot be parsed, we fall back to a flat description generated directly from the json.
+                    (_, _, _) => Ok(GeneratorDesc::Flat {
                         description: values
                             .into_iter()
                             .map(|(k, v)| format!("{k}: {v}"))
                             .join("\n"),
-                    })
+                    }),
                 }
             }
         }
