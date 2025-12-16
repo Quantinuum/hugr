@@ -29,6 +29,7 @@ from hugr.envelope import (
     read_envelope_hugr_str,
 )
 from hugr.exceptions import ParentBeforeChild
+from hugr.metadata import NodeMetadata
 from hugr.ops import (
     CFG,
     Call,
@@ -79,7 +80,7 @@ class NodeData:
     _num_inps: int = field(default=0, repr=False)
     _num_outs: int = field(default=0, repr=False)
     children: list[Node] = field(default_factory=list, repr=False)
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: NodeMetadata = field(default_factory=NodeMetadata)
 
     def _to_serial(self, node: Node) -> SerialOp:
         o = self.op._to_serial(self.parent if self.parent else node)
@@ -344,16 +345,20 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         op: Op,
         parent: ToNode | None = None,
         num_outs: int | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | NodeMetadata | None = None,
     ) -> Node:
         parent = parent.to_node() if parent else None
-        node_data = NodeData(op, parent, metadata=metadata or {})
+
+        if metadata is None or isinstance(metadata, dict):
+            metadata = NodeMetadata(metadata)
+
+        node_data = NodeData(op, parent, metadata=metadata)
 
         if self._free_nodes:
             node = self._free_nodes.pop()
             self._nodes[node.idx] = node_data
         else:
-            node = Node(len(self._nodes), {})
+            node = Node(len(self._nodes), NodeMetadata())
             self._nodes.append(node_data)
         node._num_out_ports = num_outs
         node._metadata = node_data.metadata
@@ -402,7 +407,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         op: Op,
         parent: ToNode | None = None,
         num_outs: int | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | NodeMetadata | None = None,
     ) -> Node:
         """Add a node to the HUGR.
 
@@ -423,7 +428,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         self,
         value: Value,
         parent: ToNode | None = None,
-        metadata: dict[str, Any] | None = None,
+        metadata: dict[str, Any] | NodeMetadata | None = None,
     ) -> Node:
         """Add a constant node to the HUGR.
 
@@ -474,7 +479,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         weight, self._nodes[node.idx] = self._nodes[node.idx], None
 
         # Free up the metadata dictionary
-        node._metadata = {}
+        node._metadata = NodeMetadata()
 
         self._free_nodes.append(node)
         return weight
@@ -921,7 +926,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 node_data.op,
                 node_parent,
                 num_outs=node_data._num_outs,
-                metadata=node_data.metadata,
+                metadata=node_data.metadata.as_dict(),
             )
 
         for src, dst in hugr._links.items():
@@ -964,8 +969,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             serial_idx = len(nodes)
 
             # non contiguous indices will be erased
-            nodes.append(data._to_serial(Node(serial_idx, {})))
-            metadata.append(data.metadata if data.metadata else None)
+            nodes.append(data._to_serial(Node(serial_idx, NodeMetadata())))
+            metadata.append(data.metadata._dict if data.metadata else None)
             if self.entrypoint == node:
                 entrypoint = serial_idx
 
@@ -1022,12 +1027,11 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         """Load a HUGR from a serialized form."""
         assert serial.nodes, "The encoded Hugr is empty"
 
-        def get_meta(idx: int) -> dict[str, Any]:
-            if not serial.metadata:
-                return {}
-            if idx < len(serial.metadata):
-                return serial.metadata[idx] or {}
-            return {}
+        def get_meta(idx: int) -> NodeMetadata:
+            meta = NodeMetadata()
+            if serial.metadata and idx < len(serial.metadata):
+                meta._dict = serial.metadata[idx] or {}
+            return meta
 
         # The first node is always the HUGR root.
         root_node = serial.nodes[0]
