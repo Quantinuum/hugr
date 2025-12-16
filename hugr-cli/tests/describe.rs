@@ -8,13 +8,11 @@ use assert_cmd::Command;
 use assert_fs::NamedTempFile;
 use assert_fs::assert::PathAssert;
 use assert_fs::fixture::FileWriteBin;
-use hugr::Extension;
 use hugr::builder::ModuleBuilder;
 use hugr::builder::{Dataflow, DataflowSubContainer, HugrBuilder};
 use hugr::core::Visibility;
-use hugr::envelope::{
-    EnvelopeConfig, EnvelopeFormat, EnvelopeHeader, GENERATOR_KEY, USED_EXTENSIONS_KEY,
-};
+use hugr::envelope::description::ExtensionDesc;
+use hugr::envelope::{EnvelopeConfig, EnvelopeFormat, EnvelopeHeader};
 use hugr::extension::prelude::bool_t;
 use hugr::extension::{ExtensionId, ExtensionRegistry, Version};
 use hugr::hugr::HugrView;
@@ -22,6 +20,7 @@ use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::handle::NodeHandle;
 use hugr::package::Package;
 use hugr::types::Signature;
+use hugr::{Extension, metadata};
 use predicates::{prelude::*, str::contains};
 use rstest::{fixture, rstest};
 use serde_json::Value;
@@ -103,14 +102,12 @@ fn package_with_exts() -> Vec<u8> {
         .unwrap();
     let mut hugr = module.finish_hugr().unwrap();
     hugr.set_entrypoint(f_n);
-    hugr.set_metadata(
+    hugr.set_metadata::<metadata::HugrUsedExtensions>(
         hugr.module_root(),
-        USED_EXTENSIONS_KEY,
-        json!([{ "name": "used_ext", "version": "1.0.0" }]),
+        vec![ExtensionDesc::new("used_ext", Version::new(1, 0, 0))],
     );
-    hugr.set_metadata(
+    hugr.set_metadata::<metadata::HugrGenerator>(
         hugr.module_root(),
-        GENERATOR_KEY,
         json!({ "name": "my_generator", "version": "2.0.0" }),
     );
     let mut package = Package::new(vec![hugr]);
@@ -352,7 +349,7 @@ fn test_schema(mut describe_cmd: Command) {
           ]
         },
         "ExtensionDesc": {
-          "description": "High level description of an extension.",
+          "description": "High level description of an extension.\n\nThese are stored at the module root node metadata under the [`crate::metadata::HugrUsedExtensions`] entry.",
           "type": "object",
           "properties": {
             "name": {

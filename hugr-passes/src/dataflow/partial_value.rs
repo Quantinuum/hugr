@@ -211,20 +211,18 @@ impl<V: AbstractValue, N: std::fmt::Debug> PartialSum<V, N> {
             return Err(ExtractValueError::MultipleVariants(self));
         }
         let (tag, v) = self.0.into_iter().exactly_one().unwrap();
-        if let TypeEnum::Sum(st) = typ.as_type_enum() {
-            if let Some(r) = st.get_variant(tag) {
-                if let Ok(r) = TypeRow::try_from(r.clone()) {
-                    if v.len() == r.len() {
-                        return Ok(Sum {
-                            tag,
-                            values: zip_eq(v, r.iter())
-                                .map(|(v, t)| v.try_into_concrete(t))
-                                .collect::<Result<Vec<_>, _>>()?,
-                            st: st.clone(),
-                        });
-                    }
-                }
-            }
+        if let TypeEnum::Sum(st) = typ.as_type_enum()
+            && let Some(r) = st.get_variant(tag)
+            && let Ok(r) = TypeRow::try_from(r.clone())
+            && v.len() == r.len()
+        {
+            return Ok(Sum {
+                tag,
+                values: zip_eq(v, r.iter())
+                    .map(|(v, t)| v.try_into_concrete(t))
+                    .collect::<Result<Vec<_>, _>>()?,
+                st: st.clone(),
+            });
         }
         Err(ExtractValueError::BadSumType {
             typ: typ.clone(),

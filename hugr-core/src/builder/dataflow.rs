@@ -461,7 +461,6 @@ impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
 pub(crate) mod test {
     use cool_asserts::assert_matches;
     use rstest::rstest;
-    use serde_json::json;
     use std::collections::HashMap;
 
     use crate::builder::build_traits::DataflowHugr;
@@ -471,12 +470,11 @@ pub(crate) mod test {
         endo_sig, inout_sig,
     };
     use crate::extension::SignatureError;
-    use crate::extension::prelude::Noop;
-    use crate::extension::prelude::{bool_t, qb_t, usize_t};
-    use crate::hugr::linking::NodeLinkingDirective;
+    use crate::extension::prelude::{Noop, bool_t, qb_t, usize_t};
+    use crate::hugr::linking::{NameLinkingPolicy, NodeLinkingDirective, OnMultiDefn};
     use crate::hugr::validate::InterGraphEdgeError;
+    use crate::metadata::Metadata;
     use crate::ops::{FuncDecl, FuncDefn, OpParent, OpTag, OpTrait, Value, handle::NodeHandle};
-
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
     use crate::types::{EdgeKind, FuncValueType, RowVariable, Signature, Type, TypeBound, TypeRV};
@@ -698,10 +696,22 @@ pub(crate) mod test {
 
     #[test]
     fn add_hugr() -> Result<(), BuildError> {
+        struct XIntMetadata;
+        impl Metadata for XIntMetadata {
+            type Type<'hugr> = u32;
+            const KEY: &'static str = "x";
+        }
+
+        struct XStringMetadata;
+        impl Metadata for XStringMetadata {
+            type Type<'hugr> = &'hugr str;
+            const KEY: &'static str = "x";
+        }
+
         // Create a simple DFG
         let mut dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()]))?;
         let [i1] = dfg_builder.input_wires_arr();
-        dfg_builder.set_metadata("x", 42);
+        dfg_builder.set_metadata::<XIntMetadata>(42);
         let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
 
         // Create a module, and insert the DFG into it
@@ -714,22 +724,22 @@ pub(crate) mod test {
             let [i1] = f_build.input_wires_arr();
             let dfg = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
             let f = f_build.finish_with_outputs([dfg.out_wire(0)])?;
-            module_builder.set_child_metadata(f.node(), "x", "hi");
+            module_builder.set_child_metadata::<XStringMetadata>(f.node(), "hi");
             (dfg.node(), f.node())
         };
 
         let hugr = module_builder.finish_hugr()?;
         assert_eq!(hugr.entry_descendants().count(), 7);
 
-        assert_eq!(hugr.get_metadata(hugr.entrypoint(), "x"), None);
-        assert_eq!(hugr.get_metadata(dfg_node, "x").cloned(), Some(json!(42)));
-        assert_eq!(hugr.get_metadata(f_node, "x").cloned(), Some(json!("hi")));
+        assert_eq!(hugr.get_metadata::<XIntMetadata>(hugr.entrypoint()), None);
+        assert_eq!(hugr.get_metadata::<XIntMetadata>(dfg_node), Some(42));
+        assert_eq!(hugr.get_metadata::<XStringMetadata>(f_node), Some("hi"));
 
         Ok(())
     }
 
     #[rstest]
-    fn add_hugr_link_nodes(
+    fn add_link_hugr_by_node(
         #[values(false, true)] replace: bool,
         #[values(true, false)] view: bool,
     ) {
@@ -783,6 +793,48 @@ pub(crate) mod test {
             expected_decl_names.push(ins_decl_name)
         }
         assert_eq!(decl_names, expected_decl_names);
+    }
+
+    #[test]
+    fn add_link_hugr() {
+        let to_insert = {
+            let mut dfb = DFGBuilder::new(endo_sig(vec![usize_t(); 2])).unwrap();
+            let mut mb = dfb.module_root_builder();
+            let fb = mb
+                .define_function_vis("foo", endo_sig(usize_t()), Visibility::Public)
+                .unwrap();
+            let ins = fb.input_wires();
+            let func = fb.finish_with_outputs(ins).unwrap();
+            let [in1, in2] = dfb.input_wires_arr();
+            let [out1] = dfb.call(func.handle(), &[], [in1]).unwrap().outputs_arr();
+            let [out2] = dfb.call(func.handle(), &[], [in2]).unwrap().outputs_arr();
+            dfb.finish_hugr_with_outputs([out1, out2]).unwrap()
+        };
+        let mut dfb = DFGBuilder::new(inout_sig(usize_t(), vec![usize_t(); 2])).unwrap();
+        let [in1] = dfb.input_wires_arr();
+        let pol = NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget);
+        let [out1, out2] = dfb
+            .add_link_view_with_wires(&to_insert, &pol, [in1, in1])
+            .unwrap()
+            .outputs_arr();
+        assert!({
+            let h = dfb.hugr();
+            h.children(h.module_root())
+                .skip(1)
+                .exactly_one()
+                .is_ok_and(|n| h.static_targets(n).unwrap().count() == 2)
+        });
+        let [out3, out4] = dfb
+            .add_link_hugr_with_wires(to_insert, &pol, [out1, out2])
+            .unwrap()
+            .outputs_arr();
+        let h = dfb.finish_hugr_with_outputs([out3, out4]).unwrap();
+        assert!(
+            h.children(h.module_root())
+                .skip(1)
+                .exactly_one()
+                .is_ok_and(|n| h.static_targets(n).unwrap().count() == 4)
+        );
     }
 
     #[test]

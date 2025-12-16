@@ -15,6 +15,7 @@ use crate::hugr::internal::HugrMutInternals;
 use crate::hugr::test::check_hugr_equality;
 use crate::hugr::validate::ValidationError;
 use crate::hugr::views::ExtractionResult;
+use crate::metadata::Metadata;
 use crate::ops::custom::{ExtensionOp, OpaqueOp, OpaqueOpError};
 use crate::ops::{self, DFG, Input, Module, Output, Value, dataflow::IOTrait};
 use crate::package::Package;
@@ -80,7 +81,7 @@ impl NamedSchema {
         strs.extend(errors.flat_map(|error| {
             [
                 format!("Validation error: {error}"),
-                format!("Instance path: {}", error.instance_path),
+                format!("Instance path: {}", error.instance_path()),
             ]
         }));
         strs.push("Serialization test failed.".to_string());
@@ -362,9 +363,21 @@ fn simpleser() {
 
 #[test]
 fn weighted_hugr_ser() {
+    struct NameMetadata;
+    impl Metadata for NameMetadata {
+        type Type<'hugr> = &'hugr str;
+        const KEY: &'static str = "name";
+    }
+
+    struct ValMetadata;
+    impl Metadata for ValMetadata {
+        type Type<'hugr> = u32;
+        const KEY: &'static str = "val";
+    }
+
     let hugr = {
         let mut module_builder = ModuleBuilder::new();
-        module_builder.set_metadata("name", "test");
+        module_builder.set_metadata::<NameMetadata>("test");
 
         let t_row = vec![Type::new_sum([vec![usize_t()], vec![qb_t()]])];
         let mut f_build = module_builder
@@ -380,7 +393,7 @@ fn weighted_hugr_ser() {
                     .out_wire(0)
             })
             .collect_vec();
-        f_build.set_metadata("val", 42);
+        f_build.set_metadata::<ValMetadata>(42);
         f_build.finish_with_outputs(outputs).unwrap();
 
         module_builder.finish_hugr().unwrap()

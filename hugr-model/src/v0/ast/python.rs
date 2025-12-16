@@ -4,13 +4,15 @@ use crate::v0::Visibility;
 
 use super::{Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, Term};
 use pyo3::{
-    Bound, PyAny, PyResult,
+    PyAny,
     exceptions::PyTypeError,
     types::{PyAnyMethods, PyStringMethods as _, PyTypeMethods as _},
 };
 
-impl<'py> pyo3::FromPyObject<'py> for Term {
-    fn extract_bound(term: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for Term {
+    type Error = pyo3::PyErr;
+
+    fn extract(term: pyo3::Borrowed<'_, 'py, PyAny>) -> pyo3::PyResult<Self> {
         let name = term.get_type().name()?;
 
         Ok(match name.to_cow()?.as_ref() {
@@ -90,8 +92,10 @@ impl<'py> pyo3::IntoPyObject<'py> for &Term {
     }
 }
 
-impl<'py> pyo3::FromPyObject<'py> for SeqPart {
-    fn extract_bound(part: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for SeqPart {
+    type Error = pyo3::PyErr;
+
+    fn extract(part: pyo3::Borrowed<'_, 'py, PyAny>) -> pyo3::PyResult<Self> {
         let name = part.get_type().name()?;
 
         if name.to_cow()?.as_ref() == "Splice" {
@@ -121,8 +125,10 @@ impl<'py> pyo3::IntoPyObject<'py> for &SeqPart {
     }
 }
 
-impl<'py> pyo3::FromPyObject<'py> for Param {
-    fn extract_bound(symbol: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for Param {
+    type Error = pyo3::PyErr;
+
+    fn extract(symbol: pyo3::Borrowed<'_, 'py, PyAny>) -> pyo3::PyResult<Self> {
         let name = symbol.getattr("name")?.extract()?;
         let r#type = symbol.getattr("type")?.extract()?;
         Ok(Self { name, r#type })
@@ -141,8 +147,10 @@ impl<'py> pyo3::IntoPyObject<'py> for &Param {
     }
 }
 
-impl<'py> pyo3::FromPyObject<'py> for Visibility {
-    fn extract_bound(ob: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for Visibility {
+    type Error = pyo3::PyErr;
+
+    fn extract(ob: pyo3::Borrowed<'_, 'py, PyAny>) -> pyo3::PyResult<Self> {
         match ob.str()?.to_cow()?.as_ref() {
             "Public" => Ok(Visibility::Public),
             "Private" => Ok(Visibility::Private),
@@ -167,8 +175,10 @@ impl<'py> pyo3::IntoPyObject<'py> for &Visibility {
     }
 }
 
-impl<'py> pyo3::FromPyObject<'py> for Symbol {
-    fn extract_bound(symbol: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for Symbol {
+    type Error = pyo3::PyErr;
+
+    fn extract(symbol: pyo3::Borrowed<'_, 'py, PyAny>) -> pyo3::PyResult<Self> {
         let name = symbol.getattr("name")?.extract()?;
         let params: Vec<_> = symbol.getattr("params")?.extract()?;
         let visibility = symbol.getattr("visibility")?.extract()?;
@@ -202,8 +212,10 @@ impl<'py> pyo3::IntoPyObject<'py> for &Symbol {
     }
 }
 
-impl<'py> pyo3::FromPyObject<'py> for Node {
-    fn extract_bound(node: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for Node {
+    type Error = pyo3::PyErr;
+
+    fn extract(node: pyo3::Borrowed<'_, 'py, PyAny>) -> pyo3::PyResult<Self> {
         let operation = node.getattr("operation")?.extract()?;
         let inputs: Vec<_> = node.getattr("inputs")?.extract()?;
         let outputs: Vec<_> = node.getattr("outputs")?.extract()?;
@@ -241,8 +253,10 @@ impl<'py> pyo3::IntoPyObject<'py> for &Node {
     }
 }
 
-impl<'py> pyo3::FromPyObject<'py> for Operation {
-    fn extract_bound(op: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for Operation {
+    type Error = pyo3::PyErr;
+
+    fn extract(op: pyo3::Borrowed<'_, 'py, PyAny>) -> pyo3::PyResult<Self> {
         let name = op.get_type().name()?;
 
         Ok(match name.to_cow()?.as_ref() {
@@ -358,8 +372,10 @@ impl<'py> pyo3::IntoPyObject<'py> for &Operation {
     }
 }
 
-impl<'py> pyo3::FromPyObject<'py> for Region {
-    fn extract_bound(region: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for Region {
+    type Error = pyo3::PyErr;
+
+    fn extract(region: pyo3::Borrowed<'_, 'py, PyAny>) -> pyo3::PyResult<Self> {
         let kind = region.getattr("kind")?.extract()?;
         let sources: Vec<_> = region.getattr("sources")?.extract()?;
         let targets: Vec<_> = region.getattr("targets")?.extract()?;
@@ -397,8 +413,10 @@ impl<'py> pyo3::IntoPyObject<'py> for &Region {
     }
 }
 
-impl<'py> pyo3::FromPyObject<'py> for Module {
-    fn extract_bound(module: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for Module {
+    type Error = pyo3::PyErr;
+
+    fn extract(module: pyo3::Borrowed<'_, 'py, PyAny>) -> pyo3::PyResult<Self> {
         let root = module.getattr("root")?.extract()?;
         Ok(Self { root })
     }
@@ -416,8 +434,10 @@ impl<'py> pyo3::IntoPyObject<'py> for &Module {
     }
 }
 
-impl<'py> pyo3::FromPyObject<'py> for Package {
-    fn extract_bound(package: &Bound<'py, PyAny>) -> PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for Package {
+    type Error = pyo3::PyErr;
+
+    fn extract(package: pyo3::Borrowed<'_, 'py, PyAny>) -> pyo3::PyResult<Self> {
         let modules = package.getattr("modules")?.extract()?;
         Ok(Self { modules })
     }

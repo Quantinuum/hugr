@@ -90,7 +90,7 @@ use thiserror::Error;
 use crate::extension::SignatureError;
 use crate::extension::simple_op::OpLoadError;
 use crate::hugr::ValidationError;
-use crate::hugr::linking::NodeLinkingError;
+use crate::hugr::linking::{NameLinkingError, NodeLinkingError};
 use crate::ops::handle::{BasicBlockID, CfgID, ConditionalID, DfgID, FuncID, TailLoopID};
 use crate::ops::{NamedOp, OpType};
 use crate::types::Type;
@@ -178,13 +178,23 @@ pub enum BuildError {
         node: Node,
     },
 
-    /// From [Dataflow::add_link_hugr_by_node_with_wires]
+    /// Deprecated: [Self::HugrNodeLinkingError] is emitted instead
+    #[deprecated(note = "No longer emitted; HugrNodeLinkingError used instead")]
     #[error{"In inserting Hugr: {0}"}]
-    HugrInsertionError(#[from] NodeLinkingError<Node, Node>),
+    HugrInsertionError(NodeLinkingError<Node, Node>),
 
-    /// From [Dataflow::add_link_view_by_node_with_wires].
-    /// Note that because the type of node in the [NodeLinkingError] depends
-    /// upon the view being inserted, we convert the error to a string here.
+    /// From [Dataflow::add_link_hugr_by_node_with_wires]
+    #[error("In inserting Hugr: {0}")]
+    HugrNodeLinkingError(#[from] NodeLinkingError<Node, Node>),
+
+    /// From [Dataflow::add_link_hugr_with_wires].
+    #[error{"In linking Hugr: {0}"}]
+    HugrLinkingError(#[from] NameLinkingError<Node, Node>),
+
+    /// From [Dataflow::add_link_view_by_node_with_wires] or
+    /// [Dataflow::add_link_view_with_wires].
+    /// Note that because the type of node in the [NodeLinkingError] or [NameLinkingError]
+    /// depends upon the view being inserted, we convert the error to a string here.
     #[error("In inserting HugrView: {0}")]
     HugrViewInsertionError(String),
 
