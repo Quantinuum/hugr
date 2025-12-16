@@ -11,7 +11,7 @@ use assert_fs::fixture::FileWriteBin;
 use hugr::builder::ModuleBuilder;
 use hugr::builder::{Dataflow, DataflowSubContainer, HugrBuilder};
 use hugr::core::Visibility;
-use hugr::envelope::description::ExtensionDesc;
+use hugr::envelope::description::{ExtensionDesc, GeneratorDesc};
 use hugr::envelope::{EnvelopeConfig, EnvelopeFormat, EnvelopeHeader};
 use hugr::extension::prelude::bool_t;
 use hugr::extension::{ExtensionId, ExtensionRegistry, Version};
@@ -108,7 +108,7 @@ fn package_with_exts() -> Vec<u8> {
     );
     hugr.set_metadata::<metadata::HugrGenerator>(
         hugr.module_root(),
-        json!({ "name": "my_generator", "version": "2.0.0" }),
+        GeneratorDesc::new("my_generator", Version::new(2, 0, 0)),
     );
     let mut package = Package::new(vec![hugr]);
     let packed_ext = Extension::new(
