@@ -35,9 +35,10 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
 import pyzstd
+from semver import Version
 
 import hugr._hugr.model as rust
 
@@ -263,3 +264,97 @@ class EnvelopeConfig:
 # These can only be initialized _after_ the class is defined.
 EnvelopeConfig.TEXT = EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=None)
 EnvelopeConfig.BINARY = EnvelopeConfig(format=EnvelopeFormat.MODEL_WITH_EXTS, zstd=0)
+
+
+@dataclass(frozen=True)
+class GeneratorDesc:
+    """Description of the generator that defined the HUGR module.
+
+    These are stored at the module root node metadata under the
+    :class:`hugr.metadata.HugrGenerator` entry.
+    """
+
+    name: str
+    version: Version | None
+
+    def _to_json(self) -> dict[str, str]:
+        """Encodes the generator as a dictionary of native types that can be
+        serialized by `json.dump`.
+        """
+        if self.version is None:
+            return {
+                "name": self.name,
+            }
+        else:
+            return {
+                "name": self.name,
+                "version": str(self.version),
+            }
+
+    @classmethod
+    def _from_json(cls, value: Any) -> GeneratorDesc:
+        """Decodes the generator from a native types obtained from `json.load`."""
+        if isinstance(value, str):
+            return GeneratorDesc(name=value, version=None)
+
+        if not isinstance(value, dict):
+            msg = (
+                "Expected generator metadata to be a string or a dict,"
+                + " but got {type(value)}"
+            )
+            raise TypeError(msg)
+
+        fallback_name = " ".join(f"{k}: {v}" for k, v in value.items())
+        if "name" not in value or any(k != "name" and k != "version" for k in value):
+            return GeneratorDesc(name=fallback_name, version=None)
+        if "version" in value:
+            try:
+                version = Version.parse(value["version"])
+            except ValueError:
+                return GeneratorDesc(name=fallback_name, version=None)
+            return GeneratorDesc(name=value["name"], version=version)
+        else:
+            return GeneratorDesc(name=value["name"], version=None)
+
+
+@dataclass
+class ExtensionDesc:
+    """High level description of a HUGR extension.
+
+    A list of these is stored at the module root node metadata under the
+    :class:`hugr.metadata.HugrUsedExtensions` entry.
+    """
+
+    name: str
+    version: Version
+
+    def _to_json(self) -> dict[str, str]:
+        """Encodes the extension as a dictionary of native types that can be
+        serialized by `json.dump`.
+        """
+        return {
+            "name": self.name,
+            "version": str(self.version),
+        }
+
+    @classmethod
+    def _from_json(cls, value: Any) -> ExtensionDesc:
+        """Decodes the extension from a native types obtained from `json.load`."""
+        if not isinstance(value, dict):
+            msg = f"Expected extension metadata to be a dict, but got {type(value)}"
+            raise TypeError(msg)
+        if "name" not in value:
+            msg = (
+                "Expected extension metadata to be a dict with a 'name' key,"
+                + f" but got {value}"
+            )
+            raise TypeError(msg)
+        if "version" not in value:
+            msg = (
+                "Expected extension metadata to be a dict with a 'version' key,"
+                + f" but got {value}"
+            )
+            raise TypeError(msg)
+        return ExtensionDesc(
+            name=value["name"], version=Version.parse(value["version"])
+        )

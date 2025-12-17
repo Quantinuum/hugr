@@ -5,18 +5,40 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, overload
 
+import hugr._hugr.metadata as rust_metadata
+from hugr.envelope import ExtensionDesc, GeneratorDesc
+
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
-MetaCovariant = TypeVar("MetaCovariant", covariant=True)
 Meta = TypeVar("Meta")
 
 
-class Metadata(Protocol[MetaCovariant]):
-    """Metadata for a HUGR node."""
+class Metadata(Protocol[Meta]):
+    """Metadata for a HUGR node.
+
+    This is a protocol for metadata entries that defines a unique key to
+    identify the entry, and the type of the value.
+
+    Values in a hugr are encoded using json. When the value type is not a
+    primitive type, `to_json` and `from_json` must be implemented to serialize
+    and deserialize the value.
+
+    Args:
+        value: The value of the metadata.
+    """
 
     KEY: ClassVar[str]
-    TYPE: ClassVar[type]
+
+    @classmethod
+    def to_json(cls, value: Meta) -> Any:
+        """Serialize the metadata value to a json value."""
+        return value
+
+    @classmethod
+    def from_json(cls, value: Any) -> Meta:
+        """Deserialize the metadata value from the stored json value."""
+        return value
 
 
 @dataclass
@@ -35,11 +57,19 @@ class NodeMetadata:
     @overload
     def get(self, key: str, default: Any | None = None) -> Any | None: ...
     @overload
-    def get(self, key: Metadata[Meta], default: Meta | None = None) -> Meta | None: ...
-    def get(self, key: str | Metadata[Meta], default: Any | None = None) -> Meta | None:
-        if not isinstance(key, str):
-            key = key.KEY
-        return self._dict.get(key, default)
+    def get(
+        self, key: type[Metadata[Meta]], default: Meta | None = None
+    ) -> Meta | None: ...
+    def get(
+        self, key: str | type[Metadata[Meta]], default: Any | None = None
+    ) -> Any | None:
+        if isinstance(key, str):
+            return self._dict.get(key, default)
+        elif key.KEY in self._dict:
+            val = self._dict[key.KEY]
+            return key.from_json(val)
+        else:
+            return None
 
     def items(self) -> Iterable[tuple[str, Any]]:
         return self._dict.items()
@@ -50,23 +80,24 @@ class NodeMetadata:
     @overload
     def __getitem__(self, key: str) -> Any: ...
     @overload
-    def __getitem__(self, key: Metadata[Meta]) -> Meta: ...
-    def __getitem__(self, key: str | Metadata[Meta]) -> Any:
-        if not isinstance(key, str):
-            key = key.KEY
-        return self._dict[key]
+    def __getitem__(self, key: type[Metadata[Meta]]) -> Meta: ...
+    def __getitem__(self, key: str | type[Metadata[Meta]]) -> Any:
+        if isinstance(key, str):
+            return self._dict[key]
+        else:
+            val = self._dict[key.KEY]
+            return key.from_json(val)
 
     @overload
     def __setitem__(self, key: str, value: Any) -> None: ...
     @overload
-    def __setitem__(self, key: Metadata[Meta], value: Meta) -> None: ...
-    def __setitem__(self, key: str | Metadata[Meta], value: Any) -> None:
-        if not isinstance(key, str):
-            if not isinstance(value, key.TYPE):
-                error = f"Value for metadata key {key.KEY} must be of type {key.TYPE}"
-                raise TypeError(error)
-            key = key.KEY
-        self._dict[key] = value
+    def __setitem__(self, key: type[Metadata[Meta]], value: Meta) -> None: ...
+    def __setitem__(self, key: str | type[Metadata[Meta]], value: Any) -> None:
+        if isinstance(key, str):
+            self._dict[key] = value
+        else:
+            json_value = key.to_json(value)
+            self._dict[key.KEY] = json_value
 
     def __iter__(self) -> Iterator[str]:
         return iter(self._dict)
@@ -74,10 +105,56 @@ class NodeMetadata:
     def __len__(self) -> int:
         return len(self._dict)
 
-    def __contains__(self, key: str | Metadata[Meta]) -> bool:
+    def __contains__(self, key: str | type[Metadata[Meta]]) -> bool:
         if not isinstance(key, str):
             key = key.KEY
         return key in self._dict
 
     def __repr__(self) -> str:
         return f"NodeMetadata({self._dict})"
+
+
+# --- Core metadata keys ---
+
+
+class HugrGenerator(Metadata[GeneratorDesc]):
+    """Metadata describing the generator that defined the HUGR module.
+
+    This value is only valid when set at the module root node.
+    """
+
+    KEY = rust_metadata.HUGR_GENERATOR
+
+    @classmethod
+    def to_json(cls, value: GeneratorDesc) -> dict[str, str]:
+        return value._to_json()
+
+    @classmethod
+    def from_json(cls, value: Any) -> GeneratorDesc:
+        return GeneratorDesc._from_json(value)
+
+
+class HugrUsedExtensions(Metadata[list[ExtensionDesc]]):
+    """Metadata storing the list of extensions required to define the HUGR.
+
+    This list may contain additional extensions that are no longer present in
+    the Hugr.
+
+    This value is only valid when set at the module root node.
+    """
+
+    KEY = rust_metadata.HUGR_USED_EXTENSIONS
+
+    @classmethod
+    def to_json(cls, value: list[ExtensionDesc]) -> list[dict[str, str]]:
+        return [e._to_json() for e in value]
+
+    @classmethod
+    def from_json(cls, value: Any) -> list[ExtensionDesc]:
+        if not isinstance(value, list):
+            msg = (
+                "Expected UsedExtensions metadata to be a list,"
+                + f" but got {type(value)}"
+            )
+            raise TypeError(msg)
+        return [ExtensionDesc._from_json(e) for e in value]

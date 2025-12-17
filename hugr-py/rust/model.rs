@@ -5,7 +5,8 @@ use hugr_cli::RunWithIoError;
 use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::{PyErr, PyResult, create_exception, pymodule};
 
-#[pymodule(submodule)]
+#[pymodule]
+#[pyo3(submodule)]
 pub mod model {
     use hugr_cli::CliArgs;
     use hugr_model::v0::ast;
