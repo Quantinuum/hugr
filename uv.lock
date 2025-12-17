@@ -392,7 +392,7 @@ requires-dist = [
     { name = "pydantic", specifier = "~=2.8" },
     { name = "pydantic-extra-types", specifier = "~=2.9" },
     { name = "pytket", marker = "extra == 'pytket'", specifier = ">=1.34.0" },
-    { name = "pyzstd", specifier = "~=0.18.0" },
+    { name = "pyzstd", specifier = ">=0.18,<0.20" },
     { name = "semver", specifier = "~=3.0" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=8.1.3,<9.0.0" },
     { name = "typing-extensions", specifier = "~=4.12" },
