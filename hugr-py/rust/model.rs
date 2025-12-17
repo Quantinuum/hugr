@@ -5,12 +5,13 @@ use hugr_cli::RunWithIoError;
 use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::{PyErr, PyResult, create_exception, pymodule};
 
-#[pymodule]
+#[pymodule(submodule)]
 pub mod model {
     use hugr_cli::CliArgs;
     use hugr_model::v0::ast;
     use pyo3::exceptions::PyValueError;
-    use pyo3::{PyResult, pyfunction};
+    use pyo3::types::{PyAnyMethods, PyModule};
+    use pyo3::{Bound, PyResult, Python, pyfunction};
 
     #[pymodule_export]
     use super::HugrCliDescribeError;
@@ -116,6 +117,16 @@ pub mod model {
         let cli_args = CliArgs::new_from_args(args);
         let input = input_bytes.unwrap_or(&[]);
         cli_args.run_with_io(input).map_err(super::cli_error_to_py)
+    }
+
+    /// Hack: workaround for <https://github.com/PyO3/pyo3/issues/759>
+    #[pymodule_init]
+    fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
+        Python::attach(|py| {
+            py.import("sys")?
+                .getattr("modules")?
+                .set_item("hugr._hugr.model", m)
+        })
     }
 }
 
