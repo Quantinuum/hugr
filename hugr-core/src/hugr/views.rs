@@ -11,6 +11,7 @@ pub mod sibling_subgraph;
 #[cfg(test)]
 mod tests;
 
+use serde::de::Deserialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -28,9 +29,10 @@ use portgraph::{LinkView, PortView};
 
 use super::internal::{HugrInternals, HugrMutInternals};
 use super::validate::ValidationContext;
-use super::{Hugr, HugrMut, Node, NodeMetadata, ValidationError};
+use super::{Hugr, HugrMut, Node, ValidationError};
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
+use crate::metadata::{Metadata, RawMetadataValue};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
@@ -100,13 +102,27 @@ pub trait HugrView: HugrInternals {
     fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
 
     /// Returns the metadata associated with a node.
+    ///
+    /// For a non type-safe accessor use [`HugrView::get_metadata_any`] instead.
     #[inline]
-    fn get_metadata(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&NodeMetadata> {
-        if self.contains_node(node) {
-            self.node_metadata_map(node).get(key.as_ref())
-        } else {
-            None
+    fn get_metadata<M: Metadata>(&self, node: Self::Node) -> Option<<M as Metadata>::Type<'_>> {
+        self.get_metadata_any(node, <M as Metadata>::KEY)
+            .and_then(|value| <<M as Metadata>::Type<'_> as Deserialize>::deserialize(value).ok())
+    }
+
+    /// Returns a metadata entry associated with a node and a string key.
+    ///
+    /// When possible, prefer using the type-safe accessor [`HugrView::get_metadata`] instead.
+    #[inline]
+    fn get_metadata_any(
+        &self,
+        node: Self::Node,
+        key: impl AsRef<str>,
+    ) -> Option<&RawMetadataValue> {
+        if !self.contains_node(node) {
+            return None;
         }
+        self.node_metadata_map(node).get(key.as_ref())
     }
 
     /// Returns the operation type of a node.
