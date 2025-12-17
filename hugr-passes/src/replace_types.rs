@@ -37,6 +37,7 @@ pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linea
 ///
 /// [`DataflowParent`]: hugr_core::ops::OpTag::DataflowParent
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum NodeTemplate {
     /// A single node - so if replacing an existing node, change only the op
     SingleOp(OpType),
@@ -51,11 +52,11 @@ pub enum NodeTemplate {
     /// Other children of the Hugr reachable from the entrypoint will also be inserted
     /// according to the specified linking policy.
     LinkedHugr(Box<Hugr>, NameLinkingPolicy),
+    /// A Call to an existing function.
     #[deprecated(
         note = "Use LinkedHugr with Call entrypoint and FuncDecl",
         since = "0.24.4"
     )]
-    /// A Call to an existing function.
     Call(Node, Vec<TypeArg>),
 }
 
