@@ -7,7 +7,7 @@ from enum import Enum
 
 from semver import Version
 
-import hugr._hugr as rust
+import hugr._hugr.model as rust
 from hugr.tys import Visibility
 
 

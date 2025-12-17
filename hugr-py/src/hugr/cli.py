@@ -7,7 +7,7 @@ validate, describe, convert, and mermaid.
 
 from pydantic import BaseModel
 
-from hugr._hugr import HugrCliDescribeError, HugrCliError, cli_with_io
+from hugr._hugr.model import HugrCliDescribeError, HugrCliError, cli_with_io
 
 __all__ = [
     "cli_with_io",
