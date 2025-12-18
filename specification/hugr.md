@@ -1590,7 +1590,7 @@ so must be supported by all third-party tooling.
 
 `error`: an error type which operations use as a variant of sum to indicate when an error may occur. See [Arithmetic Extensions](#arithmetic-extensions) for some examples.
 
-### Operations
+#### Operations
 
 | Name              | Inputs       | Outputs       | Meaning                                                                                                                                                                                                            |
 |-------------------|--------------|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -1774,6 +1774,85 @@ Conversions between integers and floats:
 | `convert_s<N>` | `int<N>`  | `float64`                  | signed int to float   |
 | `bytecast_int64_to_float64` | `int<6>`  | `float64`     | reinterpret an int64 as a float64 based on its bytes, with the same endianness. |
 | `bytecast_float64_to_int64` | `float64` | `int64`       | reinterpret an float64 as an int based on its bytes, with the same endianness. |
+
+### Collections Extensions
+
+There are multiple extensions defining types, values and operations to work with collections of data:
+
+- `collections.array`: The standard linear and fixed-length array type, parameterised by length and element type.
+- `collections.borrow_arr`: A linear and fixed-length array type that provides additional unsafe operations for borrowing elements from the array, parameterised by length and element type.
+- `collections.static_array`: An array type for modeling globally available constant arrays of copyable values, parameterised only by element type.
+- `collections.list`: A variable-length list type, paramterised by element type.
+
+The array and borrow array extensions are implemented using a generic `ArrayKind` trait that allows different array implementations to share parts of their implementation.
+
+#### `collections.array`
+
+This extension provides the `array` type and value with the following operations:
+
+
+| Operation       | Inputs          | Outputs         | Meaning         |
+|-----------------|-----------------|-----------------|-----------------|
+| `new_array`     | `elem_ty^SIZE` | `array<SIZE, elemty>` | Make a new array, given distinct inputs equal to its length. `SIZE` must be statically known (not a variable). |
+| `get`           | `array<size, elemty>`, `usize` | `option<elemty>`, `array` | Copy an element out of the array (**copyable** elements only). Return none if the index is out of bounds. |
+| `set`           | `array<size, elemty>`, `usize`, `elemty` | `either<elemty, array>` | Exchange an element of the array with an external value. Tagged for failure/success respectively. |
+| `swap`          | `array<size, elemty>`, `usize`, `usize` | `either<array, array>` | Exchange the elements at two indices within the array. Tagged for failure/success respectively. |
+| `pop_left`      | `array<SIZE, elemty>` | `option<elemty, array<SIZE-1, elemty>>` | Pop an element from the left of the array. `SIZE` must be statically known (not a variable). Return none if the input array is size 0. |
+| `pop_right`     | `array<SIZE, elemty>` | `option<elemty, array<SIZE-1, elemty>>` | Pop an element from the right of the array. `SIZE` must be statically known (not a variable). Return none if the input array is size 0. |
+| `discard_empty` | `array<0, elemty>` | `()`  | Discard an empty array. |
+| `discard`       | `array<SIZE, elemty>` | `()`  | Discard an array with **copyable** elements. |
+| `clone`         | `array<SIZE, elemty>` | `array<SIZE, elemty>`, `array<SIZE, elemty>` | Clone an array with **copyable** elements. |
+| `unpack`        | `array<SIZE, elemty>` | `elemty^SIZE` | Unpack an array into its individual elements. `SIZE` must be statically known (not a variable). |
+| `repeat`        | `(() -> elemty)` | `array<SIZE, elemty>` | Create a new array whose elements are initialised by calling the given function `SIZE` times. |
+| `scan`          | `array<SIZE, elemty_src>`,  `(elemty_src, list<acc_ty> -> elemty_dest, list<acc_ty)`, `list<acc_ty>` | `array<SIZE, elemty_dest>`, `list<acc_ty>`  | A combination of map and foldl. Apply a function to each element of the array with an accumulator that is passed through from start to finish. Return the resulting array and the final state of the accumulator. |
+
+
+#### `collections.borrow_arr`
+
+This extension contains the `borrow_array` type and value. It has all the operations as the array extension does (see previous section), with addtional unsafe operations to deal with borrowing elements. Borrowing means taking elements out of an array while being able to rely on the underlying implementation to keep track of which elements have already been taken out.
+
+| Operation             | Inputs                | Outputs               | Meaning               |
+|-----------------------|-----------------------|-----------------------|-----------------------|
+| `borrow`              | `borrow_array<size, elemty>`, `usize`| `borrow_array<size, elemty>`, `elemty` | Borrow an element from the array at the given index. The element already being borrowed should result in a panic. |
+| `return`              | `borrow_array<size, elemty>`, `usize`, `elemty` | `borrow_array<size, elemty>`| Return an element to the array at the given index. There already being an element at this index should result in a panic. |
+| `discard_all_borrowed`| `borrow_array<size, elemty>`| `()`| Discard an array where all elements have been borrowed. Should panic if there are still elements in the array. |
+| `new_all_borrowed`.   | `()` | `borrow_array<size, elemty>`| Create a new borrow array where all elements are borrowed. |
+| `is_borrowed`         | `borrow_array<size, elemty>`, `usize` | `bool`, `borrow_array<size, elemty>` | Check if the element at the given index is borrowed. |
+
+There are also conversion operations to convert borrow arrays to and from standard arrays:
+
+| Operation    | Inputs       | Outputs      | Meaning      |
+|--------------|--------------|--------------|--------------|
+| `from_array` | `array<size, elemty>` | `borrow_array<size, elemty>` | Turn an array into a borrow array. |
+| `to_array`   | `borrow_array<size, elemty>` | `array<size, elemty>` | Turn a borrow array into an array. |
+
+#### `collections.static_array`
+
+
+This extension contains the `static_array` type and value for modelling constant statically sized arrays. The only way of obtaining a value of type `static_array` is by creating a `StaticArrayValue`. There are only two operations provided:
+
+
+| Operation    | Inputs       | Outputs      | Meaning      |
+|--------------|--------------|--------------|--------------|
+| `get`        | `static_array<elemty>`, `usize` | `option<elemty>`| Get the element at the given index. Return none if the index is out of bounds. |
+| `len`        | `static_array<elemty>` | `usize` | Get sthe length of the array. |
+
+
+
+#### `collections.list`
+
+This extension contains the `list` type and value. Lists are dynamically sized, with all elements having the same type.
+
+| Operation | Inputs | Outputs | Meaning |
+|-----------|--------|---------|---------|
+| `pop`     | `list<elemty>` | `list<elemty>`, `option<elemty>` | Pop from the end of list. Return an optional value. |
+| `push`    | `list<elemty>`, `elemty` | `list<elemty>` | Push to end of list. Return the new list. |
+| `get`     | `list<elemty>`, `usize` | `option<elemty>` | Lookup an element in a list by index. |
+| `set`     | `list<elemty>`, `usize`, `elemty` | `list<elemty>`, `either<elemty, elemty>`,  | Replace the element at the given index, and return the old value. If the index is out of bounds, return the input value as an error. |
+| `insert`  | `list<elemty>`, `usize`, `elemty` | `list<elemty>`, `either<elem_ty, ()>` | Insert an element at the given index. Elements at higher indices are shifted one position to the right. Return an error with the element if the index is out of bounds. |
+| `length`  | `list<elemty>` | `list<elemty>`, `usize` | Get the length of a list. |
+
+
 
 ## Glossary
 
