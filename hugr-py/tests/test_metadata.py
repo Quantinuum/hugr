@@ -41,3 +41,13 @@ def test_metadata_roundtrip() -> None:
         {"name": "ext.a", "version": "0.1.0"},
         {"name": "ext.b", "version": "2.0.0"},
     ]
+
+
+def test_metadata_default() -> None:
+    hugr = Hugr[Any]()
+    node = hugr[hugr.module_root]
+
+    assert node.metadata.get(HugrGenerator) is None
+    assert node.metadata.get(
+        HugrGenerator, GeneratorDesc("hugr-py-test", Version.parse("1.2.3"))
+    ) == GeneratorDesc("hugr-py-test", Version.parse("1.2.3"))

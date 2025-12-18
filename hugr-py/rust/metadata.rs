@@ -7,12 +7,6 @@ pub mod metadata {
     use pyo3::types::{PyAnyMethods, PyModule};
     use pyo3::{Bound, PyResult, Python};
 
-    #[pymodule_export]
-    const HUGR_GENERATOR: &str = hugr_core::metadata::HugrGenerator::KEY;
-
-    #[pymodule_export]
-    const HUGR_USED_EXTENSIONS: &str = hugr_core::metadata::HugrUsedExtensions::KEY;
-
     /// Hack: workaround for <https://github.com/PyO3/pyo3/issues/759>
     #[pymodule_init]
     fn init(m: &Bound<'_, PyModule>) -> PyResult<()> {
@@ -22,4 +16,10 @@ pub mod metadata {
                 .set_item("hugr._hugr.metadata", m)
         })
     }
+
+    #[pymodule_export]
+    const HUGR_GENERATOR: &str = hugr_core::metadata::HugrGenerator::KEY;
+
+    #[pymodule_export]
+    const HUGR_USED_EXTENSIONS: &str = hugr_core::metadata::HugrUsedExtensions::KEY;
 }

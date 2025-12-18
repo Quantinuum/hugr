@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, overload
 
@@ -50,16 +51,15 @@ class NodeMetadata:
     def __init__(self, metadata: dict[str, Any] | None = None) -> None:
         if metadata is None:
             metadata = {}
-        self._dict = {
-            k if isinstance(k, str) else k.KEY: v for k, v in metadata.items()
-        }
+        # Only a shallow copy, values may still be shared with the original dictionary.
+        self._dict = copy.copy(metadata)
 
     @overload
     def get(self, key: str, default: Any | None = None) -> Any | None: ...
     @overload
-    def get(
-        self, key: type[Metadata[Meta]], default: Meta | None = None
-    ) -> Meta | None: ...
+    def get(self, key: type[Metadata[Meta]], default: Meta) -> Meta: ...
+    @overload
+    def get(self, key: type[Metadata[Meta]], default: None = None) -> Meta | None: ...
     def get(
         self, key: str | type[Metadata[Meta]], default: Any | None = None
     ) -> Any | None:
@@ -69,7 +69,7 @@ class NodeMetadata:
             val = self._dict[key.KEY]
             return key.from_json(val)
         else:
-            return None
+            return default
 
     def items(self) -> Iterable[tuple[str, Any]]:
         return self._dict.items()

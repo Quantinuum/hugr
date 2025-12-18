@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import json
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
@@ -926,7 +927,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 node_data.op,
                 node_parent,
                 num_outs=node_data._num_outs,
-                metadata=node_data.metadata.as_dict(),
+                metadata=copy.copy(node_data.metadata),
             )
 
         for src, dst in hugr._links.items():
@@ -970,7 +971,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
             # non contiguous indices will be erased
             nodes.append(data._to_serial(Node(serial_idx, NodeMetadata())))
-            metadata.append(data.metadata._dict if data.metadata else None)
+            metadata.append(data.metadata.as_dict() if data.metadata else None)
             if self.entrypoint == node:
                 entrypoint = serial_idx
 
@@ -1028,10 +1029,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         assert serial.nodes, "The encoded Hugr is empty"
 
         def get_meta(idx: int) -> NodeMetadata:
-            meta = NodeMetadata()
             if serial.metadata and idx < len(serial.metadata):
-                meta._dict = serial.metadata[idx] or {}
-            return meta
+                return NodeMetadata(serial.metadata[idx] or {})
+            else:
+                return NodeMetadata()
 
         # The first node is always the HUGR root.
         root_node = serial.nodes[0]
