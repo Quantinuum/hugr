@@ -714,88 +714,31 @@ flowchart
 Each node in the HUGR may have arbitrary metadata attached to it. This
 is preserved during graph modifications, and,
 [when possible](#metadata-updates-on-replacement), copied when rewriting.
-Additionally the metadata may record references to other nodes; these
-references are updated along with node indices.
-
-The metadata could either be built into the hugr itself (metadata as
-node weights) or separated from it (keep a separate map from node ID to
-metadata). The advantages of the first approach are:
-
-- just one object to have around, not two;
-- reassignment of node IDs doesn't mess with metadata.
-
-The advantages of the second approach are:
-
-- Metadata should make no difference to the semantics of the hugr (by
-  definition, otherwise it isn't metadata but data), so it makes sense
-  to be separated from the core structure.
-- We can be more agile with the details, such as formatting and
-  versioning.
-
-The problem of reassignment can be solved by having an API function that
-operates on both together atomically. We will therefore tentatively
-adopt the second approach, keeping metadata and hugr in separate
-structures.
 
 For each node, the metadata is a dictionary keyed by strings. Keys are
 used to identify applications or users so these do not (accidentally)
-interfere with each other's metadata; for example a reverse-DNS system
-(`com.quantinuum.username....` or `com.quantinuum.tket....`). The values
-are tuples of (1) any serializable struct, and (2) a list of node
-indices. References from the serialized struct to other nodes should
-indirect through the list of node indices stored with the struct.
-
-**TODO**: Specify format, constraints, and serialization. Is YAML syntax
-appropriate?
+interfere with each other's metadata; we use a reverse-DNS system
+(`com.quantinuum.tket....`). The values
+are required to be serializable. 
 
 There is an API to add metadata, or extend existing metadata, or read
 existing metadata, given the node ID.
-
-**TODO** Examples illustrating this API.
-
+<!---
 **TODO** Do we want to reserve any top-level metadata keys, e.g. `Name`,
 `Ports` (for port metadata) or `History` (for use by the rewrite
 engine)?
-
+-->
 Reserved metadata keys used by the HUGR tooling are prefixed with `core.`.
 Use of this prefix by external tooling may cause issues.
+Keys used by the reference implementation are described in the separate [metadata documentation](metadata.md).
 
-#### Generator Metadata
-Tooling generating HUGR can specify some reserved metadata keys to be used for debugging
-purposes.
-
-The key `core.generator` when used on the module root node is
-used to specify the tooling used to generate the module.
-The associated value must be an object/dictionary containing the fields `name`
-and `version`, each with string values. Extra fields may be used to include
-additional data about generating tooling that may be useful for debugging. Example:
-
-```json
-{
-  "core.generator": { "name": "my_compiler", "version": "1.0.0" }
-}
-```
-
-The key `core.used_extensions` when used on the module root node is
-used to specify the names and versions of all the extensions used in the module.
-Some of these may correspond to extensions packaged with the module, but they
-may also be extensions the consuming tooling has pre-loaded. They can be used by the
-tooling to check for extension version mismatches. The value associated with the key
-must be an array of objects/dictionaries containing the keys `name` and `version`, each
-with string values. Example:
-```json
-{
-  "core.used_extensions": [{ "name": "my_ext", "version": "2.2.3" }]
-}
-```
-
-
+<!---
 
 **TODO** Do we allow per-port metadata (using the same mechanism?)
 
 **TODO** What about references to ports? Should we add a list of port
 indices after the list of node indices?
-
+-->
 ## Type System
 
 There are two classes of type: `AnyType` $\supset$ `CopyableType`. Types in these
