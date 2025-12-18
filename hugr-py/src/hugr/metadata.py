@@ -113,6 +113,12 @@ class NodeMetadata:
     def __repr__(self) -> str:
         return f"NodeMetadata({self._dict})"
 
+    def __copy__(self) -> NodeMetadata:
+        return NodeMetadata(copy.copy(self._dict))
+
+    def __deepcopy__(self, memo: dict[int, Any]) -> NodeMetadata:
+        return NodeMetadata(copy.deepcopy(self._dict, memo))
+
 
 # --- Core metadata keys ---
 
