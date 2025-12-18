@@ -555,7 +555,7 @@ pub(crate) mod test {
     };
     use crate::std_extensions::arithmetic::int_types::ConstInt;
     use crate::std_extensions::collections::array::{ArrayValue, array_type};
-    use crate::std_extensions::collections::value_array::{VArrayValue, value_array_type};
+    use crate::std_extensions::collections::borrow_array::{BArrayValue, borrow_array_type};
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
@@ -726,10 +726,9 @@ pub(crate) mod test {
     }
 
     #[fixture]
-    fn const_value_array_bool() -> Value {
-        VArrayValue::new(bool_t(), [Value::true_val(), Value::false_val()]).into()
+    fn const_borrow_array_bool() -> Value {
+        BArrayValue::new(bool_t(), [Value::true_val(), Value::false_val()]).into()
     }
-
     #[fixture]
     fn const_array_options() -> Value {
         let some_true = Value::some([Value::true_val()]);
@@ -739,11 +738,11 @@ pub(crate) mod test {
     }
 
     #[fixture]
-    fn const_value_array_options() -> Value {
+    fn const_borrow_array_options() -> Value {
         let some_true = Value::some([Value::true_val()]);
         let none = Value::none(vec![bool_t()]);
         let elem_ty = SumType::new_option(vec![bool_t()]);
-        VArrayValue::new(elem_ty.into(), [some_true, none]).into()
+        BArrayValue::new(elem_ty.into(), [some_true, none]).into()
     }
 
     #[rstest]
@@ -753,9 +752,9 @@ pub(crate) mod test {
     #[case(const_tuple(), Type::new_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
     #[case(const_array_bool(), array_type(2, bool_t()), "const:custom:array")]
     #[case(
-        const_value_array_bool(),
-        value_array_type(2, bool_t()),
-        "const:custom:value_array"
+        const_borrow_array_bool(),
+        borrow_array_type(2, bool_t()),
+        "const:custom:borrow_array"
     )]
     #[case(
         const_array_options(),
@@ -763,9 +762,9 @@ pub(crate) mod test {
         "const:custom:array"
     )]
     #[case(
-        const_value_array_options(),
-        value_array_type(2, SumType::new_option(vec![bool_t()]).into()),
-        "const:custom:value_array"
+        const_borrow_array_options(),
+        borrow_array_type(2, SumType::new_option(vec![bool_t()]).into()),
+        "const:custom:borrow_array"
     )]
     fn const_type(
         #[case] const_value: Value,
@@ -786,9 +785,9 @@ pub(crate) mod test {
     #[case(const_serialized_usize(), const_usize())]
     #[case(const_tuple_serialized(), const_tuple())]
     #[case(const_array_bool(), const_array_bool())]
-    #[case(const_value_array_bool(), const_value_array_bool())]
+    #[case(const_borrow_array_bool(), const_borrow_array_bool())]
     #[case(const_array_options(), const_array_options())]
-    #[case(const_value_array_options(), const_value_array_options())]
+    #[case(const_borrow_array_options(), const_borrow_array_options())]
     // Opaque constants don't get resolved into concrete types when running miri,
     // as the `typetag` machinery is not available.
     #[cfg_attr(miri, ignore)]

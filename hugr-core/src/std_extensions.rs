@@ -24,7 +24,6 @@ pub fn std_reg() -> ExtensionRegistry {
         collections::list::EXTENSION.to_owned(),
         collections::borrow_array::EXTENSION.to_owned(),
         collections::static_array::EXTENSION.to_owned(),
-        collections::value_array::EXTENSION.to_owned(),
         logic::EXTENSION.to_owned(),
         ptr::EXTENSION.to_owned(),
     ]);

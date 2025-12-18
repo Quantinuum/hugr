@@ -13,8 +13,6 @@ mod half_node;
 pub mod inline_dfgs;
 pub mod inline_funcs;
 pub use inline_funcs::inline_acyclic;
-pub mod linearize_array;
-pub use linearize_array::LinearizeArrayPass;
 pub mod lower;
 mod monomorphize;
 pub mod normalize_cfgs;

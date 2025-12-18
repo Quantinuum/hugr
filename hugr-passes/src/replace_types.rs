@@ -8,7 +8,6 @@ use std::sync::Arc;
 use handlers::list_const;
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::list::list_type_def;
-use hugr_core::std_extensions::collections::value_array::value_array_type_def;
 use thiserror::Error;
 
 use hugr_core::builder::{BuildError, BuildHandle, Dataflow};
@@ -261,7 +260,6 @@ impl Default for ReplaceTypes {
         let mut res = Self::new_empty();
         res.linearize = DelegatingLinearizer::default();
         res.replace_consts_parametrized(array_type_def(), handlers::array_const);
-        res.replace_consts_parametrized(value_array_type_def(), handlers::value_array_const);
         res.replace_consts_parametrized(list_type_def(), list_const);
         res
     }
@@ -848,13 +846,12 @@ mod test {
     use hugr_core::std_extensions::collections::array::{
         self, Array, ArrayKind, ArrayOpDef, GenericArrayValue, array_type, array_type_def,
     };
+    use hugr_core::std_extensions::collections::borrow_array::{
+        BArrayValue, BorrowArray, borrow_array_type,
+    };
     use hugr_core::std_extensions::collections::list::{
-        ListOp, ListValue, list_type, list_type_def,
+        ListOp, ListOpInst, ListValue, list_type, list_type_def,
     };
-    use hugr_core::std_extensions::collections::value_array::{
-        VArrayOp, VArrayOpDef, VArrayValue, ValueArray, value_array_type,
-    };
-
     use hugr_core::types::{
         EdgeKind, PolyFuncType, Signature, SumType, Term, Type, TypeArg, TypeBound, TypeRow,
     };
@@ -929,7 +926,7 @@ mod test {
         new: impl Fn(Signature) -> Result<T, BuildError>,
     ) -> T {
         let mut dfb = new(Signature::new(
-            vec![value_array_type(64, elem_ty.clone()), i64_t()],
+            vec![list_type(elem_ty.clone()), i64_t()],
             elem_ty.clone(),
         ))
         .unwrap();
@@ -938,9 +935,12 @@ mod test {
             .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [idx])
             .unwrap()
             .outputs_arr();
-        let [opt, _] = dfb
+        let [opt] = dfb
             .add_dataflow_op(
-                VArrayOpDef::get.to_concrete(elem_ty.clone(), 64),
+                ListOp::get
+                    .with_type(elem_ty.clone())
+                    .to_extension_op()
+                    .unwrap(),
                 [val, idx],
             )
             .unwrap()
@@ -958,7 +958,7 @@ mod test {
         lw.set_replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
         lw.set_replace_parametrized_type(
             pv,
-            Box::new(|args: &[TypeArg]| Some(value_array_type(64, just_elem_type(args).clone()))),
+            Box::new(|args: &[TypeArg]| Some(list_type(just_elem_type(args).clone()))),
         );
         lw.set_replace_op(
             &read_op(ext, bool_t()),
@@ -1089,13 +1089,12 @@ mod test {
                 .collect_vec(),
             ["get", "itousize", "panic"]
         );
-        // The PackedVec<PackedVec<bool>> becomes an array<i64>
-        let [array_get] = ext_ops
+        // The PackedVec<PackedVec<bool>> becomes a list<i64>
+        let array_gets = ext_ops
             .into_iter()
-            .filter_map(|e| VArrayOp::from_extension_op(e).ok())
-            .collect_array()
-            .unwrap();
-        assert_eq!(array_get, VArrayOpDef::get.to_concrete(i64_t(), 64));
+            .filter_map(|e| ListOpInst::from_extension_op(e).ok())
+            .collect_vec();
+        assert_eq!(array_gets, [ListOp::get.with_type(i64_t())]);
     }
 
     #[test]
@@ -1122,10 +1121,10 @@ mod test {
 
         let mut lowerer = ReplaceTypes::default();
 
-        // 1. Lower List<T> to Array<10, T> UNLESS T is usize_t() or i64_t
+        // 1. Lower List<T> to BArray<10, T> UNLESS T is usize_t() or i64_t
         lowerer.set_replace_parametrized_type(list_type_def(), |args| {
             let ty = just_elem_type(args);
-            (![usize_t(), i64_t()].contains(ty)).then_some(value_array_type(10, ty.clone()))
+            (![usize_t(), i64_t()].contains(ty)).then_some(borrow_array_type(10, ty.clone()))
         });
         {
             let mut h = backup.clone();
@@ -1133,7 +1132,7 @@ mod test {
             let sig = h.signature(h.entrypoint()).unwrap();
             assert_eq!(
                 sig.input(),
-                &TypeRow::from(vec![list_type(usize_t()), value_array_type(10, bool_t())])
+                &TypeRow::from(vec![list_type(usize_t()), borrow_array_type(10, bool_t())])
             );
             assert_eq!(sig.input(), sig.output());
         }
@@ -1155,7 +1154,7 @@ mod test {
             let sig = h.signature(h.entrypoint()).unwrap();
             assert_eq!(
                 sig.input(),
-                &TypeRow::from(vec![list_type(i64_t()), value_array_type(10, bool_t())])
+                &TypeRow::from(vec![list_type(i64_t()), borrow_array_type(10, bool_t())])
             );
             assert_eq!(sig.input(), sig.output());
             // This will have to update inside the Const
@@ -1168,11 +1167,11 @@ mod test {
             assert_eq!(cst.get_type(), Type::new_sum(vec![list_type(i64_t()); 2]));
         }
 
-        // 3. Lower all List<T> to Array<4,T>
+        // 3. Lower all List<T> to BArray<4,T>
         let mut h = backup;
         lowerer.set_replace_parametrized_type(
             list_type_def(),
-            Box::new(|args: &[TypeArg]| Some(value_array_type(4, just_elem_type(args).clone()))),
+            Box::new(|args: &[TypeArg]| Some(borrow_array_type(4, just_elem_type(args).clone()))),
         );
         lowerer.replace_consts_parametrized(list_type_def(), |opaq, repl| {
             // First recursively transform the contents
@@ -1182,7 +1181,7 @@ mod test {
             let lv = opaq.value().downcast_ref::<ListValue>().unwrap();
 
             Ok(Some(
-                VArrayValue::new(lv.get_element_type().clone(), lv.get_contents().to_vec()).into(),
+                BArrayValue::new(lv.get_element_type().clone(), lv.get_contents().to_vec()).into(),
             ))
         });
         lowerer.run(&mut h).unwrap();
@@ -1192,7 +1191,10 @@ mod test {
                 .as_load_constant()
                 .map(hugr_core::ops::LoadConstant::constant_type),
             Some(&Type::new_sum(vec![
-                Type::from(value_array_type(4, i64_t()));
+                Type::from(borrow_array_type(
+                    4,
+                    i64_t()
+                ));
                 2
             ]))
         );
@@ -1281,11 +1283,8 @@ mod test {
 
     #[rstest]
     #[case(&[], Array)]
-    #[case(&[], ValueArray)]
     #[case(&[3], Array)]
-    #[case(&[3], ValueArray)]
-    #[case(&[5,7,11,13,17,19], Array)]
-    #[case(&[5,7,11,13,17,19], ValueArray)]
+    #[case(&[5,7,11,13,17,19], BorrowArray)]
     fn array_const<AK: ArrayKind>(#[case] vals: &[u64], #[case] _kind: AK)
     where
         GenericArrayValue<AK>: CustomConst,
@@ -1388,7 +1387,7 @@ mod test {
         let ep = h.entrypoint();
         lowerer.set_regions(vec![h.entrypoint()]);
         assert!(lowerer.run(&mut h).unwrap());
-        let v_u = value_array_type(64, usize_t());
+        let v_u = list_type(usize_t());
         assert_eq!(h.signature(ep).unwrap().as_ref(), &endo_sig(v_u.clone()));
         assert_eq!(h.num_nodes(), h.num_nodes());
         let [f_in, _] = h.get_io(h.get_parent(ep).unwrap()).unwrap();
@@ -1472,7 +1471,7 @@ mod test {
         );
 
         // Arrays of 64 bools should thus be transformed into PackedVec<bool> and then to int64s
-        // Arrays of 64 non-bools should thus become PackedVec<T> and then back to ValueArray<64, T>
+        // Arrays of 64 non-bools should thus become PackedVec<T> and thus List<T>
         let a64 = |t| array_type(64, t);
         let opt = |t| Type::from(option_type(t));
         let mut dfb = DFGBuilder::new(Signature::new(
