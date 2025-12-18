@@ -8,8 +8,7 @@ use hugr_core::builder::{
 use hugr_core::extension::prelude::{UnwrapBuilder, option_type};
 use hugr_core::hugr::linking::{NameLinkingPolicy, OnMultiDefn};
 use hugr_core::ops::constant::CustomConst;
-use hugr_core::ops::{OpTrait, OpType, Tag};
-use hugr_core::ops::{Value, constant::OpaqueValue};
+use hugr_core::ops::{OpTrait, OpType, Tag, Value, constant::OpaqueValue};
 use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
 use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
@@ -21,9 +20,9 @@ use hugr_core::std_extensions::collections::borrow_array::{
     BArrayClone, BArrayDiscard, BArrayOpBuilder, BorrowArray, borrow_array_type,
 };
 use hugr_core::std_extensions::collections::list::ListValue;
-use hugr_core::std_extensions::collections::value_array::ValueArray;
 use hugr_core::types::{PolyFuncType, SumType, Transformable, Type, TypeArg, TypeBound};
 use hugr_core::{Visibility, type_row};
+
 use itertools::Itertools;
 
 use crate::mangle_name;
@@ -91,18 +90,6 @@ pub fn array_const(
     repl: &ReplaceTypes,
 ) -> Result<Option<Value>, ReplaceTypesError> {
     generic_array_const::<Array>(val, repl)
-}
-
-/// Handler for [`VArrayValue`] constants that recursively
-/// [`ReplaceTypes::change_value`]s the elements of the list.
-/// Included in [`ReplaceTypes::default`].
-///
-/// [`VArrayValue`]: hugr_core::std_extensions::collections::value_array::VArrayValue
-pub fn value_array_const(
-    val: &OpaqueValue,
-    repl: &ReplaceTypes,
-) -> Result<Option<Value>, ReplaceTypesError> {
-    generic_array_const::<ValueArray>(val, repl)
 }
 
 pub(super) fn discard_to_unit_func_name(t: &Type) -> String {
@@ -343,18 +330,6 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         Box::new(dfb.finish_hugr_with_outputs(out_arrays).unwrap()),
         NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseSource),
     ))
-}
-
-/// Handler for copying/discarding value arrays if their elements have become linear.
-/// Included in [`ReplaceTypes::default`] and [`DelegatingLinearizer::default`].
-///
-/// [`DelegatingLinearizer::default`]: super::DelegatingLinearizer::default
-pub fn linearize_value_array(
-    args: &[TypeArg],
-    num_outports: usize,
-    lin: &CallbackHandler,
-) -> Result<NodeTemplate, LinearizeError> {
-    linearize_generic_array::<ValueArray>(args, num_outports, lin)
 }
 
 /// Handler for copying and discarding of arrays. Only works if the elements are copyable, or

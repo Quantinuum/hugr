@@ -7,12 +7,11 @@ use hugr_core::builder::{
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::borrow_array::borrow_array_type_def;
-use hugr_core::std_extensions::collections::value_array::value_array_type_def;
 use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
 use hugr_core::{HugrView, IncomingPort, Node, Wire, hugr::hugrmut::HugrMut, ops::Tag};
 use itertools::Itertools;
 
-use super::handlers::{copy_discard_array, copy_discard_borrow_array, linearize_value_array};
+use super::handlers::{copy_discard_array, copy_discard_borrow_array};
 use super::{NodeTemplate, ParametricType};
 
 /// Trait for things that know how to wire up linear outports to other than one
@@ -128,7 +127,6 @@ pub struct DelegatingLinearizer {
 impl Default for DelegatingLinearizer {
     fn default() -> Self {
         let mut res = Self::new_empty();
-        res.register_callback(value_array_type_def(), linearize_value_array);
         res.register_callback(array_type_def(), copy_discard_array);
         res.register_callback(borrow_array_type_def(), copy_discard_borrow_array);
         res
@@ -370,7 +368,6 @@ impl Linearizer for CallbackHandler<'_> {
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
-    use std::iter::successors;
     use std::sync::Arc;
 
     use hugr_core::builder::{
@@ -379,27 +376,23 @@ mod test {
 
     use hugr_core::Visibility;
     use hugr_core::extension::prelude::{option_type, qb_t, usize_t};
-    use hugr_core::extension::simple_op::MakeExtensionOp;
     use hugr_core::extension::{
         CustomSignatureFunc, OpDef, SignatureError, SignatureFunc, TypeDefBound, Version,
     };
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::ops::{DataflowOpTrait, ExtensionOp, OpName, OpType};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
-    use hugr_core::std_extensions::collections::borrow_array::borrow_array_type;
-    use hugr_core::std_extensions::collections::value_array::{
-        VArrayOpDef, VArrayRepeat, VArrayScan, VArrayScanDef, value_array_type,
-        value_array_type_def,
-    };
+    use hugr_core::std_extensions::collections::array::array_type;
+    use hugr_core::std_extensions::collections::borrow_array::{BArrayOpDef, borrow_array_type};
     use hugr_core::types::type_param::TypeParam;
     use hugr_core::types::{
-        FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeEnum, TypeRow,
+        FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRow,
     };
     use hugr_core::{Extension, Hugr, HugrView, Node, hugr::IdentList, type_row};
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::replace_types::handlers::{discard_to_unit_func_name, linearize_value_array};
+    use crate::replace_types::handlers::discard_to_unit_func_name;
     use crate::replace_types::{LinearizeError, Linearizer, NodeTemplate, ReplaceTypesError};
     use crate::{ComposablePass, ReplaceTypes};
 
@@ -490,12 +483,12 @@ mod test {
         // Build Hugr - uses first input three times, discards second input (both usize)
         let mut outer = DFGBuilder::new(inout_sig(
             vec![usize_t(); 2],
-            vec![usize_t(), value_array_type(2, usize_t())],
+            vec![usize_t(), borrow_array_type(2, usize_t())],
         ))
         .unwrap();
         let [inp, _] = outer.input_wires_arr();
         let new_array = outer
-            .add_dataflow_op(VArrayOpDef::new_array.to_concrete(usize_t(), 2), [inp, inp])
+            .add_dataflow_op(BArrayOpDef::new_array.to_concrete(usize_t(), 2), [inp, inp])
             .unwrap();
         let [arr] = new_array.outputs_arr();
         let mut h = outer.finish_hugr_with_outputs([inp, arr]).unwrap();
@@ -514,7 +507,7 @@ mod test {
             HashMap::from([
                 ("TestExt.copy".into(), 2),
                 ("TestExt.discard".into(), 1),
-                ("collections.value_array.new_array".into(), 1)
+                ("collections.borrow_arr.new_array".into(), 1)
             ])
         );
     }
@@ -713,104 +706,6 @@ mod test {
     }
 
     #[rstest]
-    fn value_array(#[values(2, 3, 4)] num_outports: usize) {
-        let num_new = num_outports - 1;
-        let (e, mut lowerer) = ext_lowerer();
-
-        lowerer
-            .linearizer_mut()
-            .register_callback(value_array_type_def(), linearize_value_array);
-        let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
-        let opt_lin_ty = Type::from(option_type(lin_t.clone()));
-        let array_ty = || value_array_type(5, usize_t());
-        let mut dfb = DFGBuilder::new(inout_sig(array_ty(), vec![array_ty(); num_new])).unwrap();
-        let [array_in] = dfb.input_wires_arr();
-        // The outer DFG passes the input array into (1) a DFG that discards it
-        let discard = dfb
-            .dfg_builder(
-                Signature::new(value_array_type(5, usize_t()), type_row![]),
-                [array_in],
-            )
-            .unwrap()
-            .finish_with_outputs([])
-            .unwrap();
-        // and (2) its own output
-        let mut h = dfb
-            .finish_hugr_with_outputs(vec![array_in; num_new])
-            .unwrap();
-
-        assert!(lowerer.run(&mut h).unwrap());
-
-        let (discard_ops, copy_ops): (Vec<_>, Vec<_>) = h
-            .entry_descendants()
-            .filter_map(|n| h.get_optype(n).as_extension_op().map(|e| (n, e)))
-            .partition(|(n, _)| {
-                successors(Some(*n), |n| h.get_parent(*n)).contains(&discard.node())
-            });
-        {
-            let [(n, ext_op)] = discard_ops.try_into().unwrap();
-            assert!(VArrayScanDef::from_extension_op(ext_op).is_ok());
-            assert_eq!(
-                ext_op.signature().output,
-                TypeRow::from(vec![value_array_type(5, Type::UNIT)])
-            );
-            assert_eq!(h.linked_inputs(n, 0).next(), None);
-        }
-        assert_eq!(copy_ops.len(), num_new * 2 + 1); // 1 middle scan; 1repeat+1unwrap per new
-        let copy_ops = copy_ops.into_iter().map(|(_, e)| e).collect_vec();
-        let rpts = copy_ops
-            .iter()
-            .copied()
-            .filter(|e| VArrayRepeat::from_extension_op(e).is_ok())
-            .collect_vec();
-        assert_eq!(rpts.len(), num_new);
-        for rpt in rpts {
-            assert_eq!(
-                rpt.signature().output(),
-                &TypeRow::from(value_array_type(5, opt_lin_ty.clone()))
-            );
-        }
-        let unwrap_scans = copy_ops
-            .iter()
-            .filter_map(|e| {
-                VArrayScan::from_extension_op(e)
-                    .ok()
-                    .filter(|sc| sc.acc_tys.is_empty())
-            })
-            .collect_vec();
-        assert_eq!(unwrap_scans.len(), num_new);
-        for scan in unwrap_scans {
-            assert_eq!(scan.src_ty, opt_lin_ty);
-            assert_eq!(scan.tgt_ty, lin_t);
-        }
-
-        let copy_sig = copy_ops
-            .into_iter()
-            .find(|e| VArrayScan::from_extension_op(e).is_ok_and(|sc| !sc.acc_tys.is_empty()))
-            .unwrap()
-            .signature()
-            .into_owned();
-        assert_eq!(
-            copy_sig.output,
-            TypeRow::from(
-                [value_array_type(5, lin_t.clone()), INT_TYPES[6].clone()]
-                    .into_iter()
-                    .chain(vec![
-                        value_array_type(5, option_type(lin_t.clone()).into());
-                        num_new
-                    ])
-                    .collect_vec()
-            )
-        );
-        assert_eq!(copy_sig.input[0], copy_sig.output[0]);
-        assert!(matches!(
-            copy_sig.input[1].as_type_enum(),
-            TypeEnum::Function(_)
-        ));
-        assert_eq!(copy_sig.input[2..], copy_sig.output[1..]);
-    }
-
-    #[rstest]
     fn call_in_array(#[values(true, false)] use_linking: bool) {
         let (e, _) = ext_lowerer();
         let lin_ct = e.get_type(LIN_T).unwrap().instantiate([]).unwrap();
@@ -887,7 +782,7 @@ mod test {
         // Now lower usize_t to array<lin_t>
         lower_discard_to_call.set_replace_type(
             usize_t().as_extension().unwrap().clone(),
-            value_array_type(4, lin_ct.into()),
+            array_type(4, lin_ct.into()),
         );
         let mut h = backup.clone();
         let r = lower_discard_to_call.run(&mut h);

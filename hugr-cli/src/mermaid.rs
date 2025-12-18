@@ -79,7 +79,6 @@ impl MermaidArgs {
         input_override: Option<R>,
         mut output_override: Option<W>,
     ) -> Result<()> {
-        #[allow(deprecated)]
         let hugr = self.input_args.get_hugr_with_reader(input_override)?;
 
         if self.validate {
