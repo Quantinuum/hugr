@@ -324,7 +324,7 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to replace occurrences of type `src` with `dest`.
-    #[deprecated(note = "Use set_replace_type")]
+    #[deprecated(note = "Use set_replace_type", since = "0.25.0")]
     pub fn replace_type(&mut self, src: CustomType, dest: Type) {
         #[expect(deprecated)] // remove together
         self.replace_type_opts(src, dest, ReplacementOptions::default())
@@ -359,14 +359,14 @@ impl ReplaceTypes {
 
     /// Configures this instance to replace occurrences of type `src` with `dest`,
     /// according to the given `ReplacementOptions`.
-    #[deprecated(note = "Use set_replace_type")]
+    #[deprecated(note = "Use set_replace_type", since = "0.25.0")]
     pub fn replace_type_opts(&mut self, src: CustomType, dest: Type, opts: ReplacementOptions) {
         self.type_map.insert(src, (dest, opts));
     }
 
     /// Configures this instance to change occurrences of a parametrized type `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
-    #[deprecated(note = "Use set_replace_parametrized_type")]
+    #[deprecated(note = "Use set_replace_parametrized_type", since = "0.25.0")]
     pub fn replace_parametrized_type(
         &mut self,
         src: &TypeDef,
@@ -415,7 +415,7 @@ impl ReplaceTypes {
     /// Configures this instance to change occurrences of a parametrized type `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s,
     /// and using the given [ReplacementOptions].
-    #[deprecated(note = "Use set_replace_parametrized_type")]
+    #[deprecated(note = "Use set_replace_parametrized_type", since = "0.25.0")]
     pub fn replace_parametrized_type_opts(
         &mut self,
         src: &TypeDef,
@@ -428,7 +428,7 @@ impl ReplaceTypes {
 
     /// Allows to configure how to deal with types/wires that were `Copyable`
     /// but have become linear as a result of type-changing.
-    #[deprecated(note = "Use get_linearizer or linearizer_mut")]
+    #[deprecated(note = "Use get_linearizer or linearizer_mut", since = "0.25.0")]
     pub fn linearizer(&mut self) -> &mut DelegatingLinearizer {
         &mut self.linearize
     }
@@ -453,7 +453,7 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
-    #[deprecated(note = "Use set_replace_op")]
+    #[deprecated(note = "Use set_replace_op", since = "0.25.0")]
     pub fn replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
         #[expect(deprecated)] // remove together
         self.replace_op_with(src, dest, ReplacementOptions::default())
@@ -479,7 +479,7 @@ impl ReplaceTypes {
     }
 
     /// Configures this instance to change occurrences of `src` to `dest`.
-    #[deprecated(note = "Use set_replace_op")]
+    #[deprecated(note = "Use set_replace_op", since = "0.25.0")]
     pub fn replace_op_with(
         &mut self,
         src: &ExtensionOp,
@@ -491,7 +491,7 @@ impl ReplaceTypes {
 
     /// Configures this instance to change occurrences of a parametrized op `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
-    #[deprecated(note = "Use set_replace_parametrized_op")]
+    #[deprecated(note = "Use set_replace_parametrized_op", since = "0.25.0")]
     pub fn replace_parametrized_op(
         &mut self,
         src: &OpDef,
@@ -524,7 +524,7 @@ impl ReplaceTypes {
 
     /// Configures this instance to change occurrences of a parametrized op `src`
     /// via a callback that builds the replacement type given the [`TypeArg`]s.
-    #[deprecated(note = "Use set_replace_parametrized_op")]
+    #[deprecated(note = "Use set_replace_parametrized_op", since = "0.25.0")]
     pub fn replace_parametrized_op_with(
         &mut self,
         src: &OpDef,

@@ -179,7 +179,10 @@ pub enum BuildError {
     },
 
     /// Deprecated: [Self::HugrNodeLinkingError] is emitted instead
-    #[deprecated(note = "No longer emitted; HugrNodeLinkingError used instead")]
+    #[deprecated(
+        note = "No longer emitted; HugrNodeLinkingError used instead",
+        since = "0.25.0"
+    )]
     #[error{"In inserting Hugr: {0}"}]
     HugrInsertionError(NodeLinkingError<Node, Node>),
 
