@@ -6,6 +6,8 @@ use hugr_core::core::HugrNode;
 use hugr_core::hugr::{ValidationError, hugrmut::HugrMut};
 use itertools::Either;
 
+use crate::PassScope;
+
 /// An optimization pass that can be sequenced with another and/or wrapped
 /// e.g. by [`ValidatingPass`]
 pub trait ComposablePass<H: HugrMut>: Sized {
@@ -16,6 +18,11 @@ pub trait ComposablePass<H: HugrMut>: Sized {
 
     /// Run the pass on the given HUGR.
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error>;
+
+    /// Set the scope configuration used to run the pass.
+    ///
+    /// See [`PassScope`] for more details.
+    fn with_scope(self, scope: &PassScope) -> Self;
 
     /// Apply a function to the error type of this pass, returning a new
     /// [`ComposablePass`] that has the same result type.
@@ -28,6 +35,10 @@ pub trait ComposablePass<H: HugrMut>: Sized {
 
     /// Returns a [`ComposablePass`] that does "`self` then `other`", so long as
     /// `other::Err` can be combined with ours.
+    ///
+    /// Composed passes may have different configured [`PassScope`]s. Use
+    /// [`with_scope`] after the composition to override all the scope
+    /// configurations if needed.
     fn then<P: ComposablePass<H>, E: ErrorCombiner<Self::Error, P::Error>>(
         self,
         other: P,
@@ -47,6 +58,14 @@ pub trait ComposablePass<H: HugrMut>: Sized {
                 let res1 = self.0.run(hugr).map_err(E::from_first)?;
                 let res2 = self.1.run(hugr).map_err(E::from_second)?;
                 Ok((res1, res2))
+            }
+
+            fn with_scope(self, scope: &PassScope) -> Self {
+                Self(
+                    self.0.with_scope(scope),
+                    self.1.with_scope(scope),
+                    PhantomData,
+                )
             }
         }
 
@@ -109,6 +128,10 @@ impl<P: ComposablePass<H>, H: HugrMut, E: Error, F: Fn(P::Error) -> E> Composabl
 
     fn run(&self, hugr: &mut H) -> Result<P::Result, Self::Error> {
         self.0.run(hugr).map_err(&self.1)
+    }
+
+    fn with_scope(self, scope: &PassScope) -> Self {
+        Self(self.0.with_scope(scope), self.1, PhantomData)
     }
 }
 
@@ -188,6 +211,10 @@ where
         })?;
         Ok(res)
     }
+
+    fn with_scope(self, scope: &PassScope) -> Self {
+        Self(self.0.with_scope(scope), self.1)
+    }
 }
 
 // IfThen ------------------------------
@@ -224,6 +251,14 @@ impl<
         let res: bool = self.0.run(hugr).map_err(ErrorCombiner::from_first)?;
         res.then(|| self.1.run(hugr).map_err(ErrorCombiner::from_second))
             .transpose()
+    }
+
+    fn with_scope(self, scope: &PassScope) -> Self {
+        Self(
+            self.0.with_scope(scope),
+            self.1.with_scope(scope),
+            PhantomData,
+        )
     }
 }
 
