@@ -18,7 +18,7 @@ use hugr_core::ops::{
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 
-use crate::ComposablePass;
+use crate::{ComposablePass, PassScope};
 
 /// Merge any basic blocks that are direct children of the specified [`CFG`]-entrypoint
 /// Hugr.
@@ -142,6 +142,12 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
             results.insert(cfg, res);
         }
         Ok(results)
+    }
+
+    fn with_scope(self, _scope: &PassScope) -> Self {
+        // TODO: Use the configured scope when running the pass.
+        // <https://github.com/Quantinuum/hugr/issues/2771>
+        self
     }
 }
 

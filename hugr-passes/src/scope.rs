@@ -75,7 +75,10 @@ impl PassScope {
     /// These are the root regions that the pass should be applied to. If
     /// [`PassScope::recursive`] is `true`, the descendants of the root regions
     /// should also be optimized.
-    fn roots<'a, H: HugrView<Node = Node>>(&'a self, hugr: &'a H) -> impl Iterator<Item = H::Node> {
+    pub fn roots<'a, H: HugrView<Node = Node>>(
+        &'a self,
+        hugr: &'a H,
+    ) -> impl Iterator<Item = H::Node> {
         match self {
             Self::EntrypointFlat | Self::EntrypointRecursive => {
                 // Include the entrypoint if it is not the module root.
@@ -109,7 +112,7 @@ impl PassScope {
     /// This computes all the regions to be optimized at once. In general, it is
     /// more efficient to traverse the Hugr incrementally starting from
     /// [PassScope::roots] instead.
-    fn regions<'a, H: HugrView<Node = Node>>(&'a self, hugr: &'a H) -> Vec<H::Node> {
+    pub fn regions<'a, H: HugrView<Node = Node>>(&'a self, hugr: &'a H) -> Vec<H::Node> {
         let mut regions = self.roots(hugr).collect_vec();
 
         if self.recursive() {
@@ -136,7 +139,7 @@ impl PassScope {
     ///
     /// Other nodes may also be in scope, as listed in the definition of the
     /// [PassScope] variant.
-    fn in_scope<H: HugrView<Node = Node>>(&self, hugr: &H, node: H::Node) -> bool {
+    pub fn in_scope<H: HugrView<Node = Node>>(&self, hugr: &H, node: H::Node) -> bool {
         // The root module node is never in scope.
         let Some(node_parent) = hugr.get_parent(node) else {
             return false;
@@ -176,7 +179,7 @@ impl PassScope {
 
     /// Returns `true` if the pass should be applied recursively on the
     /// descendants of the root regions.
-    fn recursive(&self) -> bool {
+    pub fn recursive(&self) -> bool {
         !matches!(self, Self::EntrypointFlat)
     }
 }

@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
-use crate::ComposablePass;
+use crate::{ComposablePass, PassScope};
 
 /// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
@@ -184,6 +184,12 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
             hugr.remove_node(n);
         }
         Ok(())
+    }
+
+    fn with_scope(self, _scope: &PassScope) -> Self {
+        // TODO: Use the configured scope when running the pass.
+        // <https://github.com/Quantinuum/hugr/issues/2771>
+        self
     }
 }
 #[cfg(test)]

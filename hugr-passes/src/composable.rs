@@ -22,6 +22,13 @@ pub trait ComposablePass<H: HugrMut>: Sized {
     /// Set the scope configuration used to run the pass.
     ///
     /// See [`PassScope`] for more details.
+    ///
+    /// In `hugr 0.25.*`, this configuration is only a guidance, and may be
+    /// ignored by the pass.
+    ///
+    /// From `hugr >=0.26.0`, passes must respect the scope configuration.
+    //
+    // For hugr passes, this is tracked by <https://github.com/Quantinuum/hugr/issues/2771>
     fn with_scope(self, scope: &PassScope) -> Self;
 
     /// Apply a function to the error type of this pass, returning a new
@@ -37,8 +44,8 @@ pub trait ComposablePass<H: HugrMut>: Sized {
     /// `other::Err` can be combined with ours.
     ///
     /// Composed passes may have different configured [`PassScope`]s. Use
-    /// [`with_scope`] after the composition to override all the scope
-    /// configurations if needed.
+    /// [`ComposablePass::with_scope`] after the composition to override all the
+    /// scope configurations if needed.
     fn then<P: ComposablePass<H>, E: ErrorCombiner<Self::Error, P::Error>>(
         self,
         other: P,
