@@ -38,7 +38,9 @@ pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linea
 #[derive(Clone, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum NodeTemplate {
-    /// A single node - so if replacing an existing node, change only the op
+    /// A single node - so if replacing an existing node, change only the op.
+    ///
+    /// An error will be raised if the new op has a static inport; use [Self::LinkedHugr] instead.
     SingleOp(OpType),
     /// Defines a sub-Hugr whose entrypoint-subtree to insert, the entrypoint (which must be
     /// a [CFG], [Conditional], [DFG] or [`TailLoop`]) becoming (/replacing) the desired Node.
@@ -136,7 +138,15 @@ impl NodeTemplate {
     fn replace(self, hugr: &mut impl HugrMut<Node = Node>, n: Node) -> Result<(), BuildError> {
         assert_eq!(hugr.children(n).count(), 0);
         let (new_optype, static_source, static_inport) = match self {
-            NodeTemplate::SingleOp(op_type) => (op_type, None, None), // perhaps assert op_type has no static input?
+            NodeTemplate::SingleOp(op_type) => {
+                if op_type.static_input_port().is_some() {
+                    return Err(BuildError::UnexpectedType {
+                        node: n,
+                        op_desc: "Replacement SingleOp without static input",
+                    });
+                }
+                (op_type, None, None)
+            }
             NodeTemplate::CompoundOp(new_h) => {
                 let root = new_h.entrypoint_optype();
                 if !matches!(
