@@ -165,7 +165,7 @@ pub enum Value {
         e: OpaqueValue,
     },
     /// A higher-order function value.
-    #[deprecated(note = "Flatten and lift contents to a FuncDefn", since = "0.24.4")]
+    #[deprecated(note = "Flatten and lift contents to a FuncDefn", since = "0.25.0")]
     Function {
         /// A Hugr defining the function.
         #[serde_as(as = "Box<AsStringEnvelope>")]
@@ -375,7 +375,7 @@ impl Value {
     /// # Errors
     ///
     /// Returns an error if the Hugr root node does not define a function.
-    #[deprecated(note = "Flatten and lift contents to a FuncDefn")]
+    #[deprecated(note = "Flatten and lift contents to a FuncDefn", since = "0.25.0")]
     pub fn function(hugr: impl Into<Hugr>) -> Result<Self, ConstTypeError> {
         let hugr = hugr.into();
         mono_fn_type(&hugr)?;

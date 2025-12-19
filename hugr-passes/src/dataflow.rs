@@ -69,7 +69,7 @@ pub trait ConstLoader<V> {
 
     /// Produces an abstract value from a Hugr in a [`Value::Function`], if possible.
     /// The default just returns `None`, which will be interpreted as [`PartialValue::Top`].
-    #[deprecated(note = "Remove along with Value::Function")]
+    #[deprecated(note = "Remove along with Value::Function", since = "0.25.0")]
     fn value_from_const_hugr(&self, _loc: ConstLocation<Self::Node>, _h: &Hugr) -> Option<V> {
         None
     }
