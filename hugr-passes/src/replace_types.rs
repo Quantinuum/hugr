@@ -40,12 +40,18 @@ pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linea
 pub enum NodeTemplate {
     /// A single node - so if replacing an existing node, change only the op
     SingleOp(OpType),
-    /// Defines a sub-Hugr to insert, whose root becomes (or replaces) the desired Node.
-    /// The root must be a [CFG], [Conditional], [DFG] or [`TailLoop`].
+    /// Defines a sub-Hugr whose entrypoint-subtree to insert, the entrypoint (which must be
+    /// a [CFG], [Conditional], [DFG] or [`TailLoop`]) becoming (/replacing) the desired Node.
     // Not a FuncDefn, nor Case/DataflowBlock
-    /// Note this will be of limited use before [monomorphization](super::monomorphize())
+    /// Note 1. `CompoundOp` will be of limited use for polymorphic ops (before [monomorphization])
     /// because the new subtree will not be able to use type variables present in the
     /// parent Hugr or previous op.
+    ///
+    /// Edges incoming to the entrypoint subtree will be disconnected.
+    ///
+    /// It is **recommended** to use [Self::LinkedHugr] instead.
+    ///
+    /// [monomorphization]: super::monomorphize
     CompoundOp(Box<Hugr>),
     /// Defines a sub-Hugr to insert, whose entrypoint becomes (or replaces) the desired Node.
     /// Other children of the Hugr reachable from the entrypoint will also be inserted
@@ -132,13 +138,26 @@ impl NodeTemplate {
         let (new_optype, static_source, static_inport) = match self {
             NodeTemplate::SingleOp(op_type) => (op_type, None, None), // perhaps assert op_type has no static input?
             NodeTemplate::CompoundOp(new_h) => {
+                let root = new_h.entrypoint_optype();
+                if !matches!(
+                    root,
+                    OpType::CFG(_) | OpType::DFG(_) | OpType::Conditional(_) | OpType::TailLoop(_)
+                )
+                //if !root.is_container() || !root.dataflow_signature().is_some() // Using explicit list as per docs
+                {
+                    return Err(BuildError::UnexpectedType {
+                        node: n,
+                        op_desc: "Replacement CompoundOp not a container/dataflow node",
+                    });
+                }
+                assert!(root.static_input_port().is_none());
                 let new_entrypoint = hugr.insert_hugr(n, *new_h).inserted_entrypoint;
                 let children = hugr.children(new_entrypoint).collect::<Vec<_>>();
                 let root_opty = hugr.remove_node(new_entrypoint);
                 for ch in children {
                     hugr.set_parent(ch, n);
                 }
-                (root_opty, None, None) // perhaps assert root_opty has no static input?
+                (root_opty, None, None)
             }
             NodeTemplate::LinkedHugr(h, pol) => {
                 let new_entrypoint = hugr.insert_link_hugr(n, *h, &pol)?.inserted_entrypoint;
