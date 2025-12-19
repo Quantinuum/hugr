@@ -6,6 +6,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use handlers::list_const;
+use hugr_core::hugr::linking::{HugrLinking, NameLinkingPolicy};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::list::list_type_def;
 use thiserror::Error;
@@ -35,21 +36,43 @@ pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linea
 ///
 /// [`DataflowParent`]: hugr_core::ops::OpTag::DataflowParent
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum NodeTemplate {
-    /// A single node - so if replacing an existing node, change only the op
+    /// A single node - so if replacing an existing node, change only the op.
+    ///
+    /// An error will be raised if the new op has a static inport; use [Self::LinkedHugr] instead.
     SingleOp(OpType),
-    /// Defines a sub-Hugr to insert, whose root becomes (or replaces) the desired Node.
-    /// The root must be a [CFG], [Conditional], [DFG] or [`TailLoop`].
+    /// Defines a sub-Hugr whose entrypoint-subtree to insert, the entrypoint (which must be
+    /// a [CFG], [Conditional], [DFG] or [`TailLoop`]) becoming (/replacing) the desired Node.
     // Not a FuncDefn, nor Case/DataflowBlock
-    /// Note this will be of limited use before [monomorphization](super::monomorphize())
+    /// Note 1. `CompoundOp` will be of limited use for polymorphic ops (before [monomorphization])
     /// because the new subtree will not be able to use type variables present in the
     /// parent Hugr or previous op.
+    ///
+    /// Edges incoming to the entrypoint subtree will be disconnected.
+    ///
+    /// It is **recommended** to use [Self::LinkedHugr] instead.
+    ///
+    /// [monomorphization]: super::monomorphize
     CompoundOp(Box<Hugr>),
+    /// Defines a sub-Hugr to insert, whose entrypoint becomes (or replaces) the desired Node.
+    /// Other children of the Hugr reachable from the entrypoint will also be inserted
+    /// according to the specified linking policy.
+    LinkedHugr(Box<Hugr>, NameLinkingPolicy),
     /// A Call to an existing function.
+    #[deprecated(
+        note = "Use LinkedHugr with Call entrypoint and FuncDecl",
+        since = "0.24.4"
+    )]
     Call(Node, Vec<TypeArg>),
 }
 
 impl NodeTemplate {
+    /// Creates a [Self::LinkedHugr] from the given Hugr with the default linking policy.
+    pub fn linked_hugr(h: impl Into<Hugr>) -> Self {
+        NodeTemplate::LinkedHugr(Box::new(h.into()), NameLinkingPolicy::default())
+    }
+
     /// Adds this instance to the specified [`HugrMut`] as a new node or subtree under a
     /// given parent, returning the unique new child (of that parent) thus created
     ///
@@ -76,6 +99,10 @@ impl NodeTemplate {
             NodeTemplate::CompoundOp(new_h) => {
                 Ok(hugr.insert_hugr(parent, *new_h).inserted_entrypoint)
             }
+            NodeTemplate::LinkedHugr(h, pol) => {
+                Ok(hugr.insert_link_hugr(parent, *h, &pol)?.inserted_entrypoint)
+            }
+            #[expect(deprecated)] // remove together
             NodeTemplate::Call(target, type_args) => {
                 let c = call(hugr, target, type_args)?;
                 let tgt_port = c.called_function_port();
@@ -95,6 +122,8 @@ impl NodeTemplate {
         match self {
             NodeTemplate::SingleOp(opty) => dfb.add_dataflow_op(opty, inputs),
             NodeTemplate::CompoundOp(h) => dfb.add_hugr_with_wires(*h, inputs),
+            NodeTemplate::LinkedHugr(h, pol) => dfb.add_link_hugr_with_wires(*h, &pol, inputs),
+            #[expect(deprecated)] // remove together
             // Really we should check whether func points at a FuncDecl or FuncDefn and create
             // the appropriate variety of FuncID but it doesn't matter for the purpose of making a Call.
             NodeTemplate::Call(func, type_args) => {
@@ -108,28 +137,63 @@ impl NodeTemplate {
 
     fn replace(self, hugr: &mut impl HugrMut<Node = Node>, n: Node) -> Result<(), BuildError> {
         assert_eq!(hugr.children(n).count(), 0);
-        let new_optype = match self {
-            NodeTemplate::SingleOp(op_type) => op_type,
+        let (new_optype, static_source, static_inport) = match self {
+            NodeTemplate::SingleOp(op_type) => {
+                if op_type.static_input_port().is_some() {
+                    return Err(BuildError::UnexpectedType {
+                        node: n,
+                        op_desc: "Replacement SingleOp without static input",
+                    });
+                }
+                (op_type, None, None)
+            }
             NodeTemplate::CompoundOp(new_h) => {
+                let root = new_h.entrypoint_optype();
+                if !matches!(
+                    root,
+                    OpType::CFG(_) | OpType::DFG(_) | OpType::Conditional(_) | OpType::TailLoop(_)
+                )
+                //if !root.is_container() || !root.dataflow_signature().is_some() // Using explicit list as per docs
+                {
+                    return Err(BuildError::UnexpectedType {
+                        node: n,
+                        op_desc: "Replacement CompoundOp not a container/dataflow node",
+                    });
+                }
+                assert!(root.static_input_port().is_none());
                 let new_entrypoint = hugr.insert_hugr(n, *new_h).inserted_entrypoint;
                 let children = hugr.children(new_entrypoint).collect::<Vec<_>>();
                 let root_opty = hugr.remove_node(new_entrypoint);
                 for ch in children {
                     hugr.set_parent(ch, n);
                 }
-                root_opty
+                (root_opty, None, None)
             }
+            NodeTemplate::LinkedHugr(h, pol) => {
+                let new_entrypoint = hugr.insert_link_hugr(n, *h, &pol)?.inserted_entrypoint;
+                let children = hugr.children(new_entrypoint).collect::<Vec<_>>();
+                let static_source = hugr.static_source(new_entrypoint);
+                let root_opty = hugr.remove_node(new_entrypoint);
+                let static_inport = root_opty.static_input_port();
+                for ch in children {
+                    hugr.set_parent(ch, n);
+                }
+                (root_opty, static_source, static_inport)
+            }
+            #[expect(deprecated)] // remove together
             NodeTemplate::Call(func, type_args) => {
                 let c = call(hugr, func, type_args)?;
-                let static_inport = c.called_function_port();
-                // insert an input for the Call static input
-                hugr.insert_ports(n, Direction::Incoming, static_inport.index(), 1);
-                // connect the function to (what will be) the call
-                hugr.connect(func, 0, n, static_inport);
-                c.into()
+                let called_func_port = c.called_function_port();
+                (c.into(), Some(func), Some(called_func_port))
             }
         };
         *hugr.optype_mut(n) = new_optype;
+        if let Some(static_inport) = static_inport {
+            hugr.insert_ports(n, Direction::Incoming, static_inport.index(), 1);
+            if let Some(static_source) = static_source {
+                hugr.connect(static_source, 0, n, static_inport);
+            }
+        }
         Ok(())
     }
 
@@ -141,6 +205,8 @@ impl NodeTemplate {
         let sig = match self {
             NodeTemplate::SingleOp(op_type) => op_type,
             NodeTemplate::CompoundOp(hugr) => hugr.entrypoint_optype(),
+            NodeTemplate::LinkedHugr(hugr, _) => hugr.entrypoint_optype(),
+            #[expect(deprecated)] // remove together, perhaps refactor to return just Signature
             NodeTemplate::Call(_, _) => return Ok(()), // no way to tell
         }
         .dataflow_signature();
@@ -838,9 +904,9 @@ mod test {
     };
     use hugr_core::extension::simple_op::MakeOpDef;
     use hugr_core::extension::{TypeDefBound, Version, simple_op::MakeExtensionOp};
-    use hugr_core::hugr::{IdentList, ValidationError};
+    use hugr_core::hugr::{IdentList, ValidationError, hugrmut::HugrMut};
     use hugr_core::ops::constant::{CustomConst, OpaqueValue};
-    use hugr_core::ops::{self, ExtensionOp, OpTrait, OpType, Tag, Value};
+    use hugr_core::ops::{self, ExtensionOp, OpTrait, OpType, Tag, Value, handle::NodeHandle};
     use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
     use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
     use hugr_core::std_extensions::collections::array::{
@@ -855,7 +921,7 @@ mod test {
     use hugr_core::types::{
         EdgeKind, PolyFuncType, Signature, SumType, Term, Type, TypeArg, TypeBound, TypeRow,
     };
-    use hugr_core::{Direction, Extension, HugrView, Port, type_row};
+    use hugr_core::{Direction, Extension, HugrView, Port, Visibility, type_row};
     use itertools::Itertools;
     use rstest::rstest;
 
@@ -1317,8 +1383,8 @@ mod test {
         h.validate().unwrap();
     }
 
-    #[test]
-    fn op_to_call() {
+    #[rstest]
+    fn op_to_call(#[values(true, false)] use_linking: bool) {
         let e = ext();
         let pv = e.get_type(PACKED_VEC).unwrap();
         let inner = pv.instantiate([usize_t().into()]).unwrap();
@@ -1330,9 +1396,10 @@ mod test {
             .module_root_builder()
             .add_hugr(
                 lowered_read(Type::new_var_use(0, TypeBound::Copyable), |sig| {
-                    FunctionBuilder::new(
+                    FunctionBuilder::new_vis(
                         "lowered_read",
                         PolyFuncType::new([TypeBound::Copyable.into()], sig),
+                        Visibility::Public,
                     )
                 })
                 .finish_hugr()
@@ -1348,10 +1415,30 @@ mod test {
             .add_dataflow_op(read_op(&e, usize_t()), [inner, idx])
             .unwrap();
         let mut h = dfb.finish_hugr_with_outputs(res.outputs()).unwrap();
+        let read_poly = h
+            .get_optype(read_func)
+            .as_func_defn()
+            .unwrap()
+            .signature()
+            .clone();
 
         let mut lw = lowerer(&e);
         lw.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, _| {
-            Ok(Some(NodeTemplate::Call(read_func, args.to_owned())))
+            Ok(Some(if use_linking {
+                let mut fb = FunctionBuilder::new("not inserted", endo_sig(vec![])).unwrap();
+                let target = fb
+                    .module_root_builder()
+                    .declare("lowered_read", read_poly.clone())
+                    .unwrap();
+                let call = fb.call(&target, args, []).unwrap();
+                // We have not connected inputs or outputs to the call so the Hugr is invalid
+                let mut h = std::mem::take(fb.hugr_mut());
+                h.set_entrypoint(call.node());
+                NodeTemplate::linked_hugr(h)
+            } else {
+                #[expect(deprecated)] // remove use_linking==false case
+                NodeTemplate::Call(read_func, args.to_owned())
+            }))
         });
         lw.run(&mut h).unwrap();
         h.validate().unwrap();
