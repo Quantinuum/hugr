@@ -376,10 +376,10 @@ impl Value {
     ///
     /// Returns an error if the Hugr root node does not define a function.
     #[deprecated(note = "Flatten and lift contents to a FuncDefn", since = "0.25.0")]
+    #[expect(deprecated)] // Remove along with Value::Function
     pub fn function(hugr: impl Into<Hugr>) -> Result<Self, ConstTypeError> {
         let hugr = hugr.into();
         mono_fn_type(&hugr)?;
-        #[expect(deprecated)] // In deprecated function, remove at same time
         Ok(Self::Function {
             hugr: Box::new(hugr),
         })
