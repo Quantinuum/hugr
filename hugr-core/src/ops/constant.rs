@@ -17,6 +17,7 @@ use serialize::SerialSum;
 use delegate::delegate;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use serde_with::serde_as;
 use smol_str::SmolStr;
 use thiserror::Error;
 
@@ -921,8 +922,11 @@ pub(crate) mod test {
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
                 use ::proptest::collection::vec;
-                let leaf_strat = any::<OpaqueValue>().prop_map(|e| Self::Extension { e });
-
+                let leaf_strat = prop_oneof![
+                    any::<OpaqueValue>().prop_map(|e| Self::Extension { e }),
+                    #[expect(deprecated)] // remove prop_oneof when Value::Function removed
+                    crate::proptest::any_hugr().prop_map(|x| Value::function(x).unwrap())
+                ];
                 leaf_strat
                     .prop_recursive(
                         3,  // No more than 3 branch levels deep
