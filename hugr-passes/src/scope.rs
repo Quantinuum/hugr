@@ -32,6 +32,8 @@ use itertools::{Either, Itertools};
 ///
 /// A pass will always optimize the entrypoint region, unless it is set to the
 /// module root.
+//
+// This enum should be kept in sync with the `PassScope` enum in `hugr-py`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, derive_more::Display)]
 #[non_exhaustive]
 pub enum PassScope {
