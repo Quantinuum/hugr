@@ -7,15 +7,14 @@ use std::fmt::{self, Display};
 
 use super::type_param::TypeParam;
 use super::type_row::TypeRowBase;
-use super::{
-    MaybeRV, NoRV, RowVariable, Substitution, Transformable, Type, TypeRow, TypeTransformer,
-};
+use super::{Substitution, Transformable, Type, TypeRow, TypeTransformer};
 
 use crate::core::PortIndex;
 use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_signature_exts,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
+use crate::types::Term;
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 #[cfg(test)]
@@ -33,28 +32,37 @@ use {crate::proptest::RecursionDepth, proptest::prelude::*, proptest_derive::Arb
 ///
 /// [`function value`]: crate::ops::constant::Value::Function
 /// [`FuncDefn`]: crate::ops::FuncDefn
-pub struct FuncTypeBase<ROWVARS: MaybeRV> {
+pub struct FuncTypeBase<T> {
     /// Value inputs of the function.
     #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
-    pub input: TypeRowBase<ROWVARS>,
+    pub input: T,
     /// Value outputs of the function.
     #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
-    pub output: TypeRowBase<ROWVARS>,
+    pub output: T,
 }
 
 /// The concept of "signature" in the spec - the edges required to/from a node
 /// or within a [`FuncDefn`], also the target (value) of a call (static).
 ///
+/// Each *element* of [Signature::input] and [Signature::output] must type-check against
+/// [Term::RuntimeType]`(`[TypeBound::Linear]`)`, hence the function's
+/// arity is fixed as the length of the `Vec`.
+///
 /// [`FuncDefn`]: crate::ops::FuncDefn
-pub type Signature = FuncTypeBase<NoRV>;
+pub type Signature = FuncTypeBase<TypeRow>; // ALAN -> TermRow. Or just Vec<Type==Term>?
 
-/// A function that may contain [`RowVariable`]s and thus has potentially-unknown arity;
-/// used for [`OpDef`]'s and passable as a value round a Hugr (see [`Type::new_function`])
-/// but not a valid node type.
+/// A function whose [FuncValueType::input] and [FuncValueType::output] are arbitrary [Term]s.
+/// Each must type-check against [Term::ListType]`(`Term::RuntimeType`(`[TypeBound::Linear]`))`
+/// so can include variables containing unknown numbers of types.
+///
+/// Used for [`OpDef`]'s and may be used as a type (of function-pointer values)
+/// on wires of a Hugr (see [`Type::new_function`]) but not a valid node type.
 ///
 /// [`OpDef`]: crate::extension::OpDef
-pub type FuncValueType = FuncTypeBase<RowVariable>;
+pub type FuncValueType = FuncTypeBase<Term>;
 
+// ALAN do we need a `trait Substitutable`?
+// We probably should implement TypeTransformer for `Vec<Type>`. Oh, I guess that's TypeRow...
 impl<RV: MaybeRV> FuncTypeBase<RV> {
     pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
         Self {

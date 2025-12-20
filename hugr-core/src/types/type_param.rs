@@ -14,12 +14,9 @@ use std::sync::Arc;
 use thiserror::Error;
 use tracing::warn;
 
-use super::row_var::MaybeRV;
-use super::{
-    NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeBound, TypeTransformer,
-    check_typevar_decl,
-};
+use super::{Substitution, Transformable, Type, TypeBound, TypeTransformer, check_typevar_decl};
 use crate::extension::SignatureError;
+use crate::types::{CustomType, FuncValueType, SumType};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -95,9 +92,20 @@ pub enum Term {
     /// The type of static tuples.
     #[display("TupleType[{_0}]")]
     TupleType(Box<Term>),
-    /// A runtime type as a term. Instance of [`Term::RuntimeType`].
+    /// The type of runtime values defined by an extension type.
+    /// Instance of [Self::RuntimeType] for some bound.
+    //
+    // TODO optimise with `Box<CustomType>`?
+    // or some static version of this?
+    RuntimeExtension(CustomType),
+    /// The type of runtime values that are function pointers.
+    /// Instance of [Self::RuntimeType]`(`[TypeBound::Copyable]`)`
     #[display("{_0}")]
-    Runtime(Type),
+    RuntimeFunction(Box<FuncValueType>),
+    /// The type of runtime values that are sums of products (ADTs)
+    /// Instance of [Self::RuntimeType]`(bound)` for `bound` calculated from each variant's elements.
+    #[display("{_0}")]
+    RuntimeSum(SumType),
     /// A 64bit unsigned integer literal. Instance of [`Term::BoundedNatType`].
     #[display("{_0}")]
     BoundedNat(u64),
@@ -229,6 +237,7 @@ impl From<UpperBound> for Term {
     }
 }
 
+/*ALAN delete(?)
 impl<RV: MaybeRV> From<TypeBase<RV>> for Term {
     fn from(value: TypeBase<RV>) -> Self {
         match value.try_into_type() {
@@ -236,7 +245,7 @@ impl<RV: MaybeRV> From<TypeBase<RV>> for Term {
             Err(RowVariable(idx, bound)) => Term::new_var_use(idx, TypeParam::new_list_type(bound)),
         }
     }
-}
+}*/
 
 impl From<u64> for Term {
     fn from(n: u64) -> Self {
@@ -333,12 +342,47 @@ impl Term {
         }
     }
 
-    /// Returns a [`Type`] if the [`Term`] is a runtime type.
-    #[must_use]
-    pub fn as_runtime(&self) -> Option<TypeBase<NoRV>> {
+    /// Returns whether this `Term` is a type of runtime values
+    pub fn is_runtime(&self) -> bool {
+        matches!(
+            self,
+            Term::RuntimeExtension(_) | Term::RuntimeFunction(_) | Term::RuntimeSum(_)
+        )
+    }
+
+    /// Returns the inner [`CustomType`] if the type is from an extension.
+    pub fn as_extension(&self) -> Option<&CustomType> {
         match self {
-            TypeArg::Runtime(ty) => Some(ty.clone()),
+            Self::RuntimeExtension(ct) => Some(ct),
             _ => None,
+        }
+    }
+
+    /// Returns the inner [`SumType`] if the type is a [Self::RuntimeSum].
+    pub fn as_runtime_sum(&self) -> Option<&SumType> {
+        match self {
+            Self::RuntimeSum(st) => Some(st),
+            _ => None,
+        }
+    }
+
+    /// Returns the [TypeBound] if this is a valid runtime type.
+    pub fn least_upper_bound(&self) -> Option<TypeBound> {
+        match self {
+            Self::Extension(ct) => Some(ct.bound()),
+            Self::RuntimeSum(st) => st.bound(),
+            Self::RuntimeFunction(_) => Some(TypeBound::Copyable),
+            _ => None,
+        }
+    }
+
+    /// Report if this is a copyable runtime type, i.e. an instance
+    /// of [Self::RuntimeType]`(`[TypeBound::Copyable]`)`
+    // - i.e.the least upper bound of the type is contained by the copyable bound.
+    pub const fn copyable(&self) -> bool {
+        match self.least_upper_bound() {
+            Some(b) => TypeBound::Copyable.contains(b),
+            None => false,
         }
     }
 

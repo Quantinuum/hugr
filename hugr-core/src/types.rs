@@ -3,13 +3,10 @@
 mod check;
 pub mod custom;
 mod poly_func;
-mod row_var;
 pub(crate) mod serialize;
 mod signature;
 pub mod type_param;
 pub mod type_row;
-pub(crate) use row_var::MaybeRV;
-pub use row_var::{NoRV, RowVariable};
 
 use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_type_exts,
@@ -181,9 +178,10 @@ pub enum SumType {
     /// Special case of a Sum over unit types.
     #[allow(missing_docs)]
     Unit { size: u8 },
-    /// General case of a Sum type.
+    /// General case of a Sum type. The `term` must be (check against) a [Term::ListType]
+    /// of [Term::ListType] of [Term::RuntimeType] (for any [TypeBound])
     #[allow(missing_docs)]
-    General { rows: Vec<TypeRowRV> },
+    General { rows: Box<Term>, bound: TypeBound }, // ALAN TODO hide bound??
 }
 
 impl std::hash::Hash for SumType {
@@ -298,6 +296,7 @@ impl SumType {
     }
 
     /// Returns an iterator over the variants.
+    // ALAN not always possible if we have a variable of type ListType(ListType(Runtime))...
     pub fn variants(&self) -> impl Iterator<Item = &TypeRowRV> {
         match self {
             SumType::Unit { size } => Either::Left(itertools::repeat_n(
@@ -305,6 +304,13 @@ impl SumType {
                 *size as usize,
             )),
             SumType::General { rows } => Either::Right(rows.iter()),
+        }
+    }
+
+    pub fn bound(&self) -> TypeBound {
+        match self {
+            SumType::Unit { size } => TypeBound::Copyable,
+            SumType::General { bound, .. } => bound,
         }
     }
 }
@@ -325,33 +331,6 @@ impl<RV: MaybeRV> From<SumType> for TypeBase<RV> {
             SumType::General { rows } => TypeBase::new_sum(rows),
         }
     }
-}
-
-#[derive(Clone, Debug, Eq, Hash, derive_more::Display)]
-/// Core types
-pub enum TypeEnum<RV: MaybeRV> {
-    /// An extension type.
-    //
-    // TODO optimise with `Box<CustomType>`?
-    // or some static version of this?
-    Extension(CustomType),
-    /// An alias of a type.
-    #[display("Alias({})", _0.name())]
-    Alias(AliasDecl),
-    /// A function type.
-    #[display("{_0}")]
-    Function(Box<FuncValueType>),
-    /// A type variable, defined by an index into a list of type parameters.
-    //
-    // We cache the TypeBound here (checked in validation)
-    #[display("#{_0}")]
-    Variable(usize, TypeBound),
-    /// `RowVariable`. Of course, this requires that `RV` has instances, [`NoRV`] doesn't.
-    #[display("RowVar({_0})")]
-    RowVar(RV),
-    /// Sum of types.
-    #[display("{_0}")]
-    Sum(SumType),
 }
 
 impl<RV: MaybeRV> TypeEnum<RV> {
@@ -400,14 +379,8 @@ impl<RV: MaybeRV> TypeEnum<RV> {
 /// let func_type: Type = Type::new_function(Signature::new_endo([]));
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 /// ```
-pub struct TypeBase<RV: MaybeRV>(TypeEnum<RV>, TypeBound);
-
-/// The type of a single value, that can be sent down a wire
-pub type Type = TypeBase<NoRV>;
-
-/// One or more types - either a single type, or a row variable
-/// standing for multiple types.
-pub type TypeRV = TypeBase<RowVariable>;
+pub type Type = Term;
+pub type TypeRV = Term;
 
 impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<TypeEnum<RV1>> for TypeEnum<RV2> {
     fn eq(&self, other: &TypeEnum<RV1>) -> bool {
@@ -429,20 +402,17 @@ impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<TypeBase<RV1>> for TypeBase<RV2> {
     }
 }
 
-impl<RV: MaybeRV> TypeBase<RV> {
+impl Type {
     /// An empty `TypeRow` or `TypeRowRV`. Provided here for convenience
     pub const EMPTY_TYPEROW: TypeRowBase<RV> = TypeRowBase::<RV>::new();
-    /// Unit type (empty tuple).
-    pub const UNIT: Self = Self(
-        TypeEnum::Sum(SumType::Unit { size: 1 }),
-        TypeBound::Copyable,
-    );
+    /// Runtime unit type (empty tuple).
+    pub const UNIT: Self = Self::RuntimeSum(SumType::Unit { size: 1 });
 
     const EMPTY_TYPEROW_REF: &'static TypeRowBase<RV> = &Self::EMPTY_TYPEROW;
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<FuncValueType>) -> Self {
-        Self::new(TypeEnum::Function(Box::new(fun_ty.into())))
+        Self::new(Type::RuntimeFunction(Box::new(fun_ty.into())))
     }
 
     /// Initialize a new tuple type by providing the elements.
@@ -461,84 +431,26 @@ impl<RV: MaybeRV> TypeBase<RV> {
     where
         R: Into<TypeRowRV>,
     {
-        Self::new(TypeEnum::Sum(SumType::new(variants)))
+        Self::RuntimeSum(SumType::new(variants))
     }
 
     /// Initialize a new custom type.
-    // TODO remove? Extensions/TypeDefs should just provide `Type` directly
+    // ALAN TODO remove? Doesn't really do anything now
     #[must_use]
     pub const fn new_extension(opaque: CustomType) -> Self {
-        let bound = opaque.bound();
-        TypeBase(TypeEnum::Extension(opaque), bound)
-    }
-
-    /// Initialize a new alias.
-    #[must_use]
-    pub fn new_alias(alias: AliasDecl) -> Self {
-        Self::new(TypeEnum::Alias(alias))
-    }
-
-    pub(crate) fn new(type_e: TypeEnum<RV>) -> Self {
-        let bound = type_e.least_upper_bound();
-        Self(type_e, bound)
+        Type::RuntimeExtension(opaque)
     }
 
     /// New `UnitSum` with empty Tuple variants
     #[must_use]
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(TypeEnum::Sum(SumType::new_unary(size)), TypeBound::Copyable)
+        Self::RuntimeSum(SumType::new_unary(size))
     }
 
-    /// New use (occurrence) of the type variable with specified index.
-    /// `bound` must be exactly that with which the variable was declared
-    /// (i.e. as a [`Term::RuntimeType`]`(bound)`), which may be narrower
-    /// than required for the use.
-    #[must_use]
-    pub const fn new_var_use(idx: usize, bound: TypeBound) -> Self {
-        Self(TypeEnum::Variable(idx, bound), bound)
-    }
-
-    /// Report the least upper [`TypeBound`]
-    #[inline(always)]
-    pub const fn least_upper_bound(&self) -> TypeBound {
-        self.1
-    }
-
-    /// Report the component `TypeEnum`.
-    #[inline(always)]
-    pub const fn as_type_enum(&self) -> &TypeEnum<RV> {
-        &self.0
-    }
-
-    /// Report a mutable reference to the component `TypeEnum`.
-    #[inline(always)]
-    pub fn as_type_enum_mut(&mut self) -> &mut TypeEnum<RV> {
-        &mut self.0
-    }
-
-    /// Returns the inner [`SumType`] if the type is a sum.
-    pub fn as_sum(&self) -> Option<&SumType> {
-        match &self.0 {
-            TypeEnum::Sum(s) => Some(s),
-            _ => None,
-        }
-    }
-
-    /// Returns the inner [`CustomType`] if the type is from an extension.
-    pub fn as_extension(&self) -> Option<&CustomType> {
-        match &self.0 {
-            TypeEnum::Extension(ct) => Some(ct),
-            _ => None,
-        }
-    }
-
-    /// Report if the type is copyable - i.e.the least upper bound of the type
-    /// is contained by the copyable bound.
-    pub const fn copyable(&self) -> bool {
-        TypeBound::Copyable.contains(self.least_upper_bound())
-    }
-
+    // ALAN is this now check_term_type?
+    // Probably - that would be a good way to make existing calls to validate
+    // enforce that they are actually instances of RuntimeType's
     /// Checks all variables used in the type are in the provided list
     /// of bound variables, rejecting any [`RowVariable`]s if `allow_row_vars` is False;
     /// and that for each [`CustomType`] the corresponding
