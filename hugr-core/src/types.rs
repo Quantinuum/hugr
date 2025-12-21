@@ -649,59 +649,6 @@ impl TypeRV {
     }
 }
 
-// ====== Conversions ======
-impl<RV: MaybeRV> TypeBase<RV> {
-    /// (Fallibly) converts a `TypeBase` (parameterized, so may or may not be able
-    /// to contain [`RowVariable`]s) into a [Type] that definitely does not.
-    pub fn try_into_type(self) -> Result<Type, RowVariable> {
-        Ok(TypeBase(
-            match self.0 {
-                TypeEnum::Extension(e) => TypeEnum::Extension(e),
-                TypeEnum::Alias(a) => TypeEnum::Alias(a),
-                TypeEnum::Function(f) => TypeEnum::Function(f),
-                TypeEnum::Variable(idx, bound) => TypeEnum::Variable(idx, bound),
-                TypeEnum::RowVar(rv) => Err(rv.as_rv().clone())?,
-                TypeEnum::Sum(s) => TypeEnum::Sum(s),
-            },
-            self.1,
-        ))
-    }
-}
-
-impl TryFrom<TypeRV> for Type {
-    type Error = RowVariable;
-    fn try_from(value: TypeRV) -> Result<Self, RowVariable> {
-        value.try_into_type()
-    }
-}
-
-impl<RV1: MaybeRV> TypeBase<RV1> {
-    /// A swiss-army-knife for any safe conversion of the type argument `RV1`
-    /// to/from [`NoRV`]/RowVariable/rust-type-variable.
-    fn into_<RV2: MaybeRV>(self) -> TypeBase<RV2>
-    where
-        RV1: Into<RV2>,
-    {
-        TypeBase(
-            match self.0 {
-                TypeEnum::Extension(e) => TypeEnum::Extension(e),
-                TypeEnum::Alias(a) => TypeEnum::Alias(a),
-                TypeEnum::Function(f) => TypeEnum::Function(f),
-                TypeEnum::Variable(idx, bound) => TypeEnum::Variable(idx, bound),
-                TypeEnum::RowVar(rv) => TypeEnum::RowVar(rv.into()),
-                TypeEnum::Sum(s) => TypeEnum::Sum(s),
-            },
-            self.1,
-        )
-    }
-}
-
-impl From<Type> for TypeRV {
-    fn from(value: Type) -> Self {
-        value.into_()
-    }
-}
-
 /// Details a replacement of type variables with a finite list of known values.
 /// (Variables out of the range of the list will result in a panic)
 #[derive(Clone, Debug, derive_more::Display)]
