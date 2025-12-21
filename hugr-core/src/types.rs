@@ -181,7 +181,72 @@ pub enum SumType {
     /// General case of a Sum type. The `term` must be (check against) a [Term::ListType]
     /// of [Term::ListType] of [Term::RuntimeType] (for any [TypeBound])
     #[allow(missing_docs)]
-    General { rows: Box<Term>, bound: TypeBound }, // ALAN TODO hide bound??
+    General(GeneralSum),
+}
+
+pub struct GeneralSum {
+    rows: Box<Term>,
+    bound: Option<TypeBound>,
+}
+
+fn union_optbound(items: impl Iterator<Item = Option<TypeBound>>) {
+    let mut b = TypeBound::Copyable;
+    for i in items {
+        let Some(b2) = i else { return None };
+        b = b.union(b2);
+    }
+    b
+}
+
+impl GeneralSum {
+    pub fn new(rows: Term) {
+        let bound = if check_term_type(
+            &rows,
+            &Term::ListType(Term::ListType(TypeBound::Copyable.into())),
+        ) {
+            Some(TypeBound::Copyable)
+        } else if check_term_type(
+            &rows,
+            &Term::ListType(Term::ListType(TypeBound::Any.into())),
+        ) {
+            Some(TypeBound::Any)
+        } else {
+            None
+        };
+        #[derive(Copy, Clone, PartialEq, Eq)]
+        enum TermLvl {
+            Sum,
+            Variant,
+            Element,
+        }
+        fn bound(t: &Term, lvl: TermLvl) -> Option<TypeBound> {
+            match (t, lvl) {
+                (Term::Variable(tv), _) => match (lvl, *tv.cached_decl) {
+                    (TermLvl::Sum, Term::ListType(Term::ListType(Term::RuntimeType(b)))) => Some(b),
+                    (TermLvl::Variant, Term::ListType(Term::RuntimeType(b))) => Some(b),
+                    (TermLvl::Element, Term::RuntimeType(b)) => Some(b),
+                    _ => None,
+                },
+                (Term::RuntimeType(b), _) => (lvl == TermLvl::Element).then_some(b),
+                (_, TermLvl::Element) => None,
+                Term::List(items) => {
+                    let lvl = match lvl {
+                        TermLvl::Sum => TermLvl::Variant,
+                        TermLvl::Variant => TermLvl::Element,
+                        TermLvl::Element => unreachable!(),
+                    };
+                    union_optbound(items.iter().map(|t| bound(t, lvl)))
+                }
+                Term::ListConcat(items) => {
+                    // Elements are at same level as ListConcat
+                    union_optbound(items.iter().map(|t| bound(t, lvl)))
+                }
+                _ => None,
+            }
+        }
+        let bound = bound(&rows, TermLvl::Sum);
+        Self { rows, bound }
+    }
 }
 
 impl std::hash::Hash for SumType {
@@ -310,7 +375,7 @@ impl SumType {
     pub fn bound(&self) -> TypeBound {
         match self {
             SumType::Unit { size } => TypeBound::Copyable,
-            SumType::General { bound, .. } => bound,
+            SumType::General(GeneralSum { bound, .. }) => bound,
         }
     }
 }
