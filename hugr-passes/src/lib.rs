@@ -13,7 +13,6 @@ pub mod non_local;
 pub mod normalize_cfgs;
 pub mod redundant_order_edges;
 pub mod replace_types;
-pub mod scope;
 pub mod untuple;
 
 mod dead_funcs;
@@ -21,8 +20,7 @@ mod half_node;
 mod monomorphize;
 
 // Main pass interfaces
-pub use composable::ComposablePass;
-pub use scope::PassScope;
+pub use composable::{ComposablePass, PassScope};
 
 // Pass re-exports
 pub use dead_code::DeadCodeElimPass;

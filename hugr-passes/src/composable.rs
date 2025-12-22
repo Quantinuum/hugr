@@ -1,12 +1,14 @@
 //! Compiler passes and utilities for composing them
 
+mod scope;
+
+pub use scope::PassScope;
+
 use std::{error::Error, marker::PhantomData};
 
 use hugr_core::core::HugrNode;
 use hugr_core::hugr::{ValidationError, hugrmut::HugrMut};
 use itertools::Either;
-
-use crate::PassScope;
 
 /// An optimization pass that can be sequenced with another and/or wrapped
 /// e.g. by [`ValidatingPass`]
