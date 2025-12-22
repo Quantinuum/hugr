@@ -268,9 +268,10 @@ A **loadable HUGR** is a module HUGR where all input ports are connected and the
 no `FuncDecl/AliasDecl` nodes.
 
 An **executable HUGR** or **executable module** is a loadable HUGR where the
-root Module node has a `FuncDefn` child with function name
-"main", that is the designated entry point. Modules that act as libraries need
-not be executable.
+root Module node has a `FuncDefn` child node that is the designated entry point. This function must take no arguments as input and return no value. Modules that act as libraries need not be executable.
+
+In Hugr, an entrypoint is just a distinguished node. This node could be a `FuncDefn` and its children would define the body of the function. This `FuncDefn` node, together with its children define a region of the HUGR graph.
+When performing optimizations or rewrites on the HUGR it may be desirable in some cases to optimize certain regions and leave others unchanged.
 
 #### Dataflow
 
