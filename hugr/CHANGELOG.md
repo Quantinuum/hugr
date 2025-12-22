@@ -2,6 +2,17 @@
 
 ## [0.25.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.24.3...hugr-v0.25.0) - 2025-12-22
 
+This release includes various breaking refactors and improvements:
+- A lot of work has been done towards linking Hugrs. Now module-rooted Hugrs can
+  be linked together using configurable policies.
+- `ValueArray` has been removed.
+- A type-safe API for accessing metadata on nodes has been added.
+- Envelopes now have an extensive API for progressively describing a package,
+  and failing gracefully on errors.
+- The MSRV has been bumped to Rust 1.89, and the public pyo3 dependency has been
+  updated to 0.27.
+- Multiple deprecated definitions have been removed.
+
 ### Bug Fixes
 
 - *(hugr-core)* [**breaking**] Return error instead of panicking in `MakeRegisteredOp::to_extension_op()` ([#2701](https://github.com/Quantinuum/hugr/pull/2701))
@@ -15,14 +26,14 @@
 ### New Features
 
 - *(hugr-passes)* [**breaking**] normalize_cfgs inlines entry DFG ([#2649](https://github.com/Quantinuum/hugr/pull/2649))
-- ReplaceTypes: recurse on replacements, much deprecation ([#2442](https://github.com/Quantinuum/hugr/pull/2442))
-- Add a pass to remove redundant order edges ([#2739](https://github.com/Quantinuum/hugr/pull/2739))
+- *(hugr-passes)* ReplaceTypes: recurse on replacements, much deprecation ([#2442](https://github.com/Quantinuum/hugr/pull/2442))
+- *(hugr-passes)* Add a pass to remove redundant order edges ([#2739](https://github.com/Quantinuum/hugr/pull/2739))
 - *(hugr-passes)* [**breaking**] add NodeTemplate::LinkedHugr, deprecate ::Call ([#2749](https://github.com/Quantinuum/hugr/pull/2749))
-- return description output to python on error ([#2681](https://github.com/Quantinuum/hugr/pull/2681))
-- add hugr-core StaticGraph, deprecate hugr-passes CallGraph ([#2698](https://github.com/Quantinuum/hugr/pull/2698))
+- Return description output to python on error ([#2681](https://github.com/Quantinuum/hugr/pull/2681))
+- Add hugr-core StaticGraph, deprecate hugr-passes CallGraph ([#2698](https://github.com/Quantinuum/hugr/pull/2698))
 - [**breaking**] Remove `RootCheckable` ([#2704](https://github.com/Quantinuum/hugr/pull/2704))
 - Add method to link Hugr modules (linking pt3) ([#2529](https://github.com/Quantinuum/hugr/pull/2529))
-- `insert_link_hugr` adds entrypoint subtree and links, with reachability ([#2555](https://github.com/Quantinuum/hugr/pull/2555))
+- `insert_link_hugr` adds entrypoint subtree and links, with reachability (linking pt4) ([#2555](https://github.com/Quantinuum/hugr/pull/2555))
 - [**breaking**] Upgrade pyo3 dependency to 0.27 ([#2736](https://github.com/Quantinuum/hugr/pull/2736))
 - [**breaking**] Bump MSRV to Rust 1.89 ([#2747](https://github.com/Quantinuum/hugr/pull/2747))
 - [**breaking**] Allow disconnecting specific edges in a hugr ([#2737](https://github.com/Quantinuum/hugr/pull/2737))
