@@ -1,6 +1,21 @@
 # Changelog
 
 
+## [0.25.0](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.24.3...hugr-cli-v0.25.0) - 2025-12-22
+
+### New Features
+
+- *(cli, python)* programmatic interface to cli with python bindings ([#2677](https://github.com/Quantinuum/hugr/pull/2677))
+- return description output to python on error ([#2681](https://github.com/Quantinuum/hugr/pull/2681))
+- [**breaking**] Type-safe access for node metadata ([#2755](https://github.com/Quantinuum/hugr/pull/2755))
+- [**breaking**] GeneratorDesc metadata definition ([#2759](https://github.com/Quantinuum/hugr/pull/2759))
+
+### Refactor
+
+- [**breaking**] move envelope reading to dedicated module with dedicated errors ([#2689](https://github.com/Quantinuum/hugr/pull/2689))
+- *(cli)* [**breaking**] remove deprecated hugr_json handling ([#2690](https://github.com/Quantinuum/hugr/pull/2690))
+- [**breaking**] Remove multiple deprecated definitions ([#2751](https://github.com/Quantinuum/hugr/pull/2751))
+
 ## [0.24.1](https://github.com/CQCL/hugr/compare/hugr-cli-v0.24.0...hugr-cli-v0.24.1) - 2025-11-03
 
 ### New Features
