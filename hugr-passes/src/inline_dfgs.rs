@@ -10,7 +10,7 @@ use hugr_core::{
 };
 use itertools::Itertools;
 
-use crate::{ComposablePass, PassScope};
+use crate::ComposablePass;
 
 /// Inlines all DFG nodes nested below the entrypoint.
 ///
@@ -42,12 +42,6 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for InlineDFGsPass {
                 .unwrap();
         }
         Ok(())
-    }
-
-    fn with_scope(self, _scope: &PassScope) -> Self {
-        // TODO: Use the configured scope when running the pass.
-        // <https://github.com/Quantinuum/hugr/issues/2771>
-        self
     }
 }
 

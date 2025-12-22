@@ -10,7 +10,6 @@ use hugr_core::{
 };
 use petgraph::visit::{Dfs, Walker};
 
-use crate::PassScope;
 use crate::{
     ComposablePass,
     composable::{ValidatePassError, validate_if_test},
@@ -107,12 +106,6 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
             hugr.remove_subtree(n);
         }
         Ok(())
-    }
-
-    fn with_scope(self, _scope: &PassScope) -> Self {
-        // TODO: Use the configured scope when running the pass.
-        // <https://github.com/Quantinuum/hugr/issues/2771>
-        self
     }
 }
 

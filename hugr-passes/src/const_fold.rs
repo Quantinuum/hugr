@@ -15,7 +15,6 @@ use hugr_core::{
 };
 use value_handle::ValueHandle;
 
-use crate::PassScope;
 use crate::dataflow::{
     ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
     partial_from_const,
@@ -186,12 +185,6 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
                 }
             })?;
         Ok(())
-    }
-
-    fn with_scope(self, _scope: &PassScope) -> Self {
-        // TODO: Use the configured scope when running the pass.
-        // <https://github.com/Quantinuum/hugr/issues/2771>
-        self
     }
 }
 
