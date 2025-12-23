@@ -379,6 +379,8 @@ mod test {
     use hugr_core::extension::{
         CustomSignatureFunc, OpDef, SignatureError, SignatureFunc, TypeDefBound, Version,
     };
+    use hugr_core::hugr::ValidationError;
+    use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::ops::{DataflowOpTrait, ExtensionOp, OpName, OpType};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
@@ -891,5 +893,32 @@ mod test {
             lowerer.run(&mut h).unwrap_err(),
             ReplaceTypesError::LinearizeError(LinearizeError::NeedCopyDiscard(Box::new(qb_t())))
         );
+    }
+
+    #[rstest]
+    #[case([borrow_array_type(2, usize_t())])]
+    #[should_panic] // Fails in lowerer.run with a wrapped HugrLinkingError
+    #[case([borrow_array_type(2, usize_t()), borrow_array_type(4, usize_t())])]
+    fn test_copy_borrow_array<const N: usize>(#[case] tys: [Type; N]) {
+        // Build invalid Hugr that treats element of `tys` as copyable
+        let (inp, out, mut h) = {
+            let mut dfb = DFGBuilder::new(Signature::new(
+                Vec::from_iter(tys.clone()),
+                tys.clone().into_iter().chain(tys.clone()).collect_vec(),
+            ))
+            .unwrap();
+            (dfb.input(), dfb.output(), std::mem::take(dfb.hugr_mut()))
+        };
+        for (n, _) in tys.iter().enumerate() {
+            h.connect(inp.node(), n, out.node(), n);
+            h.connect(inp.node(), n, out.node(), n + tys.len());
+        }
+        assert!(matches!(
+            h.validate(),
+            Err(ValidationError::TooManyConnections { .. })
+        ));
+        let (_e, lowerer) = ext_lowerer();
+        lowerer.run(&mut h).unwrap();
+        h.validate().unwrap();
     }
 }
