@@ -897,7 +897,6 @@ mod test {
 
     #[rstest]
     #[case([borrow_array_type(2, usize_t())])]
-    #[should_panic] // Fails in lowerer.run with a wrapped HugrLinkingError
     #[case([borrow_array_type(2, usize_t()), borrow_array_type(4, usize_t())])]
     fn test_copy_borrow_array<const N: usize>(#[case] tys: [Type; N]) {
         // Build invalid Hugr that treats element of `tys` as copyable

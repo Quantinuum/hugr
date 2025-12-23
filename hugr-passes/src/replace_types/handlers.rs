@@ -96,8 +96,11 @@ pub(super) fn discard_to_unit_func_name(t: &Type) -> String {
     mangle_name("__discard", &[t.clone().into()])
 }
 
-fn copy_scan_func_name(t: &Type, num_new: u64) -> String {
-    mangle_name("__copy_scan", &[t.clone().into(), num_new.into()])
+fn copy_scan_func_name(array_len: u64, t: &Type, num_new: u64) -> String {
+    mangle_name(
+        "__copy_scan",
+        &[array_len.into(), t.clone().into(), num_new.into()],
+    )
 }
 
 /// Handler for copying/discarding arrays if their elements have become linear.
@@ -206,7 +209,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         let mut mb = dfb.module_root_builder();
         let mut fb = mb
             .define_function_vis(
-                copy_scan_func_name(ty, num_new as _),
+                copy_scan_func_name(*n, ty, num_new as _),
                 endo_sig(io),
                 Visibility::Public,
             )
