@@ -7,8 +7,8 @@ use hugr_core::builder::{
 };
 use hugr_core::extension::prelude::{UnwrapBuilder, option_type};
 use hugr_core::hugr::linking::{NameLinkingPolicy, OnMultiDefn};
-use hugr_core::ops::constant::CustomConst;
-use hugr_core::ops::{OpTrait, OpType, Tag, Value, constant::OpaqueValue};
+use hugr_core::ops::constant::{CustomConst, OpaqueValue};
+use hugr_core::ops::{OpTrait, OpType, Tag, Value};
 use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
 use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
 use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
@@ -20,7 +20,7 @@ use hugr_core::std_extensions::collections::borrow_array::{
     BArrayClone, BArrayDiscard, BArrayOpBuilder, BorrowArray, borrow_array_type,
 };
 use hugr_core::std_extensions::collections::list::ListValue;
-use hugr_core::types::{PolyFuncType, SumType, Transformable, Type, TypeArg, TypeBound};
+use hugr_core::types::{SumType, Transformable, Type, TypeArg};
 use hugr_core::{Visibility, type_row};
 
 use itertools::Itertools;
@@ -103,6 +103,14 @@ fn copy_scan_func_name(array_len: u64, t: &Type, num_new: u64) -> String {
     )
 }
 
+fn unwrap_func_name(t: &Type) -> String {
+    mangle_name("__unwrap", &[t.clone().into()])
+}
+
+fn make_none_func_name(t: &Type) -> String {
+    mangle_name("__mk_none", &[t.clone().into()])
+}
+
 /// Handler for copying/discarding arrays if their elements have become linear.
 ///
 /// Generic over the concrete array implementation.
@@ -170,26 +178,20 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     let arrays_of_none = {
         let fn_none = {
             let mut mb = dfb.module_root_builder();
-            let tv = Type::new_var_use(0, TypeBound::Linear);
             let mut fb = mb
                 .define_function_vis(
-                    "__mk_none",
-                    PolyFuncType::new(
-                        [TypeBound::Linear.into()],
-                        inout_sig(vec![], Type::from(option_type(tv.clone()))),
-                    ),
+                    make_none_func_name(ty),
+                    inout_sig(vec![], option_ty.clone()),
                     Visibility::Public,
                 )
                 .unwrap();
             let none = fb
-                .add_dataflow_op(Tag::new(0, vec![type_row![], tv.into()]), [])
+                .add_dataflow_op(Tag::new(0, vec![type_row![], ty.clone().into()]), [])
                 .unwrap();
             fb.finish_with_outputs(none.outputs()).unwrap()
         };
         let repeats = vec![GenericArrayRepeat::<AK>::new(option_ty.clone(), *n); num_new];
-        let fn_none = dfb
-            .load_func(fn_none.handle(), &[ty.clone().into()])
-            .unwrap();
+        let fn_none = dfb.load_func(fn_none.handle(), &[]).unwrap();
         repeats
             .into_iter()
             .map(|rpt| {
@@ -296,28 +298,20 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     //3. Scan each array-of-options, 'unwrapping' each element into a non-option
     let unwrap_elem = {
         let mut mb = dfb.module_root_builder();
-        let tv = Type::new_var_use(0, TypeBound::Linear);
         let mut fb = mb
             .define_function_vis(
-                "__unwrap",
-                PolyFuncType::new(
-                    [TypeBound::Linear.into()],
-                    inout_sig(Type::from(option_type(tv.clone())), tv.clone()),
-                ),
+                unwrap_func_name(ty),
+                inout_sig(option_ty.clone(), ty.clone()),
                 Visibility::Public,
             )
             .unwrap();
         let [opt] = fb.input_wires_arr();
-        let [val] = fb
-            .build_unwrap_sum(1, SumType::new_option(tv), opt)
-            .unwrap();
+        let [val] = fb.build_unwrap_sum(1, option_sty, opt).unwrap();
         fb.finish_with_outputs([val]).unwrap()
     };
 
     let unwrap_scan = GenericArrayScan::<AK>::new(option_ty, ty.clone(), vec![], *n);
-    let unwrap_elem = dfb
-        .load_func(unwrap_elem.handle(), &[ty.clone().into()])
-        .unwrap();
+    let unwrap_elem = dfb.load_func(unwrap_elem.handle(), &[]).unwrap();
 
     let out_arrays = std::iter::once(out_array1)
         .chain(opt_arrays.map(|opt_array| {
