@@ -1,5 +1,6 @@
 # Changelog
 
+
 ## [0.25.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.24.3...hugr-v0.25.0) - 2025-12-22
 
 This release includes various breaking refactors and improvements:
