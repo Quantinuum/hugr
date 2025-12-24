@@ -92,24 +92,13 @@ pub fn array_const(
     generic_array_const::<Array>(val, repl)
 }
 
-pub(super) fn discard_to_unit_func_name(t: &Type) -> String {
-    mangle_name("__discard", &[t.clone().into()])
-}
+pub(super) const DISCARD_TO_UNIT_PREFIX: &'static str = "__discard_unit";
 
-fn copy_scan_func_name(array_len: u64, t: &Type, num_new: u64) -> String {
-    mangle_name(
-        "__copy_scan",
-        &[array_len.into(), t.clone().into(), num_new.into()],
-    )
-}
+pub(super) const COPY_SCAN_PREFIX: &'static str = "__copy_scan";
 
-fn unwrap_func_name(t: &Type) -> String {
-    mangle_name("__unwrap", &[t.clone().into()])
-}
+pub(super) const UNWRAP_PREFIX: &'static str = "__unwrap";
 
-fn make_none_func_name(t: &Type) -> String {
-    mangle_name("__mk_none", &[t.clone().into()])
-}
+pub(super) const MAKE_NONE_PREFIX: &'static str = "__mk_none";
 
 /// Handler for copying/discarding arrays if their elements have become linear.
 ///
@@ -136,7 +125,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
                     let mut mb = dfb.module_root_builder();
                     let mut fb = mb
                         .define_function_vis(
-                            discard_to_unit_func_name(ty),
+                            mangle_name(DISCARD_TO_UNIT_PREFIX, &[ty.clone().into()]),
                             inout_sig(ty.clone(), Type::UNIT),
                             Visibility::Public,
                         )
@@ -180,7 +169,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             let mut mb = dfb.module_root_builder();
             let mut fb = mb
                 .define_function_vis(
-                    make_none_func_name(ty),
+                    mangle_name(MAKE_NONE_PREFIX, &[ty.clone().into()]),
                     inout_sig(vec![], option_ty.clone()),
                     Visibility::Public,
                 )
@@ -211,7 +200,10 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         let mut mb = dfb.module_root_builder();
         let mut fb = mb
             .define_function_vis(
-                copy_scan_func_name(*n, ty, num_new as _),
+                mangle_name(
+                    COPY_SCAN_PREFIX,
+                    &[(*n).into(), ty.clone().into(), (num_new as u64).into()],
+                ),
                 endo_sig(io),
                 Visibility::Public,
             )
@@ -300,7 +292,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         let mut mb = dfb.module_root_builder();
         let mut fb = mb
             .define_function_vis(
-                unwrap_func_name(ty),
+                mangle_name(UNWRAP_PREFIX, &[ty.clone().into()]),
                 inout_sig(option_ty.clone(), ty.clone()),
                 Visibility::Public,
             )

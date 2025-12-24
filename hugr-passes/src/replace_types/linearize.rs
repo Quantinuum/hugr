@@ -394,7 +394,7 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::replace_types::handlers::discard_to_unit_func_name;
+    use crate::replace_types::handlers::{DISCARD_TO_UNIT_PREFIX, MAKE_NONE_PREFIX, UNWRAP_PREFIX};
     use crate::replace_types::{LinearizeError, Linearizer, NodeTemplate, ReplaceTypesError};
     use crate::{ComposablePass, ReplaceTypes};
 
@@ -802,13 +802,12 @@ mod test {
             // Of course this would loop forever at runtime!
             r.unwrap();
             h.validate().unwrap();
-            let disc_func_name = discard_to_unit_func_name(&lin_t);
             let disc = h
                 .children(h.module_root())
                 .find(|n| {
                     h.get_optype(*n)
                         .as_func_defn()
-                        .is_some_and(|fd| fd.func_name() == &disc_func_name)
+                        .is_some_and(|fd| fd.func_name().contains(DISCARD_TO_UNIT_PREFIX))
                 })
                 .unwrap();
             let call = h
@@ -919,5 +918,18 @@ mod test {
         let (_e, lowerer) = ext_lowerer();
         lowerer.run(&mut h).unwrap();
         h.validate().unwrap();
+        for prefix in [UNWRAP_PREFIX, MAKE_NONE_PREFIX] {
+            assert_eq!(
+                h.children(h.module_root())
+                    .filter(|n| match h.get_optype(*n) {
+                        OpType::FuncDecl(_) => panic!("Unexpected FuncDecl"),
+                        OpType::FuncDefn(fd) => fd.func_name().contains(prefix),
+                        _ => false,
+                    })
+                    .count(),
+                1,
+                "Found multiple {prefix} funcs"
+            );
+        }
     }
 }
