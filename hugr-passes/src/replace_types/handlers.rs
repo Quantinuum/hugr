@@ -92,13 +92,13 @@ pub fn array_const(
     generic_array_const::<Array>(val, repl)
 }
 
-pub(super) const DISCARD_TO_UNIT_PREFIX: &'static str = "__discard_unit";
+pub(super) const DISCARD_TO_UNIT_PREFIX: &str = "__discard_unit";
 
-pub(super) const COPY_SCAN_PREFIX: &'static str = "__copy_scan";
+pub(super) const COPY_SCAN_PREFIX: &str = "__copy_scan";
 
-pub(super) const UNWRAP_PREFIX: &'static str = "__unwrap";
+pub(super) const UNWRAP_PREFIX: &str = "__unwrap";
 
-pub(super) const MAKE_NONE_PREFIX: &'static str = "__mk_none";
+pub(super) const MAKE_NONE_PREFIX: &str = "__mk_none";
 
 /// Handler for copying/discarding arrays if their elements have become linear.
 ///
