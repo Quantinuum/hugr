@@ -22,8 +22,6 @@ use smol_str::SmolStr;
 pub use type_param::{Term, TypeArg};
 pub use type_row::{TypeRow, TypeRowRV};
 
-pub(crate) use poly_func::PolyFuncTypeBase;
-
 use itertools::{Either, Itertools as _};
 #[cfg(test)]
 use proptest_derive::Arbitrary;
@@ -169,6 +167,7 @@ pub enum SumType {
     General(GeneralSum),
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct GeneralSum {
     /// Each term here must be an instance of [Term::ListType]([Term::RuntimeType]), being
     /// the elements of exactly one variant. (Thus, this explicitly forbids sums with an
@@ -177,7 +176,7 @@ pub struct GeneralSum {
     //`Term::ListType(Term::ListType(Term::RuntimeType))`, but then many functions like
     // `len` and `variants` would be impossible. (We might want a separate "FixedAritySum"
     // rust type supporting those, with try_from(SumType).)
-    rows: Vec<Term>,
+    rows: TypeRow,
     bound: Option<TypeBound>,
 }
 
@@ -190,31 +189,39 @@ pub(crate) fn least_upper_bound(bounds: impl IntoIterator<Item = TypeBound>) -> 
     TypeBound::Copyable
 }
 
-fn union_optbound(items: impl Iterator<Item = Option<TypeBound>>) {
+fn union_optbound(items: impl Iterator<Item = Option<TypeBound>>) -> Option<TypeBound> {
     let mut b = TypeBound::Copyable;
     for i in items {
         let Some(b2) = i else { return None };
         b = b.union(b2);
     }
-    b
+    Some(b)
 }
 
-fn sum_bound(rows: &Vec<Term>) -> Option<TypeBound> {
-    return union_optbound(rows.iter().map(|t| {
-        if check_term_type(&rows, &Term::ListType(TypeBound::Copyable.into())) {
+fn sum_bound<'a>(rows: impl IntoIterator<Item = &'a Term>) -> Option<TypeBound> {
+    union_optbound(rows.into_iter().map(|t| {
+        if check_term_type(t, &Term::new_list_type(TypeBound::Copyable)).is_ok() {
             Some(TypeBound::Copyable)
-        } else if check_term_type(&rows, &Term::ListType(TypeBound::Any.into())) {
-            Some(TypeBound::Any)
+        } else if check_term_type(t, &Term::new_list_type(TypeBound::Linear)).is_ok() {
+            Some(TypeBound::Linear)
         } else {
             None
         }
-    }));
+    }))
 }
 
 impl GeneralSum {
-    pub fn new(rows: Term) {
-        let bound = sum_bound(&rows);
+    pub fn new(rows: TypeRow) -> Self {
+        let bound = sum_bound(rows.iter());
         Self { rows, bound }
+    }
+
+    pub fn iter(&self) -> impl Iterator<Item = &Term> {
+        self.rows.iter()
+    }
+
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Term> {
+        self.rows.iter_mut()
     }
 }
 
@@ -243,8 +250,8 @@ impl std::fmt::Display for SumType {
                 display_list_with_separator(itertools::repeat_n("[]", *size as usize), f, "+")
             }
             SumType::General(GeneralSum { rows, .. }) => match rows.len() {
-                1 if rows[0].is_empty() => write!(f, "Unit"),
-                2 if rows[0].is_empty() && rows[1].is_empty() => write!(f, "Bool"),
+                1 if rows[0].is_empty_list() => write!(f, "Unit"),
+                2 if rows[0].is_empty_list() && rows[1].is_empty_list() => write!(f, "Bool"),
                 _ => display_list_with_separator(rows.iter(), f, "+"),
             },
         }
@@ -255,15 +262,15 @@ impl SumType {
     /// Initialize a new sum type.
     pub fn new<V>(variants: impl IntoIterator<Item = V>) -> Self
     where
-        V: Into<TypeRow>,
+        V: Into<Term>,
     {
         let rows = variants.into_iter().map(Into::into).collect_vec();
 
         let len: usize = rows.len();
-        if u8::try_from(len).is_ok() && rows.iter().all(TypeRowRV::is_empty) {
+        if u8::try_from(len).is_ok() && rows.iter().all(Term::is_empty_list) {
             Self::new_unary(len as u8)
         } else {
-            Self::General(GeneralSum::new(rows))
+            Self::General(GeneralSum::new(rows.into()))
         }
     }
 
@@ -287,7 +294,7 @@ impl SumType {
     #[must_use]
     pub fn get_variant(&self, tag: usize) -> Option<&Term> {
         match self {
-            SumType::Unit { size } if tag < (*size as usize) => Some(Type::EMPTY_TYPE_LIST),
+            SumType::Unit { size } if tag < (*size as usize) => Some(Type::EMPTY_TYPE_LIST_REF),
             SumType::General(GeneralSum { rows, .. }) => rows.get(tag),
             _ => None,
         }
@@ -307,7 +314,7 @@ impl SumType {
     #[must_use]
     pub fn as_tuple(&self) -> Option<&Term> {
         match self {
-            SumType::Unit { size } if *size == 1 => Some(TypeRV::EMPTY_TYPE_LIST),
+            SumType::Unit { size } if *size == 1 => Some(Term::EMPTY_TYPE_LIST_REF),
             SumType::General(GeneralSum { rows, .. }) if rows.len() == 1 => Some(&rows[0]),
             _ => None,
         }
@@ -318,8 +325,10 @@ impl SumType {
     #[must_use]
     pub fn as_option(&self) -> Option<&Term> {
         match self {
-            SumType::Unit { size } if *size == 2 => Some(TypeRV::EMPTY_TYPEROW_REF),
-            SumType::General(GeneralSum { rows, .. }) if rows.len() == 2 && rows[0].is_empty() => {
+            SumType::Unit { size } if *size == 2 => Some(Term::EMPTY_TYPE_LIST_REF),
+            SumType::General(GeneralSum { rows, .. })
+                if rows.len() == 2 && rows[0].is_empty_list() =>
+            {
                 Some(&rows[1])
             }
             _ => None,
@@ -334,10 +343,10 @@ impl SumType {
     pub fn variants(&self) -> impl Iterator<Item = &Term> {
         match self {
             SumType::Unit { size } => Either::Left(itertools::repeat_n(
-                TypeRV::EMPTY_TYPE_LIST_REF,
+                Term::EMPTY_TYPE_LIST_REF,
                 *size as usize,
             )),
-            SumType::General(GeneralSum { rows, .. }) => Either::Right(rows.iter()),
+            SumType::General(gs) => Either::Right(gs.iter()),
         }
     }
 
@@ -356,7 +365,7 @@ impl Transformable for SumType {
             SumType::General(GeneralSum { rows, bound }) => {
                 let ch = rows.transform(tr)?;
                 if ch {
-                    *bound = self.calc_bound();
+                    *bound = sum_bound(rows.iter())
                 }
                 Ok(ch)
             }
@@ -381,11 +390,11 @@ impl Type {
 
     const EMPTY_TYPE_LIST: Term = Term::List(vec![]); // or (EMPTY_TYPEROW)....? ALAN
 
-    const EMPTY_TYPER_LIST_REF: &'static Term = &Self::EMPTY_TYPE_LIST;
+    const EMPTY_TYPE_LIST_REF: &'static Term = &Self::EMPTY_TYPE_LIST;
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<FuncValueType>) -> Self {
-        Self::new(Type::RuntimeFunction(Box::new(fun_ty.into())))
+        Self::RuntimeFunction(Box::new(fun_ty.into()))
     }
 
     /// Initialize a new tuple type by providing the elements.
@@ -444,10 +453,11 @@ impl TypeRV {
     #[must_use]
     pub fn is_row_var(&self) -> bool {
         if let Term::Variable(var) = self {
-            matches!(&**var.cached_decl, Term::ListType(Term::RuntimeType(_)))
-        } else {
-            false
+            if let Term::ListType(bx) = &*var.cached_decl {
+                return matches!(&**bx, Term::RuntimeType(_));
+            }
         }
+        false
     }
 
     /// New use (occurrence) of the row variable with specified index.
@@ -459,7 +469,7 @@ impl TypeRV {
     /// [FuncDefn]: crate::ops::FuncDefn
     #[must_use]
     pub const fn new_row_var_use(idx: usize, bound: TypeBound) -> Self {
-        Self::new_var_use(idx, Term::ListType(bound.into()))
+        Self::new_var_use(idx, Term::new_list_type(bound))
     }
 }
 

@@ -225,6 +225,14 @@ impl Term {
             _ => false,
         }
     }
+
+    pub fn is_empty_list(&self) -> bool {
+        match self {
+            Term::List(v) => v.is_empty(),
+            Term::ListConcat(v) => v.iter().all(Term::is_empty_list),
+            _ => false,
+        }
+    }
 }
 
 impl From<TypeBound> for Term {
@@ -291,9 +299,6 @@ pub struct TermVar {
 }
 
 impl Term {
-    /// [`Type::UNIT`] as a [`Term::Runtime`]
-    pub const UNIT: Self = Self::Runtime(Type::UNIT);
-
     /// Makes a `TypeArg` representing a use (occurrence) of the type variable
     /// with the specified index.
     /// `decl` must be exactly that with which the variable was declared.
