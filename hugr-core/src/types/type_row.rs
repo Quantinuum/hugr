@@ -8,8 +8,7 @@ use std::{
 };
 
 use super::{
-    Substitution, Term, Transformable, Type, TypeArg,
-    TypeTransformer, type_param::TypeParam,
+    Substitution, Term, Transformable, Type, TypeArg, TypeTransformer, type_param::TypeParam,
 };
 use crate::{extension::SignatureError, utils::display_list};
 use delegate::delegate;
