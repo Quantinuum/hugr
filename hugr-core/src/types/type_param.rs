@@ -16,7 +16,7 @@ use tracing::warn;
 
 use super::{Substitution, Transformable, Type, TypeBound, TypeTransformer, check_typevar_decl};
 use crate::extension::SignatureError;
-use crate::types::{CustomType, FuncValueType, SumType};
+use crate::types::{CustomType, FuncValueType, GeneralSum, Substitutable, SumType};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -436,70 +436,6 @@ impl Term {
         }
     }
 
-    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
-        match self {
-            Term::Runtime(ty) => {
-                // RowVariables are represented as Term::Variable
-                ty.substitute1(t).into()
-            }
-            TypeArg::BoundedNat(_) | TypeArg::String(_) | TypeArg::Bytes(_) | TypeArg::Float(_) => {
-                self.clone()
-            } // We do not allow variables as bounds on BoundedNat's
-            TypeArg::List(elems) => {
-                // NOTE: This implements a hack allowing substitutions to
-                // replace `TypeArg::Variable`s representing "row variables"
-                // with a list that is to be spliced into the containing list.
-                // We won't need this code anymore once we stop conflating types
-                // with lists of types.
-
-                fn is_type(type_arg: &TypeArg) -> bool {
-                    match type_arg {
-                        TypeArg::Runtime(_) => true,
-                        TypeArg::Variable(v) => v.bound_if_row_var().is_some(),
-                        _ => false,
-                    }
-                }
-
-                let are_types = elems.first().map(is_type).unwrap_or(false);
-
-                Self::new_list_from_parts(elems.iter().map(|elem| match elem.substitute(t) {
-                    list @ TypeArg::List { .. } if are_types => SeqPart::Splice(list),
-                    list @ TypeArg::ListConcat { .. } if are_types => SeqPart::Splice(list),
-                    elem => SeqPart::Item(elem),
-                }))
-            }
-            TypeArg::ListConcat(lists) => {
-                // When a substitution instantiates spliced list variables, we
-                // may be able to merge the concatenated lists.
-                Self::new_list_from_parts(
-                    lists.iter().map(|list| SeqPart::Splice(list.substitute(t))),
-                )
-            }
-            Term::Tuple(elems) => {
-                Term::Tuple(elems.iter().map(|elem| elem.substitute(t)).collect())
-            }
-            TypeArg::TupleConcat(tuples) => {
-                // When a substitution instantiates spliced tuple variables,
-                // we may be able to merge the concatenated tuples.
-                Self::new_tuple_from_parts(
-                    tuples
-                        .iter()
-                        .map(|tuple| SeqPart::Splice(tuple.substitute(t))),
-                )
-            }
-            TypeArg::Variable(TermVar { idx, cached_decl }) => t.apply_var(*idx, cached_decl),
-            Term::RuntimeType(_) => self.clone(),
-            Term::BoundedNatType(_) => self.clone(),
-            Term::StringType => self.clone(),
-            Term::BytesType => self.clone(),
-            Term::FloatType => self.clone(),
-            Term::ListType(item_type) => Term::new_list_type(item_type.substitute(t)),
-            Term::TupleType(item_types) => Term::new_list_type(item_types.substitute(t)),
-            Term::StaticType => self.clone(),
-            Term::ConstType(ty) => Term::new_const(ty.substitute1(t)),
-        }
-    }
-
     /// Helper method for [`TypeArg::new_list_from_parts`] and [`TypeArg::new_tuple_from_parts`].
     fn new_seq_from_parts(
         parts: impl IntoIterator<Item = SeqPart<Self>>,
@@ -634,6 +570,59 @@ impl Term {
     #[inline]
     pub(crate) fn into_tuple_parts(self) -> TuplePartIter {
         TuplePartIter::new(SeqPart::Splice(self))
+    }
+}
+
+impl Substitutable for Term {
+    /// Applies a substitution to a type.
+    /// This may result in a row of types, if this [Type] is not really a single type but actually a row variable
+    /// Invariants may be confirmed by validation:
+    /// * If [`Type::validate`]`(false)` returns successfully, this method will return a Vec containing exactly one type
+    /// * If [`Type::validate`]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
+    ///   return a Vec containing any number of [Type]s. These may (or not) pass [`Type::validate`]
+    fn substitute(&self, s: &Substitution) -> Self {
+        match self {
+            TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
+            TypeArg::RuntimeSum(SumType::General(GeneralSum { rows, .. })) => {
+                Term::new_sum(rows.substitute(s))
+            }
+            TypeArg::RuntimeExtension(cty) => Term::new_extension(cty.substitute(s)),
+            TypeArg::RuntimeFunction(bf) => Term::new_function(bf.substitute(s)),
+
+            TypeArg::BoundedNat(_) | TypeArg::String(_) | TypeArg::Bytes(_) | TypeArg::Float(_) => {
+                self.clone()
+            } // We do not allow variables as bounds on BoundedNat's
+            TypeArg::List(elems) => Self::List(elems.iter().map(|t| t.substitute(s)).collect()),
+            TypeArg::ListConcat(lists) => {
+                // When a substitution instantiates spliced list variables, we
+                // may be able to merge the concatenated lists.
+                Self::new_list_from_parts(
+                    lists.iter().map(|list| SeqPart::Splice(list.substitute(s))),
+                )
+            }
+            Term::Tuple(elems) => {
+                Term::Tuple(elems.iter().map(|elem| elem.substitute(s)).collect())
+            }
+            TypeArg::TupleConcat(tuples) => {
+                // When a substitution instantiates spliced tuple variables,
+                // we may be able to merge the concatenated tuples.
+                Self::new_tuple_from_parts(
+                    tuples
+                        .iter()
+                        .map(|tuple| SeqPart::Splice(tuple.substitute(s))),
+                )
+            }
+            TypeArg::Variable(TermVar { idx, cached_decl }) => s.apply_var(*idx, cached_decl),
+            Term::RuntimeType(_) => self.clone(),
+            Term::BoundedNatType(_) => self.clone(),
+            Term::StringType => self.clone(),
+            Term::BytesType => self.clone(),
+            Term::FloatType => self.clone(),
+            Term::ListType(item_type) => Term::new_list_type(item_type.substitute(s)),
+            Term::TupleType(item_types) => Term::new_list_type(item_types.substitute(s)),
+            Term::StaticType => self.clone(),
+            Term::ConstType(ty) => Term::new_const(ty.substitute1(s)),
+        }
     }
 }
 

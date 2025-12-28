@@ -5,6 +5,7 @@ use std::borrow::Cow;
 use itertools::Itertools;
 
 use crate::extension::SignatureError;
+use crate::types::Substitutable;
 #[cfg(test)]
 use {
     super::proptest_utils::any_serde_type_param,

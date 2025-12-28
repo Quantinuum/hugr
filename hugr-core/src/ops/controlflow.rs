@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use crate::Direction;
-use crate::types::{EdgeKind, Signature, Type, TypeRow};
+use crate::types::{EdgeKind, Signature, Substitutable, Type, TypeRow};
 
 use super::OpTag;
 use super::dataflow::{DataflowOpTrait, DataflowParent};

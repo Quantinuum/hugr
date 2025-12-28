@@ -6,7 +6,6 @@ use std::borrow::Cow;
 use std::fmt::{self, Display};
 
 use super::type_param::TypeParam;
-use super::type_row::TypeRowBase;
 use super::{Substitution, Transformable, Type, TypeRow, TypeTransformer};
 
 use crate::core::PortIndex;
@@ -14,13 +13,13 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_signature_exts,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
-use crate::types::Term;
+use crate::types::{Substitutable, Term};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 #[cfg(test)]
 use {crate::proptest::RecursionDepth, proptest::prelude::*, proptest_derive::Arbitrary};
 
-#[derive(Clone, Debug, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 /// Base type for listing inputs and output types.
 ///
@@ -49,7 +48,7 @@ pub struct FuncTypeBase<T> {
 /// arity is fixed as the length of the `Vec`.
 ///
 /// [`FuncDefn`]: crate::ops::FuncDefn
-pub type Signature = FuncTypeBase<TypeRow>; // ALAN -> TermRow. Or just Vec<Type==Term>?
+pub type Signature = FuncTypeBase<TypeRow>;
 
 /// A function whose [FuncValueType::input] and [FuncValueType::output] are arbitrary [Term]s.
 /// Each must type-check against [Term::ListType]`(`Term::RuntimeType`(`[TypeBound::Linear]`))`
@@ -61,29 +60,22 @@ pub type Signature = FuncTypeBase<TypeRow>; // ALAN -> TermRow. Or just Vec<Type
 /// [`OpDef`]: crate::extension::OpDef
 pub type FuncValueType = FuncTypeBase<Term>;
 
-// ALAN do we need a `trait Substitutable`?
-// We probably should implement TypeTransformer for `Vec<Type>`. Oh, I guess that's TypeRow...
-impl<RV: MaybeRV> FuncTypeBase<RV> {
-    pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
+impl<T: Substitutable> Substitutable for FuncTypeBase<T> {
+    fn substitute(&self, tr: &Substitution) -> Self {
         Self {
             input: self.input.substitute(tr),
             output: self.output.substitute(tr),
         }
     }
+}
 
+impl<T> FuncTypeBase<T> {
     /// Create a new signature with specified inputs and outputs.
-    pub fn new(input: impl Into<TypeRowBase<RV>>, output: impl Into<TypeRowBase<RV>>) -> Self {
+    pub fn new(input: impl Into<T>, output: impl Into<T>) -> Self {
         Self {
             input: input.into(),
             output: output.into(),
         }
-    }
-
-    /// Create a new signature with the same input and output types (signature of an endomorphic
-    /// function).
-    pub fn new_endo(row: impl Into<TypeRowBase<RV>>) -> Self {
-        let row = row.into();
-        Self::new(row.clone(), row)
     }
 
     /// True if both inputs and outputs are necessarily empty.
@@ -97,24 +89,35 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
     #[inline]
     /// Returns a row of the value inputs of the function.
     #[must_use]
-    pub fn input(&self) -> &TypeRowBase<RV> {
+    pub fn input(&self) -> &T {
         &self.input
     }
 
     #[inline]
     /// Returns a row of the value outputs of the function.
     #[must_use]
-    pub fn output(&self) -> &TypeRowBase<RV> {
+    pub fn output(&self) -> &T {
         &self.output
     }
 
     #[inline]
     /// Returns a tuple with the input and output rows of the function.
     #[must_use]
-    pub fn io(&self) -> (&TypeRowBase<RV>, &TypeRowBase<RV>) {
+    pub fn io(&self) -> (&T, &T) {
         (&self.input, &self.output)
     }
+}
 
+impl<T: Clone> FuncTypeBase<T> {
+    /// Create a new signature with the same input and output types (signature of an endomorphic
+    /// function).
+    pub fn new_endo(row: impl Into<T>) -> Self {
+        let row = row.into();
+        Self::new(row.clone(), row)
+    }
+}
+
+impl FuncTypeBase<T> {
     pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.input.validate(var_decls)?;
         self.output.validate(var_decls)
@@ -137,31 +140,10 @@ impl Signature {
     }
 }
 
-impl<RV: MaybeRV> Transformable for FuncTypeBase<RV> {
+impl<IO: Transformable> Transformable for FuncTypeBase<IO> {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         // TODO handle extension sets?
         Ok(self.input.transform(tr)? | self.output.transform(tr)?)
-    }
-}
-
-impl FuncValueType {
-    /// If this `FuncValueType` contains any row variables, return one.
-    #[must_use]
-    pub fn find_rowvar(&self) -> Option<RowVariable> {
-        self.input
-            .iter()
-            .chain(self.output.iter())
-            .find_map(|t| Type::try_from(t.clone()).err())
-    }
-}
-
-// deriving Default leads to an impl that only applies for RV: Default
-impl<RV: MaybeRV> Default for FuncTypeBase<RV> {
-    fn default() -> Self {
-        Self {
-            input: Default::default(),
-            output: Default::default(),
-        }
     }
 }
 

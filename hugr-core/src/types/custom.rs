@@ -6,6 +6,7 @@ use std::sync::{Arc, Weak};
 
 use crate::Extension;
 use crate::extension::{ExtensionId, SignatureError, TypeDef};
+use crate::types::Substitutable;
 
 use super::{
     Substitution, TypeBound,

@@ -443,30 +443,6 @@ impl Type {
         }
     }
 
-    /// Applies a substitution to a type.
-    /// This may result in a row of types, if this [Type] is not really a single type but actually a row variable
-    /// Invariants may be confirmed by validation:
-    /// * If [`Type::validate`]`(false)` returns successfully, this method will return a Vec containing exactly one type
-    /// * If [`Type::validate`]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
-    ///   return a Vec containing any number of [Type]s. These may (or not) pass [`Type::validate`]
-    fn substitute(&self, t: &Substitution) -> Vec<Self> {
-        match &self.0 {
-            TypeEnum::RowVar(rv) => rv.substitute(t),
-            TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => vec![self.clone()],
-            TypeEnum::Variable(idx, bound) => {
-                let TypeArg::Runtime(ty) = t.apply_var(*idx, &((*bound).into())) else {
-                    panic!("Variable was not a type - try validate() first")
-                };
-                vec![ty.into_()]
-            }
-            TypeEnum::Extension(cty) => vec![TypeBase::new_extension(cty.substitute(t))],
-            TypeEnum::Function(bf) => vec![TypeBase::new_function(bf.substitute(t))],
-            TypeEnum::Sum(SumType::General { rows }) => {
-                vec![TypeBase::new_sum(rows.iter().map(|r| r.substitute(t)))]
-            }
-        }
-    }
-
     /// Returns a registry with the concrete extensions used by this type.
     ///
     /// This includes the extensions of custom types that may be nested
@@ -482,14 +458,6 @@ impl Type {
         } else {
             Err(ExtensionCollectionError::dropped_type(self, missing))
         }
-    }
-}
-
-impl Type {
-    fn substitute1(&self, s: &Substitution) -> Self {
-        let v = self.substitute(s);
-        let [r] = v.try_into().unwrap(); // No row vars, so every Type<false> produces exactly one
-        r
     }
 }
 
@@ -543,36 +511,10 @@ impl<'a> Substitution<'a> {
         debug_assert_eq!(check_term_type(arg, decl), Ok(()));
         arg.clone()
     }
+}
 
-    fn apply_rowvar(&self, idx: usize, bound: TypeBound) -> Vec<TypeRV> {
-        let arg = self
-            .0
-            .get(idx)
-            .expect("Undeclared type variable - call validate() ?");
-        debug_assert!(check_term_type(arg, &TypeParam::new_list_type(bound)).is_ok());
-        match arg {
-            TypeArg::List(elems) => elems
-                .iter()
-                .map(|ta| {
-                    match ta {
-                        Term::Runtime(ty) => return ty.clone().into(),
-                        Term::Variable(v) => {
-                            if let Some(b) = v.bound_if_row_var() {
-                                return TypeRV::new_row_var_use(v.index(), b);
-                            }
-                        }
-                        _ => (),
-                    }
-                    panic!("Not a list of types - call validate() ?")
-                })
-                .collect(),
-            Term::Runtime(ty) if matches!(ty.0, TypeEnum::RowVar(_)) => {
-                // Standalone "Type" can be used iff its actually a Row Variable not an actual (single) Type
-                vec![ty.clone().into()]
-            }
-            _ => panic!("Not a type or list of types - call validate() ?"),
-        }
-    }
+pub trait Substitutable {
+    fn substitute(&self, subst: &Substitution) -> Self;
 }
 
 /// A transformation that can be applied to a [Type] or [`TypeArg`].
