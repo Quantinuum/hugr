@@ -636,7 +636,24 @@ impl Term {
 impl Transformable for Term {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match self {
-            Term::Runtime(ty) => ty.transform(tr),
+            Term::RuntimeExtension(custom_type) => {
+                if let Some(nt) = tr.apply_custom(custom_type)? {
+                    *self = nt.into_();
+                    Ok(true)
+                } else {
+                    let args_changed = custom_type.args_mut().transform(tr)?;
+                    if args_changed {
+                        *self = Self::new_extension(
+                            custom_type
+                                .get_type_def(&custom_type.get_extension()?)?
+                                .instantiate(custom_type.args())?,
+                        );
+                    }
+                    Ok(args_changed)
+                }
+            }
+            Term::RuntimeFunction(fty) => fty.transform(tr),
+            Term::RuntimeSum(sum_type) => sum_type.transform(tr)?,
             Term::List(elems) => elems.transform(tr),
             Term::Tuple(elems) => elems.transform(tr),
             Term::BoundedNat(_)

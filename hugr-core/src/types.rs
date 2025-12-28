@@ -198,53 +198,56 @@ fn union_optbound(items: impl Iterator<Item = Option<TypeBound>>) {
     b
 }
 
+fn sum_bound(rows: &Term) -> Option<TypeBound> {
+    if check_term_type(
+        &rows,
+        &Term::ListType(Term::ListType(TypeBound::Copyable.into())),
+    ) {
+        Some(TypeBound::Copyable)
+    } else if check_term_type(
+        &rows,
+        &Term::ListType(Term::ListType(TypeBound::Any.into())),
+    ) {
+        Some(TypeBound::Any)
+    } else {
+        None
+    };
+    #[derive(Copy, Clone, PartialEq, Eq)]
+    enum TermLvl {
+        Sum,
+        Variant,
+        Element,
+    }
+    fn bound(t: &Term, lvl: TermLvl) -> Option<TypeBound> {
+        match (t, lvl) {
+            (Term::Variable(tv), _) => match (lvl, *tv.cached_decl) {
+                (TermLvl::Sum, Term::ListType(Term::ListType(Term::RuntimeType(b)))) => Some(b),
+                (TermLvl::Variant, Term::ListType(Term::RuntimeType(b))) => Some(b),
+                (TermLvl::Element, Term::RuntimeType(b)) => Some(b),
+                _ => None,
+            },
+            (Term::RuntimeType(b), _) => (lvl == TermLvl::Element).then_some(b),
+            (_, TermLvl::Element) => None,
+            Term::List(items) => {
+                let lvl = match lvl {
+                    TermLvl::Sum => TermLvl::Variant,
+                    TermLvl::Variant => TermLvl::Element,
+                    TermLvl::Element => unreachable!(),
+                };
+                union_optbound(items.iter().map(|t| bound(t, lvl)))
+            }
+            Term::ListConcat(items) => {
+                // Elements are at same level as ListConcat
+                union_optbound(items.iter().map(|t| bound(t, lvl)))
+            }
+            _ => None,
+        }
+    }
+}
+
 impl GeneralSum {
     pub fn new(rows: Term) {
-        let bound = if check_term_type(
-            &rows,
-            &Term::ListType(Term::ListType(TypeBound::Copyable.into())),
-        ) {
-            Some(TypeBound::Copyable)
-        } else if check_term_type(
-            &rows,
-            &Term::ListType(Term::ListType(TypeBound::Any.into())),
-        ) {
-            Some(TypeBound::Any)
-        } else {
-            None
-        };
-        #[derive(Copy, Clone, PartialEq, Eq)]
-        enum TermLvl {
-            Sum,
-            Variant,
-            Element,
-        }
-        fn bound(t: &Term, lvl: TermLvl) -> Option<TypeBound> {
-            match (t, lvl) {
-                (Term::Variable(tv), _) => match (lvl, *tv.cached_decl) {
-                    (TermLvl::Sum, Term::ListType(Term::ListType(Term::RuntimeType(b)))) => Some(b),
-                    (TermLvl::Variant, Term::ListType(Term::RuntimeType(b))) => Some(b),
-                    (TermLvl::Element, Term::RuntimeType(b)) => Some(b),
-                    _ => None,
-                },
-                (Term::RuntimeType(b), _) => (lvl == TermLvl::Element).then_some(b),
-                (_, TermLvl::Element) => None,
-                Term::List(items) => {
-                    let lvl = match lvl {
-                        TermLvl::Sum => TermLvl::Variant,
-                        TermLvl::Variant => TermLvl::Element,
-                        TermLvl::Element => unreachable!(),
-                    };
-                    union_optbound(items.iter().map(|t| bound(t, lvl)))
-                }
-                Term::ListConcat(items) => {
-                    // Elements are at same level as ListConcat
-                    union_optbound(items.iter().map(|t| bound(t, lvl)))
-                }
-                _ => None,
-            }
-        }
-        let bound = bound(&rows, TermLvl::Sum);
+        let bound = sum_bound(&rows);
         Self { rows, bound }
     }
 }
@@ -384,7 +387,13 @@ impl Transformable for SumType {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match self {
             SumType::Unit { .. } => Ok(false),
-            SumType::General { rows } => rows.transform(tr),
+            SumType::General(GeneralSum { rows, bound }) => {
+                let ch = rows.transform(tr)?;
+                if ch {
+                    *bound = self.calc_bound();
+                }
+                Ok(ch)
+            }
         }
     }
 }
@@ -589,28 +598,6 @@ impl<RV: MaybeRV> Transformable for TypeBase<RV> {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match &mut self.0 {
             TypeEnum::Alias(_) | TypeEnum::RowVar(_) | TypeEnum::Variable(..) => Ok(false),
-            TypeEnum::Extension(custom_type) => {
-                if let Some(nt) = tr.apply_custom(custom_type)? {
-                    *self = nt.into_();
-                    Ok(true)
-                } else {
-                    let args_changed = custom_type.args_mut().transform(tr)?;
-                    if args_changed {
-                        *self = Self::new_extension(
-                            custom_type
-                                .get_type_def(&custom_type.get_extension()?)?
-                                .instantiate(custom_type.args())?,
-                        );
-                    }
-                    Ok(args_changed)
-                }
-            }
-            TypeEnum::Function(fty) => fty.transform(tr),
-            TypeEnum::Sum(sum_type) => {
-                let ch = sum_type.transform(tr)?;
-                self.1 = self.0.least_upper_bound();
-                Ok(ch)
-            }
         }
     }
 }
