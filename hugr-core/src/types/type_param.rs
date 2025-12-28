@@ -415,9 +415,9 @@ impl Term {
     /// [RowVariable]: TypeEnum::RowVariable
     /// [validate]: crate::types::type_param::TypeArg::validate
     /// [TypeDef]: crate::extension::TypeDef
-        pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
+    pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            Term::RuntimeSum(SumType::General(GeneralSum{ rows, .. })) => {
+            Term::RuntimeSum(SumType::General(GeneralSum { rows, .. })) => {
                 // ALAN also verify the cached bound?? Old comments said:
                 // "There is no need to check the components against the bound,
                 // that is guaranteed by construction (even for deserialization)"...but still?

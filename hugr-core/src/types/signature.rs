@@ -2,7 +2,6 @@
 
 use itertools::Either;
 
-use std::borrow::Cow;
 use std::fmt::{self, Display};
 
 use super::type_param::TypeParam;
@@ -19,17 +18,16 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 #[cfg(test)]
 use {crate::proptest::RecursionDepth, proptest::prelude::*, proptest_derive::Arbitrary};
 
-#[derive(Clone, Debug, Default, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 /// Base type for listing inputs and output types.
 ///
 /// The exact semantics depend on the use case:
-/// - If `ROWVARS=`[`NoRV`], describes the edges required to/from a node or inside a [`FuncDefn`].
-/// - If `ROWVARS=`[`RowVariable`], describes the type of a higher-order [`function value`] or the inputs/outputs from an `OpDef`.
+/// - If `T=`[`TypeRow`], describes the edges required to/from a node or inside a [`FuncDefn`]; see [Signature].
+/// - If `T=`[`Term`], describes the type of a higher-order [`function value`] or the inputs/outputs from an `OpDef`;
+///   see [FuncValueType].
 ///
-/// `ROWVARS` specifies whether the type lists may contain [`RowVariable`]s or not.
-///
-/// [`function value`]: crate::ops::constant::Value::Function
+/// [`function value`]: crate::types::Type::RuntimeFunction
 /// [`FuncDefn`]: crate::ops::FuncDefn
 pub struct FuncTypeBase<T> {
     /// Value inputs of the function.
@@ -78,14 +76,6 @@ impl<T> FuncTypeBase<T> {
         }
     }
 
-    /// True if both inputs and outputs are necessarily empty.
-    /// (For [`FuncValueType`], even after any possible substitution of row variables)
-    #[inline(always)]
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.input.is_empty() && self.output.is_empty()
-    }
-
     #[inline]
     /// Returns a row of the value inputs of the function.
     #[must_use]
@@ -117,14 +107,20 @@ impl<T: Clone> FuncTypeBase<T> {
     }
 }
 
-impl FuncTypeBase<T> {
+impl Signature {
     pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.input.validate(var_decls)?;
         self.output.validate(var_decls)
     }
-}
 
-impl Signature {
+    /// True if both inputs and outputs are necessarily empty.
+    /// (For [`FuncValueType`], even after any possible substitution of row variables)
+    #[inline(always)]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.input.is_empty() && self.output.is_empty()
+    }
+
     /// Returns a registry with the concrete extensions used by this signature.
     pub fn used_extensions(&self) -> Result<ExtensionRegistry, ExtensionCollectionError> {
         let mut used = WeakExtensionRegistry::default();
@@ -137,6 +133,22 @@ impl Signature {
         } else {
             Err(ExtensionCollectionError::dropped_signature(self, missing))
         }
+    }
+}
+
+// ALAN definitely opportunities to deduplicate between Signature/FuncValueType here...
+impl FuncValueType {
+    pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
+        self.input.validate(var_decls)?;
+        self.output.validate(var_decls)
+    }
+
+    /// True if both inputs and outputs are necessarily empty
+    /// (even after any possible substitution of row variables)
+    #[inline(always)]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.input.is_empty_list() && self.output.is_empty_list()
     }
 }
 
@@ -267,7 +279,7 @@ impl Signature {
     }
 }
 
-impl<RV: MaybeRV> Display for FuncTypeBase<RV> {
+impl<T: Display> Display for FuncTypeBase<T> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         self.input.fmt(f)?;
         f.write_str(" -> ")?;
@@ -294,21 +306,15 @@ impl From<Signature> for FuncValueType {
     }
 }
 
-impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for FuncTypeBase<RV2> {
-    fn eq(&self, other: &FuncTypeBase<RV1>) -> bool {
-        self.input == other.input && self.output == other.output
-    }
-}
-
-impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<Cow<'_, FuncTypeBase<RV1>>> for FuncTypeBase<RV2> {
-    fn eq(&self, other: &Cow<'_, FuncTypeBase<RV1>>) -> bool {
-        self.eq(other.as_ref())
-    }
-}
-
-impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<FuncTypeBase<RV1>> for Cow<'_, FuncTypeBase<RV2>> {
-    fn eq(&self, other: &FuncTypeBase<RV1>) -> bool {
-        self.as_ref().eq(other)
+impl PartialEq<Signature> for FuncValueType {
+    fn eq(&self, other: &Signature) -> bool {
+        // Ideally we should normalize input/output first, but assume e.g. substitute has done so already
+        if let Term::List(input) = &self.input {
+            if let Term::List(output) = &self.output {
+                return *input == *other.input && *output == *other.output;
+            }
+        }
+        false
     }
 }
 

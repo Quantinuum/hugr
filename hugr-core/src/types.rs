@@ -181,6 +181,15 @@ pub struct GeneralSum {
     bound: Option<TypeBound>,
 }
 
+pub(crate) fn least_upper_bound(bounds: impl IntoIterator<Item = TypeBound>) -> TypeBound {
+    for b in bounds {
+        if b == TypeBound::Linear {
+            return TypeBound::Linear;
+        }
+    }
+    TypeBound::Copyable
+}
+
 fn union_optbound(items: impl Iterator<Item = Option<TypeBound>>) {
     let mut b = TypeBound::Copyable;
     for i in items {

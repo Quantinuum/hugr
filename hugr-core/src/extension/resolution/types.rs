@@ -10,8 +10,7 @@ use super::{ExtensionCollectionError, WeakExtensionRegistry};
 use crate::Node;
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{DataflowOpTrait, OpType, Value};
-use crate::types::type_row::TypeRowBase;
-use crate::types::{MaybeRV, Signature, SumType, Term, TypeBase, TypeEnum};
+use crate::types::{Signature, SumType, Term, TypeRow};
 
 /// Collects every extension used to define the types in an operation.
 ///

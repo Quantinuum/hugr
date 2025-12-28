@@ -4,7 +4,7 @@ use std::sync::Weak;
 use super::{CustomConcrete, ExtensionBuildError};
 use super::{Extension, ExtensionId, SignatureError};
 
-use crate::types::{CustomType, TypeName, least_upper_bound};
+use crate::types::{CustomType, Term, TypeName, least_upper_bound};
 
 use crate::types::type_param::{TypeArg, check_term_types};
 
@@ -144,13 +144,15 @@ impl TypeDef {
                     // Assume most general case
                     return TypeBound::Linear;
                 }
-                least_upper_bound(indices.iter().map(|i| {
-                    let ta = args.get(*i);
-                    match ta {
-                        Some(TypeArg::Runtime(s)) => s.least_upper_bound(),
-                        _ => panic!("TypeArg index does not refer to a type."),
-                    }
-                }))
+                let bounds = indices
+                    .iter()
+                    .map(|i| {
+                        args.get(*i)
+                            .map(Term::least_upper_bound)
+                            .expect("TypeArg index does not refer to a type.")
+                    })
+                    .collect(); // ensure all indices are valid
+                least_upper_bound(bounds)
             }
         }
     }
