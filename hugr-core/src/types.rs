@@ -412,37 +412,6 @@ impl Type {
         Self::RuntimeSum(SumType::new_unary(size))
     }
 
-    // ALAN is this now check_term_type?
-    // Probably - that would be a good way to make existing calls to validate
-    // enforce that they are actually instances of RuntimeType's
-    /// Checks all variables used in the type are in the provided list
-    /// of bound variables, rejecting any [`RowVariable`]s if `allow_row_vars` is False;
-    /// and that for each [`CustomType`] the corresponding
-    /// [`TypeDef`] is in the [`ExtensionRegistry`] and the type arguments
-    /// [validate] and fit into the def's declared parameters.
-    ///
-    /// [RowVariable]: TypeEnum::RowVariable
-    /// [validate]: crate::types::type_param::TypeArg::validate
-    /// [TypeDef]: crate::extension::TypeDef
-    pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
-        // There is no need to check the components against the bound,
-        // that is guaranteed by construction (even for deserialization)
-        match &self.0 {
-            TypeEnum::Sum(SumType::General { rows }) => {
-                // ALAN also verify the cached bound??
-                rows.iter().try_for_each(|row| row.validate(var_decls))
-            }
-            TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
-            TypeEnum::Alias(_) => Ok(()),
-            TypeEnum::Extension(custy) => custy.validate(var_decls),
-            // Function values may be passed around without knowing their arity
-            // (i.e. with row vars) as long as they are not called:
-            TypeEnum::Function(ft) => ft.validate(var_decls),
-            TypeEnum::Variable(idx, bound) => check_typevar_decl(var_decls, *idx, &(*bound).into()),
-            TypeEnum::RowVar(rv) => rv.validate(var_decls),
-        }
-    }
-
     /// Returns a registry with the concrete extensions used by this type.
     ///
     /// This includes the extensions of custom types that may be nested

@@ -99,7 +99,9 @@ pub enum Term {
     // or some static version of this?
     RuntimeExtension(CustomType),
     /// The type of runtime values that are function pointers.
-    /// Instance of [Self::RuntimeType]`(`[TypeBound::Copyable]`)`
+    /// Instance of [Self::RuntimeType]`(`[TypeBound::Copyable]`)`.
+    /// Function values may be passed around without knowing their arity
+    /// (i.e. with row vars) as long as they are not called.
     #[display("{_0}")]
     RuntimeFunction(Box<FuncValueType>),
     /// The type of runtime values that are sums of products (ADTs)
@@ -399,11 +401,33 @@ impl Term {
         }
     }
 
-    /// Much as [`Type::validate`], also checks that the type of any [`TypeArg::Opaque`]
-    /// is valid and closed.
-    pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
+    // ALAN combine this with check_term_type?
+    // Probably - that would be a good way to make existing calls to validate
+    // enforce that they are actually instances of RuntimeType's;
+    // and we'll otherwise recurse through the structure twice (or,
+    // if either validate/check_term_type recurses on both, then perhaps many times more).
+    /// Checks all variables used in the type are in the provided list
+    /// of bound variables, rejecting any [`RowVariable`]s if `allow_row_vars` is False;
+    /// and that for each [`CustomType`] the corresponding
+    /// [`TypeDef`] is in the [`ExtensionRegistry`] and the type arguments
+    /// [validate] and fit into the def's declared parameters.
+    ///
+    /// [RowVariable]: TypeEnum::RowVariable
+    /// [validate]: crate::types::type_param::TypeArg::validate
+    /// [TypeDef]: crate::extension::TypeDef
+        pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            Term::Runtime(ty) => ty.validate(var_decls),
+            Term::RuntimeSum(SumType::General(GeneralSum{ rows, .. })) => {
+                // ALAN also verify the cached bound?? Old comments said:
+                // "There is no need to check the components against the bound,
+                // that is guaranteed by construction (even for deserialization)"...but still?
+                // Seems that if we are "valid" (i.e., really, if we check_term_type)
+                // then the bound should be non-None, at least.
+                rows.iter().try_for_each(|row| row.validate(var_decls))
+            }
+            Term::RuntimeSum(SumType::Unit { .. }) => Ok(()), // No leaves there
+            Term::RuntimeExtension(custy) => custy.validate(var_decls),
+            Term::RuntimeFunction(ft) => ft.validate(var_decls),
             Term::List(elems) => {
                 // TODO: Full validation would check that the type of the elements agrees
                 elems.iter().try_for_each(|a| a.validate(var_decls))
