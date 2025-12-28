@@ -111,7 +111,9 @@ impl<RV: MaybeRV> FuncTypeBase<RV> {
         self.input.validate(var_decls)?;
         self.output.validate(var_decls)
     }
+}
 
+impl Signature {
     /// Returns a registry with the concrete extensions used by this signature.
     pub fn used_extensions(&self) -> Result<ExtensionRegistry, ExtensionCollectionError> {
         let mut used = WeakExtensionRegistry::default();
