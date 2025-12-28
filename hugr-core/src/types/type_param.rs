@@ -226,6 +226,22 @@ impl Term {
         }
     }
 
+    /*pub fn try_into_list_elements(self) -> Result<TypeRow, SignatureError> {
+            Ok(self
+                .into_list_parts()
+                .map(|s| match s {
+                    SeqPart::Item(i) => Ok(i),
+                    SeqPart::Splice(term) => Err(SignatureError::TypeArgMismatch(
+                        TermTypeError::TypeMismatch {
+                            term: Box::new(term),
+                            type_: Box::new(TypeBound::Copyable.into()),
+                        },
+                    )),
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into())
+        }
+    */
     pub fn is_empty_list(&self) -> bool {
         match self {
             Term::List(v) => v.is_empty(),
@@ -1125,6 +1141,19 @@ mod test {
                 Term::new_list([usize_t().into(), bool_t().into(), usize_t().into()])
             ])
         );
+    }
+
+    #[test]
+    fn test_try_into_list_elements() {
+        // Test successful conversion with List
+        let types = vec![Term::new_unit_sum(1), bool_t()];
+        let term = TypeArg::List(types.clone());
+        let result = term.try_into();
+        assert_eq!(result, Ok(TypeRow::from(types)));
+
+        // Test failure with non-list
+        let result = TypeRow::try_from(Term::UNIT);
+        assert!(result.is_err());
     }
 
     #[test]
