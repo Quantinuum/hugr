@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use crate::IncomingPort;
 use crate::extension::resolution::{
-    ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_term_extensions,
 };
 use crate::macros::impl_box_clone;
 use crate::types::{CustomCheckFailure, Type};
@@ -303,7 +303,7 @@ impl CustomConst for CustomSerialized {
         &mut self,
         extensions: &WeakExtensionRegistry,
     ) -> Result<(), ExtensionResolutionError> {
-        resolve_type_extensions(&mut self.typ, extensions)
+        resolve_term_extensions(&mut self.typ, extensions)
     }
     fn get_type(&self) -> Type {
         self.typ.clone()
