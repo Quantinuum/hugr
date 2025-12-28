@@ -314,7 +314,7 @@ impl<'a> Context<'a> {
         let signature = node_data
             .signature
             .ok_or_else(|| error_uninferred!("node signature"))?;
-        self.import_func_type(signature)
+        self.import_func_type::<NoRV>(signature)
     }
 
     /// Get the node with the given `NodeId`, or return an error if it does not exist.
@@ -687,7 +687,7 @@ impl<'a> Context<'a> {
         }
 
         let signature = self
-            .import_func_type(
+            .import_func_type::<NoRV>(
                 region_data
                     .signature
                     .ok_or_else(|| error_uninferred!("region signature"))?,
@@ -839,7 +839,10 @@ impl<'a> Context<'a> {
 
         let sum_rows: Vec<_> = {
             let [variants] = self.expect_symbol(*first, model::CORE_ADT)?;
-            self.import_type_rows(variants)?
+            self.import_closed_list(variants)?
+                .into_iter()
+                .map(|term_id| self.import_type_row::<NoRV>(term_id))
+                .collect::<Result<_, _>>()?
         };
 
         let rest = rest
@@ -917,7 +920,7 @@ impl<'a> Context<'a> {
                     .ok_or_else(|| error_uninferred!("node signature"))?,
             )?;
             let (sum_rows, other_inputs) = self.import_adt_and_rest(inputs)?;
-            let outputs = self.import_type_row(outputs)?;
+            let outputs = self.import_type_row::<NoRV>(outputs)?;
 
             Ok((sum_rows, other_inputs, outputs))
         })()
@@ -933,7 +936,7 @@ impl<'a> Context<'a> {
 
         for region in node_data.regions {
             let region_data = self.get_region(*region)?;
-            let signature = self.import_func_type(
+            let signature = self.import_func_type::<NoRV>(
                 region_data
                     .signature
                     .ok_or_else(|| error_uninferred!("region signature"))?,
@@ -1026,7 +1029,7 @@ impl<'a> Context<'a> {
                     return Err(error_invalid!("cfg region expects a single target"));
                 };
 
-                self.import_type_row(*target_types)?
+                self.import_type_row::<NoRV>(*target_types)?
             };
 
             let exit = self
@@ -1069,7 +1072,7 @@ impl<'a> Context<'a> {
                 .signature
                 .ok_or_else(|| error_uninferred!("region signature"))?,
         )?;
-        let inputs = self.import_type_row(inputs)?;
+        let inputs = self.import_type_row::<NoRV>(inputs)?;
         let (sum_rows, other_outputs) = self.import_adt_and_rest(outputs)?;
 
         let optype = OpType::DataflowBlock(DataflowBlock {
@@ -1160,8 +1163,8 @@ impl<'a> Context<'a> {
         parent: Node,
     ) -> Result<Node, ImportErrorInner> {
         if let Some([inputs, outputs]) = self.match_symbol(operation, model::CORE_CALL_INDIRECT)? {
-            let inputs = self.import_type_row(inputs)?;
-            let outputs = self.import_type_row(outputs)?;
+            let inputs = self.import_type_row::<NoRV>(inputs)?;
+            let outputs = self.import_type_row::<NoRV>(outputs)?;
             let signature = Signature::new(inputs, outputs);
             let optype = OpType::CallIndirect(CallIndirect { signature });
             let node = self.make_node(node_id, optype, parent)?;
@@ -1674,10 +1677,10 @@ impl<'a> Context<'a> {
         (|| {
             let [inputs, outputs] = self.get_func_type(term_id)?;
             let inputs = self
-                .import_type_row(inputs)
+                .import_type_row::<RV>(inputs)
                 .map_err(|err| error_context!(err, "function inputs"))?;
             let outputs = self
-                .import_type_row(outputs)
+                .import_type_row::<RV>(outputs)
                 .map_err(|err| error_context!(err, "function outputs"))?;
             Ok(FuncTypeBase::new(inputs, outputs))
         })()
@@ -1776,19 +1779,6 @@ impl<'a> Context<'a> {
         let mut types = Vec::new();
         import_into(self, term_id, &mut types)?;
         Ok(types)
-    }
-
-    /// Imports a list of lists as a vector of type rows.
-    ///
-    /// See [`Self::import_type_row`].
-    fn import_type_rows<RV: MaybeRV>(
-        &mut self,
-        term_id: table::TermId,
-    ) -> Result<Vec<TypeRowBase<RV>>, ImportErrorInner> {
-        self.import_closed_list(term_id)?
-            .into_iter()
-            .map(|term_id| self.import_type_row::<RV>(term_id))
-            .collect()
     }
 
     /// Imports a list as a type row.
