@@ -484,7 +484,7 @@ impl Term {
     }
 
     /// Creates a new list from a sequence of [`SeqPart`]s.
-    pub fn new_list_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
+    pub(crate) fn new_list_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
         Self::new_seq_from_parts(
             parts.into_iter().flat_map(ListPartIter::new),
             TypeArg::List,
@@ -565,14 +565,14 @@ impl Term {
     /// );
     /// ```
     #[inline]
-    pub fn into_list_parts(self) -> ListPartIter {
+    pub(crate) fn into_list_parts(self) -> ListPartIter {
         ListPartIter::new(SeqPart::Splice(self))
     }
 
     /// Creates a new tuple from a sequence of [`SeqPart`]s.
     ///
     /// Analogous to [`TypeArg::new_list_from_parts`].
-    pub fn new_tuple_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
+    pub(crate) fn new_tuple_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
         Self::new_seq_from_parts(
             parts.into_iter().flat_map(TuplePartIter::new),
             TypeArg::Tuple,
@@ -584,7 +584,7 @@ impl Term {
     ///
     /// Analogous to [`TypeArg::into_list_parts`].
     #[inline]
-    pub fn into_tuple_parts(self) -> TuplePartIter {
+    pub(crate) fn into_tuple_parts(self) -> TuplePartIter {
         TuplePartIter::new(SeqPart::Splice(self))
     }
 }
@@ -753,7 +753,7 @@ pub enum TermTypeError {
 
 /// Part of a sequence.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum SeqPart<T> {
+pub(crate) enum SeqPart<T> {
     /// An individual item in the sequence.
     Item(T),
     /// A subsequence that is spliced into the parent sequence.
@@ -762,7 +762,7 @@ pub enum SeqPart<T> {
 
 /// Iterator created by [`TypeArg::into_list_parts`].
 #[derive(Debug, Clone)]
-pub struct ListPartIter {
+pub(crate) struct ListPartIter {
     parts: SmallVec<[SeqPart<TypeArg>; 1]>,
 }
 
@@ -797,7 +797,7 @@ impl FusedIterator for ListPartIter {}
 
 /// Iterator created by [`TypeArg::into_tuple_parts`].
 #[derive(Debug, Clone)]
-pub struct TuplePartIter {
+pub(crate) struct TuplePartIter {
     parts: SmallVec<[SeqPart<TypeArg>; 1]>,
 }
 
