@@ -27,8 +27,8 @@ use crate::{
         collections::array::ArrayValue,
     },
     types::{
-        CustomType, FuncTypeBase, MaybeRV, PolyFuncType, PolyFuncTypeBase, RowVariable, Signature,
-        Term, Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow,
+        CustomType, FuncTypeBase, MaybeRV, NoRV, PolyFuncType, RowVariable, Signature, Term, Type,
+        TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow,
         type_param::{SeqPart, TypeParam},
         type_row::TypeRowBase,
     },
@@ -1378,11 +1378,11 @@ impl<'a> Context<'a> {
         Ok(node)
     }
 
-    fn import_poly_func_type<RV: MaybeRV, T>(
+    fn import_poly_func_type<T>(
         &mut self,
         node: table::NodeId,
         symbol: table::Symbol<'a>,
-        in_scope: impl FnOnce(&mut Self, PolyFuncTypeBase<RV>) -> Result<T, ImportErrorInner>,
+        in_scope: impl FnOnce(&mut Self, PolyFuncType) -> Result<T, ImportErrorInner>,
     ) -> Result<T, ImportErrorInner> {
         (|| {
             let mut imported_params = Vec::with_capacity(symbol.params.len());
@@ -1425,8 +1425,8 @@ impl<'a> Context<'a> {
                 );
             }
 
-            let body = self.import_func_type::<RV>(symbol.signature)?;
-            in_scope(self, PolyFuncTypeBase::new(imported_params, body))
+            let body = self.import_func_type::<NoRV>(symbol.signature)?;
+            in_scope(self, PolyFuncType::new(imported_params, body))
         })()
         .map_err(|err| error_context!(err, "symbol `{}` defined by node {}", symbol.name, node))
     }
