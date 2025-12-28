@@ -3,6 +3,7 @@ use crate::Visibility;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
 use crate::types::type_param::Term;
+use crate::types::{FuncValueType, PolyFuncType, Signature, TypeRow};
 use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
     extension::{ExtensionId, OpDef, SignatureFunc},
@@ -14,10 +15,7 @@ use crate::{
         arithmetic::{float_types::ConstF64, int_types::ConstInt},
         collections::array::ArrayValue,
     },
-    types::{
-        CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
-        TypeBase, TypeBound, TypeEnum, type_param::TermVar, type_row::TypeRowBase,
-    },
+    types::{CustomType, EdgeKind, SumType, TypeBound, type_param::TermVar},
 };
 
 use hugr_model::v0::bumpalo;
@@ -381,7 +379,7 @@ impl<'a> Context<'a> {
             }),
 
             OpType::AliasDefn(alias) => self.with_local_scope(node_id, |this| {
-                let value = this.export_type(&alias.definition);
+                let value = this.export_term(&alias.definition, None);
                 // TODO: We should support aliases with different types and with parameters
                 let signature = this.make_term_apply(model::CORE_TYPE, &[]);
                 let symbol = this.bump.alloc(table::Symbol {
@@ -507,7 +505,7 @@ impl<'a> Context<'a> {
                 Some(signature) => {
                     let num_inputs = signature.input_types().len();
                     let num_outputs = signature.output_types().len();
-                    let signature = self.export_func_type(signature);
+                    let signature = self.export_signature(signature);
                     (Some(signature), num_inputs, num_outputs)
                 }
                 None => (None, 0, 0),
@@ -816,11 +814,11 @@ impl<'a> Context<'a> {
     }
 
     /// Exports a polymorphic function type.
-    pub fn export_poly_func_type<RV: MaybeRV>(
+    pub fn export_poly_func_type(
         &mut self,
         name: &'a str,
         visibility: Option<model::Visibility>,
-        t: &PolyFuncTypeBase<RV>,
+        t: &PolyFuncType,
     ) -> &'a table::Symbol<'a> {
         let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
         let scope = self
@@ -846,30 +844,17 @@ impl<'a> Context<'a> {
         })
     }
 
-    pub fn export_type<RV: MaybeRV>(&mut self, t: &TypeBase<RV>) -> table::TermId {
-        self.export_type_enum(t.as_type_enum())
-    }
-
-    pub fn export_type_enum<RV: MaybeRV>(&mut self, t: &TypeEnum<RV>) -> table::TermId {
-        match t {
-            TypeEnum::Extension(ext) => self.export_custom_type(ext),
-            TypeEnum::Alias(alias) => {
-                let symbol = self.resolve_symbol(self.bump.alloc_str(alias.name()));
-                self.make_term(table::Term::Apply(symbol, &[]))
-            }
-            TypeEnum::Function(func) => self.export_func_type(func),
-            TypeEnum::Variable(index, _) => {
-                let node = self.local_scope.expect("local variable out of scope");
-                self.make_term(table::Term::Var(table::VarId(node, *index as _)))
-            }
-            TypeEnum::RowVar(rv) => self.export_row_var(rv.as_rv()),
-            TypeEnum::Sum(sum) => self.export_sum_type(sum),
-        }
-    }
-
-    pub fn export_func_type<RV: MaybeRV>(&mut self, t: &FuncTypeBase<RV>) -> table::TermId {
+    pub fn export_signature(&mut self, t: &Signature) -> table::TermId {
         let inputs = self.export_type_row(t.input());
         let outputs = self.export_type_row(t.output());
+        // Ok to use CORE_FN here: the elements of the row will be exported inside a List
+        self.make_term_apply(model::CORE_FN, &[inputs, outputs])
+    }
+
+    pub fn export_func_type(&mut self, t: &FuncValueType) -> table::TermId {
+        let inputs = self.export_term(t.input(), None);
+        let outputs = self.export_term(t.output(), None);
+        // Ok to use CORE_FN here: the input/output should each be a core List or ListConcat
         self.make_term_apply(model::CORE_FN, &[inputs, outputs])
     }
 
@@ -888,15 +873,10 @@ impl<'a> Context<'a> {
         self.make_term(table::Term::Var(table::VarId(node, var.index() as _)))
     }
 
-    pub fn export_row_var(&mut self, t: &RowVariable) -> table::TermId {
-        let node = self.local_scope.expect("local variable out of scope");
-        self.make_term(table::Term::Var(table::VarId(node, t.0 as _)))
-    }
-
     pub fn export_sum_variants(&mut self, t: &SumType) -> table::TermId {
         // Sadly we cannot use alloc_slice_fill_iter because SumType::variants is not an ExactSizeIterator.
         let parts = self.bump.alloc_slice_fill_with(t.num_variants(), |i| {
-            table::SeqPart::Item(self.export_type_row(t.get_variant(i).unwrap()))
+            table::SeqPart::Item(self.export_term(t.get_variant(i).unwrap(), None))
         });
         self.make_term(table::Term::List(parts))
     }
@@ -907,27 +887,20 @@ impl<'a> Context<'a> {
     }
 
     #[inline]
-    pub fn export_type_row<RV: MaybeRV>(&mut self, row: &TypeRowBase<RV>) -> table::TermId {
+    pub fn export_type_row(&mut self, row: &TypeRow) -> table::TermId {
         self.export_type_row_with_tail(row, None)
     }
 
-    pub fn export_type_row_with_tail<RV: MaybeRV>(
+    pub fn export_type_row_with_tail(
         &mut self,
-        row: &TypeRowBase<RV>,
+        row: &TypeRow,
         tail: Option<table::TermId>,
     ) -> table::TermId {
         let mut parts =
             BumpVec::with_capacity_in(row.len() + usize::from(tail.is_some()), self.bump);
 
         for t in row.iter() {
-            match t.as_type_enum() {
-                TypeEnum::RowVar(var) => {
-                    parts.push(table::SeqPart::Splice(self.export_row_var(var.as_rv())));
-                }
-                _ => {
-                    parts.push(table::SeqPart::Item(self.export_type(t)));
-                }
-            }
+            parts.push(table::SeqPart::Item(self.export_term(t, None)));
         }
 
         if let Some(tail) = tail {
@@ -971,7 +944,14 @@ impl<'a> Context<'a> {
                 let item_types = self.export_term(item_types, None);
                 self.make_term_apply(model::CORE_TUPLE_TYPE, &[item_types])
             }
-            Term::Runtime(ty) => self.export_type(ty),
+            Term::RuntimeExtension(ext) => self.export_custom_type(ext),
+            /*TypeEnum::Alias(alias) => {
+                let symbol = self.resolve_symbol(self.bump.alloc_str(alias.name()));
+                self.make_term(table::Term::Apply(symbol, &[]))
+            }*/
+            Term::RuntimeFunction(func) => self.export_func_type(func),
+            Term::RuntimeSum(sum) => self.export_sum_type(sum),
+
             Term::BoundedNat(value) => self.make_term(model::Literal::Nat(*value).into()),
             Term::String(value) => self.make_term(model::Literal::Str(value.into()).into()),
             Term::Float(value) => self.make_term(model::Literal::Float(*value).into()),
@@ -1011,7 +991,7 @@ impl<'a> Context<'a> {
             Term::Variable(v) => self.export_type_arg_var(v),
             Term::StaticType => self.make_term_apply(model::CORE_STATIC, &[]),
             Term::ConstType(ty) => {
-                let ty = self.export_type(ty);
+                let ty = self.export_term(ty, None);
                 self.make_term_apply(model::CORE_CONST, &[ty])
             }
         }
@@ -1026,7 +1006,7 @@ impl<'a> Context<'a> {
                 if let Some(array) = e.value().downcast_ref::<ArrayValue>() {
                     let len = self
                         .make_term(model::Literal::Nat(array.get_contents().len() as u64).into());
-                    let element_type = self.export_type(array.get_element_type());
+                    let element_type = self.export_term(array.get_element_type(), None);
                     let mut contents =
                         BumpVec::with_capacity_in(array.get_contents().len(), self.bump);
 
@@ -1065,7 +1045,7 @@ impl<'a> Context<'a> {
                 };
 
                 let json = self.make_term(model::Literal::Str(json.into()).into());
-                let runtime_type = self.export_type(&e.get_type());
+                let runtime_type = self.export_term(&e.get_type(), None);
                 let args = self.bump.alloc_slice_copy(&[runtime_type, json]);
                 let symbol = self.resolve_symbol(model::COMPAT_CONST_JSON);
                 self.make_term(table::Term::Apply(symbol, args))
