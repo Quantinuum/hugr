@@ -894,22 +894,11 @@ impl<'a> Context<'a> {
     }
 
     pub fn export_sum_variants(&mut self, t: &SumType) -> table::TermId {
-        match t {
-            SumType::Unit { size } => {
-                let parts = self.bump.alloc_slice_fill_iter(
-                    (0..*size)
-                        .map(|_| table::SeqPart::Item(self.make_term(table::Term::List(&[])))),
-                );
-                self.make_term(table::Term::List(parts))
-            }
-            SumType::General { rows } => {
-                let parts = self.bump.alloc_slice_fill_iter(
-                    rows.iter()
-                        .map(|row| table::SeqPart::Item(self.export_type_row(row))),
-                );
-                self.make_term(table::Term::List(parts))
-            }
-        }
+        // Sadly we cannot use alloc_slice_fill_iter because SumType::variants is not an ExactSizeIterator.
+        let parts = self.bump.alloc_slice_fill_with(t.num_variants(), |i| {
+            table::SeqPart::Item(self.export_type_row(t.get_variant(i).unwrap()))
+        });
+        self.make_term(table::Term::List(parts))
     }
 
     pub fn export_sum_type(&mut self, t: &SumType) -> table::TermId {
