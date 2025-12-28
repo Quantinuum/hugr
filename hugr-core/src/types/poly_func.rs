@@ -112,25 +112,6 @@ impl<T> PolyFuncTypeBase<T> {
         }
     }
 
-    /// Instantiates an outer [`PolyFuncTypeBase`], i.e. with no free variables
-    /// (as ensured by [`Self::validate`]), into a monomorphic type.
-    ///
-    /// # Errors
-    /// If there is not exactly one [`TypeArg`] for each binder ([`Self::params`]),
-    /// or an arg does not fit into its corresponding [`TypeParam`]
-    pub fn instantiate(&self, args: &[TypeArg]) -> Result<FuncTypeBase<T>, SignatureError> {
-        // Check that args are applicable, and that we have a value for each binder,
-        // i.e. each possible free variable within the body.
-        check_term_types(args, &self.params)?;
-        Ok(self.body.substitute(&Substitution(args)))
-    }
-
-    /// Validates this instance, checking that the types in the body are
-    /// wellformed with respect to the registry, and the type variables declared.
-    pub fn validate(&self) -> Result<(), SignatureError> {
-        self.body.validate(&self.params)
-    }
-
     /// Helper function for the Display implementation
     fn display_params(&self) -> Cow<'static, str> {
         if self.params.is_empty() {
@@ -148,6 +129,37 @@ impl<T> PolyFuncTypeBase<T> {
     /// Returns a mutable reference to the body of the function type.
     pub fn body_mut(&mut self) -> &mut FuncTypeBase<T> {
         &mut self.body
+    }
+}
+
+impl<T: Substitutable> PolyFuncTypeBase<T> {
+    /// Instantiates an outer [`PolyFuncTypeBase`], i.e. with no free variables
+    /// (as ensured by [`Self::validate`]), into a monomorphic type.
+    ///
+    /// # Errors
+    /// If there is not exactly one [`TypeArg`] for each binder ([`Self::params`]),
+    /// or an arg does not fit into its corresponding [`TypeParam`]
+    pub fn instantiate(&self, args: &[TypeArg]) -> Result<FuncTypeBase<T>, SignatureError> {
+        // Check that args are applicable, and that we have a value for each binder,
+        // i.e. each possible free variable within the body.
+        check_term_types(args, &self.params)?;
+        Ok(self.body.substitute(&Substitution(args)))
+    }
+}
+
+impl PolyFuncType {
+    /// Validates this instance, checking that the types in the body are
+    /// wellformed with respect to the registry, and the type variables declared.
+    pub fn validate(&self) -> Result<(), SignatureError> {
+        self.body.validate(&self.params)
+    }
+}
+
+impl PolyFuncTypeRV {
+    /// Validates this instance, checking that the types in the body are
+    /// wellformed with respect to the registry, and the type variables declared.
+    pub fn validate(&self) -> Result<(), SignatureError> {
+        self.body.validate(&self.params)
     }
 }
 
