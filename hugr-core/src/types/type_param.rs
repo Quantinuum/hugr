@@ -304,16 +304,10 @@ impl Term {
     /// `decl` must be exactly that with which the variable was declared.
     #[must_use]
     pub fn new_var_use(idx: usize, decl: Term) -> Self {
-        match decl {
-            // Note a TypeParam::List of TypeParam::Type *cannot* be represented
-            // as a TypeArg::Type because the latter stores a Type<false> i.e. only a single type,
-            // not a RowVariable.
-            Term::RuntimeType(b) => Type::new_var_use(idx, b).into(),
-            _ => Term::Variable(TermVar {
-                idx,
-                cached_decl: Box::new(decl),
-            }),
-        }
+        Term::Variable(TermVar {
+            idx,
+            cached_decl: Box::new(decl),
+        })
     }
 
     /// Creates a new string literal.
@@ -374,13 +368,13 @@ impl Term {
     }
 
     /// Returns the [TypeBound] if this is a valid runtime type.
-    pub fn least_upper_bound(&self) -> Option<TypeBound> {
+    pub const fn least_upper_bound(&self) -> Option<TypeBound> {
         match self {
-            Self::Extension(ct) => Some(ct.bound()),
+            Self::RuntimeExtension(ct) => Some(ct.bound()),
             Self::RuntimeSum(st) => st.bound(),
             Self::RuntimeFunction(_) => Some(TypeBound::Copyable),
-            Self::Variable(v) => match &**v.cached_decl {
-                TypeParam::RuntimeType(b) => Some(b),
+            Self::Variable(v) => match &*v.cached_decl {
+                TypeParam::RuntimeType(b) => Some(*b),
                 _ => None,
             },
             _ => None,
@@ -613,7 +607,7 @@ impl Substitutable for Term {
         match self {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
             TypeArg::RuntimeSum(SumType::General(GeneralSum { rows, .. })) => {
-                Term::new_sum(rows.substitute(s))
+                SumType::new_from_row(rows.substitute(s)).into()
             }
             TypeArg::RuntimeExtension(cty) => Term::new_extension(cty.substitute(s)),
             TypeArg::RuntimeFunction(bf) => Term::new_function(bf.substitute(s)),
@@ -650,7 +644,7 @@ impl Substitutable for Term {
             Term::ListType(item_type) => Term::new_list_type(item_type.substitute(s)),
             Term::TupleType(item_types) => Term::new_list_type(item_types.substitute(s)),
             Term::StaticType => self.clone(),
-            Term::ConstType(ty) => Term::new_const(ty.substitute1(s)),
+            Term::ConstType(ty) => Term::new_const(ty.substitute(s)),
         }
     }
 }
@@ -660,7 +654,7 @@ impl Transformable for Term {
         match self {
             Term::RuntimeExtension(custom_type) => {
                 if let Some(nt) = tr.apply_custom(custom_type)? {
-                    *self = nt.into_();
+                    *self = nt;
                     Ok(true)
                 } else {
                     let args_changed = custom_type.args_mut().transform(tr)?;
@@ -675,7 +669,7 @@ impl Transformable for Term {
                 }
             }
             Term::RuntimeFunction(fty) => fty.transform(tr),
-            Term::RuntimeSum(sum_type) => sum_type.transform(tr)?,
+            Term::RuntimeSum(sum_type) => sum_type.transform(tr),
             Term::List(elems) => elems.transform(tr),
             Term::Tuple(elems) => elems.transform(tr),
             Term::BoundedNat(_)

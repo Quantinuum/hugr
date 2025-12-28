@@ -9,7 +9,7 @@ pub mod type_param;
 pub mod type_row;
 
 use crate::extension::resolution::{
-    ExtensionCollectionError, WeakExtensionRegistry, collect_type_exts,
+    ExtensionCollectionError, WeakExtensionRegistry, collect_term_exts,
 };
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
 use crate::types::type_param::check_term_type;
@@ -264,13 +264,16 @@ impl SumType {
     where
         V: Into<Term>,
     {
-        let rows = variants.into_iter().map(Into::into).collect_vec();
+        Self::new_from_row(variants.into_iter().map(Into::into).collect_vec())
+    }
 
-        let len: usize = rows.len();
-        if u8::try_from(len).is_ok() && rows.iter().all(Term::is_empty_list) {
+    pub(crate) fn new_from_row(variants: impl Into<TypeRow>) -> Self {
+        let variants = variants.into();
+        let len: usize = variants.len();
+        if u8::try_from(len).is_ok() && variants.iter().all(Term::is_empty_list) {
             Self::new_unary(len as u8)
         } else {
-            Self::General(GeneralSum::new(rows.into()))
+            Self::General(GeneralSum::new(variants))
         }
     }
 
@@ -350,10 +353,10 @@ impl SumType {
         }
     }
 
-    pub fn bound(&self) -> TypeBound {
+    pub const fn bound(&self) -> Option<TypeBound> {
         match self {
-            SumType::Unit { size } => TypeBound::Copyable,
-            SumType::General(GeneralSum { bound, .. }) => bound,
+            SumType::Unit { .. } => Some(TypeBound::Copyable),
+            SumType::General(GeneralSum { bound, .. }) => *bound,
         }
     }
 }
@@ -411,7 +414,7 @@ impl Type {
     #[inline(always)]
     pub fn new_sum<R>(variants: impl IntoIterator<Item = R>) -> Self
     where
-        R: Into<TypeRowRV>,
+        R: Into<Term>,
     {
         Self::RuntimeSum(SumType::new(variants))
     }
@@ -438,7 +441,7 @@ impl Type {
         let mut used = WeakExtensionRegistry::default();
         let mut missing = ExtensionSet::new();
 
-        collect_type_exts(self, &mut used, &mut missing);
+        collect_term_exts(self, &mut used, &mut missing);
 
         if missing.is_empty() {
             Ok(used.try_into().expect("all extensions are present"))
@@ -468,7 +471,7 @@ impl TypeRV {
     /// [OpDef]: crate::extension::OpDef
     /// [FuncDefn]: crate::ops::FuncDefn
     #[must_use]
-    pub const fn new_row_var_use(idx: usize, bound: TypeBound) -> Self {
+    pub fn new_row_var_use(idx: usize, bound: TypeBound) -> Self {
         Self::new_var_use(idx, Term::new_list_type(bound))
     }
 }

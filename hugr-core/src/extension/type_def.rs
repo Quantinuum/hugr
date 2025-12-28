@@ -144,14 +144,12 @@ impl TypeDef {
                     // Assume most general case
                     return TypeBound::Linear;
                 }
-                let bounds = indices
-                    .iter()
-                    .map(|i| {
-                        args.get(*i)
-                            .map(Term::least_upper_bound)
-                            .expect("TypeArg index does not refer to a type.")
-                    })
-                    .collect(); // ensure all indices are valid
+                let bounds = indices.iter().map(|i| {
+                    args.get(*i)
+                        .copied()
+                        .and_then(Term::least_upper_bound)
+                        .expect("TypeArg index does not refer to a type.")
+                });
                 least_upper_bound(bounds)
             }
         }
