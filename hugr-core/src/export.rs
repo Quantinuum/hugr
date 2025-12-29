@@ -2,8 +2,6 @@
 use crate::Visibility;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
-use crate::types::type_param::Term;
-use crate::types::{FuncValueType, PolyFuncType, Signature, TypeRow};
 use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
     extension::{ExtensionId, OpDef, SignatureFunc},
@@ -15,7 +13,8 @@ use crate::{
         arithmetic::{float_types::ConstF64, int_types::ConstInt},
         collections::array::ArrayValue,
     },
-    types::{CustomType, EdgeKind, SumType, TypeBound, type_param::TermVar},
+    types::type_param::{Term, TermVar},
+    types::{CustomType, EdgeKind, FuncValueType, Signature, SumType, TypeBound, TypeRow},
 };
 
 use hugr_model::v0::bumpalo;
@@ -340,10 +339,12 @@ impl<'a> Context<'a> {
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
                 let symbol_name = this.export_func_name(node, &mut meta);
 
-                let symbol = this.export_poly_func_type(
+                let sig = func.signature();
+                let symbol = this.export_symbol_params(
                     symbol_name,
                     Some(func.visibility().clone().into()),
-                    func.signature(),
+                    sig.params(),
+                    |this| this.export_signature(sig.body()),
                 );
                 regions = this.bump.alloc_slice_copy(&[this.export_dfg(
                     node,
@@ -356,11 +357,12 @@ impl<'a> Context<'a> {
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
                 let symbol_name = this.export_func_name(node, &mut meta);
-
-                let symbol = this.export_poly_func_type(
+                let sig = func.signature();
+                let symbol = this.export_symbol_params(
                     symbol_name,
                     Some(func.visibility().clone().into()),
-                    func.signature(),
+                    sig.params(),
+                    |this| this.export_signature(sig.body()),
                 );
                 table::Operation::DeclareFunc(symbol)
             }),
@@ -557,7 +559,9 @@ impl<'a> Context<'a> {
 
         let symbol = self.with_local_scope(node, |this| {
             let name = this.make_qualified_name(opdef.extension_id(), opdef.name());
-            this.export_poly_func_type(name, None, poly_func_type)
+            this.export_symbol_params(name, None, poly_func_type.params(), |this| {
+                this.export_func_type(poly_func_type.body())
+            })
         });
 
         let meta = {
@@ -814,31 +818,32 @@ impl<'a> Context<'a> {
     }
 
     /// Exports a polymorphic function type.
-    pub fn export_poly_func_type(
+    pub fn export_symbol_params(
         &mut self,
         name: &'a str,
         visibility: Option<model::Visibility>,
-        t: &PolyFuncType,
+        params: &[Term],
+        export_body: impl FnOnce(&mut Self) -> table::TermId,
     ) -> &'a table::Symbol<'a> {
-        let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
+        let mut param_vec = BumpVec::with_capacity_in(params.len(), self.bump);
         let scope = self
             .local_scope
             .expect("exporting poly func type outside of local scope");
         let visibility = self.bump.alloc(visibility);
-        for (i, param) in t.params().iter().enumerate() {
+        for (i, param) in params.iter().enumerate() {
             let name = self.bump.alloc_str(&i.to_string());
             let r#type = self.export_term(param, Some((scope, i as _)));
             let param = table::Param { name, r#type };
-            params.push(param);
+            param_vec.push(param);
         }
 
         let constraints = self.bump.alloc_slice_copy(&self.local_constraints);
-        let body = self.export_func_type(t.body());
+        let body = export_body(self);
 
         self.bump.alloc(table::Symbol {
             visibility,
             name,
-            params: params.into_bump_slice(),
+            params: param_vec.into_bump_slice(),
             constraints,
             signature: body,
         })
