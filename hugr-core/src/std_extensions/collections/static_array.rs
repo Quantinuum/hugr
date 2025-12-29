@@ -81,7 +81,7 @@ impl StaticArrayValue {
         typ: Type,
         contents: impl IntoIterator<Item = Value>,
     ) -> Result<Self, ConstTypeError> {
-        if !TypeBound::Copyable.contains(typ.least_upper_bound()) {
+        if !typ.copyable() {
             return Err(CustomCheckFailure::Message(format!(
                 "Failed to construct a StaticArrayValue with non-Copyable type: {typ}"
             ))
@@ -309,17 +309,17 @@ impl HasConcrete for StaticArrayOpDef {
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         use TypeBound::Copyable;
         match type_args {
-            [arg] => {
-                let elem_ty = arg
-                    .as_runtime()
-                    .filter(|t| Copyable.contains(t.least_upper_bound()))
-                    .ok_or(SignatureError::TypeArgMismatch(
-                        TermTypeError::TypeMismatch {
+            [elem_ty] => {
+                let elem_ty = elem_ty.clone();
+                if !elem_ty.copyable() {
+                    return Err(
+                        SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
                             type_: Box::new(Copyable.into()),
-                            term: Box::new(arg.clone()),
-                        },
-                    ))?;
-
+                            term: Box::new(elem_ty),
+                        })
+                        .into(),
+                    );
+                }
                 Ok(StaticArrayOp {
                     def: *self,
                     elem_ty,

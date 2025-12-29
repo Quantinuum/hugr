@@ -8,6 +8,7 @@ use crate::Wire;
 use crate::builder::{BuildError, Dataflow};
 use crate::extension::TypeDefBound;
 use crate::ops::OpName;
+use crate::types::type_param::{TermTypeError, check_term_type};
 use crate::types::{CustomType, PolyFuncType, Signature, Type, TypeBound, TypeName};
 use crate::{
     Extension,
@@ -55,9 +56,8 @@ impl MakeOpDef for PtrOpDef {
     }
 
     fn init_signature(&self, extension_ref: &Weak<Extension>) -> SignatureFunc {
-        let ptr_t: Type =
-            ptr_custom_type(Type::new_var_use(0, TypeBound::Copyable), extension_ref).into();
         let inner_t = Type::new_var_use(0, TypeBound::Copyable);
+        let ptr_t: Type = ptr_custom_type(inner_t.clone(), extension_ref).into();
         let body = match self {
             PtrOpDef::New => Signature::new([inner_t], [ptr_t]),
             PtrOpDef::Read => Signature::new([ptr_t], [inner_t]),
@@ -203,12 +203,15 @@ impl HasConcrete for PtrOpDef {
     type Concrete = PtrOp;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        let ty = match type_args {
-            [TypeArg::Runtime(ty)] => ty.clone(),
-            _ => return Err(SignatureError::InvalidTypeArgs.into()),
+        let [ty] = type_args else {
+            return Err(
+                SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(type_args.len(), 1))
+                    .into(),
+            );
         };
+        check_term_type(ty, &TypeBound::Linear.into()).map_err(SignatureError::from)?;
 
-        Ok(self.with_type(ty))
+        Ok(self.with_type(ty.clone()))
     }
 }
 

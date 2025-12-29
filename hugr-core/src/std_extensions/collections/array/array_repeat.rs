@@ -10,7 +10,7 @@ use crate::extension::simple_op::{
 };
 use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
 use crate::ops::{ExtensionOp, OpName};
-use crate::types::type_param::{TypeArg, TypeParam};
+use crate::types::type_param::{TypeArg, TypeParam, check_term_type};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Signature, Type, TypeBound};
 
 use super::array_kind::ArrayKind;
@@ -170,7 +170,8 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayRepeatDef<AK> {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] => {
+            [TypeArg::BoundedNat(n), ty] => {
+                check_term_type(ty, &TypeBound::Linear.into()).map_err(SignatureError::from)?;
                 Ok(GenericArrayRepeat::new(ty.clone(), *n))
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),

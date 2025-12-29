@@ -8,7 +8,7 @@ use delegate::delegate;
 use crate::extension::{ExtensionId, SignatureError, TypeDef, TypeDefBound};
 use crate::ops::constant::{CustomConst, ValueName};
 use crate::type_row;
-use crate::types::type_param::{TypeArg, TypeParam};
+use crate::types::type_param::{TypeArg, TypeParam, check_term_type};
 use crate::types::{CustomCheckFailure, Term, Type, TypeBound, TypeName};
 use crate::{Extension, Wire};
 use crate::{
@@ -279,10 +279,11 @@ impl HasConcrete for BArrayUnsafeOpDef {
     type Concrete = BArrayUnsafeOp;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        match type_args {
-            [Term::BoundedNat(n), Term::Runtime(ty)] => Ok(self.to_concrete(ty.clone(), *n)),
-            _ => Err(SignatureError::InvalidTypeArgs.into()),
-        }
+        let [Term::BoundedNat(n), ty] = type_args else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+        check_term_type(ty, &TypeBound::Linear.into()).map_err(SignatureError::from)?;
+        Ok(self.to_concrete(ty.clone(), *n))
     }
 }
 

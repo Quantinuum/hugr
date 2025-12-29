@@ -15,6 +15,7 @@ use crate::extension::{
 };
 use crate::ops::{ExtensionOp, OpName};
 use crate::type_row;
+use crate::types::type_param::check_term_type;
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{FuncValueType, PolyFuncTypeRV, Term, Type, TypeBound};
 use crate::utils::Never;
@@ -326,10 +327,11 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayOpDef<AK> {
 
     fn instantiate(&self, type_args: &[Term]) -> Result<Self::Concrete, OpLoadError> {
         let (ty, size) = match (self, type_args) {
-            (GenericArrayOpDef::discard_empty, [Term::Runtime(ty)]) => (ty.clone(), 0),
-            (_, [Term::BoundedNat(n), Term::Runtime(ty)]) => (ty.clone(), *n),
+            (GenericArrayOpDef::discard_empty, [ty]) => (ty.clone(), 0),
+            (_, [Term::BoundedNat(n), ty]) => (ty.clone(), *n),
             _ => return Err(SignatureError::InvalidTypeArgs.into()),
         };
+        check_term_type(&ty, &TypeBound::Linear.into()).map_err(SignatureError::from)?;
 
         Ok(self.to_concrete(ty.clone(), size))
     }

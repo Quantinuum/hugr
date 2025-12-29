@@ -13,13 +13,14 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use crate::extension::prelude::{either_type, option_type, usize_t};
 use crate::extension::resolution::{
-    ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_term_extensions,
     resolve_value_extensions,
 };
 use crate::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
 use crate::extension::{ExtensionBuildError, OpDef, SignatureFunc};
 use crate::ops::constant::{TryHash, ValueName, maybe_hash_values};
 use crate::ops::{OpName, Value};
+use crate::types::type_param::{TermTypeError, check_term_type};
 use crate::types::{Term, TypeName, TypeRowRV};
 use crate::{
     Extension,
@@ -111,9 +112,12 @@ impl CustomConst for ListValue {
             .map_err(|_| error())?;
 
         // constant can only hold classic type.
-        let [TypeArg::Runtime(ty)] = typ.args() else {
+        let [ty] = typ.args() else {
             return Err(error());
         };
+        if !ty.copyable() {
+            return Err(error());
+        }
 
         // check all values are instances of the element type
         for v in &self.0 {
@@ -136,7 +140,7 @@ impl CustomConst for ListValue {
         for val in &mut self.0 {
             resolve_value_extensions(val, extensions)?;
         }
-        resolve_type_extensions(&mut self.1, extensions)
+        resolve_term_extensions(&mut self.1, extensions)
     }
 }
 
@@ -214,7 +218,10 @@ impl ListOp {
         input: impl Into<TypeRowRV>,
         output: impl Into<TypeRowRV>,
     ) -> PolyFuncTypeRV {
-        PolyFuncTypeRV::new(vec![Self::TP], FuncValueType::new(input, output))
+        PolyFuncTypeRV::new(
+            vec![Self::TP],
+            FuncValueType::new(input.into().into_owned(), output.into().into_owned()),
+        )
     }
 
     /// Returns the type of a generic list, associated with the element type parameter at index `idx`.
@@ -349,9 +356,16 @@ impl MakeExtensionOp for ListOpInst {
     fn from_extension_op(
         ext_op: &ExtensionOp,
     ) -> Result<Self, crate::extension::simple_op::OpLoadError> {
-        let [Term::Runtime(ty)] = ext_op.args() else {
-            return Err(SignatureError::InvalidTypeArgs.into());
+        let [ty] = ext_op.args() else {
+            return Err(
+                SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(
+                    ext_op.args().len(),
+                    1,
+                ))
+                .into(),
+            );
         };
+        check_term_type(ty, &TypeBound::Linear.into()).map_err(SignatureError::from)?;
         let name = ext_op.unqualified_id();
         let Ok(op) = ListOp::from_str(name) else {
             return Err(OpLoadError::NotMember(name.to_string()));
