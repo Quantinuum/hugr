@@ -167,7 +167,8 @@ pub enum SumType {
     General(GeneralSum),
 }
 
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct GeneralSum {
     /// Each term here must be an instance of [Term::ListType]([Term::RuntimeType]), being
     /// the elements of exactly one variant. (Thus, this explicitly forbids sums with an
@@ -177,6 +178,7 @@ pub struct GeneralSum {
     // `len` and `variants` would be impossible. (We might want a separate "FixedAritySum"
     // rust type supporting those, with try_from(SumType).)
     rows: TypeRow,
+    #[serde(skip)] // TODO recalculate on deserialization
     bound: Option<TypeBound>,
 }
 
