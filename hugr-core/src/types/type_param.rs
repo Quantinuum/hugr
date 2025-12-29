@@ -207,18 +207,25 @@ impl Term {
             (Term::StringType, Term::StringType) => true,
             (Term::StaticType, Term::StaticType) => true,
             (Term::ListType(e1), Term::ListType(e2)) => e1.is_supertype(e2),
+            // The term inside a TupleType is a list of types, so this is ok as long as
+            // supertype holds element-wise
             (Term::TupleType(es1), Term::TupleType(es2)) => es1.is_supertype(es2),
             (Term::BytesType, Term::BytesType) => true,
             (Term::FloatType, Term::FloatType) => true,
-            (Term::Runtime(t1), Term::Runtime(t2)) => t1 == t2,
+            // Needed for TupleType, does not make a great deal of sense otherwise:
+            (Term::List(es1), Term::List(es2)) => {
+                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
+            }
+            // The following are not types (they have no instances), so these are just to
+            // maintain reflexivity of the relation:
+            (Term::RuntimeSum(t1), Term::RuntimeSum(t2)) => t1 == t2,
+            (Term::RuntimeFunction(f1), Term::RuntimeFunction(f2)) => f1 == f2,
+            (Term::RuntimeExtension(c1), Term::RuntimeExtension(c2)) => c1 == c2,
             (Term::BoundedNat(n1), Term::BoundedNat(n2)) => n1 == n2,
             (Term::String(s1), Term::String(s2)) => s1 == s2,
             (Term::Bytes(v1), Term::Bytes(v2)) => v1 == v2,
             (Term::Float(f1), Term::Float(f2)) => f1 == f2,
             (Term::Variable(v1), Term::Variable(v2)) => v1 == v2,
-            (Term::List(es1), Term::List(es2)) => {
-                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
-            }
             (Term::Tuple(es1), Term::Tuple(es2)) => {
                 es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
             }
@@ -444,14 +451,17 @@ impl Term {
             Term::RuntimeExtension(custy) => custy.validate(var_decls),
             Term::RuntimeFunction(ft) => ft.validate(var_decls),
             Term::List(elems) => {
-                // TODO: Full validation would check that the type of the elements agrees
+                // Full validation might check that the type of the elements agrees.
+                // However we will leave this to a separate check_term_type which knows
+                // the required element type.
                 elems.iter().try_for_each(|a| a.validate(var_decls))
             }
             Term::Tuple(elems) => elems.iter().try_for_each(|a| a.validate(var_decls)),
             Term::BoundedNat(_) | Term::String { .. } | Term::Float(_) | Term::Bytes(_) => Ok(()),
             TypeArg::ListConcat(lists) => {
-                // TODO: Full validation would check that each of the lists is indeed a
-                // list or list variable of the correct types.
+                // Full validation might check that each of the lists is indeed a list or
+                // list variable of the correct types. However we will leave this to a
+                // separate check_term_type which knows the required element type.
                 lists.iter().try_for_each(|a| a.validate(var_decls))
             }
             TypeArg::TupleConcat(tuples) => tuples.iter().try_for_each(|a| a.validate(var_decls)),
@@ -734,24 +744,19 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::Variable(TermVar { cached_decl, .. }), _) if type_.is_supertype(cached_decl) => {
             Ok(())
         }
-        (Term::Runtime(ty), Term::RuntimeType(bound)) if bound.contains(ty.least_upper_bound()) => {
+        (Term::RuntimeSum(st), Term::RuntimeType(bound)) if st.bound().is_some_and(|b| bound.contains(b)) => {
+            Ok(())
+        }
+        (Term::RuntimeFunction(_), Term::RuntimeType(_)) => Ok(()), // Function pointers are always Copyable so fit any bound
+        (Term::RuntimeExtension(cty), Term::RuntimeType(bound)) if bound.contains(cty.bound()) => {
             Ok(())
         }
         (Term::List(elems), Term::ListType(item_type)) => {
-            elems.iter().try_for_each(|term| {
-                // Also allow elements that are RowVars if fitting into a List of Types
-                if let (Term::Variable(v), Term::RuntimeType(param_bound)) = (term, &**item_type)
-                    && v.bound_if_row_var()
-                        .is_some_and(|arg_bound| param_bound.contains(arg_bound))
-                {
-                    return Ok(());
-                }
-                check_term_type(term, item_type)
-            })
+            elems.iter().try_for_each(|elem| check_term_type(elem, item_type))
         }
-        (Term::ListConcat(lists), Term::ListType(item_type)) => lists
+        (Term::ListConcat(lists), Term::ListType(_)) => lists
             .iter()
-            .try_for_each(|list| check_term_type(list, item_type)),
+            .try_for_each(|list| check_term_type(list, type_)), // ALAN this used the element type, which seems very wrong
         (TypeArg::Tuple(_) | TypeArg::TupleConcat(_), TypeParam::TupleType(item_types)) => {
             let term_parts: Vec<_> = term.clone().into_tuple_parts().collect();
             let type_parts: Vec<_> = item_types.clone().into_list_parts().collect();
