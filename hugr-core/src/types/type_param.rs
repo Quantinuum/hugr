@@ -319,10 +319,10 @@ impl Term {
     /// with the specified index.
     /// `decl` must be exactly that with which the variable was declared.
     #[must_use]
-    pub fn new_var_use(idx: usize, decl: Term) -> Self {
+    pub fn new_var_use(idx: usize, decl: impl Into<Term>) -> Self {
         Term::Variable(TermVar {
             idx,
-            cached_decl: Box::new(decl),
+            cached_decl: Box::new(decl.into()),
         })
     }
 

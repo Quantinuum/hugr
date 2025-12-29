@@ -75,7 +75,7 @@ impl TryFrom<SerSimpleType> for Term {
             SerSimpleType::Sum(st) => st.into(),
             SerSimpleType::Opaque(o) => Type::new_extension(o),
             SerSimpleType::Alias(_) => todo!("alias?"),
-            SerSimpleType::V { i, b } => Type::new_var_use(i, b.into()),
+            SerSimpleType::V { i, b } => Type::new_var_use(i, b),
             // We can't use new_row_var because that returns TypeRV not TypeBase<RV>.
             SerSimpleType::R { i, b } => Type::new_row_var_use(i, b),
         })
