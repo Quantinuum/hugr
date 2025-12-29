@@ -12,7 +12,7 @@ use crate::{
         OpParent, OpTrait, OpType,
         handle::{DataflowParentID, DfgID},
     },
-    types::{NoRV, Signature, Type, TypeBase},
+    types::{Signature, Type},
 };
 
 use super::RootChecked;
@@ -262,7 +262,7 @@ fn update_signature<H: HugrMut>(hugr: &mut H, node: H::Node, new_sig: &Signature
 
 fn check_valid_inputs<V>(
     old_ports: &[Vec<V>],
-    old_sig: &[TypeBase<NoRV>],
+    old_sig: &[Type],
     map_sig: &[usize],
 ) -> Result<(), InvalidSignature> {
     if let Some(old_pos) = map_sig
@@ -291,10 +291,7 @@ fn check_valid_inputs<V>(
     Ok(())
 }
 
-fn check_valid_outputs(
-    old_sig: &[TypeBase<NoRV>],
-    map_sig: &[usize],
-) -> Result<(), InvalidSignature> {
+fn check_valid_outputs(old_sig: &[Type], map_sig: &[usize]) -> Result<(), InvalidSignature> {
     if let Some(old_pos) = map_sig
         .iter()
         .find_map(|&old_pos| (old_pos >= old_sig.len()).then_some(old_pos))
