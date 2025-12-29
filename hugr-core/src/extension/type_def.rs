@@ -13,7 +13,8 @@ use crate::types::type_param::TypeParam;
 use crate::types::TypeBound;
 
 /// The type bound of a [`TypeDef`]
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "b")]
 #[allow(missing_docs)]
 pub enum TypeDefBound {
     /// Defined by an explicit bound.
@@ -55,11 +56,12 @@ impl TypeDefBound {
 /// A declaration of an opaque type.
 /// Note this does not provide any way to create instances
 /// - typically these are operations also provided by the Extension.
-#[derive(Clone, Debug)]
+#[derive(Clone, Debug, serde::Serialize, serde::Deserialize)]
 pub struct TypeDef {
     /// The unique Extension owning this `TypeDef` (of which this `TypeDef` is a member)
     extension: ExtensionId,
     /// A weak reference to the extension defining this operation.
+    #[serde(skip)]
     extension_ref: Weak<Extension>,
     /// The unique name of the type
     name: TypeName,

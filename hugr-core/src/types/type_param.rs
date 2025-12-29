@@ -20,7 +20,9 @@ use crate::types::{CustomType, FuncValueType, GeneralSum, Substitutable, SumType
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
+)]
 #[display("{}", _0.map(|i|i.to_string()).unwrap_or("-".to_string()))]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct UpperBound(Option<NonZeroU64>);
@@ -54,8 +56,14 @@ pub type TypeArg = Term;
 pub type TypeParam = Term;
 
 /// A term in the language of static parameters in HUGR.
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
+)]
 #[non_exhaustive]
+#[serde(
+    from = "crate::types::serialize::TermSer",
+    into = "crate::types::serialize::TermSer"
+)]
 pub enum Term {
     /// The type of runtime types.
     #[display("Type{}", match _0 {
@@ -273,7 +281,9 @@ impl<const N: usize> From<[Term; N]> for Term {
 
 /// Variable in a [`Term`], that is not a single runtime type (i.e. not a [`Type::new_var_use`]
 /// - it might be a [`Type::new_row_var_use`]).
-#[derive(Clone, Debug, PartialEq, Eq, Hash, derive_more::Display)]
+#[derive(
+    Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize, derive_more::Display,
+)]
 #[display("#{idx}")]
 pub struct TermVar {
     idx: usize,

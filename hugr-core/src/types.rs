@@ -3,6 +3,7 @@
 mod check;
 pub mod custom;
 mod poly_func;
+pub(crate) mod serialize;
 mod signature;
 pub mod type_param;
 pub mod type_row;
@@ -21,9 +22,12 @@ use smol_str::SmolStr;
 pub use type_param::{Term, TypeArg};
 pub use type_row::{TypeRow, TypeRowRV};
 
+pub(crate) use poly_func::PolyFuncTypeBase;
+
 use itertools::{Either, Itertools as _};
 #[cfg(test)]
 use proptest_derive::Arbitrary;
+use serde::{Deserialize, Serialize};
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 
@@ -36,7 +40,9 @@ pub type TypeName = SmolStr;
 pub type TypeNameRef = str;
 
 /// The kinds of edges in a HUGR, excluding Hierarchy.
-#[derive(Clone, PartialEq, Eq, Debug, derive_more::Display)]
+#[derive(
+    Clone, PartialEq, Eq, Debug, serde::Serialize, serde::Deserialize, derive_more::Display,
+)]
 #[non_exhaustive]
 pub enum EdgeKind {
     /// Control edges of a CFG region.
@@ -109,15 +115,19 @@ impl EdgeKind {
     }
 }
 
-#[derive(Copy, Default, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display)]
+#[derive(
+    Copy, Default, Clone, PartialEq, Eq, Hash, Debug, derive_more::Display, Serialize, Deserialize,
+)]
 #[cfg_attr(test, derive(Arbitrary))]
 /// Bounds on the valid operations on a type in a HUGR program.
 pub enum TypeBound {
     /// The type can be copied in the program.
+    #[serde(rename = "C", alias = "E")] // alias to read in legacy Eq variants
     Copyable,
     /// No bound on the type.
     ///
     /// It cannot be copied nor discarded.
+    #[serde(rename = "A")]
     #[default]
     Linear,
 }
@@ -143,7 +153,8 @@ impl TypeBound {
     }
 }
 
-#[derive(Clone, Debug, Eq)]
+#[derive(Clone, Debug, Eq, Serialize, Deserialize)]
+#[serde(tag = "s")]
 #[non_exhaustive]
 /// Representation of a Sum type.
 /// Either store the types of the variants, or in the special (but common) case
