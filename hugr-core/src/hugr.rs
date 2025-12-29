@@ -1,5 +1,6 @@
 //! The Hugr data structure, and its basic component handles.
 
+// When adding new public modules, add them to the public re-exports in `/hugr/src/hugr.rs`.
 pub mod hugrmut;
 pub(crate) mod ident;
 pub mod internal;
