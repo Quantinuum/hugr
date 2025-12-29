@@ -66,7 +66,7 @@ just test-python
 ```
 or, to try a specific test:
 ```bash
-just test-rust -k test_name
+just test-rust test_name
 just test-python -k test_name
 ```
 
