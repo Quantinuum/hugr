@@ -537,7 +537,6 @@ fn serialize_types_roundtrip() {
 #[case(bool_t())]
 #[case(usize_t())]
 #[case(INT_TYPES[2].clone())]
-#[case(Type::new_alias(crate::ops::AliasDecl::new("t", TypeBound::Linear)))]
 #[case(Type::new_var_use(2, TypeBound::Copyable))]
 #[case(Type::new_runtime_tuple(vec![bool_t(),qb_t()]))]
 #[case(Type::new_sum([vec![bool_t(),qb_t()], vec![Type::new_unit_sum(4)]]))]

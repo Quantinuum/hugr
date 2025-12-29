@@ -9,11 +9,9 @@ use crate::hugr::{
     ValidationError, hugrmut::InsertedForest, internal::HugrMutInternals, views::HugrView,
 };
 use crate::ops;
-use crate::ops::handle::{AliasID, FuncID, NodeHandle};
-use crate::types::{PolyFuncType, Type, TypeBound};
+use crate::ops::handle::{FuncID, NodeHandle};
+use crate::types::PolyFuncType;
 use crate::{Hugr, Node, Visibility, ops::FuncDefn};
-
-use smol_str::SmolStr;
 
 /// Builder for a HUGR module.
 #[derive(Debug, Default, Clone, PartialEq)]
@@ -179,49 +177,6 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
         self.define_function_op(FuncDefn::new(name, signature))
     }
 
-    /// Add a [`crate::ops::OpType::AliasDefn`] node and return a handle to the Alias.
-    ///
-    /// # Errors
-    ///
-    /// Error in adding [`crate::ops::OpType::AliasDefn`] child node.
-    pub fn add_alias_def(
-        &mut self,
-        name: impl Into<SmolStr>,
-        typ: Type,
-    ) -> Result<AliasID<true>, BuildError> {
-        // TODO: add AliasDefn in other containers
-        // This is currently tricky as they are not connected to anything so do
-        // not appear in topological traversals.
-        // Could be fixed by removing single-entry requirement and sorting from
-        // every 0-input node.
-        let name: SmolStr = name.into();
-        let bound = typ.least_upper_bound();
-        let node = self.add_child_node(ops::AliasDefn {
-            name: name.clone(),
-            definition: typ,
-        });
-
-        Ok(AliasID::new(node, name, bound))
-    }
-
-    /// Add a [`crate::ops::OpType::AliasDecl`] node and return a handle to the Alias.
-    /// # Errors
-    ///
-    /// Error in adding [`crate::ops::OpType::AliasDecl`] child node.
-    pub fn add_alias_declare(
-        &mut self,
-        name: impl Into<SmolStr>,
-        bound: TypeBound,
-    ) -> Result<AliasID<false>, BuildError> {
-        let name: SmolStr = name.into();
-        let node = self.add_child_node(ops::AliasDecl {
-            name: name.clone(),
-            bound,
-        });
-
-        Ok(AliasID::new(node, name, bound))
-    }
-
     /// Add some module-children of another Hugr to this module, with
     /// linking directives specified explicitly by [Node].
     ///
@@ -279,28 +234,6 @@ mod test {
             let call = f_build.call(&f_id, &[], f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish_hugr()
-        };
-        assert_matches!(build_result, Ok(_));
-        Ok(())
-    }
-
-    #[test]
-    fn simple_alias() -> Result<(), BuildError> {
-        let build_result = {
-            let mut module_builder = ModuleBuilder::new();
-
-            let qubit_state_type =
-                module_builder.add_alias_declare("qubit_state", TypeBound::Linear)?;
-
-            let f_build = module_builder.define_function(
-                "main",
-                Signature::new(
-                    vec![qubit_state_type.get_alias_type()],
-                    vec![qubit_state_type.get_alias_type()],
-                ),
-            )?;
-            n_identity(f_build)?;
             module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_));
