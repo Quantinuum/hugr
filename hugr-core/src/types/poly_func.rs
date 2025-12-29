@@ -23,17 +23,7 @@ use super::{Substitutable, Substitution, Term, TypeRow};
 /// [`FuncDecl`]: crate::ops::module::FuncDecl
 /// [`FuncDefn`]: crate::ops::module::FuncDefn
 /// [`OpDef`]: crate::extension::OpDef
-#[derive(
-    Clone,
-    PartialEq,
-    Debug,
-    Default,
-    Eq,
-    Hash,
-    derive_more::Display,
-    serde::Serialize,
-    serde::Deserialize,
-)]
+#[derive(Clone, PartialEq, Debug, Default, Eq, Hash, derive_more::Display)]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 #[display("{}{body}", self.display_params())]
 pub struct PolyFuncTypeBase<T> {

@@ -15,12 +15,11 @@ use super::{
 use super::{Type, TypeName};
 
 /// An opaque type element. Contains the unique identifier of its definition.
-#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone)]
 pub struct CustomType {
     /// The identifier for the extension owning this type.
     extension: ExtensionId,
     /// A weak reference to the extension defining this type.
-    #[serde(skip)]
     extension_ref: Weak<Extension>,
     /// Unique identifier of the opaque type.
     /// Same as the corresponding [`TypeDef`]
