@@ -15,7 +15,7 @@ use crate::extension::{
 use crate::ops::OpName;
 use crate::ops::constant::{CustomCheckFailure, CustomConst, ValueName};
 use crate::ops::{NamedOp, Value};
-use crate::types::type_param::{TypeArg, TypeParam};
+use crate::types::type_param::{TypeArg, TypeParam, check_term_type};
 use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Term, Type,
     TypeBound, TypeName, TypeRV, TypeRow, TypeRowRV,
@@ -26,7 +26,7 @@ use crate::{Extension, type_row};
 use strum::{EnumIter, EnumString, IntoStaticStr};
 
 use super::ExtensionRegistry;
-use super::resolution::{ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions};
+use super::resolution::{ExtensionResolutionError, WeakExtensionRegistry, resolve_term_extensions};
 
 mod unwrap_builder;
 
@@ -592,7 +592,7 @@ impl CustomConst for ConstExternalSymbol {
         &mut self,
         extensions: &WeakExtensionRegistry,
     ) -> Result<(), ExtensionResolutionError> {
-        resolve_type_extensions(&mut self.typ, extensions)
+        resolve_term_extensions(&mut self.typ, extensions)
     }
 
     fn validate(&self) -> Result<(), CustomCheckFailure> {
@@ -711,14 +711,10 @@ impl MakeExtensionOp for MakeTuple {
         let [TypeArg::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        let tys: Result<Vec<Type>, _> = elems
-            .iter()
-            .map(|a| match a {
-                TypeArg::Runtime(ty) => Ok(ty.clone()),
-                _ => Err(SignatureError::InvalidTypeArgs),
-            })
-            .collect();
-        Ok(Self(tys?.into()))
+        for e in elems {
+            check_term_type(e, &TypeBound::Linear.into()).map_err(SignatureError::from)?;
+        }
+        Ok(Self(elems.clone().into()))
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
@@ -766,14 +762,10 @@ impl MakeExtensionOp for UnpackTuple {
         let [Term::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        let tys: Result<Vec<Type>, _> = elems
-            .iter()
-            .map(|a| match a {
-                Term::Runtime(ty) => Ok(ty.clone()),
-                _ => Err(SignatureError::InvalidTypeArgs),
-            })
-            .collect();
-        Ok(Self(tys?.into()))
+        for e in elems {
+            check_term_type(e, &TypeBound::Linear.into()).map_err(SignatureError::from)?;
+        }
+        Ok(Self(elems.clone().into()))
     }
 
     fn type_args(&self) -> Vec<Term> {
@@ -881,9 +873,10 @@ impl MakeExtensionOp for Noop {
         Self: Sized,
     {
         let _def = NoopDef::from_def(ext_op.def())?;
-        let [TypeArg::Runtime(ty)] = ext_op.args() else {
+        let [ty] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
+        check_term_type(ty, &TypeBound::Linear.into()).map_err(SignatureError::from)?;
         Ok(Self(ty.clone()))
     }
 
@@ -990,15 +983,11 @@ impl MakeExtensionOp for Barrier {
         let [TypeArg::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        let tys: Result<Vec<Type>, _> = elems
-            .iter()
-            .map(|a| match a {
-                TypeArg::Runtime(ty) => Ok(ty.clone()),
-                _ => Err(SignatureError::InvalidTypeArgs),
-            })
-            .collect();
+        for e in elems {
+            check_term_type(e, &TypeBound::Linear.into()).map_err(SignatureError::from)?;
+        }
         Ok(Self {
-            type_row: tys?.into(),
+            type_row: elems.clone().into(),
         })
     }
 

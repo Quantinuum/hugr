@@ -69,11 +69,9 @@ pub trait UnwrapBuilder: Dataflow {
         input: Wire,
         mut error: impl FnMut(usize) -> T,
     ) -> Result<[Wire; N], BuildError> {
-        let variants: Vec<TypeRow> = (0..sum_type.num_variants())
-            .map(|i| {
-                let tr_rv = sum_type.get_variant(i).unwrap().to_owned();
-                TypeRow::try_from(tr_rv)
-            })
+        let variants: Vec<TypeRow> = sum_type
+            .variants()
+            .map(|t| t.clone().try_into())
             .collect::<Result<_, _>>()?;
 
         // TODO don't panic if tag >= num_variants
