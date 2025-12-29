@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.25.1](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.0...hugr-passes-v0.25.1) - 2025-12-29
+
+### Bug Fixes
+
+- two problems in array linearization from #2749 ([#2779](https://github.com/Quantinuum/hugr/pull/2779))
+
 ## [0.25.0](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.24.3...hugr-passes-v0.25.0) - 2025-12-22
 
 ### New Features
