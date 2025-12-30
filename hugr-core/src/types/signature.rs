@@ -15,12 +15,8 @@ use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::types::{Substitutable, Term};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
-#[cfg(test)]
-use {crate::proptest::RecursionDepth, proptest::prelude::*, proptest_derive::Arbitrary};
-
 // Default here works only for <TypeRow>
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 /// Base type for listing inputs and output types.
 ///
 /// The exact semantics depend on the use case:
@@ -32,10 +28,8 @@ use {crate::proptest::RecursionDepth, proptest::prelude::*, proptest_derive::Arb
 /// [`FuncDefn`]: crate::ops::FuncDefn
 pub struct FuncTypeBase<T> {
     /// Value inputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<T>(params)"))]
     pub input: T,
     /// Value outputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<T>(params)"))]
     pub output: T,
 }
 
@@ -330,11 +324,39 @@ impl PartialEq<Signature> for FuncValueType {
 
 #[cfg(test)]
 mod test {
+    use proptest::prelude::{Arbitrary, BoxedStrategy, Strategy, any_with};
+
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
+    use crate::proptest::RecursionDepth;
     use crate::type_row;
-    use crate::types::{CustomType, test::FnTransformer};
+    use crate::types::{CustomType, TypeRow, test::FnTransformer};
 
     use super::*;
+
+    impl Arbitrary for Signature {
+        type Parameters = RecursionDepth;
+        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            let input_strategy = any_with::<TypeRow>(depth);
+            let output_strategy = any_with::<TypeRow>(depth);
+            (input_strategy, output_strategy)
+                .prop_map(|(input, output)| Signature::new(input, output))
+                .boxed()
+        }
+        type Strategy = BoxedStrategy<Self>;
+    }
+
+    impl Arbitrary for FuncValueType {
+        type Parameters = RecursionDepth;
+        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            let input_strategy = any_with::<Term>(depth);
+            let output_strategy = any_with::<Term>(depth);
+            (input_strategy, output_strategy)
+                .prop_map(|(input, output)| FuncValueType::new(input, output))
+                .boxed()
+        }
+        type Strategy = BoxedStrategy<Self>;
+    }
+
     #[test]
     fn test_function_type() {
         let mut f_type = Signature::new(type_row![Type::UNIT], type_row![Type::UNIT]);

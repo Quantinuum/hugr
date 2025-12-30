@@ -5,13 +5,6 @@ use std::borrow::Cow;
 use itertools::Itertools;
 
 use crate::{extension::SignatureError, types::FuncValueType};
-#[cfg(test)]
-use {
-    super::proptest_utils::any_serde_type_param,
-    crate::proptest::RecursionDepth,
-    ::proptest::{collection::vec, prelude::*},
-    proptest_derive::Arbitrary,
-};
 
 use super::signature::FuncTypeBase;
 use super::type_param::{TypeArg, TypeParam, check_term_types};
@@ -34,16 +27,13 @@ use super::{Substitutable, Substitution, Term, TypeRow};
     serde::Serialize,
     serde::Deserialize,
 )]
-#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 #[display("{}{body}", self.display_params())]
 pub struct PolyFuncTypeBase<T> {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [`TypeArg`]s before the function can be called. This
     /// defines the indices used by variables inside the body.
-    #[cfg_attr(test, proptest(strategy = "vec(any_serde_type_param(params), 0..3)"))]
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [`Self::params`]
-    #[cfg_attr(test, proptest(strategy = "any_with::<FuncTypeBase<T>>(params)"))]
     body: FuncTypeBase<T>,
 }
 
@@ -178,17 +168,45 @@ pub(crate) mod test {
     use std::sync::Arc;
 
     use cool_asserts::assert_matches;
+    use proptest::collection::vec;
+    use proptest::prelude::{Arbitrary, BoxedStrategy, Strategy, any_with};
 
     use crate::Extension;
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound};
+    use crate::proptest::RecursionDepth;
     use crate::std_extensions::collections::array::{self, array_type_parametric};
     use crate::std_extensions::collections::list;
+    use crate::types::proptest_utils::any_serde_type_param;
     use crate::types::type_param::{Term, TermTypeError, TypeArg, TypeParam};
     use crate::types::{
         CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound,
         TypeName,
     };
+
+    impl Arbitrary for PolyFuncType {
+        type Parameters = RecursionDepth;
+        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            let params_strategy = vec(any_serde_type_param(depth), 0..3);
+            let body_strategy = any_with::<Signature>(depth);
+            (params_strategy, body_strategy)
+                .prop_map(|(params, body)| PolyFuncType::new(params, body))
+                .boxed()
+        }
+        type Strategy = BoxedStrategy<Self>;
+    }
+
+    impl Arbitrary for PolyFuncTypeRV {
+        type Parameters = RecursionDepth;
+        fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            let params_strategy = vec(any_serde_type_param(depth), 0..3);
+            let body_strategy = any_with::<FuncValueType>(depth);
+            (params_strategy, body_strategy)
+                .prop_map(|(params, body)| PolyFuncTypeRV::new(params, body))
+                .boxed()
+        }
+        type Strategy = BoxedStrategy<Self>;
+    }
 
     impl PolyFuncType {
         fn new_validated(
