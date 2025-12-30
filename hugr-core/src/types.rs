@@ -404,11 +404,11 @@ impl Type {
 
     /// Initialize a new tuple type by providing the elements.
     #[inline(always)]
-    pub fn new_runtime_tuple(types: impl Into<TypeRowRV>) -> Self {
+    pub fn new_runtime_tuple(types: impl Into<Term>) -> Self {
         let row = types.into();
-        match row.len() {
-            0 => Self::UNIT,
-            _ => Self::new_sum([row]),
+        match row.is_empty_list() {
+            true => Self::UNIT,
+            false => Self::new_sum([row]),
         }
     }
 
