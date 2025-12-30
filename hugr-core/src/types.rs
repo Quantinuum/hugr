@@ -634,10 +634,14 @@ pub(crate) mod test {
     fn as_option() {
         let opt = option_type([usize_t()]);
 
-        assert_eq!(opt.as_option().unwrap(), &usize_t()); // ALAN no...should be list of usize_t ?
+        assert_eq!(opt.as_option().unwrap(), &Term::new_list([usize_t()]));
+        assert_eq!(
+            Type::new_unit_sum(3).as_runtime_sum().unwrap().as_option(),
+            None
+        );
         assert_eq!(
             Type::new_unit_sum(2).as_runtime_sum().unwrap().as_option(),
-            None
+            Some(&Term::EMPTY_TYPE_LIST) // Yes, option of zero types is valid
         );
 
         assert_eq!(
