@@ -117,11 +117,11 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
                         TypeParam::new_list_type(TypeBound::Linear),
                     ],
                     FuncValueType::new(
-                        vec![
-                            TypeRV::new_extension(error_type.clone()),
+                        Term::new_list_concat([
+                            Term::new_list([TypeRV::new_extension(error_type.clone())]),
                             TypeRV::new_row_var_use(0, TypeBound::Linear),
-                        ],
-                        vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
+                        ]),
+                        TypeRV::new_row_var_use(1, TypeBound::Linear),
                     ),
                 ),
                 extension_ref,
@@ -137,11 +137,11 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
                         TypeParam::new_list_type(TypeBound::Linear),
                     ],
                     FuncValueType::new(
-                        vec![
-                            TypeRV::new_extension(error_type),
+                        Term::new_list_concat([
+                            Term::new_list([Type::new_extension(error_type)]),
                             TypeRV::new_row_var_use(0, TypeBound::Linear),
-                        ],
-                        vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
+                        ]),
+                        TypeRV::new_row_var_use(1, TypeBound::Linear),
                     ),
                 ),
                 extension_ref,
@@ -643,7 +643,7 @@ impl MakeOpDef for TupleOpDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         let rv = TypeRV::new_row_var_use(0, TypeBound::Linear);
-        let tuple_type = TypeRV::new_runtime_tuple(vec![rv.clone()]);
+        let tuple_type = TypeRV::new_runtime_tuple(rv.clone());
 
         let param = TypeParam::new_list_type(TypeBound::Linear);
         match self {
