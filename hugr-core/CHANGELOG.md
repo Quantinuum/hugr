@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.25.2](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.1...hugr-core-v0.25.2) - 2025-12-30
+
+### Bug Fixes
+
+- *(determinism)* use BTreeMap in ModuleGraph ([#2783](https://github.com/Quantinuum/hugr/pull/2783))
+
+### New Features
+
+- Re-export hugr_core::hugr::linking from hugr:: ([#2781](https://github.com/Quantinuum/hugr/pull/2781))
+
 ## [0.25.0](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.24.3...hugr-core-v0.25.0) - 2025-12-22
 
 ### Bug Fixes
