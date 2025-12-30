@@ -558,31 +558,6 @@ impl<E: Transformable> Transformable for [E] {
     }
 }
 
-pub(crate) fn check_typevar_decl(
-    decls: &[TypeParam],
-    idx: usize,
-    cached_decl: &TypeParam,
-) -> Result<(), SignatureError> {
-    match decls.get(idx) {
-        None => Err(SignatureError::FreeTypeVar {
-            idx,
-            num_decls: decls.len(),
-        }),
-        Some(actual) => {
-            // The cache here just mirrors the declaration. The typevar can be used
-            // anywhere expecting a kind *containing* the decl - see `check_type_arg`.
-            if actual == cached_decl {
-                Ok(())
-            } else {
-                Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    cached: Box::new(cached_decl.clone()),
-                    actual: Box::new(actual.clone()),
-                })
-            }
-        }
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod test {
     use std::hash::{Hash, Hasher};

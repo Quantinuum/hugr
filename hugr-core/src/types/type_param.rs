@@ -14,7 +14,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tracing::warn;
 
-use super::{Substitution, Transformable, Type, TypeBound, TypeTransformer, check_typevar_decl};
+use super::{Substitution, Transformable, Type, TypeBound, TypeTransformer};
 use crate::extension::SignatureError;
 use crate::types::{CustomType, FuncValueType, GeneralSum, Substitutable, SumType};
 
@@ -468,11 +468,6 @@ impl Term {
             }
             TypeArg::TupleConcat(tuples) => tuples.iter().try_for_each(|a| a.validate(var_decls)),
             Term::Variable(TermVar { idx, cached_decl }) => {
-                assert!(
-                    !matches!(&**cached_decl, TypeParam::RuntimeType { .. }),
-                    "Malformed TypeArg::Variable {cached_decl} - should be inconstructible"
-                );
-
                 check_typevar_decl(var_decls, *idx, cached_decl)
             }
             Term::RuntimeType { .. } => Ok(()),
@@ -621,6 +616,31 @@ impl Term {
     #[inline]
     pub(crate) fn into_tuple_parts(self) -> TuplePartIter {
         TuplePartIter::new(SeqPart::Splice(self))
+    }
+}
+
+fn check_typevar_decl(
+    decls: &[TypeParam],
+    idx: usize,
+    cached_decl: &TypeParam,
+) -> Result<(), SignatureError> {
+    match decls.get(idx) {
+        None => Err(SignatureError::FreeTypeVar {
+            idx,
+            num_decls: decls.len(),
+        }),
+        Some(actual) => {
+            // The cache here just mirrors the declaration. The typevar can be used
+            // anywhere expecting a kind *containing* the decl - see `check_type_arg`.
+            if actual == cached_decl {
+                Ok(())
+            } else {
+                Err(SignatureError::TypeVarDoesNotMatchDeclaration {
+                    cached: Box::new(cached_decl.clone()),
+                    actual: Box::new(actual.clone()),
+                })
+            }
+        }
     }
 }
 
