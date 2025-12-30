@@ -12,7 +12,8 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_signature_exts,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
-use crate::types::{Substitutable, Term};
+use crate::types::type_param::check_term_type;
+use crate::types::{Substitutable, Term, TypeBound};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 // Default here works only for <TypeRow>
@@ -114,7 +115,13 @@ impl<T: Clone> FuncTypeBase<T> {
 impl Signature {
     pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.input.validate(var_decls)?;
-        self.output.validate(var_decls)
+        self.output.validate(var_decls)?;
+        // check_term_type never gets here (and would not look at inputs/outputs if it did),
+        // so do that here
+        for t in self.input.iter().chain(self.output.iter()) {
+            check_term_type(t, &TypeBound::Linear.into())?;
+        }
+        Ok(())
     }
 
     /// True if both inputs and outputs are necessarily empty.
@@ -144,7 +151,12 @@ impl Signature {
 impl FuncValueType {
     pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.input.validate(var_decls)?;
-        self.output.validate(var_decls)
+        self.output.validate(var_decls)?;
+        // check_term_type does not look at inputs/outputs, so do that here
+        for t in [&self.input, &self.output] {
+            check_term_type(t, &Term::new_list_type(TypeBound::Linear))?;
+        }
+        Ok(())
     }
 
     /// True if both inputs and outputs are necessarily empty

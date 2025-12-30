@@ -423,11 +423,6 @@ impl Term {
         }
     }
 
-    // ALAN combine this with check_term_type?
-    // Probably - that would be a good way to make existing calls to validate
-    // enforce that they are actually instances of RuntimeType's;
-    // and we'll otherwise recurse through the structure twice (or,
-    // if either validate/check_term_type recurses on both, then perhaps many times more).
     /// Checks all variables used in the type are in the provided list
     /// of bound variables, rejecting any [`RowVariable`]s if `allow_row_vars` is False;
     /// and that for each [`CustomType`] the corresponding
@@ -439,13 +434,20 @@ impl Term {
     /// [TypeDef]: crate::extension::TypeDef
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            Term::RuntimeSum(SumType::General(GeneralSum { rows, .. })) => {
-                // ALAN also verify the cached bound?? Old comments said:
-                // "There is no need to check the components against the bound,
-                // that is guaranteed by construction (even for deserialization)"...but still?
-                // Seems that if we are "valid" (i.e., really, if we check_term_type)
-                // then the bound should be non-None, at least.
-                rows.iter().try_for_each(|row| row.validate(var_decls))
+            Term::RuntimeSum(SumType::General(GeneralSum { rows, bound })) => {
+                rows.iter().try_for_each(|row| row.validate(var_decls))?;
+                // check_term_type does not look beyond the cached bound, so do that here.
+                let b = bound.unwrap_or(TypeBound::Linear);
+                rows.iter()
+                    .try_for_each(|row| check_term_type(row, &Term::new_list_type(b)))?;
+                debug_assert!(match bound {
+                    Some(TypeBound::Copyable) => true, // Cached bound accurate, all ok
+                    None => false, // Cached bound should have been set to (at least) Linear
+                    Some(TypeBound::Linear) => !rows.iter().all(|r| {
+                        check_term_type(r, &Term::new_list_type(TypeBound::Copyable)).is_ok()
+                    }), // Cached bound should have been set to Copyable
+                });
+                Ok(())
             }
             Term::RuntimeSum(SumType::Unit { .. }) => Ok(()), // No leaves there
             Term::RuntimeExtension(custy) => custy.validate(var_decls),
