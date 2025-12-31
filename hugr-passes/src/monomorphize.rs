@@ -233,13 +233,13 @@ fn escape_dollar(str: impl AsRef<str>) -> String {
 fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match arg {
         TypeArg::RuntimeExtension(cty) => {
-            f.write_fmt(format_args!("t({})", escape_dollar(cty.to_string())))
+            f.write_fmt(format_args!("e({})", escape_dollar(cty.to_string())))
         }
         TypeArg::RuntimeSum(sty) => {
             f.write_fmt(format_args!("t({})", escape_dollar(sty.to_string())))
         }
         TypeArg::RuntimeFunction(fty) => {
-            f.write_fmt(format_args!("t({})", escape_dollar(fty.to_string())))
+            f.write_fmt(format_args!("f({})", escape_dollar(fty.to_string())))
         }
         TypeArg::BoundedNat(n) => f.write_fmt(format_args!("n({n})")),
         TypeArg::String(arg) => f.write_fmt(format_args!("s({})", escape_dollar(arg))),
@@ -635,7 +635,7 @@ mod test {
     #[rstest]
     #[case::bounded_nat(vec![0.into()], "$foo$$n(0)")]
     #[case::type_unit(vec![Type::UNIT.into()], "$foo$$t(Unit)")]
-    #[case::type_int(vec![INT_TYPES[2].clone().into()], "$foo$$t(int(2))")]
+    #[case::type_int(vec![INT_TYPES[2].clone().into()], "$foo$$e(int(2))")]
     #[case::string(vec!["arg".into()], "$foo$$s(arg)")]
     #[case::dollar_string(vec!["$arg".into()], "$foo$$s(\\$arg)")]
     #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$list($n(0)$t(Unit))")]
