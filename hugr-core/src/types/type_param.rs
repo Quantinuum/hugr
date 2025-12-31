@@ -123,7 +123,8 @@ pub enum Term {
     /// A list of static terms. Instance of [`Term::ListType`].
     #[display("[{}]", {
         use itertools::Itertools as _;
-        _0.iter().map(|t|t.to_string()).join(",")
+        // extra space matching old Display for Type(Row) - TODO, change Vec<Type> to TypeRow?
+        _0.iter().map(|t|t.to_string()).join(", ")
     })]
     List(Vec<Term>),
     /// Instance of [`TypeParam::List`] defined by a sequence of concatenated lists of the same type.
