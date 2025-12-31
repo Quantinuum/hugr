@@ -65,10 +65,9 @@ impl TryFrom<Type> for SerSimpleType {
     }
 }
 
-impl TryFrom<SerSimpleType> for Term {
-    type Error = SignatureError;
-    fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
-        Ok(match value {
+impl From<SerSimpleType> for Term {
+    fn from(value: SerSimpleType) -> Self {
+        match value {
             SerSimpleType::Q => qb_t(),
             SerSimpleType::I => usize_t(),
             SerSimpleType::G(sig) => Type::new_function(*sig),
@@ -76,9 +75,8 @@ impl TryFrom<SerSimpleType> for Term {
             SerSimpleType::Opaque(o) => Type::new_extension(o),
             SerSimpleType::Alias(_) => todo!("alias?"),
             SerSimpleType::V { i, b } => Type::new_var_use(i, b),
-            // We can't use new_row_var because that returns TypeRV not TypeBase<RV>.
             SerSimpleType::R { i, b } => Type::new_row_var_use(i, b),
-        })
+        }
     }
 }
 
@@ -102,7 +100,7 @@ pub(super) enum TypeParamSer {
 #[serde(tag = "tya")]
 pub(super) enum TypeArgSer {
     Type {
-        ty: Type,
+        ty: SerSimpleType,
     },
     BoundedNat {
         n: u64,

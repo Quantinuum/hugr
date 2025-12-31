@@ -168,7 +168,6 @@ pub enum SumType {
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
 pub struct GeneralSum {
     /// Each term here must be an instance of [Term::ListType]([Term::RuntimeType]), being
     /// the elements of exactly one variant. (Thus, this explicitly forbids sums with an
@@ -832,13 +831,9 @@ pub(super) mod proptest_utils {
             | TypeArgSer::Tuple { elems: terms }
             | TypeArgSer::TupleConcat { tuples: terms } => terms.iter().all(term_is_serde_type_arg),
             TypeArgSer::Variable { v } => term_is_serde_type_param(&v.cached_decl),
-            TypeArgSer::Type { ty } => {
-                if let Some(cty) = ty.as_extension() {
-                    cty.args().iter().all(term_is_serde_type_arg)
-                } else {
-                    true
-                }
-            } // Do we need to inspect inside function types? sum types?
+            TypeArgSer::Type { ty } => Term::from(ty)
+                .as_extension()
+                .is_none_or(|cty| cty.args().iter().all(term_is_serde_type_arg)), // Do we need to inspect inside function types? sum types?
             TypeArgSer::BoundedNat { .. }
             | TypeArgSer::String { .. }
             | TypeArgSer::Bytes { .. }
