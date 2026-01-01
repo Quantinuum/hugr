@@ -183,8 +183,8 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayScan<AK> {
     fn type_args(&self) -> Vec<TypeArg> {
         vec![
             self.size.into(),
-            self.src_ty.clone().into(),
-            self.tgt_ty.clone().into(),
+            self.src_ty.clone(),
+            self.tgt_ty.clone(),
             TypeArg::new_list(self.acc_tys.clone().into_iter().map_into()),
         ]
     }

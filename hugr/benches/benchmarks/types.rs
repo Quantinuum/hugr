@@ -1,8 +1,7 @@
 // Required for black_box uses
 #![allow(clippy::unit_arg)]
 use hugr::extension::prelude::{qb_t, usize_t};
-use hugr::ops::AliasDecl;
-use hugr::types::{Signature, Type, TypeBound};
+use hugr::types::{Signature, Type};
 
 use criterion::{AxisScale, Criterion, PlotConfiguration, criterion_group};
 use std::hint::black_box;

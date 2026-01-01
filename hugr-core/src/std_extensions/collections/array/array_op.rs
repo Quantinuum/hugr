@@ -291,7 +291,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayOp<AK> {
         use GenericArrayOpDef::{
             _phantom, discard_empty, get, new_array, pop_left, pop_right, set, swap, unpack,
         };
-        let ty_arg = self.elem_ty.clone().into();
+        let ty_arg = self.elem_ty.clone();
         match self.def {
             discard_empty => {
                 debug_assert_eq!(

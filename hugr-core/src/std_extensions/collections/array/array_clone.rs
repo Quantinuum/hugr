@@ -157,7 +157,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayClone<AK> {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![self.size.into(), self.elem_ty.clone().into()]
+        vec![self.size.into(), self.elem_ty.clone()]
     }
 }
 

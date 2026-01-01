@@ -333,11 +333,7 @@ mod test {
             //   let tag = Tag::new(0, vec![vec![elem_ty; 2].into()]);
             //   let tag = fb.add_dataflow_op(tag, [elem, elem]).unwrap();
             // ...but since this will never execute, we can test recursion here
-            let tag = fb.call(
-                &FuncID::<true>::from(fb.container_node()),
-                &[tv0().into()],
-                [elem],
-            )?;
+            let tag = fb.call(&FuncID::<true>::from(fb.container_node()), &[tv0()], [elem])?;
             fb.finish_with_outputs(tag.outputs())?
         };
 
@@ -348,7 +344,7 @@ mod test {
                 PolyFuncType::new([TypeBound::Copyable.into()], sig),
             )?;
             let [elem] = fb.input_wires_arr();
-            let pair = fb.call(db.handle(), &[tv0().into()], [elem])?;
+            let pair = fb.call(db.handle(), &[tv0()], [elem])?;
 
             let [elem1, elem2] = fb
                 .add_dataflow_op(UnpackTuple::new(vec![tv0(); 2].into()), pair.outputs())?
@@ -361,11 +357,9 @@ mod test {
             let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
             let mut fb = mb.define_function("main", Signature::new([usize_t()], outs))?;
             let [elem] = fb.input_wires_arr();
-            let [res1] = fb
-                .call(tr.handle(), &[usize_t().into()], [elem])?
-                .outputs_arr();
-            let pair = fb.call(db.handle(), &[usize_t().into()], [elem])?;
-            let pty = pair_type(usize_t()).into();
+            let [res1] = fb.call(tr.handle(), &[usize_t()], [elem])?.outputs_arr();
+            let pair = fb.call(db.handle(), &[usize_t()], [elem])?;
+            let pty = pair_type(usize_t());
             let [res2] = fb.call(tr.handle(), &[pty], pair.outputs())?.outputs_arr();
             fb.finish_with_outputs([res1, res2])?
         };
@@ -382,10 +376,10 @@ mod test {
 
         let mut funcs = list_funcs(&mono);
         let expected_mangled_names = [
-            mangle_name("double", &[usize_t().into()]),
-            mangle_name("triple", &[usize_t().into()]),
-            mangle_name("double", &[pair_type(usize_t()).into()]),
-            mangle_name("triple", &[pair_type(usize_t()).into()]),
+            mangle_name("double", &[usize_t()]),
+            mangle_name("triple", &[usize_t()]),
+            mangle_name("double", &[pair_type(usize_t())]),
+            mangle_name("triple", &[pair_type(usize_t())]),
         ];
 
         for n in &expected_mangled_names {
@@ -463,8 +457,7 @@ mod test {
             let op_def = collections::borrow_array::EXTENSION
                 .get_op("borrow")
                 .unwrap();
-            let op = hugr_core::ops::ExtensionOp::new(op_def.clone(), vec![sv(0), tv(1).into()])
-                .unwrap();
+            let op = hugr_core::ops::ExtensionOp::new(op_def.clone(), vec![sv(0), tv(1)]).unwrap();
             // borrow the element at that index and return it along with the array
             let [arr, get] = pf2.add_dataflow_op(op, [inw, idx]).unwrap().outputs_arr();
             pf2.finish_with_outputs([get, arr]).unwrap()
@@ -483,7 +476,7 @@ mod test {
         // pf1: two calls to pf2, one depending on pf1's TypeArg, the other not
         // first call stays generic in size but specifies the type as an array of 2 usizes
         let inner = pf1
-            .call(pf2.handle(), &[sv(0), arr2u().into()], pf1.input_wires())
+            .call(pf2.handle(), &[sv(0), arr2u()], pf1.input_wires())
             .unwrap();
         let [inner_arr, outer_arr] = inner.outputs_arr();
         // discard the outer array output even though it is not all borrowed to get around linearity (would panic if you actually ran this)
@@ -491,8 +484,7 @@ mod test {
             .get_op("discard_all_borrowed")
             .unwrap();
         let discard_op =
-            hugr_core::ops::ExtensionOp::new(discard_op_def.clone(), vec![sv(0), arr2u().into()])
-                .unwrap();
+            hugr_core::ops::ExtensionOp::new(discard_op_def.clone(), vec![sv(0), arr2u()]).unwrap();
         let [] = pf1
             .add_dataflow_op(discard_op, [outer_arr])
             .unwrap()
@@ -501,7 +493,7 @@ mod test {
         let elem = pf1
             .call(
                 pf2.handle(),
-                &[TypeArg::BoundedNat(2), usize_t().into()],
+                &[TypeArg::BoundedNat(2), usize_t()],
                 [inner_arr],
             )
             .unwrap();
@@ -509,7 +501,7 @@ mod test {
         let [result, inner_arr] = elem.outputs_arr();
         let discard_op = hugr_core::ops::ExtensionOp::new(
             discard_op_def.clone(),
-            vec![TypeArg::BoundedNat(2), usize_t().into()],
+            vec![TypeArg::BoundedNat(2), usize_t()],
         )
         .unwrap();
         let [] = pf1
@@ -533,8 +525,7 @@ mod test {
         let [left_arr, ar2_unwrapped] = outer
             .build_unwrap_sum(1, st.clone(), ar2.out_wire(0))
             .unwrap();
-        let discard_op =
-            ExtensionOp::new(discard_op_def.clone(), vec![sa(2), usize_t().into()]).unwrap();
+        let discard_op = ExtensionOp::new(discard_op_def.clone(), vec![sa(2), usize_t()]).unwrap();
         let [] = outer
             .add_dataflow_op(discard_op, [left_arr])
             .unwrap()
@@ -556,9 +547,9 @@ mod test {
             vec![
                 &mangle_name("pf1", &[TypeArg::BoundedNat(5)]),
                 &mangle_name("pf1", &[TypeArg::BoundedNat(4)]),
-                &mangle_name("pf2", &[TypeArg::BoundedNat(5), arr2u().into()]), // from pf1<5>
-                &mangle_name("pf2", &[TypeArg::BoundedNat(4), arr2u().into()]), // from pf1<4>
-                &mangle_name("pf2", &[TypeArg::BoundedNat(2), usize_t().into()]), // from both pf1<4> and <5>
+                &mangle_name("pf2", &[TypeArg::BoundedNat(5), arr2u()]), // from pf1<5>
+                &mangle_name("pf2", &[TypeArg::BoundedNat(4), arr2u()]), // from pf1<4>
+                &mangle_name("pf2", &[TypeArg::BoundedNat(2), usize_t()]), // from both pf1<4> and <5>
                 "get_usz",
                 "pf2",
                 "mainish",
@@ -606,9 +597,7 @@ mod test {
                 let mut builder = module_builder
                     .define_function("main", Signature::new_endo([Type::UNIT]))
                     .unwrap();
-                let func_ptr = builder
-                    .load_func(foo.handle(), &[Type::UNIT.into()])
-                    .unwrap();
+                let func_ptr = builder.load_func(foo.handle(), &[Type::UNIT]).unwrap();
                 let [r] = {
                     let signature = Signature::new_endo([Type::UNIT]);
                     builder
@@ -634,12 +623,12 @@ mod test {
 
     #[rstest]
     #[case::bounded_nat(vec![0.into()], "$foo$$n(0)")]
-    #[case::type_unit(vec![Type::UNIT.into()], "$foo$$t(Unit)")]
-    #[case::type_int(vec![INT_TYPES[2].clone().into()], "$foo$$e(int(2))")]
+    #[case::type_unit(vec![Type::UNIT], "$foo$$t(Unit)")]
+    #[case::type_int(vec![INT_TYPES[2].clone()], "$foo$$e(int(2))")]
     #[case::string(vec!["arg".into()], "$foo$$s(arg)")]
     #[case::dollar_string(vec!["$arg".into()], "$foo$$s(\\$arg)")]
-    #[case::sequence(vec![vec![0.into(), Type::UNIT.into()].into()], "$foo$$list($n(0)$t(Unit))")]
-    #[case::sequence(vec![TypeArg::Tuple(vec![0.into(),Type::UNIT.into()])], "$foo$$tuple($n(0)$t(Unit))")]
+    #[case::sequence(vec![vec![0.into(), Type::UNIT].into()], "$foo$$list($n(0)$t(Unit))")]
+    #[case::sequence(vec![TypeArg::Tuple(vec![0.into(),Type::UNIT])], "$foo$$tuple($n(0)$t(Unit))")]
     #[should_panic]
     #[case::typeargvariable(vec![TypeArg::new_var_use(1, TypeParam::StringType)],
                             "$foo$$v(1)")]

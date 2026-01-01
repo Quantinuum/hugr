@@ -118,7 +118,7 @@ fn ptr_custom_type(ty: impl Into<Type>, extension_ref: &Weak<Extension>) -> Cust
     let ty = ty.into();
     CustomType::new(
         PTR_TYPE_ID,
-        [ty.into()],
+        [ty],
         EXTENSION_ID,
         TypeBound::Copyable,
         extension_ref,
@@ -156,7 +156,7 @@ impl MakeExtensionOp for PtrOp {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![self.ty.clone().into()]
+        vec![self.ty.clone()]
     }
 }
 

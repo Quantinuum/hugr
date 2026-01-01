@@ -324,7 +324,7 @@ fn invalid_types() {
 
     let valid = Type::new_extension(CustomType::new(
         "MyContainer",
-        vec![usize_t().into()],
+        vec![usize_t()],
         EXT_ID,
         TypeBound::Linear,
         &Arc::downgrade(&ext),
@@ -336,7 +336,7 @@ fn invalid_types() {
     // valid is Any, so is not allowed as an element of an outer MyContainer.
     let element_outside_bound = CustomType::new(
         "MyContainer",
-        vec![valid.clone().into()],
+        vec![valid.clone()],
         EXT_ID,
         TypeBound::Linear,
         &Arc::downgrade(&ext),
@@ -345,13 +345,13 @@ fn invalid_types() {
         validate_to_sig_error(element_outside_bound),
         SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
             type_: Box::new(TypeBound::Copyable.into()),
-            term: Box::new(valid.into())
+            term: Box::new(valid)
         })
     );
 
     let bad_bound = CustomType::new(
         "MyContainer",
-        vec![usize_t().into()],
+        vec![usize_t()],
         EXT_ID,
         TypeBound::Copyable,
         &Arc::downgrade(&ext),
@@ -367,7 +367,7 @@ fn invalid_types() {
     // bad_bound claims to be Copyable, which is valid as an element for the outer MyContainer.
     let nested = CustomType::new(
         "MyContainer",
-        vec![Type::new_extension(bad_bound).into()],
+        vec![Type::new_extension(bad_bound)],
         EXT_ID,
         TypeBound::Linear,
         &Arc::downgrade(&ext),
@@ -382,7 +382,7 @@ fn invalid_types() {
 
     let too_many_type_args = CustomType::new(
         "MyContainer",
-        vec![usize_t().into(), 3u64.into()],
+        vec![usize_t(), 3u64.into()],
         EXT_ID,
         TypeBound::Linear,
         &Arc::downgrade(&ext),
@@ -527,7 +527,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
 #[test]
 fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     fn uint_seq(i: usize) -> Term {
-        vec![usize_t().into(); i].into()
+        vec![usize_t(); i].into()
     }
     let e = extension_with_eval_parallel();
     let mut dfb = DFGBuilder::new(inout_sig(
@@ -605,7 +605,7 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
         vec![Type::new_function(Signature::new_endo([usize_t()]))],
     );
     let mut f = m.define_function("main", sig)?;
-    let l = f.load_func(&id, &[usize_t().into()])?;
+    let l = f.load_func(&id, &[usize_t()])?;
     f.finish_with_outputs([l])?;
     let _ = m.finish_hugr()?;
     Ok(())

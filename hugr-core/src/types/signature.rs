@@ -54,6 +54,7 @@ impl Default for FuncValueType {
 pub type Signature = FuncTypeBase<TypeRow>;
 
 /// A function whose [FuncValueType::input] and [FuncValueType::output] are arbitrary [Term]s.
+///
 /// Each must type-check against [Term::ListType]`(`Term::RuntimeType`(`[TypeBound::Linear]`))`
 /// so can include variables containing unknown numbers of types.
 ///
@@ -447,10 +448,10 @@ impl From<Signature> for FuncValueType {
 impl PartialEq<Signature> for FuncValueType {
     fn eq(&self, other: &Signature) -> bool {
         // Ideally we should normalize input/output first, but assume e.g. substitute has done so already
-        if let Term::List(input) = &self.input {
-            if let Term::List(output) = &self.output {
-                return *input == *other.input && *output == *other.output;
-            }
+        if let Term::List(input) = &self.input
+            && let Term::List(output) = &self.output
+        {
+            return *input == *other.input && *output == *other.output;
         }
         false
     }

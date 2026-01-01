@@ -1088,16 +1088,8 @@ mod test {
         // `Term::TupleType` requires a `Term::Tuple` of the same number of elems
         let usize_and_ty =
             TypeParam::new_tuple_type([TypeParam::max_nat_type(), TypeBound::Copyable.into()]);
-        check(
-            TypeArg::Tuple(vec![5.into(), usize_t().into()]),
-            &usize_and_ty,
-        )
-        .unwrap();
-        check(
-            TypeArg::Tuple(vec![usize_t().into(), 5.into()]),
-            &usize_and_ty,
-        )
-        .unwrap_err(); // Wrong way around
+        check(TypeArg::Tuple(vec![5.into(), usize_t()]), &usize_and_ty).unwrap();
+        check(TypeArg::Tuple(vec![usize_t(), 5.into()]), &usize_and_ty).unwrap_err(); // Wrong way around
         let two_types = TypeParam::new_tuple_type(Term::new_list([
             TypeBound::Linear.into(),
             TypeBound::Linear.into(),
@@ -1123,10 +1115,7 @@ mod test {
         check_term_type(&outer_arg, &outer_param).unwrap();
 
         let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg]));
-        assert_eq!(
-            outer_arg2,
-            vec![bool_t().into(), Term::UNIT, usize_t().into()].into()
-        );
+        assert_eq!(outer_arg2, vec![bool_t(), Term::UNIT, usize_t()].into());
 
         // Of course this is still valid (as substitution is guaranteed to preserve validity)
         check_term_type(&outer_arg2, &outer_param).unwrap();
@@ -1149,27 +1138,27 @@ mod test {
         let Term::List(mut elems) = good_arg.clone() else {
             panic!()
         };
-        elems.push(usize_t().into());
+        elems.push(usize_t());
         assert_eq!(
             check_term_type(&Term::new_list(elems), &outer_param),
             Err(TermTypeError::TypeMismatch {
-                term: Box::new(usize_t().into()),
+                term: Box::new(usize_t()),
                 // The error reports the type expected for each element of the list:
                 type_: Box::new(TypeParam::new_list_type(TypeBound::Linear))
             })
         );
 
         // Now substitute a list of two types for that row-variable
-        let row_var_arg = vec![usize_t().into(), bool_t().into()].into();
+        let row_var_arg = vec![usize_t(), bool_t()].into();
         check_term_type(&row_var_arg, &row_var_decl).unwrap();
         let subst_arg = good_arg.substitute(&Substitution(std::slice::from_ref(&row_var_arg)));
         check_term_type(&subst_arg, &outer_param).unwrap(); // invariance of substitution
         assert_eq!(
             subst_arg,
             Term::new_list([
-                Term::new_list([usize_t().into()]),
+                Term::new_list([usize_t()]),
                 row_var_arg,
-                Term::new_list([usize_t().into(), bool_t().into(), usize_t().into()])
+                Term::new_list([usize_t(), bool_t(), usize_t()])
             ])
         );
     }

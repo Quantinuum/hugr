@@ -240,12 +240,12 @@ pub(crate) mod test {
             Signature::new(vec![list_of_var], vec![usize_t()]),
         )?;
 
-        let t = list_len.instantiate(&[usize_t().into()])?;
+        let t = list_len.instantiate(&[usize_t()])?;
         assert_eq!(
             t,
             Signature::new(
                 vec![Type::new_extension(
-                    list_def.instantiate([usize_t().into()]).unwrap()
+                    list_def.instantiate([usize_t()]).unwrap()
                 )],
                 vec![usize_t()]
             )
@@ -266,15 +266,15 @@ pub(crate) mod test {
             PolyFuncType::new_validated(type_params.clone(), Signature::new_endo([good_array]))?;
 
         // Sanity check (good args)
-        good_ts.instantiate(&[5u64.into(), usize_t().into()])?;
+        good_ts.instantiate(&[5u64.into(), usize_t()])?;
 
-        let wrong_args = good_ts.instantiate(&[usize_t().into(), 5u64.into()]);
+        let wrong_args = good_ts.instantiate(&[usize_t(), 5u64.into()]);
         assert_eq!(
             wrong_args,
             Err(SignatureError::TypeArgMismatch(
                 TermTypeError::TypeMismatch {
                     type_: Box::new(type_params[0].clone()),
-                    term: Box::new(usize_t().into()),
+                    term: Box::new(usize_t()),
                 }
             ))
         );
@@ -453,10 +453,10 @@ pub(crate) mod test {
         .unwrap();
 
         fn seq2() -> Vec<TypeArg> {
-            vec![usize_t().into(), bool_t().into()]
+            vec![usize_t(), bool_t()]
         }
-        pf.instantiate(&[usize_t().into()]).unwrap_err();
-        pf.instantiate(&[Term::new_list([usize_t().into(), Term::new_list(seq2())])])
+        pf.instantiate(&[usize_t()]).unwrap_err();
+        pf.instantiate(&[Term::new_list([usize_t(), Term::new_list(seq2())])])
             .unwrap_err();
 
         let t2 = pf.instantiate(&[Term::new_list(seq2())]).unwrap();
@@ -483,11 +483,7 @@ pub(crate) mod test {
 
         let inner3 = Type::new_function(Signature::new_endo([usize_t(), bool_t(), usize_t()]));
         let t3 = pf
-            .instantiate(&[Term::new_list([
-                usize_t().into(),
-                bool_t().into(),
-                usize_t().into(),
-            ])])
+            .instantiate(&[Term::new_list([usize_t(), bool_t(), usize_t()])])
             .unwrap();
         assert_eq!(
             t3,

@@ -469,7 +469,7 @@ pub(crate) mod test {
         BuilderWiringError, CFGBuilder, DataflowSubContainer, ModuleBuilder, TailLoopBuilder,
         endo_sig, inout_sig,
     };
-    use crate::extension::SignatureError;
+
     use crate::extension::prelude::{Noop, bool_t, qb_t, usize_t};
     use crate::hugr::linking::{NameLinkingPolicy, NodeLinkingDirective, OnMultiDefn};
     use crate::hugr::validate::InterGraphEdgeError;
@@ -938,13 +938,8 @@ pub(crate) mod test {
         )?;
 
         // But cannot eval it...
-        let ev = e.instantiate_extension_op(
-            "eval",
-            [
-                vec![usize_t().into()].into(),
-                vec![tv.clone().into()].into(),
-            ],
-        );
+        let ev =
+            e.instantiate_extension_op("eval", [vec![usize_t()].into(), vec![tv.clone()].into()]);
         assert_eq!(
             ev,
             Err(TermTypeError::TypeMismatch {

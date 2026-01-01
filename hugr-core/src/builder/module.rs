@@ -215,7 +215,7 @@ mod test {
     use cool_asserts::assert_matches;
 
     use crate::builder::test::dfg_calling_defn_decl;
-    use crate::builder::{Dataflow, DataflowSubContainer, test::n_identity};
+    use crate::builder::{Dataflow, DataflowSubContainer};
     use crate::extension::prelude::usize_t;
     use crate::{hugr::linking::NodeLinkingDirective, ops::OpType, types::Signature};
 

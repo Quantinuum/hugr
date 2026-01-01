@@ -264,8 +264,7 @@ pub(crate) mod test {
     use crate::extension::{Extension, ExtensionRegistry, Version};
     use crate::extension::{ExtensionId, PRELUDE_REGISTRY};
     use crate::hugr::HugrMut;
-    use crate::hugr::test::check_hugr_equality;
-    use crate::std_extensions::STD_REG;
+
     use std::sync::Arc;
     /// Returns an `ExtensionRegistry` with the extensions from both
     /// sets. Avoids cloning if the first one already contains all

@@ -714,10 +714,10 @@ pub(super) mod test {
         reg.validate()?;
         let e = reg.get(&EXT_ID).unwrap();
 
-        let list_usize = Type::new_extension(list_def.instantiate(vec![usize_t().into()])?);
+        let list_usize = Type::new_extension(list_def.instantiate(vec![usize_t()])?);
         let mut dfg = DFGBuilder::new(endo_sig(vec![list_usize]))?;
         let rev = dfg.add_dataflow_op(
-            e.instantiate_extension_op(&OP_NAME, vec![usize_t().into()])
+            e.instantiate_extension_op(&OP_NAME, vec![usize_t()])
                 .unwrap(),
             dfg.input_wires(),
         )?;
@@ -762,7 +762,7 @@ pub(super) mod test {
                 ext.add_op("MyOp".into(), String::new(), SigFun(), extension_ref)?;
 
             // Base case, no type variables:
-            let args = [TypeArg::BoundedNat(3), usize_t().into()];
+            let args = [TypeArg::BoundedNat(3), usize_t()];
             assert_eq!(
                 def.compute_signature(&args),
                 Ok(Signature::new(
@@ -775,7 +775,7 @@ pub(super) mod test {
             // Second arg may be a variable (substitutable)
             let tyvar = Type::new_var_use(0, TypeBound::Copyable);
             let tyvars: Vec<Type> = vec![tyvar.clone(); 3];
-            let args = [TypeArg::BoundedNat(3), tyvar.clone().into()];
+            let args = [TypeArg::BoundedNat(3), tyvar.clone()];
             assert_eq!(
                 def.compute_signature(&args),
                 Ok(Signature::new(
@@ -797,7 +797,7 @@ pub(super) mod test {
 
             // First arg must be concrete, not a variable
             let kind = TypeParam::bounded_nat_type(NonZeroU64::new(5).unwrap());
-            let args = [TypeArg::new_var_use(0, kind.clone()), usize_t().into()];
+            let args = [TypeArg::new_var_use(0, kind.clone()), usize_t()];
             // We can't prevent this from getting into our compute_signature implementation:
             assert_eq!(
                 def.compute_signature(&args),
@@ -833,12 +833,12 @@ pub(super) mod test {
                 extension_ref,
             )?;
             let tv = Type::new_var_use(0, TypeBound::Copyable);
-            let args = [tv.clone().into()];
+            let args = [tv.clone()];
             let decls = [TypeBound::Copyable.into()];
             def.validate_args(&args, &decls).unwrap();
             assert_eq!(def.compute_signature(&args), Ok(Signature::new_endo([tv])));
             // But not with an external row variable
-            let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Copyable).into();
+            let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Copyable);
             assert_eq!(
                 def.compute_signature(std::slice::from_ref(&arg)),
                 Err(SignatureError::TypeArgMismatch(

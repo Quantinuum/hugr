@@ -202,7 +202,7 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> MakeExtensionOp
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::BoundedNat(self.size), self.elem_ty.clone().into()]
+        vec![TypeArg::BoundedNat(self.size), self.elem_ty.clone()]
     }
 }
 

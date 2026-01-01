@@ -330,7 +330,7 @@ pub fn list_type_def() -> &'static TypeDef {
 /// Get the type of a list of `elem_type` as a `CustomType`.
 #[must_use]
 pub fn list_custom_type(elem_type: Type) -> CustomType {
-    list_type_def().instantiate(vec![elem_type.into()]).unwrap()
+    list_type_def().instantiate(vec![elem_type]).unwrap()
 }
 
 /// Get the `Type` of a list of `elem_type`.
@@ -378,7 +378,7 @@ impl MakeExtensionOp for ListOpInst {
     }
 
     fn type_args(&self) -> Vec<Term> {
-        vec![self.elem_type.clone().into()]
+        vec![self.elem_type.clone()]
     }
 }
 
@@ -419,7 +419,7 @@ mod test {
     fn test_list() {
         let list_def = list_type_def();
 
-        let list_type = list_def.instantiate([usize_t().into()]).unwrap();
+        let list_type = list_def.instantiate([usize_t()]).unwrap();
 
         assert!(list_def.instantiate([3u64.into()]).is_err());
 

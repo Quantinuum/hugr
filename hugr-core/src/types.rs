@@ -497,10 +497,10 @@ impl TypeRV {
     /// Tells if this Type is a row variable, i.e. could stand for any number >=0 of Types
     #[must_use]
     pub fn is_row_var(&self) -> bool {
-        if let Term::Variable(var) = self {
-            if let Term::ListType(bx) = &*var.cached_decl {
-                return matches!(&**bx, Term::RuntimeType(_));
-            }
+        if let Term::Variable(var) = self
+            && let Term::ListType(bx) = &*var.cached_decl
+        {
+            return matches!(&**bx, Term::RuntimeType(_));
         }
         false
     }
@@ -783,7 +783,7 @@ pub(crate) mod test {
 
         let coln = e.get_type(&COLN).unwrap();
         let c_of_cpy = coln
-            .instantiate([Term::new_list([Type::from(cpy.clone()).into()])])
+            .instantiate([Term::new_list([Type::from(cpy.clone())])])
             .unwrap();
 
         let mut t = Type::new_extension(c_of_cpy.clone());
@@ -791,19 +791,19 @@ pub(crate) mod test {
             t.transform(&cpy_to_qb),
             Err(SignatureError::from(TermTypeError::TypeMismatch {
                 type_: Box::new(TypeBound::Copyable.into()),
-                term: Box::new(qb_t().into())
+                term: Box::new(qb_t())
             }))
         );
 
         let mut t = Type::new_extension(
-            coln.instantiate([Term::new_list([mk_opt(Type::from(cpy.clone())).into()])])
+            coln.instantiate([Term::new_list([mk_opt(Type::from(cpy.clone()))])])
                 .unwrap(),
         );
         assert_eq!(
             t.transform(&cpy_to_qb),
             Err(SignatureError::from(TermTypeError::TypeMismatch {
                 type_: Box::new(TypeBound::Copyable.into()),
-                term: Box::new(mk_opt(qb_t()).into())
+                term: Box::new(mk_opt(qb_t()))
             }))
         );
 
@@ -813,14 +813,14 @@ pub(crate) mod test {
             (ct == &c_of_cpy).then_some(usize_t())
         });
         let mut t = Type::new_extension(
-            coln.instantiate([Term::new_list(vec![Type::from(c_of_cpy.clone()).into(); 2])])
+            coln.instantiate([Term::new_list(vec![Type::from(c_of_cpy.clone()); 2])])
                 .unwrap(),
         );
         assert_eq!(t.transform(&cpy_to_qb2), Ok(true));
         assert_eq!(
             t,
             Type::new_extension(
-                coln.instantiate([Term::new_list([usize_t().into(), usize_t().into()])])
+                coln.instantiate([Term::new_list([usize_t(), usize_t()])])
                     .unwrap()
             )
         );
@@ -830,8 +830,7 @@ pub(crate) mod test {
 
         use crate::proptest::RecursionDepth;
 
-        use super::{Type, TypeBound};
-        use crate::types::{CustomType, FuncValueType, SumType, TypeRow};
+        use crate::types::{SumType, TypeRow};
         use proptest::prelude::*;
 
         impl Arbitrary for super::SumType {

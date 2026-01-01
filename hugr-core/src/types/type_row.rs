@@ -184,10 +184,7 @@ impl DerefMut for TypeRow {
 #[cfg(test)]
 mod test {
     use super::*;
-    use crate::{
-        extension::prelude::bool_t,
-        types::{Type, TypeArg, TypeRV},
-    };
+    use crate::{extension::prelude::bool_t, types::Type};
 
     mod proptest {
         use super::super::TypeRow;

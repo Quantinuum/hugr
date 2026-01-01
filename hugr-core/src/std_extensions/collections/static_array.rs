@@ -295,7 +295,7 @@ impl MakeExtensionOp for StaticArrayOp {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![self.elem_ty.clone().into()]
+        vec![self.elem_ty.clone()]
     }
 }
 

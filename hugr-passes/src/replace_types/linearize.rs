@@ -854,9 +854,7 @@ mod test {
         let build_hugr = |ty: Type| {
             let mut dfb = DFGBuilder::new(Signature::new([ty.clone()], [])).unwrap();
             let [inp] = dfb.input_wires_arr();
-            let drop_op = drop_ext
-                .instantiate_extension_op("drop", [ty.into()])
-                .unwrap();
+            let drop_op = drop_ext.instantiate_extension_op("drop", [ty]).unwrap();
             dfb.add_dataflow_op(drop_op, [inp]).unwrap();
             dfb.finish_hugr().unwrap()
         };

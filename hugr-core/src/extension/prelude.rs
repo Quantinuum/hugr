@@ -718,7 +718,7 @@ impl MakeExtensionOp for MakeTuple {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![Term::new_list(self.0.iter().map(|t| t.clone().into()))]
+        vec![Term::new_list(self.0.iter().cloned())]
     }
 }
 
@@ -769,7 +769,7 @@ impl MakeExtensionOp for UnpackTuple {
     }
 
     fn type_args(&self) -> Vec<Term> {
-        vec![Term::new_list(self.0.iter().map(|t| t.clone().into()))]
+        vec![Term::new_list(self.0.iter().cloned())]
     }
 }
 
@@ -881,7 +881,7 @@ impl MakeExtensionOp for Noop {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![self.0.clone().into()]
+        vec![self.0.clone()]
     }
 }
 
@@ -992,9 +992,7 @@ impl MakeExtensionOp for Barrier {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::new_list(
-            self.type_row.iter().map(|t| t.clone().into()),
-        )]
+        vec![TypeArg::new_list(self.type_row.iter().cloned())]
     }
 }
 
@@ -1171,8 +1169,7 @@ mod test {
     /// test the panic operation with input and output wires
     fn test_panic_with_io() {
         let error_val = ConstError::new(42, "PANIC");
-        let type_arg_q: Term = qb_t().into();
-        let type_arg_2q: Term = Term::new_list([type_arg_q.clone(), type_arg_q]);
+        let type_arg_2q: Term = Term::new_list([qb_t(), qb_t()]);
         let panic_op = PRELUDE
             .instantiate_extension_op(&PANIC_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
