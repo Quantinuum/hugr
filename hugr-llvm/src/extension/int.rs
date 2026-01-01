@@ -678,7 +678,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                     outs,
                     out_log_width,
                     true,
-                    out_ty.as_sum().unwrap().clone(),
+                    out_ty.as_runtime_sum().unwrap().clone(),
                 )?;
                 Ok(vec![result])
             })
@@ -696,7 +696,7 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                     outs,
                     out_log_width,
                     false,
-                    out_ty.as_sum().unwrap().clone(),
+                    out_ty.as_runtime_sum().unwrap().clone(),
                 )?;
                 Ok(vec![result])
             })
@@ -782,7 +782,7 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
     signed: bool,
 ) -> Result<LLVMSumValue<'c>> {
     let int_arg_ty = int_types::INT_TYPES[log_width as usize].clone();
-    let tuple_sum_ty = HugrSumType::new_runtime_tuple(vec![int_arg_ty.clone(), int_arg_ty.clone()]);
+    let tuple_sum_ty = HugrSumType::new_tuple(vec![int_arg_ty.clone(), int_arg_ty.clone()]);
 
     let pair_ty = LLVMSumType::try_from_hugr_type(&ctx.typing_session(), tuple_sum_ty.clone())?;
 
@@ -1187,8 +1187,8 @@ mod test {
     }
 
     fn test_binary_int_op(ext_op: ExtensionOp, log_width: u8) -> Hugr {
-        let ty = &INT_TYPES[log_width as usize];
-        test_int_op_with_results::<2>(ext_op, log_width, None, ty.clone())
+        let ty = INT_TYPES[log_width as usize].to_owned();
+        test_int_op_with_results::<2>(ext_op, log_width, None, ty)
     }
 
     fn test_binary_icmp_op(ext_op: ExtensionOp, log_width: u8) -> Hugr {
@@ -1212,11 +1212,11 @@ mod test {
         output_type: Type,
         process: impl Fn(&mut DFGW, Outputs) -> Result<Outputs>,
     ) -> Hugr {
-        let ty = &INT_TYPES[log_width as usize];
+        let ty = INT_TYPES[log_width as usize].to_owned();
         let input_tys = if inputs.is_some() {
             vec![]
         } else {
-            let input_tys = itertools::repeat_n(ty.clone(), N).collect();
+            let input_tys = itertools::repeat_n(ty, N).collect();
             assert_eq!(input_tys, ext_op.signature().input.to_vec());
             input_tys
         };

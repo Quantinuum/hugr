@@ -5,10 +5,8 @@ use hugr_core::ops::{
     CFG, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
     LoadFunction, OpTag, OpTrait, OpType, Output, Tag, TailLoop, Value, constant::Sum,
 };
-use hugr_core::{
-    HugrView, NodeIndex,
-    types::{SumType, Type, TypeEnum},
-};
+use hugr_core::types::{SumType, Term, Type, TypeBound, type_param::check_term_type};
+use hugr_core::{HugrView, NodeIndex};
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::{BasicValueEnum, CallableValue};
 use itertools::{Itertools, zip_eq};
@@ -101,15 +99,16 @@ where
 }
 
 fn get_exactly_one_sum_type(ts: impl IntoIterator<Item = Type>) -> Result<SumType> {
-    let Some(TypeEnum::Sum(sum_type)) = ts
+    match ts
         .into_iter()
-        .map(|t| t.as_type_enum().clone())
+        // ALAN Do we need to error on multiple (non-sum)types?
+        // if not, we can just take as_runtime_sum?
+        .filter(|t| check_term_type(t, &TypeBound::Linear.into()).is_ok())
         .exactly_one()
-        .ok()
-    else {
-        Err(anyhow!("Not exactly one SumType"))?
-    };
-    Ok(sum_type)
+    {
+        Ok(Term::RuntimeSum(st)) => Ok(st),
+        _ => Err(anyhow!("Not exactly one SumType")),
+    }
 }
 
 pub fn emit_value<'c, H: HugrView<Node = Node>>(

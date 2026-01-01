@@ -14,7 +14,7 @@ use hugr_core::ops::DataflowOpTrait;
 use hugr_core::std_extensions::collections::array::{
     self, ArrayOp, ArrayOpDef, ArrayRepeat, ArrayScan, array_type,
 };
-use hugr_core::types::{TypeArg, TypeEnum};
+use hugr_core::types::{Term, TypeArg};
 use hugr_core::{HugrView, Node};
 use inkwell::IntPredicate;
 use inkwell::builder::{Builder, BuilderError};
@@ -135,7 +135,7 @@ impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
             .custom_type((array::EXTENSION_ID, array::ARRAY_TYPENAME), {
                 let ccg = self.0.clone();
                 move |ts, hugr_type| {
-                    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = hugr_type.args() else {
+                    let [TypeArg::BoundedNat(n), ty] = hugr_type.args() else {
                         return Err(anyhow!("Invalid type args for array type"));
                     };
                     let elem_ty = ts.llvm_type(ty)?;
@@ -357,7 +357,7 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
                 .ok_or(anyhow!("ArrayOp::get has no outputs"))?;
 
             let res_sum_ty = {
-                let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
+                let Term::RuntimeSum(st) = res_hugr_ty else {
                     Err(anyhow!("ArrayOp::get output is not a sum type"))?
                 };
                 ts.llvm_sum_type(st.clone())?
@@ -420,7 +420,7 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
                 .ok_or(anyhow!("ArrayOp::set has no outputs"))?;
 
             let res_sum_ty = {
-                let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
+                let Term::RuntimeSum(st) = res_hugr_ty else {
                     Err(anyhow!("ArrayOp::set output is not a sum type"))?
                 };
                 ts.llvm_sum_type(st.clone())?
@@ -494,7 +494,7 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
                 .ok_or(anyhow!("ArrayOp::swap has no outputs"))?;
 
             let res_sum_ty = {
-                let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
+                let Term::RuntimeSum(st) = res_hugr_ty else {
                     Err(anyhow!("ArrayOp::swap output is not a sum type"))?
                 };
                 ts.llvm_sum_type(st.clone())?

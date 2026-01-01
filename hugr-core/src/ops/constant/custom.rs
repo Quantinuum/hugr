@@ -181,7 +181,9 @@ pub struct CustomSerialized {
 
 fn into_sertype<S: serde::Serializer>(ty: &Type, s: S) -> Result<S::Ok, S::Error> {
     use serde::Serialize;
-    crate::types::serialize::SerSimpleType::try_from(ty.clone()).unwrap().serialize(s)
+    crate::types::serialize::SerSimpleType::try_from(ty.clone())
+        .unwrap()
+        .serialize(s)
 }
 
 #[derive(Debug, Error)]
