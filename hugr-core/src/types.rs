@@ -609,12 +609,8 @@ pub(crate) mod test {
                 // Dummy extension reference.
                 &Weak::default(),
             )),
-            Type::new_alias(AliasDecl::new("my_alias", TypeBound::Copyable)),
         ]);
-        assert_eq!(
-            &t.to_string(),
-            "[usize, [] -> [], my_custom, Alias(my_alias)]"
-        );
+        assert_eq!(&t.to_string(), "[usize, [] -> [], my_custom]");
     }
 
     #[rstest::rstest]
@@ -631,22 +627,22 @@ pub(crate) mod test {
     #[test]
     fn as_sum() {
         let t = Type::new_unit_sum(0);
-        assert!(t.as_sum().is_some());
+        assert!(t.as_runtime_sum().is_some());
     }
 
     #[test]
     fn as_option() {
         let opt = option_type([usize_t()]);
 
-        assert_eq!(opt.as_unary_option().unwrap().clone(), usize_t());
+        assert_eq!(opt.as_option().unwrap(), &usize_t()); // ALAN no...should be list of usize_t ?
         assert_eq!(
-            Type::new_unit_sum(2).as_sum().unwrap().as_unary_option(),
+            Type::new_unit_sum(2).as_runtime_sum().unwrap().as_option(),
             None
         );
 
         assert_eq!(
             Type::new_runtime_tuple(vec![usize_t()])
-                .as_sum()
+                .as_runtime_sum()
                 .unwrap()
                 .as_option(),
             None
@@ -664,20 +660,31 @@ pub(crate) mod test {
 
     #[test]
     fn sum_variants() {
+        fn into_typerow(t: &Term) -> TypeRow {
+            t.clone().try_into().unwrap()
+        }
         let variants: Vec<TypeRowRV> = vec![
             [TypeRV::UNIT].into(),
             vec![TypeRV::new_row_var_use(0, TypeBound::Linear)].into(),
         ];
         let t = SumType::new(variants.clone());
-        assert_eq!(variants, t.variants().cloned().collect_vec());
+        //ALAN that'll fail check_term_type(&Term::from(t.clone()), &TypeBound::Linear.into()).unwrap();...right?
+        assert_eq!(variants, t.variants().map(into_typerow).collect_vec());
 
         let empty_rows = vec![TypeRV::EMPTY_TYPEROW; 3];
         let sum_unary = SumType::new_unary(3);
         let sum_general = SumType::General(GeneralSum {
-            rows: empty_rows.clone(),
-            bound: TypeBound::Copyable,
+            rows: empty_rows
+                .iter()
+                .map(|r| Term::new_list(r.clone().into_owned()))
+                .collect::<Vec<_>>()
+                .into(),
+            bound: Some(TypeBound::Copyable),
         });
-        assert_eq!(&empty_rows, &sum_unary.variants().cloned().collect_vec());
+        assert_eq!(
+            &empty_rows,
+            &sum_unary.variants().map(into_typerow).collect_vec()
+        );
         assert_eq!(sum_general, sum_unary);
 
         let mut hasher_general = std::hash::DefaultHasher::new();
@@ -804,8 +811,8 @@ pub(crate) mod test {
 
         use crate::proptest::RecursionDepth;
 
-        use super::{AliasDecl, MaybeRV, TypeBase, TypeBound, TypeEnum};
-        use crate::types::{CustomType, FuncValueType, SumType, TypeRowRV};
+        use super::{Type, TypeBound};
+        use crate::types::{CustomType, FuncValueType, SumType, TypeRow};
         use proptest::prelude::*;
 
         impl Arbitrary for super::SumType {
@@ -816,30 +823,10 @@ pub(crate) mod test {
                 if depth.leaf() {
                     any::<u8>().prop_map(Self::new_unary).boxed()
                 } else {
-                    vec(any_with::<TypeRowRV>(depth), 0..3)
+                    vec(any_with::<TypeRow>(depth), 0..3)
                         .prop_map(SumType::new)
                         .boxed()
                 }
-            }
-        }
-
-        impl<RV: MaybeRV> Arbitrary for TypeBase<RV> {
-            type Parameters = RecursionDepth;
-            type Strategy = BoxedStrategy<Self>;
-            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-                // We descend here, because a TypeEnum may contain a Type
-                let depth = depth.descend();
-                prop_oneof![
-                    1 => any::<AliasDecl>().prop_map(TypeBase::new_alias),
-                    1 => any_with::<CustomType>(depth.into()).prop_map(TypeBase::new_extension),
-                    1 => any_with::<FuncValueType>(depth).prop_map(TypeBase::new_function),
-                    1 => any_with::<SumType>(depth).prop_map(TypeBase::from),
-                    1 => (any::<usize>(), any::<TypeBound>()).prop_map(|(i,b)| TypeBase::new_var_use(i,b)),
-                    // proptest_derive::Arbitrary's weight attribute requires a constant,
-                    // rather than this expression, hence the manual impl:
-                    RV::weight() => RV::arb().prop_map(|rv| TypeBase::new(TypeEnum::RowVar(rv)))
-                ]
-                    .boxed()
             }
         }
     }

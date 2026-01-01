@@ -744,16 +744,18 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::Variable(TermVar { cached_decl, .. }), _) if type_.is_supertype(cached_decl) => {
             Ok(())
         }
-        (Term::RuntimeSum(st), Term::RuntimeType(bound)) if st.bound().is_some_and(|b| bound.contains(b)) => {
+        (Term::RuntimeSum(st), Term::RuntimeType(bound))
+            if st.bound().is_some_and(|b| bound.contains(b)) =>
+        {
             Ok(())
         }
         (Term::RuntimeFunction(_), Term::RuntimeType(_)) => Ok(()), // Function pointers are always Copyable so fit any bound
         (Term::RuntimeExtension(cty), Term::RuntimeType(bound)) if bound.contains(cty.bound()) => {
             Ok(())
         }
-        (Term::List(elems), Term::ListType(item_type)) => {
-            elems.iter().try_for_each(|elem| check_term_type(elem, item_type))
-        }
+        (Term::List(elems), Term::ListType(item_type)) => elems
+            .iter()
+            .try_for_each(|elem| check_term_type(elem, item_type)),
         (Term::ListConcat(lists), Term::ListType(_)) => lists
             .iter()
             .try_for_each(|list| check_term_type(list, type_)), // ALAN this used the element type, which seems very wrong
@@ -934,8 +936,8 @@ mod test {
 
     use super::{Substitution, TypeArg, TypeParam, check_term_type};
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::types::Term;
     use crate::types::type_param::SeqPart;
+    use crate::types::{Substitutable, Term, TypeRow};
     use crate::types::{TypeBound, TypeRV, type_param::TermTypeError};
 
     #[test]
@@ -1175,7 +1177,10 @@ mod test {
 
         use super::super::{TermVar, UpperBound};
         use crate::proptest::RecursionDepth;
-        use crate::types::{Term, Type, TypeBound, proptest_utils::any_serde_type_param};
+        use crate::types::{
+            CustomType, FuncValueType, SumType, Term, Type, TypeBound,
+            proptest_utils::any_serde_type_param,
+        };
 
         impl Arbitrary for TermVar {
             type Parameters = RecursionDepth;
@@ -1201,6 +1206,13 @@ mod test {
                     Just(Self::BytesType).boxed(),
                     Just(Self::FloatType).boxed(),
                     Just(Self::StringType).boxed(),
+                    any_with::<CustomType>(depth.into())
+                        .prop_map(Self::new_extension)
+                        .boxed(),
+                    any_with::<FuncValueType>(depth)
+                        .prop_map(Self::new_function)
+                        .boxed(),
+                    any_with::<SumType>(depth).prop_map(Self::from).boxed(),
                     any::<TypeBound>().prop_map(Self::from).boxed(),
                     any::<UpperBound>().prop_map(Self::from).boxed(),
                     any::<u64>().prop_map(Self::from).boxed(),

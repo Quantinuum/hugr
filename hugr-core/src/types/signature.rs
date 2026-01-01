@@ -18,6 +18,7 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 #[cfg(test)]
 use {crate::proptest::RecursionDepth, proptest::prelude::*, proptest_derive::Arbitrary};
 
+// Default here works only for <TypeRow>
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 /// Base type for listing inputs and output types.
@@ -31,11 +32,20 @@ use {crate::proptest::RecursionDepth, proptest::prelude::*, proptest_derive::Arb
 /// [`FuncDefn`]: crate::ops::FuncDefn
 pub struct FuncTypeBase<T> {
     /// Value inputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
+    #[cfg_attr(test, proptest(strategy = "any_with::<T>(params)"))]
     pub input: T,
     /// Value outputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<TypeRowBase<ROWVARS>>(params)"))]
+    #[cfg_attr(test, proptest(strategy = "any_with::<T>(params)"))]
     pub output: T,
+}
+
+impl Default for FuncValueType {
+    fn default() -> Self {
+        Self {
+            input: Term::new_list(Vec::new()),
+            output: Term::new_list(Vec::new()),
+        }
+    }
 }
 
 /// The concept of "signature" in the spec - the edges required to/from a node
@@ -322,7 +332,7 @@ impl PartialEq<Signature> for FuncValueType {
 mod test {
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
     use crate::type_row;
-    use crate::types::{CustomType, TypeEnum, test::FnTransformer};
+    use crate::types::{CustomType, test::FnTransformer};
 
     use super::*;
     #[test]
@@ -353,7 +363,7 @@ mod test {
 
     #[test]
     fn test_transform() {
-        let TypeEnum::Extension(usz_t) = usize_t().as_type_enum().clone() else {
+        let Term::RuntimeExtension(usz_t) = usize_t() else {
             panic!()
         };
         let tr = FnTransformer(|ct: &CustomType| (ct == &usz_t).then_some(bool_t()));

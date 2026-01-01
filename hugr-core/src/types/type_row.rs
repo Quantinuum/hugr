@@ -190,55 +190,25 @@ mod test {
     };
 
     mod proptest {
+        use super::super::TypeRow;
         use crate::proptest::RecursionDepth;
-        use crate::types::{MaybeRV, TypeBase, TypeRowBase};
+        use crate::types::Type;
         use ::proptest::prelude::*;
 
-        impl<RV: MaybeRV> Arbitrary for super::super::TypeRowBase<RV> {
+        impl Arbitrary for TypeRow {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 use proptest::collection::vec;
                 if depth.leaf() {
-                    Just(TypeRowBase::new()).boxed()
+                    Just(TypeRow::new()).boxed()
                 } else {
-                    vec(any_with::<TypeBase<RV>>(depth), 0..4)
+                    vec(any_with::<Type>(depth), 0..4)
                         .prop_map(|ts| ts.clone().into())
                         .boxed()
                 }
             }
         }
-    }
-
-    #[test]
-    fn test_try_from_term_to_typerv() {
-        // Test successful conversion with Runtime type
-        let runtime_type = Type::UNIT;
-        let term = TypeArg::Runtime(runtime_type.clone());
-        let result = TypeRV::try_from(term);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), TypeRV::from(runtime_type));
-
-        // Test failure with non-type kind
-        let term = Term::String("test".to_string());
-        let result = TypeRV::try_from(term);
-        assert!(result.is_err());
-    }
-
-    #[test]
-    fn test_try_from_term_to_typerow() {
-        // Test successful conversion with List
-        let types = vec![Type::new_unit_sum(1), bool_t()];
-        let type_args = types.iter().map(|t| TypeArg::Runtime(t.clone())).collect();
-        let term = TypeArg::List(type_args);
-        let result = TypeRow::try_from(term);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), TypeRow::from(types));
-
-        // Test failure with non-list
-        let term = TypeArg::Runtime(Type::UNIT);
-        let result = TypeRow::try_from(term);
-        assert!(result.is_err());
     }
 
     #[test]

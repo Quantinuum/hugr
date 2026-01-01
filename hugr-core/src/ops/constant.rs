@@ -830,7 +830,7 @@ pub(crate) mod test {
         );
         let json_const: Value = CustomSerialized::new(typ_int.clone(), 6.into()).into();
         let classic_t = Type::new_extension(typ_int.clone());
-        assert_matches!(classic_t.least_upper_bound(), TypeBound::Copyable);
+        assert_matches!(classic_t.least_upper_bound(), Some(TypeBound::Copyable));
         assert_eq!(json_const.get_type(), classic_t);
 
         let typ_qb = CustomType::new(

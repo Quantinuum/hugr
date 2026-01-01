@@ -142,7 +142,7 @@ macro_rules! impl_sertesting_from {
     };
 }
 
-impl_sertesting_from!(crate::types::TypeRV, typ);
+impl_sertesting_from!(crate::types::Type, typ);
 impl_sertesting_from!(crate::types::SumType, sum_type);
 impl_sertesting_from!(crate::types::PolyFuncTypeRV, poly_func_type);
 impl_sertesting_from!(crate::ops::Value, value);
@@ -153,13 +153,6 @@ impl From<PolyFuncType> for SerTestingLatest {
     fn from(v: PolyFuncType) -> Self {
         let v: PolyFuncTypeRV = v.into();
         v.into()
-    }
-}
-
-impl From<Type> for SerTestingLatest {
-    fn from(v: Type) -> Self {
-        let t: TypeRV = v.into();
-        t.into()
     }
 }
 

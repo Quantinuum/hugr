@@ -681,8 +681,8 @@ mod test {
         let new_inputs = vec![bool_t(), float64_type()];
         dfg_view.extend_inputs(&new_inputs).unwrap();
         assert_eq!(
-            dfg_view.hugr().inner_function_type().unwrap(),
-            Signature::new(vec![qb_t(), bool_t(), float64_type()], vec![qb_t()])
+            dfg_view.hugr().inner_function_type().unwrap().as_ref(),
+            &Signature::new(vec![qb_t(), bool_t(), float64_type()], vec![qb_t()])
         );
 
         let new_inputs_fail = vec![qb_t()];

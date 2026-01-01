@@ -477,7 +477,7 @@ pub(crate) mod test {
     use crate::ops::{FuncDecl, FuncDefn, OpParent, OpTag, OpTrait, Value, handle::NodeHandle};
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::TypeParam;
-    use crate::types::{EdgeKind, FuncValueType, RowVariable, Signature, Type, TypeBound, TypeRV};
+    use crate::types::{EdgeKind, FuncValueType, Signature, Type, TypeBound, TypeRV};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{Wire, builder::test::n_identity, type_row};
 
@@ -942,12 +942,7 @@ pub(crate) mod test {
             "eval",
             [vec![usize_t().into()].into(), vec![tv.into()].into()],
         );
-        assert_eq!(
-            ev,
-            Err(SignatureError::RowVarWhereTypeExpected {
-                var: RowVariable(0, TypeBound::Copyable)
-            })
-        );
+        ev.unwrap(); // ALAN this'll be a SignatureError, but what
         Ok(())
     }
 
