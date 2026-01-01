@@ -77,7 +77,7 @@ fn package_with_exts() -> Vec<u8> {
             ext.add_op(
                 "Id".into(),
                 "".into(),
-                Signature::new_endo(bool_t()),
+                Signature::new_endo([bool_t()]),
                 extension_ref,
             )
             .unwrap();
@@ -85,7 +85,7 @@ fn package_with_exts() -> Vec<u8> {
     );
     let mut module = ModuleBuilder::new();
     let mut df = module
-        .define_function("entry_fn", Signature::new_endo(bool_t()))
+        .define_function("entry_fn", Signature::new_endo([bool_t()]))
         .unwrap();
     let [i] = df.input_wires_arr();
     let i = df
@@ -96,7 +96,7 @@ fn package_with_exts() -> Vec<u8> {
     module
         .declare_vis(
             "public_fn",
-            Signature::new_endo(bool_t()).into(),
+            Signature::new_endo([bool_t()]).into(),
             Visibility::Public,
         )
         .unwrap();

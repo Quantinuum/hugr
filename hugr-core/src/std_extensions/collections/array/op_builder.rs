@@ -329,7 +329,7 @@ pub fn build_all_array_ops_generic<B: Dataflow, AK: ArrayKind>(mut builder: B) -
             .unwrap();
         let res_sum_ty = {
             let array_type = AK::ty(2, usize_t());
-            either_type(array_type.clone(), array_type)
+            either_type([array_type.clone()], [array_type])
         };
         builder.build_unwrap_sum(1, res_sum_ty, r).unwrap()
     };
@@ -340,7 +340,7 @@ pub fn build_all_array_ops_generic<B: Dataflow, AK: ArrayKind>(mut builder: B) -
             .unwrap();
         (
             builder
-                .build_unwrap_sum(1, option_type(usize_t()), r)
+                .build_unwrap_sum(1, option_type([usize_t()]), r)
                 .unwrap(),
             arr,
         )

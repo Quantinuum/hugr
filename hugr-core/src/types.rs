@@ -397,7 +397,7 @@ impl<RV: MaybeRV> TypeEnum<RV> {
 /// ```
 /// # use hugr::types::{Type, TypeBound, Signature};
 ///
-/// let func_type: Type = Type::new_function(Signature::new_endo(vec![]));
+/// let func_type: Type = Type::new_function(Signature::new_endo([]));
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 /// ```
 pub struct TypeBase<RV: MaybeRV>(TypeEnum<RV>, TypeBound);
@@ -867,7 +867,7 @@ pub(crate) mod test {
     fn construct() {
         let t: Type = Type::new_tuple(vec![
             usize_t(),
-            Type::new_function(Signature::new_endo(vec![])),
+            Type::new_function(Signature::new_endo([])),
             Type::new_extension(CustomType::new(
                 "my_custom",
                 [],
@@ -903,7 +903,7 @@ pub(crate) mod test {
 
     #[test]
     fn as_option() {
-        let opt = option_type(usize_t());
+        let opt = option_type([usize_t()]);
 
         assert_eq!(opt.as_unary_option().unwrap().clone(), usize_t());
         assert_eq!(
@@ -932,7 +932,7 @@ pub(crate) mod test {
     #[test]
     fn sum_variants() {
         let variants: Vec<TypeRowRV> = vec![
-            TypeRV::UNIT.into(),
+            [TypeRV::UNIT].into(),
             vec![TypeRV::new_row_var_use(0, TypeBound::Linear)].into(),
         ];
         let t = SumType::new(variants.clone());
@@ -1013,7 +1013,7 @@ pub(crate) mod test {
         });
 
         let cpy = e.get_type(&CPY).unwrap().instantiate([]).unwrap();
-        let mk_opt = |t: Type| Type::new_sum([type_row![], TypeRow::from(t)]);
+        let mk_opt = |t: Type| Type::new_sum([type_row![], [t].into()]);
 
         let cpy_to_qb = FnTransformer(|ct: &CustomType| (ct == &cpy).then_some(qb_t()));
 

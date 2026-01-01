@@ -215,7 +215,7 @@ mod test {
         let cst_used = cb.add_constant(Value::unary_unit_sum());
         let mut block = cb.entry_builder([type_row![]], type_row![]).unwrap();
         let mut dfg_unused = block
-            .dfg_builder(Signature::new(type_row![], usize_t()), [])
+            .dfg_builder(Signature::new(type_row![], [usize_t()]), [])
             .unwrap();
         let lc_unused = dfg_unused.load_const(&cst_unused);
         let lc1 = dfg_unused.load_const(&cst_used_in_dfg);
@@ -330,19 +330,24 @@ mod test {
             ExtensionId::new_unchecked("test_qext"),
             Version::new(0, 0, 0),
             |e, w| {
-                e.add_op("new".into(), "".into(), inout_sig(vec![], qb_t()), w)
+                e.add_op("new".into(), "".into(), inout_sig(vec![], [qb_t()]), w)
                     .unwrap();
-                e.add_op("gate".into(), "".into(), endo_sig(qb_t()), w)
+                e.add_op("gate".into(), "".into(), endo_sig([qb_t()]), w)
                     .unwrap();
-                e.add_op("measure".into(), "".into(), inout_sig(qb_t(), bool_t()), w)
-                    .unwrap();
-                e.add_op("not".into(), "".into(), endo_sig(bool_t()), w)
+                e.add_op(
+                    "measure".into(),
+                    "".into(),
+                    inout_sig([qb_t()], [bool_t()]),
+                    w,
+                )
+                .unwrap();
+                e.add_op("not".into(), "".into(), endo_sig([bool_t()]), w)
                     .unwrap();
             },
         );
         let [new, gate, measure, not] = ["new", "gate", "measure", "not"]
             .map(|n| ExtensionOp::new(test_ext.get_op(n).unwrap().clone(), []).unwrap());
-        let mut dfb = DFGBuilder::new(endo_sig(qb_t())).unwrap();
+        let mut dfb = DFGBuilder::new(endo_sig([qb_t()])).unwrap();
         // Unused new...measure, can be removed
         let qn = dfb.add_dataflow_op(new.clone(), []).unwrap().outputs();
         let [_] = dfb

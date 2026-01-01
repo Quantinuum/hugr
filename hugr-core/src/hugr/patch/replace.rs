@@ -731,7 +731,7 @@ mod test {
 
     #[test]
     fn test_invalid() {
-        let utou = Signature::new_endo(vec![usize_t()]);
+        let utou = Signature::new_endo([usize_t()]);
         let ext = Extension::new_test_arc("new_ext".try_into().unwrap(), |ext, extension_ref| {
             ext.add_op("foo".into(), String::new(), utou.clone(), extension_ref)
                 .unwrap();

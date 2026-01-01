@@ -333,7 +333,7 @@ pub(crate) fn test_state_space() -> TestStateSpace {
 #[fixture]
 pub(super) fn persistent_hugr_empty_child() -> (PersistentHugr, [CommitId; 2], [PatchNode; 3]) {
     let (triple_not_hugr, not_nodes) = {
-        let mut dfg_builder = DFGBuilder::new(endo_sig(bool_t())).unwrap();
+        let mut dfg_builder = DFGBuilder::new(endo_sig([bool_t()])).unwrap();
         let [mut w] = dfg_builder.input_wires_arr();
         let not_nodes = [(); 3].map(|()| {
             let handle = dfg_builder.add_dataflow_op(LogicOp::Not, vec![w]).unwrap();
@@ -347,7 +347,7 @@ pub(super) fn persistent_hugr_empty_child() -> (PersistentHugr, [CommitId; 2], [
     };
     let mut hugr = PersistentHugr::with_base(triple_not_hugr);
     let empty_hugr = {
-        let dfg_builder = DFGBuilder::new(endo_sig(bool_t())).unwrap();
+        let dfg_builder = DFGBuilder::new(endo_sig([bool_t()])).unwrap();
         let inputs = dfg_builder.input_wires();
         dfg_builder.finish_hugr_with_outputs(inputs).unwrap()
     };

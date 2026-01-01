@@ -256,7 +256,7 @@ mod test {
             .add_dataflow_op(test_quantum_extension::h_gate(), [p])?
             .outputs_arr();
         let swap = {
-            let swap = h.dfg_builder(Signature::new_endo(vec![qb_t(), qb_t()]), [p_h, q])?;
+            let swap = h.dfg_builder(Signature::new_endo([qb_t(), qb_t()]), [p_h, q])?;
             let [a, b] = swap.input_wires_arr();
             swap.finish_with_outputs([b, a])?
         };
@@ -337,7 +337,7 @@ mod test {
         let [a, b] = outer.input_wires_arr();
         let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;
         let h_b = outer.add_dataflow_op(test_quantum_extension::h_gate(), [b])?;
-        let mut inner = outer.dfg_builder(endo_sig(qb_t()), h_b.outputs())?;
+        let mut inner = outer.dfg_builder(endo_sig([qb_t()]), h_b.outputs())?;
         let [i] = inner.input_wires_arr();
         let f = inner.add_load_value(float_types::ConstF64::new(1.0));
         inner.add_other_wire(inner.input().node(), f.node());

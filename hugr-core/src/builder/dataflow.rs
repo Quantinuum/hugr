@@ -509,7 +509,7 @@ pub(crate) mod test {
         F: FnOnce(&mut DFGBuilder<Hugr>) -> Result<(), BuildError>,
     {
         let build_result = {
-            let mut builder = DFGBuilder::new(inout_sig(bool_t(), vec![bool_t(), bool_t()]))?;
+            let mut builder = DFGBuilder::new(inout_sig([bool_t()], vec![bool_t(); 2]))?;
 
             f(&mut builder)?;
 
@@ -709,7 +709,7 @@ pub(crate) mod test {
         }
 
         // Create a simple DFG
-        let mut dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()]))?;
+        let mut dfg_builder = DFGBuilder::new(Signature::new_endo([bool_t()]))?;
         let [i1] = dfg_builder.input_wires_arr();
         dfg_builder.set_metadata::<XIntMetadata>(42);
         let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
@@ -719,7 +719,7 @@ pub(crate) mod test {
 
         let (dfg_node, f_node) = {
             let mut f_build =
-                module_builder.define_function("main", Signature::new_endo(bool_t()))?;
+                module_builder.define_function("main", Signature::new_endo([bool_t()]))?;
 
             let [i1] = f_build.input_wires_arr();
             let dfg = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
@@ -743,10 +743,10 @@ pub(crate) mod test {
         #[values(false, true)] replace: bool,
         #[values(true, false)] view: bool,
     ) {
-        let mut fb = FunctionBuilder::new("main", Signature::new_endo(bool_t())).unwrap();
+        let mut fb = FunctionBuilder::new("main", Signature::new_endo([bool_t()])).unwrap();
         let my_decl = fb
             .module_root_builder()
-            .declare("func1", Signature::new_endo(bool_t()).into())
+            .declare("func1", Signature::new_endo([bool_t()]).into())
             .unwrap();
         let (insert, ins_defn, ins_decl) = dfg_calling_defn_decl();
         let ins_defn_name = insert
@@ -801,7 +801,7 @@ pub(crate) mod test {
             let mut dfb = DFGBuilder::new(endo_sig(vec![usize_t(); 2])).unwrap();
             let mut mb = dfb.module_root_builder();
             let fb = mb
-                .define_function_vis("foo", endo_sig(usize_t()), Visibility::Public)
+                .define_function_vis("foo", endo_sig([usize_t()]), Visibility::Public)
                 .unwrap();
             let ins = fb.input_wires();
             let func = fb.finish_with_outputs(ins).unwrap();
@@ -810,7 +810,7 @@ pub(crate) mod test {
             let [out2] = dfb.call(func.handle(), &[], [in2]).unwrap().outputs_arr();
             dfb.finish_hugr_with_outputs([out1, out2]).unwrap()
         };
-        let mut dfb = DFGBuilder::new(inout_sig(usize_t(), vec![usize_t(); 2])).unwrap();
+        let mut dfb = DFGBuilder::new(inout_sig([usize_t()], vec![usize_t(); 2])).unwrap();
         let [in1] = dfb.input_wires_arr();
         let pol = NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget);
         let [out1, out2] = dfb
@@ -839,11 +839,11 @@ pub(crate) mod test {
 
     #[test]
     fn barrier_node() -> Result<(), BuildError> {
-        let mut parent = DFGBuilder::new(endo_sig(bool_t()))?;
+        let mut parent = DFGBuilder::new(endo_sig([bool_t()]))?;
 
         let [w] = parent.input_wires_arr();
 
-        let mut dfg_b = parent.dfg_builder(endo_sig(bool_t()), [w])?;
+        let mut dfg_b = parent.dfg_builder(endo_sig([bool_t()]), [w])?;
         let [w] = dfg_b.input_wires_arr();
 
         let barr0 = dfg_b.add_barrier([w])?;
@@ -928,8 +928,11 @@ pub(crate) mod test {
             PolyFuncType::new(
                 [TypeParam::new_list_type(TypeBound::Copyable)],
                 Signature::new(
-                    Type::new_function(FuncValueType::new(usize_t(), tv.clone())),
-                    vec![],
+                    [Type::new_function(FuncValueType::new(
+                        [usize_t()],
+                        [tv.clone()],
+                    ))],
+                    [],
                 ),
             ),
         )?;
@@ -953,11 +956,11 @@ pub(crate) mod test {
         let (mut hugr, load_constant, call) = {
             let mut builder = ModuleBuilder::new();
             let func = builder
-                .declare("func", Signature::new_endo(bool_t()).into())
+                .declare("func", Signature::new_endo([bool_t()]).into())
                 .unwrap();
             let (load_constant, call) = {
                 let mut builder = builder
-                    .define_function("main", Signature::new(Type::EMPTY_TYPEROW, bool_t()))
+                    .define_function("main", Signature::new(Type::EMPTY_TYPEROW, [bool_t()]))
                     .unwrap();
                 let load_constant = builder.add_load_value(Value::true_val());
                 let [r] = builder

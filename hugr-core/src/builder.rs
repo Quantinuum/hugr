@@ -42,7 +42,7 @@
 //!     let _dfg_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "main",
-//!             Signature::new_endo(bool_t()),
+//!             Signature::new_endo([bool_t()]),
 //!         )?;
 //!
 //!         // Get the wires from the function inputs.
@@ -59,7 +59,7 @@
 //!     let _circuit_handle = {
 //!         let mut dfg = module_builder.define_function(
 //!             "circuit",
-//!             Signature::new_endo(vec![bool_t(), bool_t()]),
+//!             Signature::new_endo([bool_t(), bool_t()]),
 //!         )?;
 //!         let mut circuit = dfg.as_circuit(dfg.input_wires());
 //!
@@ -382,18 +382,18 @@ pub(crate) mod test {
     /// Returns the Hugr and both function handles.
     #[fixture]
     pub(crate) fn dfg_calling_defn_decl() -> (Hugr, FuncID<true>, FuncID<false>) {
-        let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
+        let mut dfb = DFGBuilder::new(Signature::new(vec![], [bool_t()])).unwrap();
         let new_defn = {
             let mut mb = dfb.module_root_builder();
             let fb = mb
-                .define_function("helper_id", Signature::new_endo(bool_t()))
+                .define_function("helper_id", Signature::new_endo([bool_t()]))
                 .unwrap();
             let [f_inp] = fb.input_wires_arr();
             fb.finish_with_outputs([f_inp]).unwrap()
         };
         let new_decl = dfb
             .module_root_builder()
-            .declare("helper2", Signature::new_endo(bool_t()).into())
+            .declare("helper2", Signature::new_endo([bool_t()]).into())
             .unwrap();
         let cst = dfb.add_load_value(ops::Value::true_val());
         let [c1] = dfb
