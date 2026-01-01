@@ -12,7 +12,7 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_signature_exts,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
-use crate::types::type_param::check_term_type;
+use crate::types::type_param::{TermTypeError, check_term_type};
 use crate::types::{Substitutable, Term, TypeBound};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
@@ -73,14 +73,6 @@ impl<T: Substitutable> Substitutable for FuncTypeBase<T> {
 }
 
 impl<T> FuncTypeBase<T> {
-    /// Create a new signature with specified inputs and outputs.
-    pub fn new(input: impl Into<T>, output: impl Into<T>) -> Self {
-        Self {
-            input: input.into(),
-            output: output.into(),
-        }
-    }
-
     #[inline]
     /// Returns a row of the value inputs of the function.
     #[must_use]
@@ -103,16 +95,167 @@ impl<T> FuncTypeBase<T> {
     }
 }
 
-impl<T: Clone> FuncTypeBase<T> {
+impl FuncValueType {
+    /// Create a new FuncValueType with specified inputs and outputs.
+    ///
+    /// # Panics
+    ///
+    /// If the inputs, or outputs, are not each lists of runtime types.
+    /// See [Self::try_new] and [Self::new_unchecked] for alternatives.
+    pub fn new(input: impl Into<Term>, output: impl Into<Term>) -> Self {
+        Self::try_new(input, output).unwrap()
+    }
+
+    /// Create a new FuncValueType with specified inputs and outputs.
+    ///
+    /// # Errors
+    ///
+    /// If the inputs, or outputs, are not each lists of runtime types.
+    /// See [Self::new_unchecked].
+    pub fn try_new(input: impl Into<Term>, output: impl Into<Term>) -> Result<Self, TermTypeError> {
+        let input = input.into();
+        let output = output.into();
+        check_term_type(&input, &Term::new_list_type(TypeBound::Linear))?;
+        check_term_type(&output, &Term::new_list_type(TypeBound::Linear))?;
+        Ok(Self::new_unchecked(input, output))
+    }
+
+    /// Create a new FuncValueType with specified inputs and outputs.
+    /// No checks are performed as to whether the inputs and outputs are appropriate
+    /// (i.e. lists of runtime types).
+    pub fn new_unchecked(input: impl Into<Term>, output: impl Into<Term>) -> Self {
+        Self {
+            input: input.into(),
+            output: output.into(),
+        }
+    }
+
     /// Create a new signature with the same input and output types (signature of an endomorphic
     /// function).
-    pub fn new_endo(row: impl Into<T>) -> Self {
+    ///
+    /// # Panics
+    ///
+    /// If the row is not a list of runtime types.
+    /// See [Self::try_new_endo] and [Self::new_endo_unchecked] for alternatives.
+    pub fn new_endo(row: impl Into<Term>) -> Self {
+        Self::try_new_endo(row).unwrap()
+    }
+
+    /// Create a new signature with the same input and output types (signature of an endomorphic
+    /// function).
+    ///
+    /// # Errors
+    ///
+    /// If the row is not a list of runtime types.
+    pub fn try_new_endo(row: impl Into<Term>) -> Result<Self, TermTypeError> {
         let row = row.into();
-        Self::new(row.clone(), row)
+        check_term_type(&row, &Term::new_list_type(TypeBound::Linear))?;
+        Ok(Self::new_endo_unchecked(row))
+    }
+
+    /// Create a new signature with the same input and output types (signature of an endomorphic
+    /// function).
+    /// No checks are performed as to whether the row is appropriate
+    /// (i.e. a list of runtime types).
+    pub fn new_endo_unchecked(row: impl Into<Term>) -> Self {
+        let row = row.into();
+        Self::new_unchecked(row.clone(), row)
+    }
+
+    // ALAN definitely opportunities to deduplicate between Signature/FuncValueType here...
+    pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
+        self.input.validate(var_decls)?;
+        self.output.validate(var_decls)?;
+        // check_term_type does not look at inputs/outputs, so do that here
+        for t in [&self.input, &self.output] {
+            check_term_type(t, &Term::new_list_type(TypeBound::Linear))?;
+        }
+        Ok(())
+    }
+
+    /// True if both inputs and outputs are necessarily empty
+    /// (even after any possible substitution of row variables)
+    #[inline(always)]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.input.is_empty_list() && self.output.is_empty_list()
     }
 }
 
 impl Signature {
+    /// Create a new signature with specified inputs and outputs.
+    ///
+    /// # Panics
+    ///
+    /// If any of the input or output types are not runtime types.
+    /// See [Self::try_new] or [Self::new_unchecked] for alternatives.
+    pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+        Self::try_new(input, output).unwrap()
+    }
+
+    /// Create a new signature with specified inputs and outputs.
+    ///
+    /// # Errors
+    ///
+    /// If any of the input or output types are not runtime types. See [Self::new_unchecked] for an alternative.
+    pub fn try_new(
+        input: impl Into<TypeRow>,
+        output: impl Into<TypeRow>,
+    ) -> Result<Self, TermTypeError> {
+        let input = input.into();
+        let output = output.into();
+        for t in input.iter().chain(output.iter()) {
+            check_term_type(t, &TypeBound::Linear.into())?;
+        }
+        Ok(Self::new_unchecked(input, output))
+    }
+
+    /// Create a new signature with specified inputs and outputs.
+    /// No checks are performed as to whether the input and output types are appropriate
+    /// (i.e. runtime types).
+    pub fn new_unchecked(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+        Self {
+            input: input.into(),
+            output: output.into(),
+        }
+    }
+
+    /// Create a new signature with the same input and output types (signature of an endomorphic
+    /// function).
+    ///
+    /// # Panics
+    ///
+    /// If any element of the row is not a runtime type.
+    /// See [Self::try_new_endo] or [Self::new_endo_unchecked] for alternatives.
+    pub fn new_endo(row: impl Into<TypeRow>) -> Self {
+        let row = row.into();
+        Self::new(row.clone(), row)
+    }
+
+    /// Create a new signature with the same input and output types (signature of an endomorphic
+    /// function).
+    ///
+    /// # Errors
+    ///
+    /// If any element of the row is not a runtime type.
+    /// See [Self::new_endo_unchecked] for an alternative.
+    pub fn try_new_endo(row: impl Into<TypeRow>) -> Result<Self, TermTypeError> {
+        let row = row.into();
+        for t in row.iter() {
+            check_term_type(t, &TypeBound::Linear.into())?;
+        }
+        Ok(Self::new_endo_unchecked(row))
+    }
+
+    /// Create a new signature with the same input and output types (signature of an endomorphic
+    /// function).
+    /// No checks are performed as to whether the elements of the row are appropriate
+    /// (i.e. runtime types).
+    pub fn new_endo_unchecked(row: impl Into<TypeRow>) -> Self {
+        let row = row.into();
+        Self::new_unchecked(row.clone(), row)
+    }
+
     pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.input.validate(var_decls)?;
         self.output.validate(var_decls)?;
@@ -144,27 +287,6 @@ impl Signature {
         } else {
             Err(ExtensionCollectionError::dropped_signature(self, missing))
         }
-    }
-}
-
-// ALAN definitely opportunities to deduplicate between Signature/FuncValueType here...
-impl FuncValueType {
-    pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
-        self.input.validate(var_decls)?;
-        self.output.validate(var_decls)?;
-        // check_term_type does not look at inputs/outputs, so do that here
-        for t in [&self.input, &self.output] {
-            check_term_type(t, &Term::new_list_type(TypeBound::Linear))?;
-        }
-        Ok(())
-    }
-
-    /// True if both inputs and outputs are necessarily empty
-    /// (even after any possible substitution of row variables)
-    #[inline(always)]
-    #[must_use]
-    pub fn is_empty(&self) -> bool {
-        self.input.is_empty_list() && self.output.is_empty_list()
     }
 }
 

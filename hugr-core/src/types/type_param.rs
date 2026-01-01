@@ -656,7 +656,7 @@ impl Substitutable for Term {
         match self {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
             TypeArg::RuntimeSum(SumType::General(GeneralSum { rows, .. })) => {
-                SumType::new_from_row(rows.substitute(s)).into()
+                SumType::new_unchecked(rows.substitute(s).into_owned()).into()
             }
             TypeArg::RuntimeExtension(cty) => Term::new_extension(cty.substitute(s)),
             TypeArg::RuntimeFunction(bf) => Term::new_function(bf.substitute(s)),

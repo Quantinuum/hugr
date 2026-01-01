@@ -8,12 +8,13 @@ mod signature;
 pub mod type_param;
 pub mod type_row;
 
-use crate::extension::resolution::{
-    ExtensionCollectionError, WeakExtensionRegistry, collect_term_exts,
-};
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
 use crate::types::type_param::check_term_type;
 use crate::utils::display_list_with_separator;
+use crate::{
+    extension::resolution::{ExtensionCollectionError, WeakExtensionRegistry, collect_term_exts},
+    types::type_param::TermTypeError,
+};
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
@@ -212,7 +213,32 @@ fn sum_bound<'a>(rows: impl IntoIterator<Item = &'a Term>) -> Option<TypeBound> 
 }
 
 impl GeneralSum {
-    pub fn new(rows: TypeRow) -> Self {
+    /// Initialize a new general sum type. (Note the number of variants is fixed.)
+    ///
+    /// # Panics
+    ///
+    /// If any element of `rows` is not a list (perhaps of variable length) of runtime types.
+    /// See [Self::try_new] or [Self::new_unchecked] for alternatives.
+    pub fn new(rows: impl Into<TypeRow>) -> Self {
+        Self::try_new(rows).unwrap()
+    }
+
+    /// Initialize a new general sum type, checking that each variant is a list of runtime types.
+    ///
+    /// # Errors
+    ///
+    /// If any element of `rows` is not a list (perhaps of variable length) of runtime types.
+    pub fn try_new(rows: impl Into<TypeRow>) -> Result<Self, TermTypeError> {
+        let rows = rows.into();
+        for row in rows.iter() {
+            check_term_type(row, &Term::new_list_type(TypeBound::Linear))?;
+        }
+        Ok(Self::new_unchecked(rows))
+    }
+
+    /// Initialize a new general sum type without checking the variants.
+    pub fn new_unchecked(rows: impl Into<TypeRow>) -> Self {
+        let rows: TypeRow = rows.into();
         let bound = sum_bound(rows.iter());
         Self { rows, bound }
     }
@@ -261,20 +287,44 @@ impl std::fmt::Display for SumType {
 
 impl SumType {
     /// Initialize a new sum type.
+    ///
+    /// # Panics
+    ///
+    /// If any element of `variants` is not a list (perhaps of variable length) of runtime types.
+    /// See [Self::try_new] or [Self::new_unchecked] for alternatives.
     pub fn new<V>(variants: impl IntoIterator<Item = V>) -> Self
     where
         V: Into<Term>,
     {
-        Self::new_from_row(variants.into_iter().map(Into::into).collect_vec())
+        Self::try_new(variants).unwrap()
     }
 
-    pub(crate) fn new_from_row(variants: impl Into<TypeRow>) -> Self {
+    /// Initialize a new sum type, checking that each variant is a list of runtime types.
+    ///
+    /// # Errors
+    ///
+    /// If any element of `variants` is not a list (perhaps of variable length) of runtime types.
+    /// See [Self::new_unchecked] for an alternative.
+    pub fn try_new<V: Into<Term>>(
+        variants: impl IntoIterator<Item = V>,
+    ) -> Result<Self, TermTypeError> {
+        let variants = variants.into_iter().map(V::into).collect_vec();
+        let len = variants.len();
+        if u8::try_from(len).is_ok() && variants.iter().all(Term::is_empty_list) {
+            Ok(Self::new_unary(len as u8))
+        } else {
+            GeneralSum::try_new(variants).map(Self::General)
+        }
+    }
+
+    /// Initialize a new sum type without checking the variants.
+    pub fn new_unchecked(variants: impl Into<TypeRow>) -> Self {
         let variants = variants.into();
         let len: usize = variants.len();
         if u8::try_from(len).is_ok() && variants.iter().all(Term::is_empty_list) {
             Self::new_unary(len as u8)
         } else {
-            Self::General(GeneralSum::new(variants))
+            Self::General(GeneralSum::new_unchecked(variants))
         }
     }
 
