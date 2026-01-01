@@ -476,7 +476,7 @@ pub(crate) mod test {
     use crate::metadata::Metadata;
     use crate::ops::{FuncDecl, FuncDefn, OpParent, OpTag, OpTrait, Value, handle::NodeHandle};
     use crate::std_extensions::logic::test::and_op;
-    use crate::types::type_param::TypeParam;
+    use crate::types::type_param::{TermTypeError, TypeParam};
     use crate::types::{EdgeKind, FuncValueType, Signature, Type, TypeBound, TypeRV};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{Wire, builder::test::n_identity, type_row};
@@ -940,9 +940,19 @@ pub(crate) mod test {
         // But cannot eval it...
         let ev = e.instantiate_extension_op(
             "eval",
-            [vec![usize_t().into()].into(), vec![tv.into()].into()],
+            [
+                vec![usize_t().into()].into(),
+                vec![tv.clone().into()].into(),
+            ],
         );
-        ev.unwrap(); // ALAN this'll be a SignatureError, but what
+        assert_eq!(
+            ev,
+            Err(TermTypeError::TypeMismatch {
+                term: Box::new(tv),
+                type_: Box::new(TypeBound::Linear.into())
+            }
+            .into())
+        );
         Ok(())
     }
 
