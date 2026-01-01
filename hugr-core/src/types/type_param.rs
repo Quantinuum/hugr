@@ -391,11 +391,13 @@ impl Term {
         }
     }
 
-    /// Returns the [TypeBound] if this is a valid runtime type.
+    /// Returns the [TypeBound] if this `Term` is a runtime type.
+    /// (Does not check sub-[Term]s inside [Self::RuntimeSum] or [Self::RuntimeFunction];
+    /// call [Self::validate] for that.)
     pub const fn least_upper_bound(&self) -> Option<TypeBound> {
         match self {
             Self::RuntimeExtension(ct) => Some(ct.bound()),
-            Self::RuntimeSum(st) => st.bound(),
+            Self::RuntimeSum(st) => Some(st.bound()),
             Self::RuntimeFunction(_) => Some(TypeBound::Copyable),
             Self::Variable(v) => match &*v.cached_decl {
                 TypeParam::RuntimeType(b) => Some(*b),
@@ -438,16 +440,15 @@ impl Term {
             Term::RuntimeSum(SumType::General(GeneralSum { rows, bound })) => {
                 rows.iter().try_for_each(|row| row.validate(var_decls))?;
                 // check_term_type does not look beyond the cached bound, so do that here.
-                let b = bound.unwrap_or(TypeBound::Linear);
                 rows.iter()
-                    .try_for_each(|row| check_term_type(row, &Term::new_list_type(b)))?;
-                debug_assert!(match bound {
-                    Some(TypeBound::Copyable) => true, // Cached bound accurate, all ok
-                    None => false, // Cached bound should have been set to (at least) Linear
-                    Some(TypeBound::Linear) => !rows.iter().all(|r| {
-                        check_term_type(r, &Term::new_list_type(TypeBound::Copyable)).is_ok()
-                    }), // Cached bound should have been set to Copyable
-                });
+                    .try_for_each(|row| check_term_type(row, &Term::new_list_type(*bound)))?;
+                debug_assert!(
+                    *bound == TypeBound::Copyable
+                        || !rows.iter().all(|r| {
+                            check_term_type(r, &Term::new_list_type(TypeBound::Copyable)).is_ok()
+                        }),
+                    "Incorrect bound, should have been Copyable"
+                );
                 Ok(())
             }
             Term::RuntimeSum(SumType::Unit { .. }) => Ok(()), // No leaves there
@@ -656,6 +657,8 @@ impl Substitutable for Term {
         match self {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
             TypeArg::RuntimeSum(SumType::General(GeneralSum { rows, .. })) => {
+                // A substitution of a row variable for an empty list, could make this from
+                // a GeneralSum into a unary SumType. Even new_unchecked recomputes the bound.
                 SumType::new_unchecked(rows.substitute(s).into_owned()).into()
             }
             TypeArg::RuntimeExtension(cty) => Term::new_extension(cty.substitute(s)),
@@ -767,11 +770,7 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::Variable(TermVar { cached_decl, .. }), _) if type_.is_supertype(cached_decl) => {
             Ok(())
         }
-        (Term::RuntimeSum(st), Term::RuntimeType(bound))
-            if st.bound().is_some_and(|b| bound.contains(b)) =>
-        {
-            Ok(())
-        }
+        (Term::RuntimeSum(st), Term::RuntimeType(bound)) if bound.contains(st.bound()) => Ok(()),
         (Term::RuntimeFunction(_), Term::RuntimeType(_)) => Ok(()), // Function pointers are always Copyable so fit any bound
         (Term::RuntimeExtension(cty), Term::RuntimeType(bound)) if bound.contains(cty.bound()) => {
             Ok(())

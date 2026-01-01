@@ -178,8 +178,10 @@ pub struct GeneralSum {
     // `len` and `variants` would be impossible. (We might want a separate "FixedAritySum"
     // rust type supporting those, with try_from(SumType).)
     rows: TypeRow,
+    /// Caches the bound. Falls back to [TypeBound::Linear] if any are not even runtime types
+    /// (this is checked in validation)
     #[serde(skip)] // TODO recalculate on deserialization
-    bound: Option<TypeBound>,
+    bound: TypeBound,
 }
 
 pub(crate) fn least_upper_bound(bounds: impl IntoIterator<Item = TypeBound>) -> TypeBound {
@@ -191,23 +193,12 @@ pub(crate) fn least_upper_bound(bounds: impl IntoIterator<Item = TypeBound>) -> 
     TypeBound::Copyable
 }
 
-fn union_optbound(items: impl Iterator<Item = Option<TypeBound>>) -> Option<TypeBound> {
-    let mut b = TypeBound::Copyable;
-    for i in items {
-        let Some(b2) = i else { return None };
-        b = b.union(b2);
-    }
-    Some(b)
-}
-
-fn sum_bound<'a>(rows: impl IntoIterator<Item = &'a Term>) -> Option<TypeBound> {
-    union_optbound(rows.into_iter().map(|t| {
+fn sum_bound<'a>(rows: impl IntoIterator<Item = &'a Term>) -> TypeBound {
+    least_upper_bound(rows.into_iter().map(|t| {
         if check_term_type(t, &Term::new_list_type(TypeBound::Copyable)).is_ok() {
-            Some(TypeBound::Copyable)
-        } else if check_term_type(t, &Term::new_list_type(TypeBound::Linear)).is_ok() {
-            Some(TypeBound::Linear)
+            TypeBound::Copyable
         } else {
-            None
+            TypeBound::Linear
         }
     }))
 }
@@ -404,9 +395,9 @@ impl SumType {
         }
     }
 
-    pub const fn bound(&self) -> Option<TypeBound> {
+    pub const fn bound(&self) -> TypeBound {
         match self {
-            SumType::Unit { .. } => Some(TypeBound::Copyable),
+            SumType::Unit { .. } => TypeBound::Copyable,
             SumType::General(GeneralSum { bound, .. }) => *bound,
         }
     }
@@ -711,7 +702,7 @@ pub(crate) mod test {
                 .map(Term::from)
                 .collect::<Vec<_>>()
                 .into(),
-            bound: Some(TypeBound::Copyable),
+            bound: TypeBound::Copyable,
         });
         assert_eq!(sum_general, sum_unary);
 
