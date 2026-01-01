@@ -21,8 +21,7 @@ use hugr_core::ops::{
     ExtensionOp, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop, Value,
 };
 use hugr_core::types::{
-    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeRow,
-    TypeTransformer,
+    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeRow, TypeTransformer,
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Wire};
 
@@ -783,8 +782,8 @@ impl ReplaceTypes {
                 Ok(any_change)
             }
             Value::Extension { e } => Ok({
-                let new_const = match e.get_type().as_type_enum() {
-                    TypeEnum::Extension(exty) => match self.consts.get(exty) {
+                let new_const = match e.get_type().as_extension() {
+                    Some(exty) => match self.consts.get(exty) {
                         Some(const_fn) => Some(const_fn(e, self)),
                         None => self
                             .param_consts
@@ -921,6 +920,7 @@ mod test {
     };
     use hugr_core::types::{
         EdgeKind, PolyFuncType, Signature, SumType, Term, Type, TypeArg, TypeBound, TypeRow,
+        type_param::check_term_type,
     };
     use hugr_core::{Direction, Extension, HugrView, Port, Visibility, type_row};
     use itertools::Itertools;
@@ -942,10 +942,12 @@ mod test {
     }
 
     fn just_elem_type(args: &[TypeArg]) -> &Type {
-        let [TypeArg::Runtime(ty)] = args else {
-            panic!("Expected just elem type")
-        };
-        ty
+        if let [ty] = args {
+            if check_term_type(ty, &TypeBound::Linear.into()).is_ok() {
+                return ty;
+            }
+        }
+        panic!("Expected just elem type")
     }
 
     fn ext() -> Arc<Extension> {
@@ -1182,7 +1184,7 @@ mod test {
             Value::sum(
                 0,
                 [ListValue::new(usize_t(), [cu(1), cu(3), cu(3), cu(7)]).into()],
-                st,
+                st.clone(),
             )
             .unwrap(),
         );
@@ -1289,9 +1291,13 @@ mod test {
             },
         );
         fn option_contents(ty: &Type) -> Option<Type> {
-            let row = ty.as_sum()?.get_variant(1).unwrap().clone();
-            let elem = row.into_owned().into_iter().exactly_one().unwrap();
-            Some(elem.try_into_type().unwrap())
+            let row = ty.as_runtime_sum()?.get_variant(1).unwrap().clone();
+            TypeRow::try_from(row)
+                .unwrap()
+                .iter()
+                .exactly_one()
+                .ok()
+                .cloned()
         }
         let i32_t = || INT_TYPES[5].clone();
         let opt_i32 = Type::from(option_type([i32_t()]));
@@ -1522,10 +1528,12 @@ mod test {
                 .unwrap()
                 .as_ref(),
             move |args, _| {
-                let [sz, Term::Runtime(ty)] = args else {
+                let [sz, ty] = args else {
                     panic!("Expected two args to array-get")
                 };
-                if sz != &Term::BoundedNat(64) {
+                if sz != &Term::BoundedNat(64)
+                    || !check_term_type(ty, &TypeBound::Linear.into()).is_ok()
+                {
                     return Ok(None);
                 }
                 let pv = ext

@@ -20,7 +20,9 @@ use hugr_core::std_extensions::collections::borrow_array::{
     BArrayClone, BArrayDiscard, BArrayOpBuilder, BorrowArray, borrow_array_type,
 };
 use hugr_core::std_extensions::collections::list::ListValue;
-use hugr_core::types::{SumType, Transformable, Type, TypeArg};
+use hugr_core::types::{
+    SumType, Transformable, Type, TypeArg, TypeBound, type_param::check_term_type,
+};
 use hugr_core::{Visibility, type_row};
 
 use itertools::Itertools;
@@ -110,9 +112,10 @@ pub fn linearize_generic_array<AK: ArrayKind>(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = args else {
+    let [TypeArg::BoundedNat(n), ty] = args else {
         panic!("Illegal TypeArgs to array: {args:?}")
     };
+    check_term_type(ty, &TypeBound::Linear.into()).unwrap();
     if num_outports == 0 {
         // "Simple" discard
         let array_scan = GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n);
@@ -226,7 +229,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         // Wrap each remaining copy into an option
         let set_op = OpType::from(GenericArrayOpDef::<AK>::set.to_concrete(option_ty.clone(), *n));
         let either_st = set_op.dataflow_signature().unwrap().output[0]
-            .as_sum()
+            .as_runtime_sum()
             .unwrap()
             .clone();
         let opt_arrays = opt_arrays
@@ -332,9 +335,10 @@ pub fn copy_discard_array(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = args else {
+    let [TypeArg::BoundedNat(n), ty] = args else {
         panic!("Illegal TypeArgs to array: {args:?}")
     };
+    check_term_type(ty, &TypeBound::Linear.into()).unwrap();
     if ty.copyable() {
         // For arrays with copyable elements, we can just use the clone/discard ops
         if num_outports == 0 {
@@ -379,9 +383,10 @@ pub fn copy_discard_borrow_array(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = args else {
+    let [TypeArg::BoundedNat(n), ty] = args else {
         panic!("Illegal TypeArgs to borrow array: {args:?}")
     };
+    check_term_type(ty, &TypeBound::Linear.into()).unwrap();
     if ty.copyable() {
         // For arrays with copyable elements, we can just use the clone/discard ops
         if num_outports == 0 {

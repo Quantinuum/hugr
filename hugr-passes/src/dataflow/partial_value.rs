@@ -1,7 +1,7 @@
 use ascent::Lattice;
 use ascent::lattice::BoundedLattice;
 use hugr_core::Node;
-use hugr_core::types::{SumType, Type, TypeArg, TypeEnum, TypeRow};
+use hugr_core::types::{SumType, Type, TypeArg, TypeRow};
 use itertools::{Itertools, zip_eq};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -211,9 +211,8 @@ impl<V: AbstractValue, N: std::fmt::Debug> PartialSum<V, N> {
             return Err(ExtractValueError::MultipleVariants(self));
         }
         let (tag, v) = self.0.into_iter().exactly_one().unwrap();
-        if let TypeEnum::Sum(st) = typ.as_type_enum()
-            && let Some(r) = st.get_variant(tag)
-            && let Ok(r) = TypeRow::try_from(r.clone())
+        if let Some(st) = typ.as_runtime_sum()
+            && let Some(Ok(r)) = st.get_variant(tag).cloned().map(TypeRow::try_from)
             && v.len() == r.len()
         {
             return Ok(Sum {

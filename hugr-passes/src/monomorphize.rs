@@ -232,7 +232,15 @@ fn escape_dollar(str: impl AsRef<str>) -> String {
 
 fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match arg {
-        TypeArg::Runtime(ty) => f.write_fmt(format_args!("t({})", escape_dollar(ty.to_string()))),
+        TypeArg::RuntimeExtension(cty) => {
+            f.write_fmt(format_args!("t({})", escape_dollar(cty.to_string())))
+        }
+        TypeArg::RuntimeSum(sty) => {
+            f.write_fmt(format_args!("t({})", escape_dollar(sty.to_string())))
+        }
+        TypeArg::RuntimeFunction(fty) => {
+            f.write_fmt(format_args!("t({})", escape_dollar(fty.to_string())))
+        }
         TypeArg::BoundedNat(n) => f.write_fmt(format_args!("n({n})")),
         TypeArg::String(arg) => f.write_fmt(format_args!("s({})", escape_dollar(arg))),
         TypeArg::List(elems) => f.write_fmt(format_args!("list({})", TypeArgsSeq(elems))),
@@ -282,8 +290,8 @@ mod test {
     };
     use hugr_core::extension::prelude::{ConstUsize, UnpackTuple, UnwrapBuilder, usize_t};
     use hugr_core::ops::handle::{FuncID, NodeHandle};
-    use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
-    use hugr_core::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound, TypeEnum};
+    use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, ExtensionOp, FuncDefn, Tag};
+    use hugr_core::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound};
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
@@ -521,15 +529,12 @@ mod test {
         let popleft = BArrayOpDef::pop_left.to_concrete(arr2u(), n);
         let ar2 = outer.add_dataflow_op(popleft.clone(), [arr2]).unwrap();
         let sig = popleft.to_extension_op().unwrap().signature().into_owned();
-        let TypeEnum::Sum(st) = sig.output().get(0).unwrap().as_type_enum() else {
-            panic!()
-        };
+        let st = sig.output().get(0).unwrap().as_runtime_sum().unwrap();
         let [left_arr, ar2_unwrapped] = outer
             .build_unwrap_sum(1, st.clone(), ar2.out_wire(0))
             .unwrap();
         let discard_op =
-            hugr_core::ops::ExtensionOp::new(discard_op_def.clone(), vec![sa(2), usize_t().into()])
-                .unwrap();
+            ExtensionOp::new(discard_op_def.clone(), vec![sa(2), usize_t().into()]).unwrap();
         let [] = outer
             .add_dataflow_op(discard_op, [left_arr])
             .unwrap()

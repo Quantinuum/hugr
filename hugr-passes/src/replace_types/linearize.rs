@@ -7,7 +7,7 @@ use hugr_core::builder::{
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::borrow_array::borrow_array_type_def;
-use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
+use hugr_core::types::{CustomType, Signature, Term, Type, TypeArg, TypeRow};
 use hugr_core::{HugrView, IncomingPort, Node, Wire, hugr::hugrmut::HugrMut, ops::Tag};
 use itertools::Itertools;
 
@@ -272,8 +272,8 @@ impl Linearizer for DelegatingLinearizer {
         }
         assert!(num_outports != 1);
 
-        match typ.as_type_enum() {
-            TypeEnum::Sum(sum_type) => {
+        match typ {
+            Term::RuntimeSum(sum_type) => {
                 let variants = sum_type
                     .variants()
                     .map(|trv| trv.clone().try_into())
@@ -319,7 +319,7 @@ impl Linearizer for DelegatingLinearizer {
                     cb.finish_hugr().unwrap(),
                 )))
             }
-            TypeEnum::Extension(cty) => {
+            Term::RuntimeExtension(cty) => {
                 if let Some((copy, discard)) = self.copy_discard.get(cty) {
                     Ok(if num_outports == 0 {
                         discard.clone()
@@ -352,7 +352,7 @@ impl Linearizer for DelegatingLinearizer {
                     Ok(tmpl)
                 }
             }
-            TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
+            Term::RuntimeFunction(_) => panic!("Ruled out above as copyable"),
             _ => Err(LinearizeError::UnsupportedType(Box::new(typ.clone()))),
         }
     }
@@ -389,7 +389,7 @@ mod test {
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections::array::array_type;
     use hugr_core::std_extensions::collections::borrow_array::{BArrayOpDef, borrow_array_type};
-    use hugr_core::types::type_param::TypeParam;
+    use hugr_core::types::type_param::{TypeParam, check_term_type};
     use hugr_core::types::{
         FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRow,
     };
@@ -844,9 +844,10 @@ mod test {
         );
         let drop_op = drop_ext.get_op("drop").unwrap();
         lowerer.set_replace_parametrized_op(drop_op, |args, rt| {
-            let [TypeArg::Runtime(ty)] = args else {
+            let [ty] = args else {
                 panic!("Expected just one type")
             };
+            check_term_type(ty, &TypeBound::Linear.into()).unwrap();
             Ok(Some(rt.get_linearizer().copy_discard_op(ty, 0)?))
         });
 
