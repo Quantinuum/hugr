@@ -421,10 +421,7 @@ pub(crate) mod test {
         let decl = Term::new_list_type(TP_ANY);
         let e = PolyFuncTypeRV::new_validated(
             [decl.clone()],
-            FuncValueType::new(
-                vec![usize_t()],
-                vec![Term::new_row_var_use(0, TypeBound::Copyable)], // ALAN should fail until remove vec!
-            ),
+            FuncValueType::new([usize_t()], Term::new_row_var_use(0, TypeBound::Copyable)),
         )
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
@@ -474,10 +471,10 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables_inner() {
-        let inner_fty = Type::new_function(FuncValueType::new_endo([Term::new_row_var_use(
+        let inner_fty = Type::new_function(FuncValueType::new_endo(Term::new_row_var_use(
             0,
             TypeBound::Copyable,
-        )]));
+        )));
         let pf = PolyFuncType::new_validated(
             [Term::new_list_type(TypeBound::Copyable)],
             Signature::new(vec![usize_t(), inner_fty.clone()], vec![inner_fty]),

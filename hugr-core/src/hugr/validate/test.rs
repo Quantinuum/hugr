@@ -497,8 +497,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
     Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
         let inputs = TypeRV::new_row_var_use(0, TypeBound::Linear);
         let outputs = TypeRV::new_row_var_use(1, TypeBound::Linear);
-        let evaled_fn =
-            TypeRV::new_function(FuncValueType::new([inputs.clone()], [outputs.clone()]));
+        let evaled_fn = TypeRV::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone()],
             FuncValueType::new(Term::new_list_concat([[evaled_fn].into(), inputs]), outputs),
@@ -511,14 +510,15 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
             [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
             Signature::new(
                 [
-                    Type::new_function(FuncValueType::new([rv(0)], [rv(2)])),
-                    Type::new_function(FuncValueType::new([rv(1)], [rv(3)])),
+                    Type::new_function(FuncValueType::new(rv(0), rv(2))),
+                    Type::new_function(FuncValueType::new(rv(1), rv(3))),
                 ],
                 [Type::new_function(FuncValueType::new(
                     Term::new_list_concat([rv(0), rv(1)]),
                     Term::new_list_concat([rv(2), rv(3)]),
-                ))]),
-            );
+                ))],
+            ),
+        );
         ext.add_op("parallel".into(), String::new(), pf, extension_ref)
             .unwrap();
     })

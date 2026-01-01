@@ -930,7 +930,7 @@ pub(crate) mod test {
                 Signature::new(
                     [Type::new_function(FuncValueType::new(
                         [usize_t()],
-                        [tv.clone()],
+                        tv.clone(),
                     ))],
                     [],
                 ),
