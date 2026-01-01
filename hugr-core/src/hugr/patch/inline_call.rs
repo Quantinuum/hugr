@@ -287,7 +287,7 @@ mod test {
 
     #[test]
     fn test_polymorphic() -> Result<(), Box<dyn std::error::Error>> {
-        let tuple_ty = Type::new_tuple(vec![usize_t(); 2]);
+        let tuple_ty = Type::new_runtime_tuple(vec![usize_t(); 2]);
         let mut fb =
             FunctionBuilder::new("mkpair", Signature::new([usize_t()], [tuple_ty.clone()]))?;
         let helper = {

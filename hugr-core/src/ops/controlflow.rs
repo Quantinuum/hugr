@@ -378,7 +378,7 @@ mod test {
         let tv1 = Type::new_var_use(1, TypeBound::Linear);
         let cond = Conditional {
             sum_rows: vec![[usize_t()].into(), [tv1.clone()].into()],
-            other_inputs: vec![Type::new_tuple([TypeRV::new_row_var_use(
+            other_inputs: vec![Type::new_runtime_tuple([TypeRV::new_row_var_use(
                 0,
                 TypeBound::Linear,
             )])]
@@ -393,7 +393,7 @@ mod test {
         assert_eq!(
             cond2.signature(),
             Signature::new(
-                [st, Type::new_tuple(vec![usize_t(); 3])],
+                [st, Type::new_runtime_tuple(vec![usize_t(); 3])],
                 [usize_t(), qb_t()]
             )
         );

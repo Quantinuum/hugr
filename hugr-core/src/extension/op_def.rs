@@ -748,7 +748,7 @@ pub(super) mod test {
                     .collect();
                 Ok(PolyFuncTypeRV::new(
                     vec![TP.clone()],
-                    Signature::new(tvs.clone(), vec![Type::new_tuple(tvs)]),
+                    Signature::new(tvs.clone(), vec![Type::new_runtime_tuple(tvs)]),
                 ))
             }
 
@@ -767,7 +767,7 @@ pub(super) mod test {
                 def.compute_signature(&args),
                 Ok(Signature::new(
                     vec![usize_t(); 3],
-                    vec![Type::new_tuple(vec![usize_t(); 3])]
+                    vec![Type::new_runtime_tuple(vec![usize_t(); 3])]
                 ))
             );
             assert_eq!(def.validate_args(&args, &[]), Ok(()));
@@ -780,7 +780,7 @@ pub(super) mod test {
                 def.compute_signature(&args),
                 Ok(Signature::new(
                     tyvars.clone(),
-                    vec![Type::new_tuple(tyvars)]
+                    vec![Type::new_runtime_tuple(tyvars)]
                 ))
             );
             def.validate_args(&args, &[TypeBound::Copyable.into()])

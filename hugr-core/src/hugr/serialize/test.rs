@@ -522,7 +522,7 @@ fn serialize_types_roundtrip() {
     check_testing_roundtrip(g.clone());
 
     // A Simple tuple
-    let t = Type::new_tuple(vec![usize_t(), g]);
+    let t = Type::new_runtime_tuple(vec![usize_t(), g]);
     check_testing_roundtrip(t);
 
     // A Classic sum
@@ -539,7 +539,7 @@ fn serialize_types_roundtrip() {
 #[case(INT_TYPES[2].clone())]
 #[case(Type::new_alias(crate::ops::AliasDecl::new("t", TypeBound::Linear)))]
 #[case(Type::new_var_use(2, TypeBound::Copyable))]
-#[case(Type::new_tuple(vec![bool_t(),qb_t()]))]
+#[case(Type::new_runtime_tuple(vec![bool_t(),qb_t()]))]
 #[case(Type::new_sum([vec![bool_t(),qb_t()], vec![Type::new_unit_sum(4)]]))]
 #[case(Type::new_function(Signature::new_endo([qb_t(),bool_t(),usize_t()])))]
 fn roundtrip_type(#[case] typ: Type) {
@@ -595,7 +595,7 @@ fn polyfunctype2() -> PolyFuncTypeRV {
 #[case(PolyFuncType::new([TypeParam::new_tuple_type([TypeBound::Linear.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], Signature::new_endo(type_row![])))]
 #[case(PolyFuncType::new(
     [TypeParam::new_list_type(TypeBound::Linear)],
-    Signature::new_endo([Type::new_tuple([TypeRV::new_row_var_use(0, TypeBound::Linear)])])))]
+    Signature::new_endo([Type::new_runtime_tuple([TypeRV::new_row_var_use(0, TypeBound::Linear)])])))]
 fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
     check_testing_roundtrip(poly_func_type);
 }

@@ -292,11 +292,11 @@ mod test {
     use super::{is_polymorphic, mangle_name};
 
     fn pair_type(ty: Type) -> Type {
-        Type::new_tuple(vec![ty.clone(), ty])
+        Type::new_runtime_tuple(vec![ty.clone(), ty])
     }
 
     fn triple_type(ty: Type) -> Type {
-        Type::new_tuple(vec![ty.clone(), ty.clone(), ty])
+        Type::new_runtime_tuple(vec![ty.clone(), ty.clone(), ty])
     }
 
     #[test]
@@ -334,7 +334,7 @@ mod test {
         };
 
         let tr = {
-            let sig = Signature::new([tv0()], [Type::new_tuple(vec![tv0(); 3])]);
+            let sig = Signature::new([tv0()], [Type::new_runtime_tuple(vec![tv0(); 3])]);
             let mut fb = mb.define_function(
                 "triple",
                 PolyFuncType::new([TypeBound::Copyable.into()], sig),

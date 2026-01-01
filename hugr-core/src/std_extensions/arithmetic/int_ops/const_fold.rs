@@ -586,7 +586,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     } else {
                         let q_type = INT_TYPES[logwidth0 as usize].clone();
                         let r_type = q_type.clone();
-                        let qr_type: Type = Type::new_tuple(vec![q_type, r_type]);
+                        let qr_type: Type = Type::new_runtime_tuple(vec![q_type, r_type]);
                         let err_value = || {
                             ConstError {
                                 signal: 0,
@@ -647,7 +647,7 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     } else {
                         let q_type = INT_TYPES[logwidth0 as usize].clone();
                         let r_type = INT_TYPES[logwidth0 as usize].clone();
-                        let qr_type: Type = Type::new_tuple(vec![q_type, r_type]);
+                        let qr_type: Type = Type::new_runtime_tuple(vec![q_type, r_type]);
                         let err_value = || {
                             ConstError {
                                 signal: 0,

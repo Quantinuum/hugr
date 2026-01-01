@@ -861,7 +861,7 @@ mod test {
         };
         // We can drop a tuple of 2* lin_t
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
-        let mut h = build_hugr(Type::new_tuple(vec![lin_t.clone(); 2]));
+        let mut h = build_hugr(Type::new_runtime_tuple(vec![lin_t.clone(); 2]));
         lowerer.run(&mut h).unwrap();
         h.validate().unwrap();
         let mut exts = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());

@@ -757,7 +757,7 @@ pub(crate) mod test {
     #[case(Value::unit(), Type::UNIT, "const:seq:{}")]
     #[case(const_usize(), usize_t(), "const:custom:ConstUsize(")]
     #[case(serialized_float(17.4), float64_type(), "const:custom:json:Object")]
-    #[case(const_tuple(), Type::new_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
+    #[case(const_tuple(), Type::new_runtime_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
     #[case(const_array_bool(), array_type(2, bool_t()), "const:custom:array")]
     #[case(
         const_borrow_array_bool(),

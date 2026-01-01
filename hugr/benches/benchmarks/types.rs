@@ -11,8 +11,8 @@ use std::hint::black_box;
 fn make_complex_type() -> Type {
     let qb = qb_t();
     let int = usize_t();
-    let q_register = Type::new_tuple(vec![qb; 8]);
-    let b_register = Type::new_tuple(vec![int; 8]);
+    let q_register = Type::new_runtime_tuple(vec![qb; 8]);
+    let b_register = Type::new_runtime_tuple(vec![int; 8]);
     let q_alias = Type::new_alias(AliasDecl::new("QReg", TypeBound::Linear));
     let sum = Type::new_sum([[q_register], [q_alias]]);
     Type::new_function(Signature::new(vec![sum], vec![b_register]))

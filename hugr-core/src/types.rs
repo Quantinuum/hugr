@@ -399,7 +399,7 @@ impl Type {
 
     /// Initialize a new tuple type by providing the elements.
     #[inline(always)]
-    pub fn new_tuple(types: impl Into<TypeRowRV>) -> Self {
+    pub fn new_runtime_tuple(types: impl Into<TypeRowRV>) -> Self {
         let row = types.into();
         match row.len() {
             0 => Self::UNIT,
@@ -593,7 +593,7 @@ pub(crate) mod test {
 
     #[test]
     fn construct() {
-        let t: Type = Type::new_tuple(vec![
+        let t: Type = Type::new_runtime_tuple(vec![
             usize_t(),
             Type::new_function(Signature::new_endo([])),
             Type::new_extension(CustomType::new(
@@ -640,7 +640,7 @@ pub(crate) mod test {
         );
 
         assert_eq!(
-            Type::new_tuple(vec![usize_t()])
+            Type::new_runtime_tuple(vec![usize_t()])
                 .as_sum()
                 .unwrap()
                 .as_option(),

@@ -735,7 +735,7 @@ mod test {
 
         {
             // one-variant-elidable-fields -> empty_struct
-            let hugr_type = HugrType::new_tuple(vec![HugrType::UNIT, HugrType::UNIT]);
+            let hugr_type = HugrType::new_runtime_tuple(vec![HugrType::UNIT, HugrType::UNIT]);
             assert_eq!(ts.llvm_type(&hugr_type).unwrap(), empty_struct.clone());
         }
 
@@ -753,19 +753,19 @@ mod test {
 
         {
             // one-variant-one-field -> bare field
-            let hugr_type = HugrType::new_tuple(vec![usize_t()]);
+            let hugr_type = HugrType::new_runtime_tuple(vec![usize_t()]);
             assert_eq!(ts.llvm_type(&hugr_type).unwrap(), i64);
         }
 
         {
             // one-variant-one-non-elidable-field -> bare field
-            let hugr_type = HugrType::new_tuple(vec![HugrType::UNIT, usize_t()]);
+            let hugr_type = HugrType::new_runtime_tuple(vec![HugrType::UNIT, usize_t()]);
             assert_eq!(ts.llvm_type(&hugr_type).unwrap(), i64);
         }
 
         {
             // one-variant-multi-field -> struct-of-fields
-            let hugr_type = HugrType::new_tuple(vec![usize_t(), bool_t(), HugrType::UNIT]);
+            let hugr_type = HugrType::new_runtime_tuple(vec![usize_t(), bool_t(), HugrType::UNIT]);
             let llvm_type = iwc.struct_type(&[i64, i1], false).into();
             assert_eq!(ts.llvm_type(&hugr_type).unwrap(), llvm_type);
         }

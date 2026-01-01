@@ -1970,7 +1970,7 @@ mod tests {
         assert_eq!(subg.nodes().len(), 1);
         assert_eq!(
             subg.signature(&h).io(),
-            Signature::new(type_row![], vec![Type::new_tuple(type_row![])]).io()
+            Signature::new(type_row![], vec![Type::new_runtime_tuple(type_row![])]).io()
         );
 
         // `from_nodes` is different, is it only uses incoming and outgoing edges to
@@ -1990,7 +1990,7 @@ mod tests {
         // A hugr with some empty MakeTuple operations.
         let tuple_op = MakeTuple::new(type_row![]);
         let untuple_op = UnpackTuple::new(type_row![]);
-        let tuple_t = Type::new_tuple(type_row![]);
+        let tuple_t = Type::new_runtime_tuple(type_row![]);
 
         let mut b = DFGBuilder::new(Signature::new(type_row![], vec![tuple_t.clone()])).unwrap();
         let mk_tuple_1 = b.add_dataflow_op(tuple_op.clone(), []).unwrap();

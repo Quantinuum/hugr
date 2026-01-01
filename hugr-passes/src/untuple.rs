@@ -229,7 +229,7 @@ fn remove_pack_unpack<'h, T: HugrView>(
                 .cycle()
                 .take(num_unpack_outputs)
                 .chain(itertools::repeat_n(
-                    &Type::new_tuple(tuple_types.to_vec()),
+                    &Type::new_runtime_tuple(tuple_types.to_vec()),
                     num_other_outputs
                 ))
         ),
@@ -371,7 +371,7 @@ mod test {
             vec![
                 bool_t(),
                 bool_t(),
-                Type::new_tuple(vec![bool_t(), bool_t()]),
+                Type::new_runtime_tuple(vec![bool_t(), bool_t()]),
             ],
         ))
         .unwrap();

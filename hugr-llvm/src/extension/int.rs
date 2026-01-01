@@ -782,7 +782,7 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
     signed: bool,
 ) -> Result<LLVMSumValue<'c>> {
     let int_arg_ty = int_types::INT_TYPES[log_width as usize].clone();
-    let tuple_sum_ty = HugrSumType::new_tuple(vec![int_arg_ty.clone(), int_arg_ty.clone()]);
+    let tuple_sum_ty = HugrSumType::new_runtime_tuple(vec![int_arg_ty.clone(), int_arg_ty.clone()]);
 
     let pair_ty = LLVMSumType::try_from_hugr_type(&ctx.typing_session(), tuple_sum_ty.clone())?;
 

@@ -643,7 +643,7 @@ impl MakeOpDef for TupleOpDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         let rv = TypeRV::new_row_var_use(0, TypeBound::Linear);
-        let tuple_type = TypeRV::new_tuple(vec![rv.clone()]);
+        let tuple_type = TypeRV::new_runtime_tuple(vec![rv.clone()]);
 
         let param = TypeParam::new_list_type(TypeBound::Linear);
         match self {
@@ -1046,7 +1046,7 @@ mod test {
             optype.dataflow_signature().unwrap().io(),
             (
                 &type_row![Type::UNIT],
-                &vec![Type::new_tuple(type_row![Type::UNIT])].into(),
+                &vec![Type::new_runtime_tuple(type_row![Type::UNIT])].into(),
             )
         );
 
@@ -1061,7 +1061,7 @@ mod test {
         assert_eq!(
             optype.dataflow_signature().unwrap().io(),
             (
-                &vec![Type::new_tuple(type_row![Type::UNIT])].into(),
+                &vec![Type::new_runtime_tuple(type_row![Type::UNIT])].into(),
                 &type_row![Type::UNIT],
             )
         );

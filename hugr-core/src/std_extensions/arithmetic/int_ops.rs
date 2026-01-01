@@ -140,7 +140,7 @@ impl MakeOpDef for IntOpDef {
                 int_polytype(
                     1,
                     intpair.clone(),
-                    [sum_ty_with_err(Type::new_tuple(intpair))],
+                    [sum_ty_with_err(Type::new_runtime_tuple(intpair))],
                 )
             }
             .into(),

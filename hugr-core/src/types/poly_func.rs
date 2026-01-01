@@ -402,7 +402,10 @@ pub(crate) mod test {
         let rty = TypeRV::new_row_var_use(0, TypeBound::Linear);
         let pf = PolyFuncTypeBase::new_validated(
             [TypeParam::new_list_type(TP_ANY)],
-            FuncValueType::new([usize_t().into(), rty.clone()], [TypeRV::new_tuple([rty])]),
+            FuncValueType::new(
+                [usize_t().into(), rty.clone()],
+                [TypeRV::new_runtime_tuple([rty])],
+            ),
         )
         .unwrap();
 
@@ -418,7 +421,7 @@ pub(crate) mod test {
             t2,
             Signature::new(
                 vec![usize_t(), usize_t(), bool_t()],
-                vec![Type::new_tuple(vec![usize_t(), bool_t()])]
+                vec![Type::new_runtime_tuple(vec![usize_t(), bool_t()])]
             )
         );
     }
