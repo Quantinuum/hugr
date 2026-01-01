@@ -501,7 +501,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
             TypeRV::new_function(FuncValueType::new([inputs.clone()], [outputs.clone()]));
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone()],
-            FuncValueType::new([evaled_fn, inputs], [outputs]),
+            FuncValueType::new(Term::new_list_concat([[evaled_fn].into(), inputs]), outputs),
         );
         ext.add_op("eval".into(), String::new(), pf, extension_ref)
             .unwrap();
@@ -510,16 +510,15 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
             Signature::new(
-                vec![
+                [
                     Type::new_function(FuncValueType::new([rv(0)], [rv(2)])),
                     Type::new_function(FuncValueType::new([rv(1)], [rv(3)])),
                 ],
                 [Type::new_function(FuncValueType::new(
-                    [rv(0), rv(1)],
-                    [rv(2), rv(3)],
-                ))],
-            ),
-        );
+                    Term::new_list_concat([rv(0), rv(1)]),
+                    Term::new_list_concat([rv(2), rv(3)]),
+                ))]),
+            );
         ext.add_op("parallel".into(), String::new(), pf, extension_ref)
             .unwrap();
     })
@@ -552,16 +551,15 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn list1ty(t: TypeRV) -> Term {
-    Term::new_list([t.into()])
-}
-
 #[test]
 fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
     let tv = TypeRV::new_row_var_use(0, TypeBound::Linear);
-    let inner_ft = Type::new_function(FuncValueType::new_endo([tv.clone()]));
-    let ft_usz = Type::new_function(FuncValueType::new_endo([tv.clone(), usize_t().into()]));
+    let inner_ft = Type::new_function(FuncValueType::new_endo(tv.clone()));
+    let ft_usz = Type::new_function(FuncValueType::new_endo(Term::new_list_concat([
+        tv.clone(),
+        [usize_t()].into(),
+    ])));
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
@@ -580,7 +578,12 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     };
     let par = e.instantiate_extension_op(
         "parallel",
-        [tv.clone(), usize_t().into(), tv.clone(), usize_t().into()].map(list1ty),
+        [
+            tv.clone(),
+            [usize_t()].into(),
+            tv.clone(),
+            [usize_t()].into(),
+        ],
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
     fb.finish_hugr_with_outputs(par_func.outputs())?;

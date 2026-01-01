@@ -642,28 +642,28 @@ pub(crate) mod test {
         fn into_typerow(t: &Term) -> TypeRow {
             t.clone().try_into().unwrap()
         }
-        let variants: Vec<TypeRowRV> = vec![
+        let variants: Vec<Term> = vec![
             [TypeRV::UNIT].into(),
-            vec![TypeRV::new_row_var_use(0, TypeBound::Linear)].into(),
+            TypeRV::new_row_var_use(0, TypeBound::Linear),
         ];
         let t = SumType::new(variants.clone());
-        //ALAN that'll fail check_term_type(&Term::from(t.clone()), &TypeBound::Linear.into()).unwrap();...right?
-        assert_eq!(variants, t.variants().map(into_typerow).collect_vec());
+        assert_eq!(variants, t.variants().cloned().collect_vec());
 
         let empty_rows = vec![TypeRV::EMPTY_TYPEROW; 3];
         let sum_unary = SumType::new_unary(3);
-        let sum_general = SumType::General(GeneralSum {
-            rows: empty_rows
-                .iter()
-                .map(|r| Term::new_list(r.clone().into_owned()))
-                .collect::<Vec<_>>()
-                .into(),
-            bound: Some(TypeBound::Copyable),
-        });
         assert_eq!(
             &empty_rows,
             &sum_unary.variants().map(into_typerow).collect_vec()
         );
+
+        let sum_general = SumType::General(GeneralSum {
+            rows: empty_rows
+                .into_iter()
+                .map(Term::from)
+                .collect::<Vec<_>>()
+                .into(),
+            bound: Some(TypeBound::Copyable),
+        });
         assert_eq!(sum_general, sum_unary);
 
         let mut hasher_general = std::hash::DefaultHasher::new();

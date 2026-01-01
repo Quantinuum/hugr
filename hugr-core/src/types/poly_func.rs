@@ -449,8 +449,8 @@ pub(crate) mod test {
         let pf = PolyFuncTypeRV::new_validated(
             [TypeParam::new_list_type(TP_ANY)],
             FuncValueType::new(
-                [usize_t().into(), rty.clone()],
-                [Term::new_runtime_tuple([rty])],
+                Term::new_list_concat([Term::new_list([usize_t()]), rty.clone()]),
+                [Term::new_runtime_tuple(rty)],
             ),
         )
         .unwrap();

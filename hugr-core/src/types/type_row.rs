@@ -212,45 +212,18 @@ mod test {
     }
 
     #[test]
-    fn test_try_from_term_to_typerowrv() {
-        // Test successful conversion with List
-        let types = [TypeRV::from(Type::UNIT), TypeRV::from(bool_t())];
-        let type_args = types.iter().map(|t| t.clone().into()).collect();
-        let term = TypeArg::List(type_args);
-        let result = TypeRowRV::try_from(term);
-        assert!(result.is_ok());
-
-        // Test failure with non-sequence kind
-        let term = Term::String("test".to_string());
-        let result = TypeRowRV::try_from(term);
-        assert!(result.is_err());
-    }
-
-    #[test]
     fn test_from_typerow_to_term() {
         let types = vec![Type::UNIT, bool_t()];
         let type_row = TypeRow::from(types);
-        let term = Term::from(type_row);
+        let term = Term::from(type_row.clone());
 
-        match term {
+        match &term {
             Term::List(elems) => {
                 assert_eq!(elems.len(), 2);
             }
             _ => panic!("Expected Term::List"),
         }
-    }
 
-    #[test]
-    fn test_from_typerowrv_to_term() {
-        let types = vec![TypeRV::from(Type::UNIT), TypeRV::from(bool_t())];
-        let type_row_rv = TypeRowRV::from(types);
-        let term = Term::from(type_row_rv);
-
-        match term {
-            TypeArg::List(elems) => {
-                assert_eq!(elems.len(), 2);
-            }
-            _ => panic!("Expected Term::List"),
-        }
+        assert_eq!(term.try_into(), Ok(type_row));
     }
 }

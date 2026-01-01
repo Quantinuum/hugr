@@ -1041,34 +1041,36 @@ mod test {
 
         // Into a list of type, we can fit a single row var
         check(rowvar(0, TypeBound::Copyable), &seq_param).unwrap();
-        // or a list of (types or row vars)
+        // or a list of types, or a "concat" of row vars
         check(vec![], &seq_param).unwrap();
-        check_seq(&[rowvar(0, TypeBound::Copyable)], &seq_param).unwrap();
-        check_seq(
-            &[
+        check(
+            Term::ListConcat(vec![rowvar(0, TypeBound::Copyable); 2]),
+            &seq_param,
+        )
+        .unwrap();
+        // but a *list* of the rowvar is a list of list of types, which is wrong
+        check_seq(&[rowvar(0, TypeBound::Copyable)], &seq_param).unwrap_err();
+        check(
+            Term::new_list_concat([
                 rowvar(1, TypeBound::Linear),
-                usize_t().into(),
+                vec![usize_t()].into(),
                 rowvar(0, TypeBound::Copyable),
-            ],
+            ]),
             &TypeParam::new_list_type(TypeBound::Linear),
         )
         .unwrap();
-        // Next one fails because a list of Eq is required
-        check_seq(
-            &[
+        // Next one fails because a list of Copyable is required
+        check(
+            Term::new_list_concat([
                 rowvar(1, TypeBound::Linear),
-                usize_t().into(),
+                vec![usize_t()].into(),
                 rowvar(0, TypeBound::Copyable),
-            ],
+            ]),
             &seq_param,
         )
         .unwrap_err();
         // seq of seq of types is not allowed
-        check(
-            vec![usize_t().into(), vec![usize_t().into()].into()],
-            &seq_param,
-        )
-        .unwrap_err();
+        check(vec![usize_t(), vec![usize_t()].into()], &seq_param).unwrap_err();
 
         // Similar for nats (but no equivalent of fancy row vars)
         check(5, &TypeParam::max_nat_type()).unwrap();
@@ -1109,15 +1111,15 @@ mod test {
     #[test]
     fn type_arg_subst_row() {
         let row_param = Term::new_list_type(TypeBound::Copyable);
-        let row_arg: Term = vec![bool_t().into(), Term::UNIT].into();
+        let row_arg: Term = vec![bool_t(), Term::UNIT].into();
         check_term_type(&row_arg, &row_param).unwrap();
 
         // Now say a row variable referring to *that* row was used
         // to instantiate an outer "row parameter" (list of type).
         let outer_param = Term::new_list_type(TypeBound::Linear);
-        let outer_arg = Term::new_list([
-            TypeRV::new_row_var_use(0, TypeBound::Copyable).into(),
-            usize_t().into(),
+        let outer_arg = Term::new_list_concat([
+            TypeRV::new_row_var_use(0, TypeBound::Copyable),
+            Term::new_list([usize_t()]),
         ]);
         check_term_type(&outer_arg, &outer_param).unwrap();
 
@@ -1138,9 +1140,9 @@ mod test {
         let row_var_use = Term::new_var_use(0, row_var_decl.clone());
         let good_arg = Term::new_list([
             // The row variables here refer to `row_var_decl` above
-            vec![usize_t().into()].into(),
+            vec![usize_t()].into(),
             row_var_use.clone(),
-            vec![row_var_use, usize_t().into()].into(),
+            Term::new_list_concat([row_var_use, Term::new_list([usize_t()])]),
         ]);
         check_term_type(&good_arg, &outer_param).unwrap();
 

@@ -64,28 +64,24 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
         let n = TypeArg::new_var_use(0, TypeParam::max_nat_type());
         let src_elem = Type::new_var_use(1, TypeBound::Linear);
         let tgt_elem = Type::new_var_use(2, TypeBound::Linear);
-        let s = TypeRV::new_row_var_use(3, TypeBound::Linear);
+        let with_rest = |tys: Vec<Type>| {
+            TypeArg::new_list_concat([tys.into(), TypeRV::new_row_var_use(3, TypeBound::Linear)])
+        };
         PolyFuncTypeRV::new(
             params,
-            // ALAN this is massively type-mismatched, but I want to see it break
             FuncValueType::new(
-                vec![
+                with_rest(vec![
                     AK::instantiate_ty(array_def, n.clone(), src_elem.clone())
-                        .expect("Array type instantiation failed")
-                        .into(),
+                        .expect("Array type instantiation failed"),
                     Type::new_function(FuncValueType::new(
-                        vec![src_elem.into(), s.clone()],
-                        vec![tgt_elem.clone().into(), s.clone()],
-                    ))
-                    .into(),
-                    s.clone(),
-                ],
-                vec![
+                        with_rest(vec![src_elem]),
+                        with_rest(vec![tgt_elem.clone()]),
+                    )),
+                ]),
+                with_rest(vec![
                     AK::instantiate_ty(array_def, n, tgt_elem)
-                        .expect("Array type instantiation failed")
-                        .into(),
-                    s,
-                ],
+                        .expect("Array type instantiation failed"),
+                ]),
             ),
         )
         .into()
