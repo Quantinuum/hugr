@@ -456,6 +456,25 @@ impl<RV: MaybeRV> TypeEnum<RV> {
 pub type Type = Term;
 pub type TypeRV = Term;
 
+// Fallibly convert a [Term] to a [TypeRV].
+//
+// This will fail if `arg` is of non-type kind (e.g. String).
+impl TryFrom<Term> for TypeRV {
+    type Error = SignatureError;
+
+    fn try_from(value: Term) -> Result<Self, Self::Error> {
+        match value {
+            TypeArg::Runtime(ty) => Ok(ty.into()),
+            TypeArg::Variable(v) => Ok(TypeRV::new_row_var_use(
+                v.index(),
+                v.bound_if_row_var()
+                    .ok_or(SignatureError::InvalidTypeArgs)?,
+            )),
+            _ => Err(SignatureError::InvalidTypeArgs),
+        }
+    }
+}
+
 impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<TypeEnum<RV1>> for TypeEnum<RV2> {
     fn eq(&self, other: &TypeEnum<RV1>) -> bool {
         match (self, other) {
