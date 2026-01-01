@@ -372,6 +372,10 @@ impl Term {
             Self::Extension(ct) => Some(ct.bound()),
             Self::RuntimeSum(st) => st.bound(),
             Self::RuntimeFunction(_) => Some(TypeBound::Copyable),
+            Self::Variable(v) => match &**v.cached_decl {
+                TypeParam::RuntimeType(b) => Some(b),
+                _ => None,
+            },
             _ => None,
         }
     }

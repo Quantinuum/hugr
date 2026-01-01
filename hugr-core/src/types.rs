@@ -24,7 +24,6 @@ pub use type_row::{TypeRow, TypeRowRV};
 
 pub(crate) use poly_func::PolyFuncTypeBase;
 
-use itertools::FoldWhile::{Continue, Done};
 use itertools::{Either, Itertools as _};
 #[cfg(test)]
 use proptest_derive::Arbitrary;
@@ -154,18 +153,6 @@ impl TypeBound {
     }
 }
 
-/// Calculate the least upper bound for an iterator of bounds
-pub(crate) fn least_upper_bound(mut tags: impl Iterator<Item = TypeBound>) -> TypeBound {
-    tags.fold_while(TypeBound::Copyable, |acc, new| {
-        if acc == TypeBound::Linear || new == TypeBound::Linear {
-            Done(TypeBound::Linear)
-        } else {
-            Continue(acc.union(new))
-        }
-    })
-    .into_inner()
-}
-
 #[derive(Clone, Debug, Eq, Serialize, Deserialize)]
 #[serde(tag = "s")]
 #[non_exhaustive]
@@ -289,9 +276,9 @@ impl SumType {
 
     /// Report the tag'th variant, if it exists.
     #[must_use]
-    pub fn get_variant(&self, tag: usize) -> Option<&TypeRowRV> {
+    pub fn get_variant(&self, tag: usize) -> Option<&Term> {
         match self {
-            SumType::Unit { size } if tag < (*size as usize) => Some(TypeRV::EMPTY_TYPEROW_REF),
+            SumType::Unit { size } if tag < (*size as usize) => Some(Type::EMPTY_TYPE_LIST),
             SumType::General(GeneralSum { rows, .. }) => rows.get(tag),
             _ => None,
         }
@@ -311,7 +298,7 @@ impl SumType {
     #[must_use]
     pub fn as_tuple(&self) -> Option<&Term> {
         match self {
-            SumType::Unit { size } if *size == 1 => Some(TypeRV::EMPTY_TYPEROW_REF),
+            SumType::Unit { size } if *size == 1 => Some(TypeRV::EMPTY_TYPE_LIST),
             SumType::General(GeneralSum { rows, .. }) if rows.len() == 1 => Some(&rows[0]),
             _ => None,
         }
@@ -338,7 +325,7 @@ impl SumType {
     pub fn variants(&self) -> impl Iterator<Item = &Term> {
         match self {
             SumType::Unit { size } => Either::Left(itertools::repeat_n(
-                TypeRV::EMPTY_TYPEROW_REF,
+                TypeRV::EMPTY_TYPE_LIST_REF,
                 *size as usize,
             )),
             SumType::General(GeneralSum { rows, .. }) => Either::Right(rows.iter()),
@@ -374,101 +361,18 @@ impl From<SumType> for Type {
     }
 }
 
-impl<RV: MaybeRV> TypeEnum<RV> {
-    /// The smallest type bound that covers the whole type.
-    fn least_upper_bound(&self) -> TypeBound {
-        match self {
-            TypeEnum::Extension(c) => c.bound(),
-            TypeEnum::Alias(a) => a.bound,
-            TypeEnum::Function(_) => TypeBound::Copyable,
-            TypeEnum::Variable(_, b) => *b,
-            TypeEnum::RowVar(b) => b.bound(),
-            TypeEnum::Sum(SumType::Unit { size: _ }) => TypeBound::Copyable,
-            TypeEnum::Sum(SumType::General { rows }) => least_upper_bound(
-                rows.iter()
-                    .flat_map(TypeRowRV::iter)
-                    .map(TypeRV::least_upper_bound),
-            ),
-        }
-    }
-}
-
-#[derive(Clone, Debug, Eq, Hash, derive_more::Display, serde::Serialize, serde::Deserialize)]
-#[display("{_0}")]
-#[serde(
-    into = "serialize::SerSimpleType",
-    try_from = "serialize::SerSimpleType"
-)]
-/// A HUGR type - the valid types of [`EdgeKind::Value`] and [`EdgeKind::Const`] edges.
-///
-/// Such an edge is valid if the ports on either end agree on the [Type].
-/// Types have an optional [`TypeBound`] which places limits on the valid
-/// operations on a type.
-///
-/// Examples:
-/// ```
-/// # use hugr::types::{Type, TypeBound};
-/// # use hugr::type_row;
-///
-/// let sum = Type::new_sum([type_row![], type_row![]]);
-/// assert_eq!(sum.least_upper_bound(), TypeBound::Copyable);
-/// ```
-///
-/// ```
-/// # use hugr::types::{Type, TypeBound, Signature};
-///
-/// let func_type: Type = Type::new_function(Signature::new_endo([]));
-/// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
-/// ```
 pub type Type = Term;
 pub type TypeRV = Term;
 
-// Fallibly convert a [Term] to a [TypeRV].
-//
-// This will fail if `arg` is of non-type kind (e.g. String).
-impl TryFrom<Term> for TypeRV {
-    type Error = SignatureError;
-
-    fn try_from(value: Term) -> Result<Self, Self::Error> {
-        match value {
-            TypeArg::Runtime(ty) => Ok(ty.into()),
-            TypeArg::Variable(v) => Ok(TypeRV::new_row_var_use(
-                v.index(),
-                v.bound_if_row_var()
-                    .ok_or(SignatureError::InvalidTypeArgs)?,
-            )),
-            _ => Err(SignatureError::InvalidTypeArgs),
-        }
-    }
-}
-
-impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<TypeEnum<RV1>> for TypeEnum<RV2> {
-    fn eq(&self, other: &TypeEnum<RV1>) -> bool {
-        match (self, other) {
-            (TypeEnum::Extension(e1), TypeEnum::Extension(e2)) => e1 == e2,
-            (TypeEnum::Alias(a1), TypeEnum::Alias(a2)) => a1 == a2,
-            (TypeEnum::Function(f1), TypeEnum::Function(f2)) => f1 == f2,
-            (TypeEnum::Variable(i1, b1), TypeEnum::Variable(i2, b2)) => i1 == i2 && b1 == b2,
-            (TypeEnum::RowVar(v1), TypeEnum::RowVar(v2)) => v1.as_rv() == v2.as_rv(),
-            (TypeEnum::Sum(s1), TypeEnum::Sum(s2)) => s1 == s2,
-            _ => false,
-        }
-    }
-}
-
-impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<TypeBase<RV1>> for TypeBase<RV2> {
-    fn eq(&self, other: &TypeBase<RV1>) -> bool {
-        self.0 == other.0 && self.1 == other.1
-    }
-}
-
 impl Type {
     /// An empty `TypeRow` or `TypeRowRV`. Provided here for convenience
-    pub const EMPTY_TYPEROW: TypeRowBase<RV> = TypeRowBase::<RV>::new();
+    pub const EMPTY_TYPEROW: TypeRow = TypeRow::new();
     /// Runtime unit type (empty tuple).
     pub const UNIT: Self = Self::RuntimeSum(SumType::Unit { size: 1 });
 
-    const EMPTY_TYPEROW_REF: &'static TypeRowBase<RV> = &Self::EMPTY_TYPEROW;
+    const EMPTY_TYPE_LIST: Term = Term::List(vec![]); // or (EMPTY_TYPEROW)....? ALAN
+
+    const EMPTY_TYPER_LIST_REF: &'static Term = &Self::EMPTY_TYPE_LIST;
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<FuncValueType>) -> Self {
@@ -525,6 +429,7 @@ impl Type {
         // that is guaranteed by construction (even for deserialization)
         match &self.0 {
             TypeEnum::Sum(SumType::General { rows }) => {
+                // ALAN also verify the cached bound??
                 rows.iter().try_for_each(|row| row.validate(var_decls))
             }
             TypeEnum::Sum(SumType::Unit { .. }) => Ok(()), // No leaves there
@@ -580,14 +485,6 @@ impl Type {
     }
 }
 
-impl<RV: MaybeRV> Transformable for TypeBase<RV> {
-    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
-        match &mut self.0 {
-            TypeEnum::Alias(_) | TypeEnum::RowVar(_) | TypeEnum::Variable(..) => Ok(false),
-        }
-    }
-}
-
 impl Type {
     fn substitute1(&self, s: &Substitution) -> Self {
         let v = self.substitute(s);
@@ -600,7 +497,11 @@ impl TypeRV {
     /// Tells if this Type is a row variable, i.e. could stand for any number >=0 of Types
     #[must_use]
     pub fn is_row_var(&self) -> bool {
-        matches!(self.0, TypeEnum::RowVar(_))
+        if let Term::Variable(var) = self {
+            matches!(&**var.cached_decl, Term::ListType(Term::RuntimeType(_)))
+        } else {
+            false
+        }
     }
 
     /// New use (occurrence) of the row variable with specified index.
@@ -612,7 +513,7 @@ impl TypeRV {
     /// [FuncDefn]: crate::ops::FuncDefn
     #[must_use]
     pub const fn new_row_var_use(idx: usize, bound: TypeBound) -> Self {
-        Self(TypeEnum::RowVar(RowVariable(idx, bound)), bound)
+        Self::new_var_use(idx, Term::ListType(bound.into()))
     }
 }
 
