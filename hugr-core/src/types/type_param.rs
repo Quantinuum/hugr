@@ -257,30 +257,6 @@ impl Term {
             _ => false,
         }
     }
-
-    pub fn new_spliced_list(
-        elems: impl IntoIterator<Item = Term>,
-        elem_ty: &Term,
-    ) -> Result<Self, TermTypeError> {
-        let list_ty = Self::new_list_type(elem_ty.clone());
-        let parts = elems
-            .into_iter()
-            .map(|e| {
-                if check_term_type(&e, elem_ty).is_ok() {
-                    Ok(SeqPart::Item(e))
-                } else if check_term_type(&e, &list_ty).is_ok() {
-                    Ok(SeqPart::Splice(e))
-                } else {
-                    Err(TermTypeError::TypeMismatch {
-                        term: Box::new(e),
-                        type_: Box::new(elem_ty.clone()), // Not really the right error
-                    })
-                }
-            })
-            .collect::<Result<Vec<_>, _>>()?;
-
-        Ok(Self::new_list_from_parts(parts))
-    }
 }
 
 impl From<TypeBound> for Term {
