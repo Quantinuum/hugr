@@ -445,10 +445,7 @@ pub(crate) mod test {
         let rty = Term::new_row_var_use(0, TypeBound::Linear);
         let pf = PolyFuncTypeRV::new_validated(
             [TypeParam::new_list_type(TP_ANY)],
-            FuncValueType::new(
-                Term::new_list_concat([Term::new_list([usize_t()]), rty.clone()]),
-                [Term::new_runtime_tuple(rty)],
-            ),
+            FuncValueType::new_spliced([usize_t(), rty.clone()], [Term::new_runtime_tuple(rty)]),
         )
         .unwrap();
 

@@ -97,6 +97,21 @@ impl<T> FuncTypeBase<T> {
 }
 
 impl FuncValueType {
+    pub fn try_new_spliced(
+        input: impl Into<TypeRow>,
+        output: impl Into<TypeRow>,
+    ) -> Result<Self, TermTypeError> {
+        let input = Term::new_spliced_list(input.into().into_owned(), &TypeBound::Linear.into())?;
+        let output = Term::new_spliced_list(output.into().into_owned(), &TypeBound::Linear.into())?;
+        debug_assert!(check_term_type(&input, &Term::new_list_type(TypeBound::Linear)).is_ok());
+        debug_assert!(check_term_type(&output, &Term::new_list_type(TypeBound::Linear)).is_ok());
+        Ok(Self::new_unchecked(input, output))
+    }
+
+    pub fn new_spliced(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
+        Self::try_new_spliced(input, output).unwrap()
+    }
+
     /// Create a new FuncValueType with specified inputs and outputs.
     ///
     /// # Panics

@@ -204,6 +204,22 @@ fn sum_bound<'a>(rows: impl IntoIterator<Item = &'a Term>) -> TypeBound {
 }
 
 impl GeneralSum {
+    pub fn try_new_spliced(rows: impl IntoIterator<Item = TypeRow>) -> Result<Self, TermTypeError> {
+        let rows = rows
+            .into_iter()
+            .map(|row| Term::new_spliced_list(row.into_owned(), &TypeBound::Linear.into()))
+            .collect::<Result<Vec<_>, _>>()?;
+        debug_assert!(
+            rows.iter()
+                .all(|t| check_term_type(t, &Term::new_list_type(TypeBound::Linear)).is_ok())
+        );
+        Ok(Self::new_unchecked(rows))
+    }
+
+    pub fn new_spliced(rows: impl IntoIterator<Item = TypeRow>) -> Self {
+        Self::try_new_spliced(rows).unwrap()
+    }
+
     /// Initialize a new general sum type. (Note the number of variants is fixed.)
     ///
     /// # Panics
@@ -277,6 +293,25 @@ impl std::fmt::Display for SumType {
 }
 
 impl SumType {
+    pub fn try_new_spliced<R: Into<TypeRow>>(
+        variants: impl IntoIterator<Item = R>,
+    ) -> Result<Self, TermTypeError> {
+        let variants = variants
+            .into_iter()
+            .map(|v| Term::new_spliced_list(v.into().into_owned(), &TypeBound::Linear.into()))
+            .collect::<Result<Vec<_>, _>>()?;
+        debug_assert!(
+            variants
+                .iter()
+                .all(|t| check_term_type(t, &Term::new_list_type(TypeBound::Linear)).is_ok())
+        );
+        Ok(Self::new_unchecked(variants))
+    }
+
+    pub fn new_spliced<R: Into<TypeRow>>(variants: impl IntoIterator<Item = R>) -> Self {
+        Self::try_new_spliced(variants).unwrap()
+    }
+
     /// Initialize a new sum type.
     ///
     /// # Panics
