@@ -12,7 +12,7 @@ use thiserror::Error;
 
 use crate::IncomingPort;
 use crate::extension::resolution::{
-    ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_term_extensions,
 };
 use crate::macros::impl_box_clone;
 use crate::types::{CustomCheckFailure, Type};
@@ -174,8 +174,16 @@ impl_box_clone!(CustomConst, CustomConstBoxClone);
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// A constant value stored as a serialized blob that can report its own type.
 pub struct CustomSerialized {
+    #[serde(serialize_with = "into_sertype")]
     typ: Type,
     value: serde_json::Value,
+}
+
+fn into_sertype<S: serde::Serializer>(ty: &Type, s: S) -> Result<S::Ok, S::Error> {
+    use serde::Serialize;
+    crate::types::serialize::SerSimpleType::try_from(ty.clone())
+        .unwrap()
+        .serialize(s)
 }
 
 #[derive(Debug, Error)]
@@ -303,7 +311,7 @@ impl CustomConst for CustomSerialized {
         &mut self,
         extensions: &WeakExtensionRegistry,
     ) -> Result<(), ExtensionResolutionError> {
-        resolve_type_extensions(&mut self.typ, extensions)
+        resolve_term_extensions(&mut self.typ, extensions)
     }
     fn get_type(&self) -> Type {
         self.typ.clone()

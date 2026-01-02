@@ -1,12 +1,10 @@
 //! Handles to nodes in HUGR.
 use crate::Node;
 use crate::core::HugrNode;
-use crate::types::{Type, TypeBound};
 
 use derive_more::From as DerFrom;
-use smol_str::SmolStr;
 
-use super::{AliasDecl, OpTag};
+use super::OpTag;
 
 /// Common trait for handles to a node.
 /// Typically wrappers around [`Node`].
@@ -70,34 +68,6 @@ pub struct ModuleID<N = Node>(N);
 /// The `DEF` const generic is used to indicate whether the function is
 /// defined or just declared.
 pub struct FuncID<const DEF: bool, N = Node>(N);
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-/// Handle to an [`AliasDefn`](crate::ops::OpType::AliasDefn)
-/// or [`AliasDecl`](crate::ops::OpType::AliasDecl) node.
-///
-/// The `DEF` const generic is used to indicate whether the function is
-/// defined or just declared.
-pub struct AliasID<const DEF: bool, N = Node> {
-    node: N,
-    name: SmolStr,
-    bound: TypeBound,
-}
-
-impl<const DEF: bool, N> AliasID<DEF, N> {
-    /// Construct new `AliasID`
-    pub fn new(node: N, name: SmolStr, bound: TypeBound) -> Self {
-        Self { node, name, bound }
-    }
-
-    /// Construct new `AliasID`
-    pub fn get_alias_type(&self) -> Type {
-        Type::new_alias(AliasDecl::new(self.name.clone(), self.bound))
-    }
-    /// Retrieve the underlying core type
-    pub fn get_name(&self) -> &SmolStr {
-        &self.name
-    }
-}
 
 #[derive(DerFrom, Debug, Clone, PartialEq, Eq)]
 /// Handle to a [Const](crate::ops::OpType::Const) node.
@@ -166,14 +136,6 @@ impl<const DEF: bool, N: HugrNode> NodeHandle<N> for FuncID<DEF, N> {
     }
 }
 
-impl<const DEF: bool, N: HugrNode> NodeHandle<N> for AliasID<DEF, N> {
-    const TAG: OpTag = OpTag::Alias;
-    #[inline]
-    fn node(&self) -> N {
-        self.node
-    }
-}
-
 impl<N: HugrNode> NodeHandle<N> for N {
     const TAG: OpTag = OpTag::Any;
     #[inline]
@@ -200,8 +162,5 @@ impl_containerHandle!(ModuleRootID, ModuleID);
 impl_containerHandle!(CfgID, BasicBlockID);
 impl_containerHandle!(BasicBlockID, DataflowOpID);
 impl<N: HugrNode> ContainerHandle<N> for FuncID<true, N> {
-    type ChildrenHandle = DataflowOpID<N>;
-}
-impl<N: HugrNode> ContainerHandle<N> for AliasID<true, N> {
     type ChildrenHandle = DataflowOpID<N>;
 }

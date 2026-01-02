@@ -287,7 +287,7 @@ mod test {
 
     #[test]
     fn test_polymorphic() -> Result<(), Box<dyn std::error::Error>> {
-        let tuple_ty = Type::new_tuple(vec![usize_t(); 2]);
+        let tuple_ty = Type::new_runtime_tuple(vec![usize_t(); 2]);
         let mut fb =
             FunctionBuilder::new("mkpair", Signature::new([usize_t()], [tuple_ty.clone()]))?;
         let helper = {
@@ -302,10 +302,10 @@ mod test {
             let inps = fb2.input_wires();
             fb2.finish_with_outputs(inps)?
         };
-        let call1 = fb.call(helper.handle(), &[usize_t().into()], fb.input_wires())?;
+        let call1 = fb.call(helper.handle(), &[usize_t()], fb.input_wires())?;
         let [call1_out] = call1.outputs_arr();
         let tup = fb.make_tuple([call1_out, call1_out])?;
-        let call2 = fb.call(helper.handle(), &[tuple_ty.into()], [tup])?;
+        let call2 = fb.call(helper.handle(), &[tuple_ty], [tup])?;
         let mut hugr = fb.finish_hugr_with_outputs(call2.outputs()).unwrap();
 
         assert_eq!(

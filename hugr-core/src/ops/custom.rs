@@ -11,11 +11,11 @@ use {
     ::proptest_derive::Arbitrary,
 };
 
-use crate::core::HugrNode;
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ConstFoldResult, ExtensionId, OpDef, SignatureError};
 use crate::types::{Signature, type_param::TypeArg};
 use crate::{IncomingPort, ops};
+use crate::{core::HugrNode, types::Substitutable};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
@@ -410,11 +410,11 @@ mod test {
         let op = OpaqueOp::new(
             "res".try_into().unwrap(),
             "op",
-            vec![usize_t().into()],
+            vec![usize_t()],
             sig.clone(),
         );
         assert_eq!(op.name(), "OpaqueOp:res.op");
-        assert_eq!(op.args(), &[usize_t().into()]);
+        assert_eq!(op.args(), &[usize_t()]);
         assert_eq!(op.signature().as_ref(), &sig);
 
         let optype: OpType = op.into();

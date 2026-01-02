@@ -293,9 +293,7 @@ fn add_control_prefixes<H: HugrMut>(
         else {
             panic!("impossible")
         };
-        let Some(sum_type) = control_type.as_sum() else {
-            panic!("impossible")
-        };
+        let sum_type = control_type.as_runtime_sum().unwrap();
 
         let mut type_for_source = |source: &(Wire<H::Node>, Type)| {
             let (w, t) = source;

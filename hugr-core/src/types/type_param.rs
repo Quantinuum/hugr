@@ -14,12 +14,9 @@ use std::sync::Arc;
 use thiserror::Error;
 use tracing::warn;
 
-use super::row_var::MaybeRV;
-use super::{
-    NoRV, RowVariable, Substitution, Transformable, Type, TypeBase, TypeBound, TypeTransformer,
-    check_typevar_decl,
-};
+use super::{Substitution, Transformable, Type, TypeBound, TypeTransformer};
 use crate::extension::SignatureError;
+use crate::types::{CustomType, FuncValueType, GeneralSum, Substitutable, SumType};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -95,9 +92,22 @@ pub enum Term {
     /// The type of static tuples.
     #[display("TupleType[{_0}]")]
     TupleType(Box<Term>),
-    /// A runtime type as a term. Instance of [`Term::RuntimeType`].
+    /// The type of runtime values defined by an extension type.
+    /// Instance of [Self::RuntimeType] for some bound.
+    //
+    // TODO optimise with `Box<CustomType>`?
+    // or some static version of this?
+    RuntimeExtension(CustomType),
+    /// The type of runtime values that are function pointers.
+    /// Instance of [Self::RuntimeType]`(`[TypeBound::Copyable]`)`.
+    /// Function values may be passed around without knowing their arity
+    /// (i.e. with row vars) as long as they are not called.
     #[display("{_0}")]
-    Runtime(Type),
+    RuntimeFunction(Box<FuncValueType>),
+    /// The type of runtime values that are sums of products (ADTs)
+    /// Instance of [Self::RuntimeType]`(bound)` for `bound` calculated from each variant's elements.
+    #[display("{_0}")]
+    RuntimeSum(SumType),
     /// A 64bit unsigned integer literal. Instance of [`Term::BoundedNatType`].
     #[display("{_0}")]
     BoundedNat(u64),
@@ -113,7 +123,8 @@ pub enum Term {
     /// A list of static terms. Instance of [`Term::ListType`].
     #[display("[{}]", {
         use itertools::Itertools as _;
-        _0.iter().map(|t|t.to_string()).join(",")
+        // extra space matching old Display for Type(Row) - TODO, change Vec<Type> to TypeRow?
+        _0.iter().map(|t|t.to_string()).join(", ")
     })]
     List(Vec<Term>),
     /// Instance of [`TypeParam::List`] defined by a sequence of concatenated lists of the same type.
@@ -197,21 +208,55 @@ impl Term {
             (Term::StringType, Term::StringType) => true,
             (Term::StaticType, Term::StaticType) => true,
             (Term::ListType(e1), Term::ListType(e2)) => e1.is_supertype(e2),
+            // The term inside a TupleType is a list of types, so this is ok as long as
+            // supertype holds element-wise
             (Term::TupleType(es1), Term::TupleType(es2)) => es1.is_supertype(es2),
             (Term::BytesType, Term::BytesType) => true,
             (Term::FloatType, Term::FloatType) => true,
-            (Term::Runtime(t1), Term::Runtime(t2)) => t1 == t2,
+            // Needed for TupleType, does not make a great deal of sense otherwise:
+            (Term::List(es1), Term::List(es2)) => {
+                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
+            }
+            // The following are not types (they have no instances), so these are just to
+            // maintain reflexivity of the relation:
+            (Term::RuntimeSum(t1), Term::RuntimeSum(t2)) => t1 == t2,
+            (Term::RuntimeFunction(f1), Term::RuntimeFunction(f2)) => f1 == f2,
+            (Term::RuntimeExtension(c1), Term::RuntimeExtension(c2)) => c1 == c2,
             (Term::BoundedNat(n1), Term::BoundedNat(n2)) => n1 == n2,
             (Term::String(s1), Term::String(s2)) => s1 == s2,
             (Term::Bytes(v1), Term::Bytes(v2)) => v1 == v2,
             (Term::Float(f1), Term::Float(f2)) => f1 == f2,
             (Term::Variable(v1), Term::Variable(v2)) => v1 == v2,
-            (Term::List(es1), Term::List(es2)) => {
-                es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
-            }
             (Term::Tuple(es1), Term::Tuple(es2)) => {
                 es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
             }
+            _ => false,
+        }
+    }
+
+    /*pub fn try_into_list_elements(self) -> Result<TypeRow, SignatureError> {
+            Ok(self
+                .into_list_parts()
+                .map(|s| match s {
+                    SeqPart::Item(i) => Ok(i),
+                    SeqPart::Splice(term) => Err(SignatureError::TypeArgMismatch(
+                        TermTypeError::TypeMismatch {
+                            term: Box::new(term),
+                            type_: Box::new(TypeBound::Copyable.into()),
+                        },
+                    )),
+                })
+                .collect::<Result<Vec<_>, _>>()?
+                .into())
+        }
+    */
+
+    /// Returns true if this term is an empty list (contains no elements)
+    pub fn is_empty_list(&self) -> bool {
+        match self {
+            Term::List(v) => v.is_empty(),
+            // We probably don't need to be this thorough in dealing with unnormalized forms but it's easy enough
+            Term::ListConcat(v) => v.iter().all(Term::is_empty_list),
             _ => false,
         }
     }
@@ -229,6 +274,7 @@ impl From<UpperBound> for Term {
     }
 }
 
+/*ALAN delete(?)
 impl<RV: MaybeRV> From<TypeBase<RV>> for Term {
     fn from(value: TypeBase<RV>) -> Self {
         match value.try_into_type() {
@@ -236,7 +282,7 @@ impl<RV: MaybeRV> From<TypeBase<RV>> for Term {
             Err(RowVariable(idx, bound)) => Term::new_var_use(idx, TypeParam::new_list_type(bound)),
         }
     }
-}
+}*/
 
 impl From<u64> for Term {
     fn from(n: u64) -> Self {
@@ -280,24 +326,15 @@ pub struct TermVar {
 }
 
 impl Term {
-    /// [`Type::UNIT`] as a [`Term::Runtime`]
-    pub const UNIT: Self = Self::Runtime(Type::UNIT);
-
     /// Makes a `TypeArg` representing a use (occurrence) of the type variable
     /// with the specified index.
     /// `decl` must be exactly that with which the variable was declared.
     #[must_use]
-    pub fn new_var_use(idx: usize, decl: Term) -> Self {
-        match decl {
-            // Note a TypeParam::List of TypeParam::Type *cannot* be represented
-            // as a TypeArg::Type because the latter stores a Type<false> i.e. only a single type,
-            // not a RowVariable.
-            Term::RuntimeType(b) => Type::new_var_use(idx, b).into(),
-            _ => Term::Variable(TermVar {
-                idx,
-                cached_decl: Box::new(decl),
-            }),
-        }
+    pub fn new_var_use(idx: usize, decl: impl Into<Term>) -> Self {
+        Term::Variable(TermVar {
+            idx,
+            cached_decl: Box::new(decl.into()),
+        })
     }
 
     /// Creates a new string literal.
@@ -333,12 +370,53 @@ impl Term {
         }
     }
 
-    /// Returns a [`Type`] if the [`Term`] is a runtime type.
-    #[must_use]
-    pub fn as_runtime(&self) -> Option<TypeBase<NoRV>> {
+    /// Returns whether this `Term` is a type of runtime values
+    pub fn is_runtime(&self) -> bool {
+        matches!(
+            self,
+            Term::RuntimeExtension(_) | Term::RuntimeFunction(_) | Term::RuntimeSum(_)
+        )
+    }
+
+    /// Returns the inner [`CustomType`] if the type is from an extension.
+    pub fn as_extension(&self) -> Option<&CustomType> {
         match self {
-            TypeArg::Runtime(ty) => Some(ty.clone()),
+            Self::RuntimeExtension(ct) => Some(ct),
             _ => None,
+        }
+    }
+
+    /// Returns the inner [`SumType`] if the type is a [Self::RuntimeSum].
+    pub fn as_runtime_sum(&self) -> Option<&SumType> {
+        match self {
+            Self::RuntimeSum(st) => Some(st),
+            _ => None,
+        }
+    }
+
+    /// Returns the [TypeBound] if this `Term` is a runtime type.
+    /// (Does not check sub-[Term]s inside [Self::RuntimeSum] or [Self::RuntimeFunction];
+    /// call [Self::validate] for that.)
+    pub const fn least_upper_bound(&self) -> Option<TypeBound> {
+        match self {
+            Self::RuntimeExtension(ct) => Some(ct.bound()),
+            Self::RuntimeSum(st) => Some(st.bound()),
+            Self::RuntimeFunction(_) => Some(TypeBound::Copyable),
+            Self::Variable(v) => match &*v.cached_decl {
+                TypeParam::RuntimeType(b) => Some(*b),
+                _ => None,
+            },
+            _ => None,
+        }
+    }
+
+    /// Report if this is a copyable runtime type, i.e. an instance
+    /// of [Self::RuntimeType]`(`[TypeBound::Copyable]`)`
+    // - i.e.the least upper bound of the type is contained by the copyable bound.
+    pub const fn copyable(&self) -> bool {
+        match self.least_upper_bound() {
+            Some(b) => TypeBound::Copyable.contains(b),
+            None => false,
         }
     }
 
@@ -351,29 +429,50 @@ impl Term {
         }
     }
 
-    /// Much as [`Type::validate`], also checks that the type of any [`TypeArg::Opaque`]
-    /// is valid and closed.
+    /// Checks all variables used in the type are in the provided list
+    /// of bound variables, rejecting any [`RowVariable`]s if `allow_row_vars` is False;
+    /// and that for each [`CustomType`] the corresponding
+    /// [`TypeDef`] is in the [`ExtensionRegistry`] and the type arguments
+    /// [validate] and fit into the def's declared parameters.
+    ///
+    /// [RowVariable]: TypeEnum::RowVariable
+    /// [validate]: crate::types::type_param::TypeArg::validate
+    /// [TypeDef]: crate::extension::TypeDef
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            Term::Runtime(ty) => ty.validate(var_decls),
+            Term::RuntimeSum(SumType::General(GeneralSum { rows, bound })) => {
+                rows.iter().try_for_each(|row| row.validate(var_decls))?;
+                // check_term_type does not look beyond the cached bound, so do that here.
+                rows.iter()
+                    .try_for_each(|row| check_term_type(row, &Term::new_list_type(*bound)))?;
+                debug_assert!(
+                    *bound == TypeBound::Copyable
+                        || !rows.iter().all(|r| {
+                            check_term_type(r, &Term::new_list_type(TypeBound::Copyable)).is_ok()
+                        }),
+                    "Incorrect bound, should have been Copyable"
+                );
+                Ok(())
+            }
+            Term::RuntimeSum(SumType::Unit { .. }) => Ok(()), // No leaves there
+            Term::RuntimeExtension(custy) => custy.validate(var_decls),
+            Term::RuntimeFunction(ft) => ft.validate(var_decls),
             Term::List(elems) => {
-                // TODO: Full validation would check that the type of the elements agrees
+                // Full validation might check that the type of the elements agrees.
+                // However we will leave this to a separate check_term_type which knows
+                // the required element type.
                 elems.iter().try_for_each(|a| a.validate(var_decls))
             }
             Term::Tuple(elems) => elems.iter().try_for_each(|a| a.validate(var_decls)),
             Term::BoundedNat(_) | Term::String { .. } | Term::Float(_) | Term::Bytes(_) => Ok(()),
             TypeArg::ListConcat(lists) => {
-                // TODO: Full validation would check that each of the lists is indeed a
-                // list or list variable of the correct types.
+                // Full validation might check that each of the lists is indeed a list or
+                // list variable of the correct types. However we will leave this to a
+                // separate check_term_type which knows the required element type.
                 lists.iter().try_for_each(|a| a.validate(var_decls))
             }
             TypeArg::TupleConcat(tuples) => tuples.iter().try_for_each(|a| a.validate(var_decls)),
             Term::Variable(TermVar { idx, cached_decl }) => {
-                assert!(
-                    !matches!(&**cached_decl, TypeParam::RuntimeType { .. }),
-                    "Malformed TypeArg::Variable {cached_decl} - should be inconstructible"
-                );
-
                 check_typevar_decl(var_decls, *idx, cached_decl)
             }
             Term::RuntimeType { .. } => Ok(()),
@@ -385,70 +484,6 @@ impl Term {
             Term::TupleType(item_types) => item_types.validate(var_decls),
             Term::StaticType => Ok(()),
             Term::ConstType(ty) => ty.validate(var_decls),
-        }
-    }
-
-    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
-        match self {
-            Term::Runtime(ty) => {
-                // RowVariables are represented as Term::Variable
-                ty.substitute1(t).into()
-            }
-            TypeArg::BoundedNat(_) | TypeArg::String(_) | TypeArg::Bytes(_) | TypeArg::Float(_) => {
-                self.clone()
-            } // We do not allow variables as bounds on BoundedNat's
-            TypeArg::List(elems) => {
-                // NOTE: This implements a hack allowing substitutions to
-                // replace `TypeArg::Variable`s representing "row variables"
-                // with a list that is to be spliced into the containing list.
-                // We won't need this code anymore once we stop conflating types
-                // with lists of types.
-
-                fn is_type(type_arg: &TypeArg) -> bool {
-                    match type_arg {
-                        TypeArg::Runtime(_) => true,
-                        TypeArg::Variable(v) => v.bound_if_row_var().is_some(),
-                        _ => false,
-                    }
-                }
-
-                let are_types = elems.first().map(is_type).unwrap_or(false);
-
-                Self::new_list_from_parts(elems.iter().map(|elem| match elem.substitute(t) {
-                    list @ TypeArg::List { .. } if are_types => SeqPart::Splice(list),
-                    list @ TypeArg::ListConcat { .. } if are_types => SeqPart::Splice(list),
-                    elem => SeqPart::Item(elem),
-                }))
-            }
-            TypeArg::ListConcat(lists) => {
-                // When a substitution instantiates spliced list variables, we
-                // may be able to merge the concatenated lists.
-                Self::new_list_from_parts(
-                    lists.iter().map(|list| SeqPart::Splice(list.substitute(t))),
-                )
-            }
-            Term::Tuple(elems) => {
-                Term::Tuple(elems.iter().map(|elem| elem.substitute(t)).collect())
-            }
-            TypeArg::TupleConcat(tuples) => {
-                // When a substitution instantiates spliced tuple variables,
-                // we may be able to merge the concatenated tuples.
-                Self::new_tuple_from_parts(
-                    tuples
-                        .iter()
-                        .map(|tuple| SeqPart::Splice(tuple.substitute(t))),
-                )
-            }
-            TypeArg::Variable(TermVar { idx, cached_decl }) => t.apply_var(*idx, cached_decl),
-            Term::RuntimeType(_) => self.clone(),
-            Term::BoundedNatType(_) => self.clone(),
-            Term::StringType => self.clone(),
-            Term::BytesType => self.clone(),
-            Term::FloatType => self.clone(),
-            Term::ListType(item_type) => Term::new_list_type(item_type.substitute(t)),
-            Term::TupleType(item_types) => Term::new_list_type(item_types.substitute(t)),
-            Term::StaticType => self.clone(),
-            Term::ConstType(ty) => Term::new_const(ty.substitute1(t)),
         }
     }
 
@@ -484,7 +519,7 @@ impl Term {
     }
 
     /// Creates a new list from a sequence of [`SeqPart`]s.
-    pub fn new_list_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
+    pub(crate) fn new_list_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
         Self::new_seq_from_parts(
             parts.into_iter().flat_map(ListPartIter::new),
             TypeArg::List,
@@ -565,14 +600,14 @@ impl Term {
     /// );
     /// ```
     #[inline]
-    pub fn into_list_parts(self) -> ListPartIter {
+    pub(crate) fn into_list_parts(self) -> ListPartIter {
         ListPartIter::new(SeqPart::Splice(self))
     }
 
     /// Creates a new tuple from a sequence of [`SeqPart`]s.
     ///
     /// Analogous to [`TypeArg::new_list_from_parts`].
-    pub fn new_tuple_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
+    pub(crate) fn new_tuple_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
         Self::new_seq_from_parts(
             parts.into_iter().flat_map(TuplePartIter::new),
             TypeArg::Tuple,
@@ -584,15 +619,106 @@ impl Term {
     ///
     /// Analogous to [`TypeArg::into_list_parts`].
     #[inline]
-    pub fn into_tuple_parts(self) -> TuplePartIter {
+    pub(crate) fn into_tuple_parts(self) -> TuplePartIter {
         TuplePartIter::new(SeqPart::Splice(self))
+    }
+}
+
+fn check_typevar_decl(
+    decls: &[TypeParam],
+    idx: usize,
+    cached_decl: &TypeParam,
+) -> Result<(), SignatureError> {
+    match decls.get(idx) {
+        None => Err(SignatureError::FreeTypeVar {
+            idx,
+            num_decls: decls.len(),
+        }),
+        Some(actual) => {
+            // The cache here just mirrors the declaration. The typevar can be used
+            // anywhere expecting a kind *containing* the decl - see `check_type_arg`.
+            if actual == cached_decl {
+                Ok(())
+            } else {
+                Err(SignatureError::TypeVarDoesNotMatchDeclaration {
+                    cached: Box::new(cached_decl.clone()),
+                    actual: Box::new(actual.clone()),
+                })
+            }
+        }
+    }
+}
+
+impl Substitutable for Term {
+    fn substitute(&self, s: &Substitution) -> Self {
+        match self {
+            TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
+            TypeArg::RuntimeSum(SumType::General(GeneralSum { rows, .. })) => {
+                // A substitution of a row variable for an empty list, could make this from
+                // a GeneralSum into a unary SumType. Even new_unchecked recomputes the bound.
+                SumType::new_unchecked(rows.substitute(s).into_owned()).into()
+            }
+            TypeArg::RuntimeExtension(cty) => Term::new_extension(cty.substitute(s)),
+            TypeArg::RuntimeFunction(bf) => Term::new_function(bf.substitute(s)),
+
+            TypeArg::BoundedNat(_) | TypeArg::String(_) | TypeArg::Bytes(_) | TypeArg::Float(_) => {
+                self.clone()
+            } // We do not allow variables as bounds on BoundedNat's
+            TypeArg::List(elems) => Self::List(elems.iter().map(|t| t.substitute(s)).collect()),
+            TypeArg::ListConcat(lists) => {
+                // When a substitution instantiates spliced list variables, we
+                // may be able to merge the concatenated lists.
+                Self::new_list_from_parts(
+                    lists.iter().map(|list| SeqPart::Splice(list.substitute(s))),
+                )
+            }
+            Term::Tuple(elems) => {
+                Term::Tuple(elems.iter().map(|elem| elem.substitute(s)).collect())
+            }
+            TypeArg::TupleConcat(tuples) => {
+                // When a substitution instantiates spliced tuple variables,
+                // we may be able to merge the concatenated tuples.
+                Self::new_tuple_from_parts(
+                    tuples
+                        .iter()
+                        .map(|tuple| SeqPart::Splice(tuple.substitute(s))),
+                )
+            }
+            TypeArg::Variable(TermVar { idx, cached_decl }) => s.apply_var(*idx, cached_decl),
+            Term::RuntimeType(_) => self.clone(),
+            Term::BoundedNatType(_) => self.clone(),
+            Term::StringType => self.clone(),
+            Term::BytesType => self.clone(),
+            Term::FloatType => self.clone(),
+            Term::ListType(item_type) => Term::new_list_type(item_type.substitute(s)),
+            Term::TupleType(item_types) => Term::new_list_type(item_types.substitute(s)),
+            Term::StaticType => self.clone(),
+            Term::ConstType(ty) => Term::new_const(ty.substitute(s)),
+        }
     }
 }
 
 impl Transformable for Term {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match self {
-            Term::Runtime(ty) => ty.transform(tr),
+            Term::RuntimeExtension(custom_type) => {
+                if let Some(nt) = tr.apply_custom(custom_type)? {
+                    *self = nt;
+                    Ok(true)
+                } else {
+                    let args_changed = custom_type.args_mut().transform(tr)?;
+                    if args_changed {
+                        *self = Self::new_extension(
+                            custom_type
+                                .get_type_def(&custom_type.get_extension()?)?
+                                .instantiate(custom_type.args())?,
+                        );
+                    }
+                    Ok(args_changed)
+                }
+            }
+            Term::RuntimeFunction(fty) => fty.transform(tr),
+            Term::RuntimeSum(sum_type) => sum_type.transform(tr),
             Term::List(elems) => elems.transform(tr),
             Term::Tuple(elems) => elems.transform(tr),
             Term::BoundedNat(_)
@@ -641,24 +767,17 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::Variable(TermVar { cached_decl, .. }), _) if type_.is_supertype(cached_decl) => {
             Ok(())
         }
-        (Term::Runtime(ty), Term::RuntimeType(bound)) if bound.contains(ty.least_upper_bound()) => {
+        (Term::RuntimeSum(st), Term::RuntimeType(bound)) if bound.contains(st.bound()) => Ok(()),
+        (Term::RuntimeFunction(_), Term::RuntimeType(_)) => Ok(()), // Function pointers are always Copyable so fit any bound
+        (Term::RuntimeExtension(cty), Term::RuntimeType(bound)) if bound.contains(cty.bound()) => {
             Ok(())
         }
-        (Term::List(elems), Term::ListType(item_type)) => {
-            elems.iter().try_for_each(|term| {
-                // Also allow elements that are RowVars if fitting into a List of Types
-                if let (Term::Variable(v), Term::RuntimeType(param_bound)) = (term, &**item_type)
-                    && v.bound_if_row_var()
-                        .is_some_and(|arg_bound| param_bound.contains(arg_bound))
-                {
-                    return Ok(());
-                }
-                check_term_type(term, item_type)
-            })
-        }
-        (Term::ListConcat(lists), Term::ListType(item_type)) => lists
+        (Term::List(elems), Term::ListType(item_type)) => elems
             .iter()
-            .try_for_each(|list| check_term_type(list, item_type)),
+            .try_for_each(|elem| check_term_type(elem, item_type)),
+        (Term::ListConcat(lists), Term::ListType(_)) => lists
+            .iter()
+            .try_for_each(|list| check_term_type(list, type_)), // ALAN this used the element type, which seems very wrong
         (TypeArg::Tuple(_) | TypeArg::TupleConcat(_), TypeParam::TupleType(item_types)) => {
             let term_parts: Vec<_> = term.clone().into_tuple_parts().collect();
             let type_parts: Vec<_> = item_types.clone().into_list_parts().collect();
@@ -753,7 +872,7 @@ pub enum TermTypeError {
 
 /// Part of a sequence.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum SeqPart<T> {
+pub(crate) enum SeqPart<T> {
     /// An individual item in the sequence.
     Item(T),
     /// A subsequence that is spliced into the parent sequence.
@@ -762,7 +881,7 @@ pub enum SeqPart<T> {
 
 /// Iterator created by [`TypeArg::into_list_parts`].
 #[derive(Debug, Clone)]
-pub struct ListPartIter {
+pub(crate) struct ListPartIter {
     parts: SmallVec<[SeqPart<TypeArg>; 1]>,
 }
 
@@ -797,7 +916,7 @@ impl FusedIterator for ListPartIter {}
 
 /// Iterator created by [`TypeArg::into_tuple_parts`].
 #[derive(Debug, Clone)]
-pub struct TuplePartIter {
+pub(crate) struct TuplePartIter {
     parts: SmallVec<[SeqPart<TypeArg>; 1]>,
 }
 
@@ -836,8 +955,8 @@ mod test {
 
     use super::{Substitution, TypeArg, TypeParam, check_term_type};
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::types::Term;
     use crate::types::type_param::SeqPart;
+    use crate::types::{Substitutable, Term, TypeRow};
     use crate::types::{TypeBound, TypeRV, type_param::TermTypeError};
 
     #[test]
@@ -918,34 +1037,36 @@ mod test {
 
         // Into a list of type, we can fit a single row var
         check(rowvar(0, TypeBound::Copyable), &seq_param).unwrap();
-        // or a list of (types or row vars)
+        // or a list of types, or a "concat" of row vars
         check(vec![], &seq_param).unwrap();
-        check_seq(&[rowvar(0, TypeBound::Copyable)], &seq_param).unwrap();
-        check_seq(
-            &[
+        check(
+            Term::ListConcat(vec![rowvar(0, TypeBound::Copyable); 2]),
+            &seq_param,
+        )
+        .unwrap();
+        // but a *list* of the rowvar is a list of list of types, which is wrong
+        check_seq(&[rowvar(0, TypeBound::Copyable)], &seq_param).unwrap_err();
+        check(
+            Term::new_list_concat([
                 rowvar(1, TypeBound::Linear),
-                usize_t().into(),
+                vec![usize_t()].into(),
                 rowvar(0, TypeBound::Copyable),
-            ],
+            ]),
             &TypeParam::new_list_type(TypeBound::Linear),
         )
         .unwrap();
-        // Next one fails because a list of Eq is required
-        check_seq(
-            &[
+        // Next one fails because a list of Copyable is required
+        check(
+            Term::new_list_concat([
                 rowvar(1, TypeBound::Linear),
-                usize_t().into(),
+                vec![usize_t()].into(),
                 rowvar(0, TypeBound::Copyable),
-            ],
+            ]),
             &seq_param,
         )
         .unwrap_err();
         // seq of seq of types is not allowed
-        check(
-            vec![usize_t().into(), vec![usize_t().into()].into()],
-            &seq_param,
-        )
-        .unwrap_err();
+        check(vec![usize_t(), vec![usize_t()].into()], &seq_param).unwrap_err();
 
         // Similar for nats (but no equivalent of fancy row vars)
         check(5, &TypeParam::max_nat_type()).unwrap();
@@ -964,16 +1085,8 @@ mod test {
         // `Term::TupleType` requires a `Term::Tuple` of the same number of elems
         let usize_and_ty =
             TypeParam::new_tuple_type([TypeParam::max_nat_type(), TypeBound::Copyable.into()]);
-        check(
-            TypeArg::Tuple(vec![5.into(), usize_t().into()]),
-            &usize_and_ty,
-        )
-        .unwrap();
-        check(
-            TypeArg::Tuple(vec![usize_t().into(), 5.into()]),
-            &usize_and_ty,
-        )
-        .unwrap_err(); // Wrong way around
+        check(TypeArg::Tuple(vec![5.into(), usize_t()]), &usize_and_ty).unwrap();
+        check(TypeArg::Tuple(vec![usize_t(), 5.into()]), &usize_and_ty).unwrap_err(); // Wrong way around
         let two_types = TypeParam::new_tuple_type(Term::new_list([
             TypeBound::Linear.into(),
             TypeBound::Linear.into(),
@@ -986,23 +1099,20 @@ mod test {
     #[test]
     fn type_arg_subst_row() {
         let row_param = Term::new_list_type(TypeBound::Copyable);
-        let row_arg: Term = vec![bool_t().into(), Term::UNIT].into();
+        let row_arg: Term = vec![bool_t(), Term::UNIT].into();
         check_term_type(&row_arg, &row_param).unwrap();
 
         // Now say a row variable referring to *that* row was used
         // to instantiate an outer "row parameter" (list of type).
         let outer_param = Term::new_list_type(TypeBound::Linear);
-        let outer_arg = Term::new_list([
-            TypeRV::new_row_var_use(0, TypeBound::Copyable).into(),
-            usize_t().into(),
+        let outer_arg = Term::new_list_concat([
+            TypeRV::new_row_var_use(0, TypeBound::Copyable),
+            Term::new_list([usize_t()]),
         ]);
         check_term_type(&outer_arg, &outer_param).unwrap();
 
         let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg]));
-        assert_eq!(
-            outer_arg2,
-            vec![bool_t().into(), Term::UNIT, usize_t().into()].into()
-        );
+        assert_eq!(outer_arg2, vec![bool_t(), Term::UNIT, usize_t()].into());
 
         // Of course this is still valid (as substitution is guaranteed to preserve validity)
         check_term_type(&outer_arg2, &outer_param).unwrap();
@@ -1015,9 +1125,9 @@ mod test {
         let row_var_use = Term::new_var_use(0, row_var_decl.clone());
         let good_arg = Term::new_list([
             // The row variables here refer to `row_var_decl` above
-            vec![usize_t().into()].into(),
+            vec![usize_t()].into(),
             row_var_use.clone(),
-            vec![row_var_use, usize_t().into()].into(),
+            Term::new_list_concat([row_var_use, Term::new_list([usize_t()])]),
         ]);
         check_term_type(&good_arg, &outer_param).unwrap();
 
@@ -1025,29 +1135,42 @@ mod test {
         let Term::List(mut elems) = good_arg.clone() else {
             panic!()
         };
-        elems.push(usize_t().into());
+        elems.push(usize_t());
         assert_eq!(
             check_term_type(&Term::new_list(elems), &outer_param),
             Err(TermTypeError::TypeMismatch {
-                term: Box::new(usize_t().into()),
+                term: Box::new(usize_t()),
                 // The error reports the type expected for each element of the list:
                 type_: Box::new(TypeParam::new_list_type(TypeBound::Linear))
             })
         );
 
         // Now substitute a list of two types for that row-variable
-        let row_var_arg = vec![usize_t().into(), bool_t().into()].into();
+        let row_var_arg = vec![usize_t(), bool_t()].into();
         check_term_type(&row_var_arg, &row_var_decl).unwrap();
         let subst_arg = good_arg.substitute(&Substitution(std::slice::from_ref(&row_var_arg)));
         check_term_type(&subst_arg, &outer_param).unwrap(); // invariance of substitution
         assert_eq!(
             subst_arg,
             Term::new_list([
-                Term::new_list([usize_t().into()]),
+                Term::new_list([usize_t()]),
                 row_var_arg,
-                Term::new_list([usize_t().into(), bool_t().into(), usize_t().into()])
+                Term::new_list([usize_t(), bool_t(), usize_t()])
             ])
         );
+    }
+
+    #[test]
+    fn test_try_into_list_elements() {
+        // Test successful conversion with List
+        let types = vec![Term::new_unit_sum(1), bool_t()];
+        let term = TypeArg::List(types.clone());
+        let result = term.try_into();
+        assert_eq!(result, Ok(TypeRow::from(types)));
+
+        // Test failure with non-list
+        let result = TypeRow::try_from(Term::UNIT);
+        assert!(result.is_err());
     }
 
     #[test]
@@ -1064,7 +1187,10 @@ mod test {
 
         use super::super::{TermVar, UpperBound};
         use crate::proptest::RecursionDepth;
-        use crate::types::{Term, Type, TypeBound, proptest_utils::any_serde_type_param};
+        use crate::types::{
+            CustomType, FuncValueType, SumType, Term, Type, TypeBound,
+            proptest_utils::any_serde_type_param,
+        };
 
         impl Arbitrary for TermVar {
             type Parameters = RecursionDepth;
@@ -1090,6 +1216,13 @@ mod test {
                     Just(Self::BytesType).boxed(),
                     Just(Self::FloatType).boxed(),
                     Just(Self::StringType).boxed(),
+                    any_with::<CustomType>(depth.into())
+                        .prop_map(Self::new_extension)
+                        .boxed(),
+                    any_with::<FuncValueType>(depth)
+                        .prop_map(Self::new_function)
+                        .boxed(),
+                    any_with::<SumType>(depth).prop_map(Self::from).boxed(),
                     any::<TypeBound>().prop_map(Self::from).boxed(),
                     any::<UpperBound>().prop_map(Self::from).boxed(),
                     any::<u64>().prop_map(Self::from).boxed(),

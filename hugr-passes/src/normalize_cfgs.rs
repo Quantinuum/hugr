@@ -471,7 +471,7 @@ fn take_inputs<H: HugrMut>(h: &mut H, n: H::Node) -> (NodePorts<H::Node>, NodePo
 
 fn tuple_elems<H: HugrView>(h: &H, n: H::Node, p: OutgoingPort) -> TypeRow {
     match h.get_optype(n).port_kind(p) {
-        Some(EdgeKind::Value(ty)) => ty.as_sum().unwrap().as_tuple().unwrap().clone(),
+        Some(EdgeKind::Value(ty)) => ty.as_runtime_sum().unwrap().as_tuple().unwrap().clone(),
         p => panic!("Expected Value port not {:?}", p),
     }
     .try_into()

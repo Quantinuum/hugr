@@ -469,15 +469,15 @@ pub(crate) mod test {
         BuilderWiringError, CFGBuilder, DataflowSubContainer, ModuleBuilder, TailLoopBuilder,
         endo_sig, inout_sig,
     };
-    use crate::extension::SignatureError;
+
     use crate::extension::prelude::{Noop, bool_t, qb_t, usize_t};
     use crate::hugr::linking::{NameLinkingPolicy, NodeLinkingDirective, OnMultiDefn};
     use crate::hugr::validate::InterGraphEdgeError;
     use crate::metadata::Metadata;
     use crate::ops::{FuncDecl, FuncDefn, OpParent, OpTag, OpTrait, Value, handle::NodeHandle};
     use crate::std_extensions::logic::test::and_op;
-    use crate::types::type_param::TypeParam;
-    use crate::types::{EdgeKind, FuncValueType, RowVariable, Signature, Type, TypeBound, TypeRV};
+    use crate::types::type_param::{TermTypeError, TypeParam};
+    use crate::types::{EdgeKind, FuncValueType, Signature, Type, TypeBound, TypeRV};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{Wire, builder::test::n_identity, type_row};
 
@@ -930,7 +930,7 @@ pub(crate) mod test {
                 Signature::new(
                     [Type::new_function(FuncValueType::new(
                         [usize_t()],
-                        [tv.clone()],
+                        tv.clone(),
                     ))],
                     [],
                 ),
@@ -938,15 +938,15 @@ pub(crate) mod test {
         )?;
 
         // But cannot eval it...
-        let ev = e.instantiate_extension_op(
-            "eval",
-            [vec![usize_t().into()].into(), vec![tv.into()].into()],
-        );
+        let ev =
+            e.instantiate_extension_op("eval", [vec![usize_t()].into(), vec![tv.clone()].into()]);
         assert_eq!(
             ev,
-            Err(SignatureError::RowVarWhereTypeExpected {
-                var: RowVariable(0, TypeBound::Copyable)
-            })
+            Err(TermTypeError::TypeMismatch {
+                term: Box::new(tv),
+                type_: Box::new(TypeBound::Linear.into())
+            }
+            .into())
         );
         Ok(())
     }

@@ -72,7 +72,7 @@ pub trait GenericArrayOpBuilder: Dataflow {
         size: u64,
         input: Wire,
     ) -> Result<Vec<Wire>, BuildError> {
-        let op = GenericArrayOpDef::<AK>::unpack.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = GenericArrayOpDef::<AK>::unpack.instantiate(&[size.into(), elem_ty])?;
         Ok(self.add_dataflow_op(op, vec![input])?.outputs().collect())
     }
     /// Adds an array clone operation to the dataflow graph and return the wires
@@ -148,7 +148,7 @@ pub trait GenericArrayOpBuilder: Dataflow {
         input: Wire,
         index: Wire,
     ) -> Result<(Wire, Wire), BuildError> {
-        let op = GenericArrayOpDef::<AK>::get.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = GenericArrayOpDef::<AK>::get.instantiate(&[size.into(), elem_ty])?;
         let [out, arr] = self.add_dataflow_op(op, vec![input, index])?.outputs_arr();
         Ok((out, arr))
     }
@@ -180,7 +180,7 @@ pub trait GenericArrayOpBuilder: Dataflow {
         index: Wire,
         value: Wire,
     ) -> Result<Wire, BuildError> {
-        let op = GenericArrayOpDef::<AK>::set.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = GenericArrayOpDef::<AK>::set.instantiate(&[size.into(), elem_ty])?;
         let [out] = self
             .add_dataflow_op(op, vec![input, index, value])?
             .outputs_arr();
@@ -214,7 +214,7 @@ pub trait GenericArrayOpBuilder: Dataflow {
         index1: Wire,
         index2: Wire,
     ) -> Result<Wire, BuildError> {
-        let op = GenericArrayOpDef::<AK>::swap.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = GenericArrayOpDef::<AK>::swap.instantiate(&[size.into(), elem_ty])?;
         let [out] = self
             .add_dataflow_op(op, vec![input, index1, index2])?
             .outputs_arr();
@@ -244,7 +244,7 @@ pub trait GenericArrayOpBuilder: Dataflow {
         size: u64,
         input: Wire,
     ) -> Result<Wire, BuildError> {
-        let op = GenericArrayOpDef::<AK>::pop_left.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = GenericArrayOpDef::<AK>::pop_left.instantiate(&[size.into(), elem_ty])?;
         Ok(self.add_dataflow_op(op, vec![input])?.out_wire(0))
     }
 
@@ -271,7 +271,7 @@ pub trait GenericArrayOpBuilder: Dataflow {
         size: u64,
         input: Wire,
     ) -> Result<Wire, BuildError> {
-        let op = GenericArrayOpDef::<AK>::pop_right.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = GenericArrayOpDef::<AK>::pop_right.instantiate(&[size.into(), elem_ty])?;
         Ok(self.add_dataflow_op(op, vec![input])?.out_wire(0))
     }
 
@@ -292,7 +292,7 @@ pub trait GenericArrayOpBuilder: Dataflow {
     ) -> Result<(), BuildError> {
         self.add_dataflow_op(
             GenericArrayOpDef::<AK>::discard_empty
-                .instantiate(&[elem_ty.into()])
+                .instantiate(&[elem_ty])
                 .unwrap(),
             [input],
         )?;

@@ -757,7 +757,7 @@ pub(crate) mod test {
     #[case(Value::unit(), Type::UNIT, "const:seq:{}")]
     #[case(const_usize(), usize_t(), "const:custom:ConstUsize(")]
     #[case(serialized_float(17.4), float64_type(), "const:custom:json:Object")]
-    #[case(const_tuple(), Type::new_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
+    #[case(const_tuple(), Type::new_runtime_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
     #[case(const_array_bool(), array_type(2, bool_t()), "const:custom:array")]
     #[case(
         const_borrow_array_bool(),
@@ -830,7 +830,7 @@ pub(crate) mod test {
         );
         let json_const: Value = CustomSerialized::new(typ_int.clone(), 6.into()).into();
         let classic_t = Type::new_extension(typ_int.clone());
-        assert_matches!(classic_t.least_upper_bound(), TypeBound::Copyable);
+        assert_matches!(classic_t.least_upper_bound(), Some(TypeBound::Copyable));
         assert_eq!(json_const.get_type(), classic_t);
 
         let typ_qb = CustomType::new(

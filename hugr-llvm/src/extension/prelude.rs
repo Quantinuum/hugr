@@ -575,7 +575,7 @@ mod test {
     fn prelude_make_tuple(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![bool_t(), bool_t()])
-            .with_outs([Type::new_tuple(vec![bool_t(); 2])])
+            .with_outs([Type::new_runtime_tuple(vec![bool_t(); 2])])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let in_wires = builder.input_wires();
@@ -588,7 +588,7 @@ mod test {
     #[rstest]
     fn prelude_unpack_tuple(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_ins([Type::new_tuple(vec![bool_t(); 2])])
+            .with_ins([Type::new_runtime_tuple(vec![bool_t(); 2])])
             .with_outs(vec![bool_t(), bool_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {

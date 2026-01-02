@@ -21,8 +21,7 @@ use hugr_core::ops::{
     ExtensionOp, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop, Value,
 };
 use hugr_core::types::{
-    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeRow,
-    TypeTransformer,
+    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeRow, TypeTransformer,
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Wire};
 
@@ -783,8 +782,8 @@ impl ReplaceTypes {
                 Ok(any_change)
             }
             Value::Extension { e } => Ok({
-                let new_const = match e.get_type().as_type_enum() {
-                    TypeEnum::Extension(exty) => match self.consts.get(exty) {
+                let new_const = match e.get_type().as_extension() {
+                    Some(exty) => match self.consts.get(exty) {
                         Some(const_fn) => Some(const_fn(e, self)),
                         None => self
                             .param_consts
@@ -921,6 +920,7 @@ mod test {
     };
     use hugr_core::types::{
         EdgeKind, PolyFuncType, Signature, SumType, Term, Type, TypeArg, TypeBound, TypeRow,
+        type_param::check_term_type,
     };
     use hugr_core::{Direction, Extension, HugrView, Port, Visibility, type_row};
     use itertools::Itertools;
@@ -938,14 +938,16 @@ mod test {
     }
 
     fn read_op(ext: &Arc<Extension>, t: Type) -> ExtensionOp {
-        ExtensionOp::new(ext.get_op(READ).unwrap().clone(), [t.into()]).unwrap()
+        ExtensionOp::new(ext.get_op(READ).unwrap().clone(), [t]).unwrap()
     }
 
     fn just_elem_type(args: &[TypeArg]) -> &Type {
-        let [TypeArg::Runtime(ty)] = args else {
-            panic!("Expected just elem type")
-        };
-        ty
+        if let [ty] = args
+            && check_term_type(ty, &TypeBound::Linear.into()).is_ok()
+        {
+            return ty;
+        }
+        panic!("Expected just elem type")
     }
 
     fn ext() -> Arc<Extension> {
@@ -962,7 +964,7 @@ mod test {
                         w,
                     )
                     .unwrap()
-                    .instantiate(vec![Type::new_var_use(0, TypeBound::Copyable).into()])
+                    .instantiate(vec![Type::new_var_use(0, TypeBound::Copyable)])
                     .unwrap();
                 ext.add_op(
                     READ.into(),
@@ -1022,7 +1024,7 @@ mod test {
     fn lowerer(ext: &Arc<Extension>) -> ReplaceTypes {
         let pv = ext.get_type(PACKED_VEC).unwrap();
         let mut lw = ReplaceTypes::default();
-        lw.set_replace_type(pv.instantiate([bool_t().into()]).unwrap(), i64_t());
+        lw.set_replace_type(pv.instantiate([bool_t()]).unwrap(), i64_t());
         lw.set_replace_parametrized_type(
             pv,
             Box::new(|args: &[TypeArg]| Some(list_type(just_elem_type(args).clone()))),
@@ -1049,8 +1051,8 @@ mod test {
     fn module_func_cfg_call() {
         let ext = ext();
         let coln = ext.get_type(PACKED_VEC).unwrap();
-        let c_int = Type::from(coln.instantiate([i64_t().into()]).unwrap());
-        let c_bool = Type::from(coln.instantiate([bool_t().into()]).unwrap());
+        let c_int = Type::from(coln.instantiate([i64_t()]).unwrap());
+        let c_bool = Type::from(coln.instantiate([bool_t()]).unwrap());
         let mut mb = ModuleBuilder::new();
         let sig = Signature::new_endo([Type::new_var_use(0, TypeBound::Linear)]);
         let fb = mb
@@ -1063,7 +1065,7 @@ mod test {
         let mut fb = mb.define_function("main", sig).unwrap();
         let [idx, indices, bools] = fb.input_wires_arr();
         let [indices] = fb
-            .call(id.handle(), &[c_int.into()], [indices])
+            .call(id.handle(), &[c_int], [indices])
             .unwrap()
             .outputs_arr();
         let [idx2] = fb
@@ -1079,7 +1081,7 @@ mod test {
         let mut entry = cfg.entry_builder([[bool_t()].into()], type_row![]).unwrap();
         let [idx2, bools] = entry.input_wires_arr();
         let [bools] = entry
-            .call(id.handle(), &[c_bool.into()], [bools])
+            .call(id.handle(), &[c_bool], [bools])
             .unwrap()
             .outputs_arr();
         let bool_read_op = entry
@@ -1116,7 +1118,7 @@ mod test {
     fn dfg_conditional_case() {
         let ext = ext();
         let coln = ext.get_type(PACKED_VEC).unwrap();
-        let pv = |t: Type| Type::new_extension(coln.instantiate([t.into()]).unwrap());
+        let pv = |t: Type| Type::new_extension(coln.instantiate([t]).unwrap());
         let sum_rows = [[pv(pv(bool_t())), i64_t()].into(), [pv(i64_t())].into()];
         let mut dfb = DFGBuilder::new(inout_sig(
             vec![Type::new_sum(sum_rows.clone()), pv(bool_t()), pv(i64_t())],
@@ -1182,7 +1184,7 @@ mod test {
             Value::sum(
                 0,
                 [ListValue::new(usize_t(), [cu(1), cu(3), cu(3), cu(7)]).into()],
-                st,
+                st.clone(),
             )
             .unwrap(),
         );
@@ -1289,9 +1291,13 @@ mod test {
             },
         );
         fn option_contents(ty: &Type) -> Option<Type> {
-            let row = ty.as_sum()?.get_variant(1).unwrap().clone();
-            let elem = row.into_owned().into_iter().exactly_one().unwrap();
-            Some(elem.try_into_type().unwrap())
+            let row = ty.as_runtime_sum()?.get_variant(1).unwrap().clone();
+            TypeRow::try_from(row)
+                .unwrap()
+                .iter()
+                .exactly_one()
+                .ok()
+                .cloned()
         }
         let i32_t = || INT_TYPES[5].clone();
         let opt_i32 = Type::from(option_type([i32_t()]));
@@ -1391,9 +1397,9 @@ mod test {
     fn op_to_call(#[values(true, false)] use_linking: bool) {
         let e = ext();
         let pv = e.get_type(PACKED_VEC).unwrap();
-        let inner = pv.instantiate([usize_t().into()]).unwrap();
+        let inner = pv.instantiate([usize_t()]).unwrap();
         let outer = pv
-            .instantiate([Type::new_extension(inner.clone()).into()])
+            .instantiate([Type::new_extension(inner.clone())])
             .unwrap();
         let mut dfb = DFGBuilder::new(inout_sig([outer.into(), i64_t()], [usize_t()])).unwrap();
         let read_func = dfb
@@ -1459,7 +1465,7 @@ mod test {
     fn regions() {
         let ext = ext();
         let coln = ext.get_type(PACKED_VEC).unwrap();
-        let c_u = Type::new_extension(coln.instantiate(&[usize_t().into()]).unwrap());
+        let c_u = Type::new_extension(coln.instantiate(&[usize_t()]).unwrap());
         let mut h = {
             let db = DFGBuilder::new(endo_sig([c_u.clone()])).unwrap();
             let inps = db.input_wires();
@@ -1522,16 +1528,18 @@ mod test {
                 .unwrap()
                 .as_ref(),
             move |args, _| {
-                let [sz, Term::Runtime(ty)] = args else {
+                let [sz, ty] = args else {
                     panic!("Expected two args to array-get")
                 };
-                if sz != &Term::BoundedNat(64) {
+                if sz != &Term::BoundedNat(64)
+                    || check_term_type(ty, &TypeBound::Linear.into()).is_err()
+                {
                     return Ok(None);
                 }
                 let pv = ext
                     .get_type(PACKED_VEC)
                     .unwrap()
-                    .instantiate([ty.clone().into()])
+                    .instantiate([ty.clone()])
                     .unwrap();
 
                 let mut dfb = DFGBuilder::new(Signature::new(

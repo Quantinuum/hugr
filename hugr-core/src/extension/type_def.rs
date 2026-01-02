@@ -4,7 +4,7 @@ use std::sync::Weak;
 use super::{CustomConcrete, ExtensionBuildError};
 use super::{Extension, ExtensionId, SignatureError};
 
-use crate::types::{CustomType, TypeName, least_upper_bound};
+use crate::types::{CustomType, Term, TypeName, least_upper_bound};
 
 use crate::types::type_param::{TypeArg, check_term_types};
 
@@ -144,13 +144,13 @@ impl TypeDef {
                     // Assume most general case
                     return TypeBound::Linear;
                 }
-                least_upper_bound(indices.iter().map(|i| {
-                    let ta = args.get(*i);
-                    match ta {
-                        Some(TypeArg::Runtime(s)) => s.least_upper_bound(),
-                        _ => panic!("TypeArg index does not refer to a type."),
-                    }
-                }))
+                let bounds = indices.iter().map(|i| {
+                    args.get(*i)
+                        .copied()
+                        .and_then(Term::least_upper_bound)
+                        .expect("TypeArg index does not refer to a type.")
+                });
+                least_upper_bound(bounds)
             }
         }
     }
@@ -258,21 +258,19 @@ mod test {
             bound: TypeDefBound::FromParams { indices: vec![0] },
         };
         let typ = Type::new_extension(
-            def.instantiate(vec![
-                Type::new_function(Signature::new(vec![], vec![])).into(),
-            ])
-            .unwrap(),
+            def.instantiate(vec![Type::new_function(Signature::new(vec![], vec![]))])
+                .unwrap(),
         );
-        assert_eq!(typ.least_upper_bound(), TypeBound::Copyable);
-        let typ2 = Type::new_extension(def.instantiate([usize_t().into()]).unwrap());
-        assert_eq!(typ2.least_upper_bound(), TypeBound::Copyable);
+        assert_eq!(typ.least_upper_bound(), Some(TypeBound::Copyable));
+        let typ2 = Type::new_extension(def.instantiate([usize_t()]).unwrap());
+        assert_eq!(typ2.least_upper_bound(), Some(TypeBound::Copyable));
 
         // And some bad arguments...firstly, wrong kind of TypeArg:
         assert_eq!(
-            def.instantiate([qb_t().into()]),
+            def.instantiate([qb_t()]),
             Err(SignatureError::TypeArgMismatch(
                 TermTypeError::TypeMismatch {
-                    term: Box::new(qb_t().into()),
+                    term: Box::new(qb_t()),
                     type_: Box::new(TypeBound::Copyable.into())
                 }
             ))
@@ -284,7 +282,7 @@ mod test {
         );
         // Too many arguments:
         assert_eq!(
-            def.instantiate([float64_type().into(), float64_type().into(),])
+            def.instantiate([float64_type(), float64_type(),])
                 .unwrap_err(),
             SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(2, 1))
         );
