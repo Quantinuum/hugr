@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.15.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.14.2...hugr-py-v0.15.0) (2026-01-02)
+
+
+### ⚠ BREAKING CHANGES
+
+* ValueArray is gone, as is LinearizeArrayPass
+* **hugr-py:** Removes `extensions` field of `val.Extension`.
+
+### Features
+
+* `collated_digitstring_counts` to extend bitstring collation to digits ([#2788](https://github.com/Quantinuum/hugr/issues/2788)) ([191c473](https://github.com/Quantinuum/hugr/commit/191c4736b5fbe869f8d797703bbf1c29f33b3a92))
+* **hugr-py:** Remove `extensions` field of `val.Extension`. ([#2686](https://github.com/Quantinuum/hugr/issues/2686)) ([911c089](https://github.com/Quantinuum/hugr/commit/911c08921b9057f3854dd4431e4a7854b8b6991e))
+* Make `ComposablePass.__call__` return a Hugr ([#2697](https://github.com/Quantinuum/hugr/issues/2697)) ([dbf8c8e](https://github.com/Quantinuum/hugr/commit/dbf8c8e6fe72febd709921c10283fddc1f257983))
+* Result type for ComposablePasses ([#2703](https://github.com/Quantinuum/hugr/issues/2703)) ([b8df28e](https://github.com/Quantinuum/hugr/commit/b8df28e5b89eb3130d12e5cf429d642be3514e63))
+
+
+### Bug Fixes
+
+* **hugr-py:** solved graph rendering with `Const` nodes after applying`NormalizeGuppy` ([#2744](https://github.com/Quantinuum/hugr/issues/2744)) ([d996690](https://github.com/Quantinuum/hugr/commit/d99669009b5d98a0e99201f7bfa8621481741d54))
+* set hugr field of `PassResult` correctly ([#2715](https://github.com/Quantinuum/hugr/issues/2715)) ([d860722](https://github.com/Quantinuum/hugr/commit/d8607227ce6e2f79a5bf339100f303c750c7fdab))
+
+
+### Code Refactoring
+
+* Delete ValueArray ([#2760](https://github.com/Quantinuum/hugr/issues/2760)) ([b3cdc4e](https://github.com/Quantinuum/hugr/commit/b3cdc4efd2fdb4632628a641eb84f86e14f5119a))
+
 ## [0.14.4](https://github.com/CQCL/hugr/compare/hugr-py-v0.14.3...hugr-py-v0.14.4) (2025-11-26)
 
 
