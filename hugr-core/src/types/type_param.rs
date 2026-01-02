@@ -250,9 +250,12 @@ impl Term {
                 .into())
         }
     */
+
+    /// Returns true if this term is an empty list (contains no elements)
     pub fn is_empty_list(&self) -> bool {
         match self {
             Term::List(v) => v.is_empty(),
+            // We probably don't need to be this thorough in dealing with unnormalized forms but it's easy enough
             Term::ListConcat(v) => v.iter().all(Term::is_empty_list),
             _ => false,
         }
@@ -647,12 +650,6 @@ fn check_typevar_decl(
 }
 
 impl Substitutable for Term {
-    /// Applies a substitution to a type.
-    /// This may result in a row of types, if this [Type] is not really a single type but actually a row variable
-    /// Invariants may be confirmed by validation:
-    /// * If [`Type::validate`]`(false)` returns successfully, this method will return a Vec containing exactly one type
-    /// * If [`Type::validate`]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
-    ///   return a Vec containing any number of [Type]s. These may (or not) pass [`Type::validate`]
     fn substitute(&self, s: &Substitution) -> Self {
         match self {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),

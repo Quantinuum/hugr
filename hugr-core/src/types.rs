@@ -152,6 +152,15 @@ impl TypeBound {
     }
 }
 
+pub(crate) fn least_upper_bound(bounds: impl IntoIterator<Item = TypeBound>) -> TypeBound {
+    for b in bounds {
+        if b == TypeBound::Linear {
+            return TypeBound::Linear;
+        }
+    }
+    TypeBound::Copyable
+}
+
 #[derive(Clone, Debug, Eq, Serialize, Deserialize)]
 #[serde(tag = "s")]
 #[non_exhaustive]
@@ -162,12 +171,12 @@ pub enum SumType {
     /// Special case of a Sum over unit types.
     #[allow(missing_docs)]
     Unit { size: u8 },
-    /// General case of a Sum type. The `term` must be (check against) a [Term::ListType]
-    /// of [Term::ListType] of [Term::RuntimeType] (for any [TypeBound])
+    /// General case of a Sum type.
     #[allow(missing_docs)]
     General(GeneralSum),
 }
 
+/// General case of a [SumType]. Prefer using [SumType::new] and friends.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GeneralSum {
     /// Each term here must be an instance of [Term::ListType]([Term::RuntimeType]), being
@@ -182,15 +191,6 @@ pub struct GeneralSum {
     /// (this is checked in validation)
     #[serde(skip)] // TODO recalculate on deserialization
     bound: TypeBound,
-}
-
-pub(crate) fn least_upper_bound(bounds: impl IntoIterator<Item = TypeBound>) -> TypeBound {
-    for b in bounds {
-        if b == TypeBound::Linear {
-            return TypeBound::Linear;
-        }
-    }
-    TypeBound::Copyable
 }
 
 fn sum_bound<'a>(rows: impl IntoIterator<Item = &'a Term>) -> TypeBound {
@@ -234,10 +234,14 @@ impl GeneralSum {
         Self { rows, bound }
     }
 
+    /// Returns an iterator over the variants, each an instance of [Term::ListType]`(`[Term::RuntimeType]`)`
     pub fn iter(&self) -> impl Iterator<Item = &Term> {
         self.rows.iter()
     }
 
+    /// Returns a mutable iterator over the variants, each should be an instance
+    /// of [Term::ListType]`(`[Term::RuntimeType]`)` but of course `iter_mut` allows
+    /// bypassing such checks.
     pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Term> {
         self.rows.iter_mut()
     }
@@ -395,6 +399,9 @@ impl SumType {
         }
     }
 
+    /// Returns the bound of this sum type.
+    ///
+    /// (Cached; will be [TypeBound::Linear] if any variant is not a list of runtime types.)
     pub const fn bound(&self) -> TypeBound {
         match self {
             SumType::Unit { .. } => TypeBound::Copyable,
@@ -424,7 +431,9 @@ impl From<SumType> for Type {
     }
 }
 
+/// Legacy alias for Term. Will become deprecated at some point.
 pub type Type = Term;
+/// Legacy alias for Term. Will become deprecated at some point.
 pub type TypeRV = Term;
 
 impl Type {
@@ -546,7 +555,22 @@ impl<'a> Substitution<'a> {
     }
 }
 
+/// Trait for static-level constructs that can have type variables
+/// substituted according to a [`Substitution`].
 pub trait Substitutable {
+    /// Applies a substitution to this instance. Infallible (assuming the `subst` covers all
+    /// variables) and will not invalidate the instance (assuming all values substituted in,
+    /// are valid instances of the variables they replace).
+    ///
+    /// May change the structure of `self` significantly, e.g. if variables that stand for
+    /// rows of types are replaced by fixed-length lists of types.
+    ///
+    /// May change the [TypeBound] of the resulting type, e.g. if a variable whose bound
+    /// is [TypeBound::Linear] is replaced by a concrete type that is [TypeBound::Copyable].
+    ///
+    /// # Panics
+    ///
+    /// If the substitution does not cover all type variables in `self`.
     fn substitute(&self, subst: &Substitution) -> Self;
 }
 

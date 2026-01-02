@@ -22,7 +22,8 @@ pub trait UnwrapBuilder: Dataflow {
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let (input_wires, input_types): (Vec<_>, Vec<_>) = inputs.into_iter().unzip();
         let output_arg: TypeArg = output_row.into_iter().collect_vec().into();
-        let op = PRELUDE.instantiate_extension_op(&PANIC_OP_ID, [input_types.into(), output_arg])?;
+        let op =
+            PRELUDE.instantiate_extension_op(&PANIC_OP_ID, [input_types.into(), output_arg])?;
         let err = self.add_load_value(err);
         self.add_dataflow_op(op, iter::once(err).chain(input_wires))
     }

@@ -7,9 +7,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{
-    Substitution, Term, Transformable, Type, TypeArg, TypeTransformer, type_param::TypeParam,
-};
+use super::{Substitution, Term, Transformable, Type, TypeTransformer, type_param::TypeParam};
 use crate::{extension::SignatureError, types::Substitutable, utils::display_list};
 use delegate::delegate;
 use itertools::Itertools;
@@ -51,13 +49,6 @@ impl TypeRow {
     pub const fn new() -> Self {
         Self {
             types: Cow::Owned(Vec::new()),
-        }
-    }
-
-    pub fn new_from_list(value: Term) -> Result<Self, SignatureError> {
-        match value {
-            TypeArg::List(elems) => Ok(elems.into()),
-            _ => Err(SignatureError::InvalidTypeArgs),
         }
     }
 
