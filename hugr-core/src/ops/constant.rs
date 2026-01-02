@@ -699,7 +699,7 @@ pub(crate) mod test {
     fn function_value(simple_dfg_hugr: Hugr) {
         let v = Value::function(simple_dfg_hugr).unwrap();
 
-        let correct_type = Type::new_function(Signature::new_endo(vec![bool_t()]));
+        let correct_type = Type::new_function(Signature::new_endo([bool_t()]));
 
         assert_eq!(v.get_type(), correct_type);
         assert!(v.name().starts_with("const:function:"));

@@ -1573,10 +1573,8 @@ mod tests {
     /// (with a constant angle) to the last qubit.
     fn build_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare(
-            "test",
-            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()]).into(),
-        )?;
+        let func =
+            mod_builder.declare("test", Signature::new_endo([qb_t(), qb_t(), qb_t()]).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let [w0, w1, w2] = dfg.input_wires_arr();
@@ -1594,7 +1592,7 @@ mod tests {
     /// A bool to bool hugr with three subsequent NOT gates.
     fn build_3not_hugr() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare("test", Signature::new_endo(vec![bool_t()]).into())?;
+        let func = mod_builder.declare("test", Signature::new_endo([bool_t()]).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let outs1 = dfg.add_dataflow_op(LogicOp::Not, dfg.input_wires())?;
@@ -1613,7 +1611,7 @@ mod tests {
         let mut mod_builder = ModuleBuilder::new();
         let func = mod_builder.declare(
             "test",
-            Signature::new(bool_t(), vec![bool_t(), bool_t()]).into(),
+            Signature::new([bool_t()], vec![bool_t(), bool_t()]).into(),
         )?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
@@ -1631,7 +1629,7 @@ mod tests {
     /// A HUGR with a copy
     fn build_hugr_classical() -> Result<(Hugr, Node), BuildError> {
         let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare("test", Signature::new_endo(bool_t()).into())?;
+        let func = mod_builder.declare("test", Signature::new_endo([bool_t()]).into())?;
         let func_id = {
             let mut dfg = mod_builder.define_declaration(&func)?;
             let in_wire = dfg.input_wires().exactly_one().unwrap();
@@ -1654,8 +1652,7 @@ mod tests {
         assert!(sub.validate(&func, Default::default()).is_ok());
 
         let empty_dfg = {
-            let builder =
-                DFGBuilder::new(Signature::new_endo(vec![qb_t(), qb_t(), qb_t()])).unwrap();
+            let builder = DFGBuilder::new(Signature::new_endo([qb_t(), qb_t(), qb_t()])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_hugr_with_outputs(inputs).unwrap()
         };
@@ -1704,7 +1701,7 @@ mod tests {
         assert!(sub.validate(&func, Default::default()).is_ok());
         assert_eq!(
             sub.signature(&func),
-            Signature::new_endo(vec![qb_t(), qb_t(), qb_t()])
+            Signature::new_endo([qb_t(), qb_t(), qb_t()])
         );
         Ok(())
     }
@@ -1716,7 +1713,7 @@ mod tests {
         let sub = SiblingSubgraph::from_sibling_graph(&hugr, dfg)?;
 
         let empty_dfg = {
-            let builder = DFGBuilder::new(Signature::new_endo(vec![qb_t()])).unwrap();
+            let builder = DFGBuilder::new(Signature::new_endo([qb_t()])).unwrap();
             let inputs = builder.input_wires();
             builder.finish_hugr_with_outputs(inputs).unwrap()
         };
@@ -1900,7 +1897,7 @@ mod tests {
     #[test]
     fn test_unconnected() {
         // test a replacement on a subgraph with a discarded output
-        let mut b = DFGBuilder::new(Signature::new(bool_t(), type_row![])).unwrap();
+        let mut b = DFGBuilder::new(Signature::new([bool_t()], type_row![])).unwrap();
         let inw = b.input_wires().exactly_one().unwrap();
         let not_n = b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
         // Unconnected output, discarded
@@ -1911,7 +1908,7 @@ mod tests {
         assert_eq!(subg.nodes().len(), 1);
         //  TODO create a valid replacement
         let replacement = {
-            let mut rep_b = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
+            let mut rep_b = DFGBuilder::new(Signature::new_endo([bool_t()])).unwrap();
             let inw = rep_b.input_wires().exactly_one().unwrap();
 
             let not_n = rep_b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
@@ -1927,7 +1924,7 @@ mod tests {
     #[test]
     fn single_node_subgraph() {
         // A hugr with a single NOT operation, with disconnected output.
-        let mut b = DFGBuilder::new(Signature::new(bool_t(), type_row![])).unwrap();
+        let mut b = DFGBuilder::new(Signature::new([bool_t()], type_row![])).unwrap();
         let inw = b.input_wires().exactly_one().unwrap();
         let not_n = b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
         // Unconnected output, discarded
@@ -2166,8 +2163,12 @@ mod tests {
     #[fixture]
     pub(crate) fn hugr_call_subgraph() -> Hugr {
         let mut builder = ModuleBuilder::new();
-        let decl_node = builder.declare("test", endo_sig(bool_t()).into()).unwrap();
-        let mut main = builder.define_function("main", endo_sig(bool_t())).unwrap();
+        let decl_node = builder
+            .declare("test", endo_sig([bool_t()]).into())
+            .unwrap();
+        let mut main = builder
+            .define_function("main", endo_sig([bool_t()]))
+            .unwrap();
         let [bool] = main.input_wires_arr();
 
         let [bool] = main

@@ -801,7 +801,7 @@ mod test {
         let elem_ty = qb_t();
         let arr_ty = borrow_array_type(size, elem_ty.clone());
         let _ = {
-            let mut builder = DFGBuilder::new(Signature::new_endo(vec![arr_ty.clone()])).unwrap();
+            let mut builder = DFGBuilder::new(Signature::new_endo([arr_ty.clone()])).unwrap();
             let idx1 = builder.add_load_value(ConstUsize::new(11));
             let idx2 = builder.add_load_value(ConstUsize::new(11));
             let [arr] = builder.input_wires_arr();
