@@ -24,6 +24,9 @@ default = []
 [lib]
 bench = false
 
+[[test]]
+name = "model"
+
 [dependencies]
 hugr-model = { version = "0.25.1", path = "../hugr-model" }
 
@@ -74,6 +77,6 @@ proptest-derive = { workspace = true }
 
 
 # Required for documentation examples
-# hugr = { path = "../hugr" }
+hugr = { path = "../hugr" }
 serde_yaml = "0.9.34"
 anyhow = { workspace = true }

@@ -1,0 +1,105 @@
+---
+source: hugr-core/tests/model.rs
+expression: ast
+---
+(hugr 0)
+
+(mod)
+
+(import collections.array.const)
+
+(import core.const)
+
+(import core.adt)
+
+(import core.fn)
+
+(import core.const.adt)
+
+(import arithmetic.int.const)
+
+(import arithmetic.float.const_f64)
+
+(import arithmetic.float.types.float64)
+
+(import core.load_const)
+
+(import compat.const_json)
+
+(import arithmetic.int.types.int)
+
+(import collections.array.array)
+
+(define-func
+  public
+  example.bools
+  (core.fn [] [(core.adt [[] []]) (core.adt [[] []])])
+  (dfg [] [%0 %1]
+    (signature (core.fn [] [(core.adt [[] []]) (core.adt [[] []])]))
+    ((core.load_const (core.const.adt [[] []] _ 0 (tuple))) [] [%0]
+      (signature (core.fn [] [(core.adt [[] []])])))
+    ((core.load_const (core.const.adt [[] []] _ 1 (tuple))) [] [%1]
+      (signature (core.fn [] [(core.adt [[] []])])))))
+
+(define-func
+  public
+  example.make-pair
+  (core.fn
+    []
+    [(core.adt
+       [[(collections.array.array 5 (arithmetic.int.types.int 6))
+         arithmetic.float.types.float64]])])
+  (dfg [] [%0]
+    (signature
+      (core.fn
+        []
+        [(core.adt
+           [[(collections.array.array 5 (arithmetic.int.types.int 6))
+             arithmetic.float.types.float64]])]))
+    ((core.load_const
+        (core.const.adt
+          [[(collections.array.array 5 (arithmetic.int.types.int 6))
+            arithmetic.float.types.float64]]
+          _
+          0
+          (tuple
+            (collections.array.const
+              5
+              (arithmetic.int.types.int 6)
+              [(arithmetic.int.const 6 1)
+               (arithmetic.int.const 6 2)
+               (arithmetic.int.const 6 3)
+               (arithmetic.int.const 6 4)
+               (arithmetic.int.const 6 5)])
+            (arithmetic.float.const_f64 -3.0))))
+      [] [%0]
+      (signature
+        (core.fn
+          []
+          [(core.adt
+             [[(collections.array.array 5 (arithmetic.int.types.int 6))
+               arithmetic.float.types.float64]])])))))
+
+(define-func
+  public
+  example.f64-json
+  (core.fn [] [arithmetic.float.types.float64])
+  (dfg [] [%0 %1]
+    (signature
+      (core.fn
+        []
+        [arithmetic.float.types.float64 arithmetic.float.types.float64]))
+    ((core.load_const (arithmetic.float.const_f64 1.0)) [] [%0]
+      (signature (core.fn [] [arithmetic.float.types.float64])))
+    ((core.load_const
+        (compat.const_json
+          arithmetic.float.types.float64
+          "{\"c\":\"ConstUnknown\",\"v\":{\"value\":1.0}}"))
+      [] [%1]
+      (signature (core.fn [] [arithmetic.float.types.float64])))))
+
+(declare-func
+  public
+  example.const_as_param
+  (param ?0 (core.const arithmetic.float.types.float64))
+  (core.fn [] [arithmetic.float.types.float64]))

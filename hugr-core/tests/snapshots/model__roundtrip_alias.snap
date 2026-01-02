@@ -1,0 +1,19 @@
+---
+source: hugr-core/tests/model.rs
+expression: ast
+---
+(hugr 0)
+
+(mod)
+
+(import core.type)
+
+(import core.fn)
+
+(import arithmetic.int.types.int)
+
+(declare-alias local.float core.type)
+
+(define-alias local.int core.type arithmetic.int.types.int)
+
+(define-alias local.endo core.type (core.fn [] []))

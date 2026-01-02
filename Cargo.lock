@@ -1265,6 +1265,7 @@ dependencies = [
  "downcast-rs",
  "enum_dispatch",
  "html-escape",
+ "hugr",
  "hugr-model",
  "indexmap 2.12.1",
  "insta",
