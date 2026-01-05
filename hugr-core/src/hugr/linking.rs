@@ -1514,13 +1514,27 @@ mod test {
         // order (taking next available indices in the target). Actually linking them with
         // nodes already (at consistent positions) in the target only reduces variability.
         let (insert, _, _) = dfg_calling_defn_decl();
-        let [mut host, mut host2] = [0, 1].map(|_| simple_dfg_hugr());
-        host.insert_link_hugr(host.entrypoint(), insert.clone(), &NameLinkingPolicy::default())
+        let [mut host, mut host2, mut host3, mut host4] = [0, 1, 2, 3].map(|_| simple_dfg_hugr());
+        host.insert_link_from_view(host.entrypoint(), &insert, &NameLinkingPolicy::default())
             .unwrap();
         host2
-            .insert_link_hugr(host2.entrypoint(), insert, &NameLinkingPolicy::default())
+            .insert_link_from_view(host2.entrypoint(), &insert, &NameLinkingPolicy::default())
             .unwrap();
-
         assert_eq!(host, host2);
+
+        // Same between two tries of `insert_link_hugr`
+        host3
+            .insert_link_hugr(
+                host3.entrypoint(),
+                insert.clone(),
+                &NameLinkingPolicy::default(),
+            )
+            .unwrap();
+        host4
+            .insert_link_hugr(host4.entrypoint(), insert, &NameLinkingPolicy::default())
+            .unwrap();
+        assert_eq!(host3, host4);
+
+        // Do not necessarily expect host==host3.
     }
 }
