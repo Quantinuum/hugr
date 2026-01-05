@@ -83,7 +83,7 @@ pub trait HugrLinking: HugrMut {
         children: NodeLinkingDirectives<Node, Self::Node>,
     ) -> Result<InsertedForest<Node, Self::Node>, NodeLinkingError<Node, Self::Node>> {
         let transfers = check_directives(&other, parent, &children)?;
-        let mut roots = HashMap::new();
+        let mut roots = BTreeMap::new();
         if let Some(parent) = parent {
             roots.insert(other.entrypoint(), parent);
             other.set_parent(other.entrypoint(), other.module_root());
