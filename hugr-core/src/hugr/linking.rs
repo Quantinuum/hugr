@@ -754,7 +754,7 @@ struct Transfers<SourceNode, TargetNode> {
 fn check_directives<SRC: HugrView, TN: HugrNode>(
     other: &SRC,
     parent: Option<TN>,
-    children: &HashMap<SRC::Node, NodeLinkingDirective<TN>>,
+    children: &NodeLinkingDirectives<SRC::Node, TN>,
 ) -> Result<Transfers<SRC::Node, TN>, NodeLinkingError<SRC::Node, TN>> {
     if parent.is_some() {
         if other.entrypoint() == other.module_root() {
