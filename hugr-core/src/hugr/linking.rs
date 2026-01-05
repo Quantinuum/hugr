@@ -1507,4 +1507,20 @@ mod test {
             );
         }
     }
+
+    #[test]
+    fn determinism() {
+        // Really this just checks that things from the source hugr are added in consistent
+        // order (taking next available indices in the target). Actually linking them with
+        // nodes already (at consistent positions) in the target only reduces variability.
+        let (insert, _, _) = dfg_calling_defn_decl();
+        let [mut host, mut host2] = [0, 1].map(|_| simple_dfg_hugr());
+        host.insert_link_hugr(host.entrypoint(), insert.clone(), &NameLinkingPolicy::default())
+            .unwrap();
+        host2
+            .insert_link_hugr(host2.entrypoint(), insert, &NameLinkingPolicy::default())
+            .unwrap();
+
+        assert_eq!(host, host2);
+    }
 }
