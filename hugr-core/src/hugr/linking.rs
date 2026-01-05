@@ -46,9 +46,9 @@ pub trait HugrLinking: HugrMut {
             nodes.extend(other.entry_descendants());
         }
         nodes.extend(children.iter().flat_map(|(&ch, dirv)| match dirv {
-                    NodeLinkingDirective::Add { .. } => Either::Left(other.descendants(ch)),
-                    NodeLinkingDirective::UseExisting(_) => Either::Right(std::iter::once(ch)),
-                }));
+            NodeLinkingDirective::Add { .. } => Either::Left(other.descendants(ch)),
+            NodeLinkingDirective::UseExisting(_) => Either::Right(std::iter::once(ch)),
+        }));
         let mut roots = BTreeMap::new();
         if let Some(parent) = parent {
             roots.insert(other.entrypoint(), parent);
