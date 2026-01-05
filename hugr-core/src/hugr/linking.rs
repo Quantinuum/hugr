@@ -1,5 +1,6 @@
 //! Directives and errors relating to linking Hugrs.
 
+use std::collections::BTreeSet;
 use std::collections::{BTreeMap, HashMap, VecDeque, btree_map::Entry};
 use std::{fmt::Display, iter::once};
 
@@ -39,23 +40,24 @@ pub trait HugrLinking: HugrMut {
         children: NodeLinkingDirectives<HN, Self::Node>,
     ) -> Result<InsertedForest<HN, Self::Node>, NodeLinkingError<HN, Self::Node>> {
         let transfers = check_directives(other, parent, &children)?;
-        let nodes =
-            parent
-                .iter()
-                .flat_map(|_| other.entry_descendants())
-                .chain(children.iter().flat_map(|(&ch, dirv)| match dirv {
+        // Make a fresh map here, so determinism is not affected by iteration order of the HashMap in `children`
+        let mut nodes = BTreeSet::new();
+        if parent.is_some() {
+            nodes.extend(other.entry_descendants());
+        }
+        nodes.extend(children.iter().flat_map(|(&ch, dirv)| match dirv {
                     NodeLinkingDirective::Add { .. } => Either::Left(other.descendants(ch)),
                     NodeLinkingDirective::UseExisting(_) => Either::Right(std::iter::once(ch)),
                 }));
-        let mut roots = HashMap::new();
+        let mut roots = BTreeMap::new();
         if let Some(parent) = parent {
             roots.insert(other.entrypoint(), parent);
         }
-        for ch in children.keys() {
-            roots.insert(*ch, self.module_root());
+        for ch in children.into_keys() {
+            roots.insert(ch, self.module_root());
         }
         let mut inserted = self
-            .insert_view_forest(other, nodes, roots)
+            .insert_view_forest(other, nodes.iter().cloned(), roots)
             .expect("NodeLinkingDirectives were checked for disjointness");
         link_by_node(self, transfers, &mut inserted.node_map);
         Ok(inserted)
