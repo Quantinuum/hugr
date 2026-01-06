@@ -902,9 +902,9 @@ mod test {
     };
     use hugr_core::extension::SignatureError;
     use hugr_core::extension::prelude::{
-        ConstUsize, UnwrapBuilder, bool_t, option_type, qb_t, usize_t,
+        ConstUsize, Noop, UnwrapBuilder, bool_t, option_type, qb_t, usize_t,
     };
-    use hugr_core::extension::simple_op::MakeOpDef;
+    use hugr_core::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
     use hugr_core::extension::{TypeDefBound, Version, simple_op::MakeExtensionOp};
     use hugr_core::hugr::linking::{NameLinkingPolicy, OnMultiDefn};
     use hugr_core::hugr::{IdentList, ValidationError, hugrmut::HugrMut};
@@ -1459,8 +1459,8 @@ mod test {
         assert_eq!(h.children(h.module_root()).count(), 2); // main + lowered_read
     }
 
-    #[test]
-    fn op_to_call_monomorphic() {
+    #[rstest]
+    fn op_to_call_monomorphic(#[values(false, true)] i64_to_usize: bool) {
         let e = ext();
         let pv = e.get_type(PACKED_VEC).unwrap();
         let inner = pv.instantiate([usize_t().into()]).unwrap();
@@ -1522,6 +1522,16 @@ mod test {
                 )
             }))
         });
+        if i64_to_usize {
+            lw.set_replace_type(i64_t().as_extension().unwrap().clone(), usize_t());
+            lw.set_replace_op(
+                &ConvertOpDef::itousize
+                    .without_log_width()
+                    .to_extension_op()
+                    .unwrap(),
+                NodeTemplate::SingleOp(Noop::new(usize_t()).into()),
+            );
+        }
         lw.run(&mut h).unwrap();
         h.validate().unwrap();
 
