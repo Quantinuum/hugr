@@ -1,6 +1,6 @@
 # HUGR Core Metadata Specification
 
-HUGR nodes can have associated metadata, this is described in the
+HUGR nodes can have associated metadata. This is described in the
 [Extensible Metadata](./hugr.md#extensible-metadata) section of the specification.
 
 This document describes metadata keys reserved by reference HUGR tooling, which are all
@@ -17,7 +17,7 @@ model format types.
 
 | Key                        | Model Type               | Description                                                     |
 |----------------------------|--------------------------|-----------------------------------------------------------------|
-| core.meta.description      | string                   | Human readable descriptions.                                    |
+| core.meta.description      | string                   | Human-readable descriptions.                                    |
 | core.entrypoint            | -                        | Marks the module entrypoint.                                    |
 | core.order_hint.key        | nat                      | Unique per-node key within a dataflow region used for ordering. |
 | core.order_hint.input_key  | nat                      | Order hint key for the region’s input node.                     |
