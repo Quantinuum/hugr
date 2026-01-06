@@ -900,13 +900,16 @@ mod test {
         FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder, endo_sig,
         inout_sig,
     };
+    use hugr_core::extension::SignatureError;
     use hugr_core::extension::prelude::{
         ConstUsize, UnwrapBuilder, bool_t, option_type, qb_t, usize_t,
     };
     use hugr_core::extension::simple_op::MakeOpDef;
     use hugr_core::extension::{TypeDefBound, Version, simple_op::MakeExtensionOp};
+    use hugr_core::hugr::linking::{NameLinkingPolicy, OnMultiDefn};
     use hugr_core::hugr::{IdentList, ValidationError, hugrmut::HugrMut};
     use hugr_core::ops::constant::{CustomConst, OpaqueValue};
+    use hugr_core::ops::handle::FuncID;
     use hugr_core::ops::{self, ExtensionOp, OpTrait, OpType, Tag, Value, handle::NodeHandle};
     use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
     use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
@@ -926,7 +929,7 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::ComposablePass;
+    use crate::{ComposablePass, mangle_name};
 
     use super::{NodeTemplate, ReplaceTypes, handlers::list_const};
 
@@ -1454,6 +1457,95 @@ mod test {
             None
         );
         assert_eq!(h.children(h.module_root()).count(), 2); // main + lowered_read
+    }
+
+    #[test]
+    fn op_to_call_monomorphic() {
+        let e = ext();
+        let pv = e.get_type(PACKED_VEC).unwrap();
+        let inner = pv.instantiate([usize_t().into()]).unwrap();
+        let outer = pv
+            .instantiate([Type::new_extension(inner.clone()).into()])
+            .unwrap();
+        let read_outer = read_op(&e, inner.clone().into());
+        let mut dfb = DFGBuilder::new(inout_sig(
+            vec![outer.into(), inner.clone().into(), i64_t()],
+            vec![usize_t(); 2],
+        ))
+        .unwrap();
+
+        let [outer, inner, idx] = dfb.input_wires_arr();
+        let res1 = dfb
+            .add_dataflow_op(read_op(&e, usize_t()), [inner, idx])
+            .unwrap();
+        let [inner] = dfb
+            .add_dataflow_op(read_outer, [outer, idx])
+            .unwrap()
+            .outputs_arr();
+        let res2 = dfb
+            .add_dataflow_op(read_op(&e, usize_t()), [inner, idx])
+            .unwrap();
+        let mut h = dfb
+            .finish_hugr_with_outputs(res1.outputs().chain(res2.outputs()))
+            .unwrap();
+
+        let mut lw = lowerer(&e);
+        lw.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, _| {
+            Ok(Some({
+                let [Term::Runtime(ty)] = args else {
+                    return Err(SignatureError::InvalidTypeArgs.into());
+                };
+                let mut fb = FunctionBuilder::new("not inserted", endo_sig(vec![])).unwrap();
+                let read_func = fb
+                    .module_root_builder()
+                    .add_hugr(
+                        lowered_read(ty.clone(), |sig| {
+                            FunctionBuilder::new_vis(
+                                mangle_name("lowered_read", args),
+                                sig,
+                                Visibility::Public,
+                            )
+                        })
+                        .finish_hugr()
+                        .unwrap(),
+                    )
+                    .inserted_entrypoint;
+                let target = FuncID::<true>::from(read_func);
+                let call = fb.call(&target, &[], []).unwrap();
+                // We have not connected inputs or outputs to the call so the Hugr is invalid
+                let mut h = std::mem::take(fb.hugr_mut());
+                h.set_entrypoint(call.node());
+                // UseSource/UseTarget are equivalent here as both are identical copies
+                NodeTemplate::LinkedHugr(
+                    Box::new(h),
+                    NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseSource),
+                )
+            }))
+        });
+        lw.run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        assert_eq!(
+            h.entry_descendants()
+                .find(|n| h.get_optype(*n).is_extension_op()),
+            None
+        );
+        assert_eq!(h.children(h.module_root()).count(), 3); // main + lowered_read
+        for n in h.children(h.module_root()) {
+            let fd = h.get_optype(n).as_func_defn().unwrap();
+            let expected_uses_and_vis = if fd.func_name() == "main" {
+                (0, Visibility::Private)
+            } else {
+                let is_array = !fd.signature().body().output[0]
+                    .as_extension()
+                    .unwrap()
+                    .args()
+                    .is_empty();
+                (2 - (is_array as usize), Visibility::Public)
+            };
+            assert_eq!(h.output_neighbours(n).count(), expected_uses_and_vis.0);
+            assert_eq!(fd.visibility(), &expected_uses_and_vis.1);
+        }
     }
 
     #[test]
