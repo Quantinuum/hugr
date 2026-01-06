@@ -40,7 +40,8 @@ pub trait HugrLinking: HugrMut {
         children: NodeLinkingDirectives<HN, Self::Node>,
     ) -> Result<InsertedForest<HN, Self::Node>, NodeLinkingError<HN, Self::Node>> {
         let transfers = check_directives(other, parent, &children)?;
-        // Make a fresh map here, so determinism is not affected by iteration order of the HashMap in `children`
+        // Make a fresh map here, so determinism is not affected by iteration order of the HashMap in `children`.
+        // (This may be slow for large numbers of module-children, but not total size of Hugr)
         let mut nodes = BTreeSet::new();
         if parent.is_some() {
             nodes.extend(other.entry_descendants());
