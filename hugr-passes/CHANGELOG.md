@@ -1,6 +1,34 @@
 # Changelog
 
 
+## [0.25.1](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.0...hugr-passes-v0.25.1) - 2025-12-29
+
+### Bug Fixes
+
+- two problems in array linearization from #2749 ([#2779](https://github.com/Quantinuum/hugr/pull/2779))
+
+## [0.25.0](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.24.3...hugr-passes-v0.25.0) - 2025-12-22
+
+### New Features
+
+- *(hugr-passes)* [**breaking**] normalize_cfgs inlines entry DFG ([#2649](https://github.com/Quantinuum/hugr/pull/2649))
+- add hugr-core StaticGraph, deprecate hugr-passes CallGraph ([#2698](https://github.com/Quantinuum/hugr/pull/2698))
+- ReplaceTypes: recurse on replacements, much deprecation ([#2442](https://github.com/Quantinuum/hugr/pull/2442))
+- [**breaking**] Remove `RootCheckable` ([#2704](https://github.com/Quantinuum/hugr/pull/2704))
+- [**breaking**] Bump MSRV to Rust 1.89 ([#2747](https://github.com/Quantinuum/hugr/pull/2747))
+- Add a pass to remove redundant order edges ([#2739](https://github.com/Quantinuum/hugr/pull/2739))
+- *(hugr-passes)* [**breaking**] add NodeTemplate::LinkedHugr, deprecate ::Call ([#2749](https://github.com/Quantinuum/hugr/pull/2749))
+
+### Refactor
+
+- [**breaking**] Remove multiple deprecated definitions ([#2751](https://github.com/Quantinuum/hugr/pull/2751))
+- [**breaking**] Delete ValueArray ([#2760](https://github.com/Quantinuum/hugr/pull/2760))
+- Deprecate Value::Function and inline_constant_functions ([#2770](https://github.com/Quantinuum/hugr/pull/2770))
+
+### Testing
+
+- Make Hugr valid in replace_types::op_to_call ([#2732](https://github.com/Quantinuum/hugr/pull/2732))
+
 ## [0.24.3](https://github.com/CQCL/hugr/compare/hugr-passes-v0.24.2...hugr-passes-v0.24.3) - 2025-11-06
 
 ### Bug Fixes

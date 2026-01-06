@@ -16,12 +16,12 @@ use crate::{
 /// [`GenericArrayOpDef`] or [`GenericArrayValue`]
 ///
 /// Currently the available kinds of array are [`Array`] (the default one) and
-/// [`ValueArray`].
+/// [`BorrowArray`].
 ///
 /// [`GenericArrayOpDef`]: super::GenericArrayOpDef
 /// [`GenericArrayValue`]: super::GenericArrayValue
 /// [`Array`]: super::Array
-/// [`ValueArray`]: crate::std_extensions::collections::value_array::ValueArray
+/// [`BorrowArray`]: crate::std_extensions::collections::borrow_array::BorrowArray
 pub trait ArrayKind:
     Clone
     + Copy

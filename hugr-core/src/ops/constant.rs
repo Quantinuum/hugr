@@ -165,6 +165,7 @@ pub enum Value {
         e: OpaqueValue,
     },
     /// A higher-order function value.
+    #[deprecated(note = "Flatten and lift contents to a FuncDefn", since = "0.25.0")]
     Function {
         /// A Hugr defining the function.
         #[serde_as(as = "Box<AsStringEnvelope>")]
@@ -336,6 +337,7 @@ impl Value {
         match self {
             Self::Extension { e } => e.get_type(),
             Self::Sum(Sum { sum_type, .. }) => sum_type.clone().into(),
+            #[expect(deprecated)] // remove when Value::Function removed
             Self::Function { hugr } => {
                 let func_type = mono_fn_type(hugr).unwrap_or_else(|e| panic!("{}", e));
                 Type::new_function(func_type.into_owned())
@@ -373,6 +375,8 @@ impl Value {
     /// # Errors
     ///
     /// Returns an error if the Hugr root node does not define a function.
+    #[deprecated(note = "Flatten and lift contents to a FuncDefn", since = "0.25.0")]
+    #[expect(deprecated)] // Remove along with Value::Function
     pub fn function(hugr: impl Into<Hugr>) -> Result<Self, ConstTypeError> {
         let hugr = hugr.into();
         mono_fn_type(&hugr)?;
@@ -461,6 +465,7 @@ impl Value {
     fn name(&self) -> OpName {
         match self {
             Self::Extension { e } => format!("const:custom:{}", e.name()),
+            #[expect(deprecated)] // remove when Value::Function removed
             Self::Function { hugr: h } => {
                 let Ok(t) = mono_fn_type(h) else {
                     panic!("HUGR root node isn't a valid function parent.");
@@ -487,6 +492,7 @@ impl Value {
     pub fn validate(&self) -> Result<(), ConstTypeError> {
         match self {
             Self::Extension { e } => Ok(e.value().validate()?),
+            #[expect(deprecated)] // remove when Value::Function removed
             Self::Function { hugr } => {
                 mono_fn_type(hugr)?;
                 Ok(())
@@ -518,6 +524,7 @@ impl Value {
     pub fn try_hash<H: Hasher>(&self, st: &mut H) -> bool {
         match self {
             Value::Extension { e } => e.value().try_hash(&mut *st),
+            #[expect(deprecated)] // remove when Value::Function removed
             Value::Function { .. } => false,
             Value::Sum(s) => s.try_hash(st),
         }
@@ -555,7 +562,7 @@ pub(crate) mod test {
     };
     use crate::std_extensions::arithmetic::int_types::ConstInt;
     use crate::std_extensions::collections::array::{ArrayValue, array_type};
-    use crate::std_extensions::collections::value_array::{VArrayValue, value_array_type};
+    use crate::std_extensions::collections::borrow_array::{BArrayValue, borrow_array_type};
     use crate::{
         builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr},
         extension::{
@@ -687,6 +694,7 @@ pub(crate) mod test {
         );
     }
 
+    #[expect(deprecated)] // remove when Value::Function removed
     #[rstest]
     fn function_value(simple_dfg_hugr: Hugr) {
         let v = Value::function(simple_dfg_hugr).unwrap();
@@ -726,10 +734,9 @@ pub(crate) mod test {
     }
 
     #[fixture]
-    fn const_value_array_bool() -> Value {
-        VArrayValue::new(bool_t(), [Value::true_val(), Value::false_val()]).into()
+    fn const_borrow_array_bool() -> Value {
+        BArrayValue::new(bool_t(), [Value::true_val(), Value::false_val()]).into()
     }
-
     #[fixture]
     fn const_array_options() -> Value {
         let some_true = Value::some([Value::true_val()]);
@@ -739,11 +746,11 @@ pub(crate) mod test {
     }
 
     #[fixture]
-    fn const_value_array_options() -> Value {
+    fn const_borrow_array_options() -> Value {
         let some_true = Value::some([Value::true_val()]);
         let none = Value::none(vec![bool_t()]);
         let elem_ty = SumType::new_option(vec![bool_t()]);
-        VArrayValue::new(elem_ty.into(), [some_true, none]).into()
+        BArrayValue::new(elem_ty.into(), [some_true, none]).into()
     }
 
     #[rstest]
@@ -753,9 +760,9 @@ pub(crate) mod test {
     #[case(const_tuple(), Type::new_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
     #[case(const_array_bool(), array_type(2, bool_t()), "const:custom:array")]
     #[case(
-        const_value_array_bool(),
-        value_array_type(2, bool_t()),
-        "const:custom:value_array"
+        const_borrow_array_bool(),
+        borrow_array_type(2, bool_t()),
+        "const:custom:borrow_array"
     )]
     #[case(
         const_array_options(),
@@ -763,9 +770,9 @@ pub(crate) mod test {
         "const:custom:array"
     )]
     #[case(
-        const_value_array_options(),
-        value_array_type(2, SumType::new_option(vec![bool_t()]).into()),
-        "const:custom:value_array"
+        const_borrow_array_options(),
+        borrow_array_type(2, SumType::new_option(vec![bool_t()]).into()),
+        "const:custom:borrow_array"
     )]
     fn const_type(
         #[case] const_value: Value,
@@ -786,9 +793,9 @@ pub(crate) mod test {
     #[case(const_serialized_usize(), const_usize())]
     #[case(const_tuple_serialized(), const_tuple())]
     #[case(const_array_bool(), const_array_bool())]
-    #[case(const_value_array_bool(), const_value_array_bool())]
+    #[case(const_borrow_array_bool(), const_borrow_array_bool())]
     #[case(const_array_options(), const_array_options())]
-    #[case(const_value_array_options(), const_value_array_options())]
+    #[case(const_borrow_array_options(), const_borrow_array_options())]
     // Opaque constants don't get resolved into concrete types when running miri,
     // as the `typetag` machinery is not available.
     #[cfg_attr(miri, ignore)]
@@ -917,6 +924,7 @@ pub(crate) mod test {
                 use ::proptest::collection::vec;
                 let leaf_strat = prop_oneof![
                     any::<OpaqueValue>().prop_map(|e| Self::Extension { e }),
+                    #[expect(deprecated)] // remove prop_oneof when Value::Function removed
                     crate::proptest::any_hugr().prop_map(|x| Value::function(x).unwrap())
                 ];
                 leaf_strat

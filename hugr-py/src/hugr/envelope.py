@@ -39,7 +39,7 @@ from typing import TYPE_CHECKING, ClassVar
 
 import pyzstd
 
-import hugr._hugr as rust
+import hugr._hugr.model as rust
 
 if TYPE_CHECKING:
     from hugr.hugr.base import Hugr
