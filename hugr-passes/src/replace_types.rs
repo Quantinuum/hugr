@@ -1385,7 +1385,10 @@ mod test {
     }
 
     #[rstest]
-    fn op_to_call(#[values(true, false)] use_linking: bool) {
+    fn op_to_call_polymorphic(#[values(true, false)] use_linking: bool) {
+        // Note the resulting Hugr has a polymorphic lowered_read function, which would
+        // mean (re)running monomorphization *after* ReplaceTypes; usually we would expect
+        // monomorphization to happen first so that ReplaceTypes can act upon the concrete types.
         let e = ext();
         let pv = e.get_type(PACKED_VEC).unwrap();
         let inner = pv.instantiate([usize_t().into()]).unwrap();
@@ -1450,6 +1453,7 @@ mod test {
                 .find(|n| h.get_optype(*n).is_extension_op()),
             None
         );
+        assert_eq!(h.children(h.module_root()).count(), 2); // main + lowered_read
     }
 
     #[test]
