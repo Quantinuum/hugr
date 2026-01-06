@@ -193,8 +193,7 @@ The root node has no non-hierarchy edges (and this supersedes any other requirem
 edges of specific node types).
 
 A *sibling graph* is a subgraph of the HUGR containing all nodes with
-a particular parent, plus any `Order`, `Value`, `Static`, and `ControlFlow` edges between
-them.
+a particular parent, plus any edges between them.
 
 #### `Value` edges
 
