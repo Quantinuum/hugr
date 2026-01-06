@@ -157,8 +157,10 @@ EdgeKind ::= Value(Locality, AnyType)
              | Hierarchy | Order | ControlFlow
 ```
 
-Note that a port is associated with a node and zero or more Dataflow edges.
-Incoming ports are associated with exactly one edge, or many `ControlFlow` edges.
+Note that a port is associated with a node and zero or more Dataflow or `ControlFlow` edges.
+Incoming ports are associated with exactly one Dataflow edge, or any number of
+`ControlFlow` edges. Outgoing ports are associated with any number of Dataflow
+edges, or exactly one `ControlFlow` edge.
 All Dataflow edges associated with a port have the same type; thus a port has a
 well defined type, matching that of its adjoining edges. The incoming and
 outgoing ports of a node are each ordered independently, meaning that the first
@@ -170,7 +172,8 @@ The sequences of incoming and outgoing port types (carried on `Value` edges) of 
 Note that the locality is not fixed or even specified by the signature.
 
 A source port with a `CopyableType` may have any number of edges associated with
-it (including zero, which means "discard"). Any other port
+it (including zero, which means "discard"). A target port for a `ControlFlow`
+edge may also have any number of `ControlFlow` edges associated with it. Any other port
 must have exactly one edge associated with it. This captures the property of
 linear types that the value is used exactly once.
 
@@ -190,8 +193,7 @@ The root node has no non-hierarchy edges (and this supersedes any other requirem
 edges of specific node types).
 
 A *sibling graph* is a subgraph of the HUGR containing all nodes with
-a particular parent, plus any `Order`, `Value` `Static`, and `ControlFlow` edges between
-them.
+a particular parent, plus any edges between them.
 
 #### `Value` edges
 
@@ -406,7 +408,7 @@ with inputs the same as the CFG-node; the second child is an
 The remaining children are either `DFB`s or [scoped definitions](#scoped-definitions).
 
 The first output of the graph contained in a `DFB` has type
-`Sum(\#t(0),...,#t(n-1))`, where the node has `n` successors, and the
+`Sum(#t(0),...,#t(n-1))`, where the node has `n` successors, and the
 remaining outputs are a row `#x`. `#t(i)` with `#x` appended matches the
 inputs of successor `i`.
 
@@ -630,7 +632,8 @@ analysis required to move computations out of a CFG-node into
 Conditional- and TailLoop-nodes). Note that such conversion could be
 done for only a subpart of the HUGR at a time.
 
-The following CFG is equivalent to the previous example. In this diagram:
+The following CFG is equivalent to the example given in the
+[Control Flow Graphs](#control-flow-graphs) section. In this diagram:
 
 - the thick arrow from "angle source" to "F" is an `Ext` edge (from an
   ancestral DFG into the CFG's entry block);
