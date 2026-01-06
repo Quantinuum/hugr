@@ -176,7 +176,20 @@ impl NodeTemplate {
                 }
                 (root_opty, None, None)
             }
-            NodeTemplate::LinkedHugr(h, pol) => {
+            NodeTemplate::LinkedHugr(mut h, pol) => {
+                // We have to recursively process any children that *might* be linked in,
+                // before linking, as otherwise they'll signature conflict with other,
+                // already-recursively-processed, functions with which they might be linked.
+                let mut containing_func = h.entrypoint();
+                while let Some(parent) = h.get_parent(containing_func) {
+                    containing_func = parent;
+                }
+
+                for ch in h.children(h.module_root()).collect::<Vec<_>>() {
+                    if ch != containing_func {
+                        rt.process_subtree_opts(&mut h, ch, opts)?;
+                    }
+                }
                 let new_entrypoint = hugr
                     .insert_link_hugr(n, *h, &pol)
                     .map_err(|e| ef(BuildError::from(e)))?
