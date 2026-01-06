@@ -135,15 +135,22 @@ impl NodeTemplate {
         }
     }
 
-    fn replace(self, hugr: &mut impl HugrMut<Node = Node>, n: Node) -> Result<(), BuildError> {
+    fn replace<H: HugrMut<Node = Node>>(
+        self,
+        hugr: &mut H,
+        n: Node,
+        rt: &ReplaceTypes,
+        opts: &ReplacementOptions,
+    ) -> Result<(), ReplaceTypesError> {
+        let ef = |e| ReplaceTypesError::AddTemplateError(n, Box::new(e));
         assert_eq!(hugr.children(n).count(), 0);
         let (new_optype, static_source, static_inport) = match self {
             NodeTemplate::SingleOp(op_type) => {
                 if op_type.static_input_port().is_some() {
-                    return Err(BuildError::UnexpectedType {
+                    return Err(ef(BuildError::UnexpectedType {
                         node: n,
                         op_desc: "Replacement SingleOp without static input",
-                    });
+                    }));
                 }
                 (op_type, None, None)
             }
@@ -155,10 +162,10 @@ impl NodeTemplate {
                 )
                 //if !root.is_container() || !root.dataflow_signature().is_some() // Using explicit list as per docs
                 {
-                    return Err(BuildError::UnexpectedType {
+                    return Err(ef(BuildError::UnexpectedType {
                         node: n,
                         op_desc: "Replacement CompoundOp not a container/dataflow node",
-                    });
+                    }));
                 }
                 assert!(root.static_input_port().is_none());
                 let new_entrypoint = hugr.insert_hugr(n, *new_h).inserted_entrypoint;
@@ -170,7 +177,10 @@ impl NodeTemplate {
                 (root_opty, None, None)
             }
             NodeTemplate::LinkedHugr(h, pol) => {
-                let new_entrypoint = hugr.insert_link_hugr(n, *h, &pol)?.inserted_entrypoint;
+                let new_entrypoint = hugr
+                    .insert_link_hugr(n, *h, &pol)
+                    .map_err(|e| ef(BuildError::from(e)))?
+                    .inserted_entrypoint;
                 let children = hugr.children(new_entrypoint).collect::<Vec<_>>();
                 let static_source = hugr.static_source(new_entrypoint);
                 let root_opty = hugr.remove_node(new_entrypoint);
@@ -182,7 +192,7 @@ impl NodeTemplate {
             }
             #[expect(deprecated)] // remove together
             NodeTemplate::Call(func, type_args) => {
-                let c = call(hugr, func, type_args)?;
+                let c = call(hugr, func, type_args).map_err(ef)?;
                 let called_func_port = c.called_function_port();
                 (c.into(), Some(func), Some(called_func_port))
             }
@@ -194,6 +204,7 @@ impl NodeTemplate {
                 hugr.connect(static_source, 0, n, static_inport);
             }
         }
+        rt.process_subtree_opts(hugr, n, opts)?;
         Ok(())
     }
 
@@ -638,6 +649,26 @@ impl ReplaceTypes {
         self.regions = Some(regions.into_iter().collect());
     }
 
+    fn process_subtree_opts(
+        &self,
+        hugr: &mut impl HugrMut<Node = Node>,
+        root: Node,
+        opts: &ReplacementOptions,
+    ) -> Result<(), ReplaceTypesError> {
+        if opts.process_recursive {
+            self.change_subtree(hugr, root, opts.linearize_unchanged)?;
+            // change_subtree does not linearize its root, just as change_node
+            // does not linearize the node it's called on; our caller does.
+        } else if opts.linearize_unchanged {
+            let mut descs = hugr.descendants(root);
+            assert_eq!(descs.next(), Some(root));
+            for n in descs.collect::<Vec<_>>() {
+                self.linearize_outputs(hugr, n)?;
+            }
+        }
+        Ok(())
+    }
+
     fn change_subtree(
         &self,
         hugr: &mut impl HugrMut<Node = Node>,
@@ -741,20 +772,7 @@ impl ReplaceTypes {
                     }
                 };
                 if let Some((replacement, opts)) = replacement {
-                    replacement
-                        .replace(hugr, n)
-                        .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
-                    if opts.process_recursive {
-                        self.change_subtree(hugr, n, opts.linearize_unchanged)?;
-                        // change_subtree does not linearize its root, just as change_node
-                        // does not linearize the node it's called on; our caller does.
-                    } else if opts.linearize_unchanged {
-                        let mut descs = hugr.descendants(n);
-                        assert_eq!(descs.next(), Some(n));
-                        for n in descs.collect::<Vec<_>>() {
-                            self.linearize_outputs(hugr, n)?;
-                        }
-                    }
+                    replacement.replace(hugr, n, self, &opts)?;
                     true
                 } else {
                     changed
