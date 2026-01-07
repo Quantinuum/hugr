@@ -420,14 +420,19 @@ Some normalizations are possible:
 - If the entry node has only one successor and that successor is the
   exit node, the CFG node itself can be removed.
 
-The CFG in the example below has three inputs: one (call it `v`) of type "P"
-(not specified, but with a conversion to boolean represented by the nodes labelled "P?1" and "P?2"), one of
-type "qubit" and one (call it `t`) of type "angle".
+The CFG in the example below takes three inputs:
 
-The CFG has the effect of performing an `Rz` rotation on the qubit with angle
-`x`. where `x` is the constant `C` if `v` and `H(v)` are both true and `G(F(t))`
-otherwise. (`H` is a function from type "P" to type "P" and `F` and `G` are
-functions from type "angle" to type "angle".)
+- A value `v` of type "P" (its exact structure isn’t specified, but it can be converted to a boolean—this conversion is represented by the nodes labeled "P?1" and "P?2").
+- A value of type "qubit".
+- A value `t` of type "angle".
+
+The CFG applies an `Rz` rotation to the qubit. The rotation angle `x` is determined as follows:
+
+- If both `v` and `H(v)` evaluate to true, then `x` is the constant `C`.
+- Otherwise, `x` is `G(F(t))`.
+
+Here, `H` maps values of type "P" to "P", and both `F` and `G` map values of type "angle" to "angle".
+
 
 The `DFB` nodes are labelled `Entry` and `BB1` to `BB4`. Note that the first
 output of each of these is a sum type, whose arity is the number of outgoing
