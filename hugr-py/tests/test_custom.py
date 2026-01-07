@@ -163,3 +163,20 @@ def test_custom_type(ext_t: tys.ExtType, registry: ext.ExtensionRegistry):
     assert isinstance(f_t_opaque.input[0], tys.Opaque)
 
     assert f_t_opaque.resolve(registry) == f_t
+
+
+def test_qualified_name():
+    # Test TypeDef with extension
+    assert _LIST_T.qualified_name() == "my_extension.List"
+
+    # Test TypeDef without extension
+    standalone_type = ext.TypeDef(
+        "Standalone",
+        description="A standalone type.",
+        params=[],
+        bound=ext.ExplicitBound(tys.TypeBound.Copyable),
+    )
+    assert standalone_type.qualified_name() == "Standalone"
+
+    # Test OpDef with extension
+    assert _STRINGLY_DEF.qualified_name() == "my_extension.StringlyOp"
