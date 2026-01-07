@@ -136,6 +136,21 @@ class TypeDef(ExtensionObject):
             bound=ext_s.TypeDefBound(root=self.bound._to_serial()),
         )
 
+    def qualified_name(self) -> str:
+        """Get the fully qualified name of the type definition.
+
+        Returns the extension name prefixed to the type name if the type
+        belongs to an extension (e.g., "my_extension.MyType"), otherwise
+        returns just the type name.
+
+        Returns:
+            The qualified name of the type definition.
+        """
+        ext_name = self._extension.name if self._extension else ""
+        if ext_name:
+            return f"{ext_name}.{self.name}"
+        return self.name
+
     def instantiate(self, args: Sequence[tys.TypeArg]) -> tys.ExtType:
         """Instantiate a concrete type from this type definition.
 
@@ -220,6 +235,15 @@ class OpDef(ExtensionObject):
         )
 
     def qualified_name(self) -> str:
+        """Get the fully qualified name of the operation definition.
+
+        Returns the extension name prefixed to the operation name if the operation
+        belongs to an extension (e.g., "my_extension.MyOp"), otherwise
+        returns just the operation name.
+
+        Returns:
+            The qualified name of the operation definition.
+        """
         ext_name = self._extension.name if self._extension else ""
         if ext_name:
             return f"{ext_name}.{self.name}"
