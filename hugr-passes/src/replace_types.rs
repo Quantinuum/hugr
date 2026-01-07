@@ -267,7 +267,7 @@ impl ReplacementOptions {
 /// A configuration of what types, ops, and constants should be replaced with what.
 /// May be applied to a Hugr via [`Self::run`].
 ///
-/// Parametrized types and ops will be reparametrized taking into account the
+/// Parametrized types and ops will be reparameterized taking into account the
 /// replacements, but any ops taking/returning the replaced types *not* as a result of
 /// parametrization, will also need to be replaced - see [`Self::replace_op`].
 /// Similarly [Const]s.
@@ -409,7 +409,7 @@ impl ReplaceTypes {
     /// substitution (parametric polymorphism) happening later will not respect this replacement.
     ///
     /// If there are any [`LoadConstant`]s of this type, callers should also call [`Self::replace_consts`]
-    /// (or [`Self::replace_consts_parametrized`]) as the [`LoadConstant`]s will be reparametrized
+    /// (or [`Self::replace_consts_parametrized`]) as the [`LoadConstant`]s will be reparameterized
     /// (and this will break the edge from [Const] to [`LoadConstant`]).
     ///
     /// Note that if `src` is Copyable and `dest` is Linear, then (besides linearity violations)
@@ -455,7 +455,7 @@ impl ReplaceTypes {
     ///
     /// If there are any [`LoadConstant`]s of any of these types, callers should also call
     /// [`Self::replace_consts_parametrized`] (or [`Self::replace_consts`]) as the
-    /// [`LoadConstant`]s will be reparametrized (and this will break the edge from [Const] to
+    /// [`LoadConstant`]s will be reparameterized (and this will break the edge from [Const] to
     /// [`LoadConstant`]).
     /// See [Self::set_replace_type] for more details (including recursion).
     pub fn set_replace_parametrized_type(

@@ -82,10 +82,10 @@ class Cfg(ParentBuilder[ops.CFG], AbstractContextManager):
     exit: Node
 
     def __init__(self, *input_types: Type) -> None:
-        input_typs = list(input_types)
-        root_op = ops.CFG(inputs=input_typs)
+        input_types_lst = list(input_types)
+        root_op = ops.CFG(inputs=input_types_lst)
         hugr = Hugr(root_op)
-        self._init_impl(hugr, hugr.entrypoint, input_typs)
+        self._init_impl(hugr, hugr.entrypoint, input_types_lst)
 
     def _init_impl(
         self: Cfg, hugr: Hugr, entrypoint: Node, input_types: TypeRow
