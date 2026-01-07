@@ -13,7 +13,7 @@ use thiserror::Error;
 use crate::{CommitId, PatchNode, PersistentHugr, PersistentWire, Walker};
 
 /// A set of pinned nodes and wires between them, along with a fixed input
-/// and output boundary, simmilar to [`SiblingSubgraph`].
+/// and output boundary, similar to [`SiblingSubgraph`].
 ///
 /// Unlike [`SiblingSubgraph`], subgraph validity (in particular convexity) is
 /// not checked (and cannot be checked), as the same [`PinnedSubgraph`] may
