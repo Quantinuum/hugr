@@ -181,7 +181,9 @@ impl NodeTemplate {
                 // before linking, as otherwise they'll signature conflict with other,
                 // already-recursively-processed, functions with which they might be linked.
                 let mut containing_func = h.entrypoint();
-                while let Some(parent) = h.get_parent(containing_func) {
+                while let Some(parent) = h.get_parent(containing_func)
+                    && !h.get_optype(parent).is_module()
+                {
                     containing_func = parent;
                 }
 
