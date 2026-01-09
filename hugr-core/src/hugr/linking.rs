@@ -1064,7 +1064,7 @@ mod test {
         let mut h = simple_dfg_hugr();
         let temp = h.add_node_with_parent(
             h.module_root(),
-            FuncDecl::new("temp", Signature::new_endo(vec![])),
+            FuncDecl::new("temp", Signature::new_endo([])),
         );
 
         let (insert, defn, decl) = dfg_calling_defn_decl();
@@ -1126,8 +1126,8 @@ mod test {
         multi_defn: OnMultiDefn,
     ) {
         let i64_t = || INT_TYPES[6].to_owned();
-        let foo_sig = Signature::new_endo(i64_t());
-        let bar_sig = Signature::new(vec![i64_t(); 2], i64_t());
+        let foo_sig = Signature::new_endo([i64_t()]);
+        let bar_sig = Signature::new(vec![i64_t(); 2], [i64_t()]);
         let def_foo = {
             let mut fb =
                 FunctionBuilder::new_vis("foo", foo_sig.clone(), Visibility::Public).unwrap();
@@ -1149,7 +1149,7 @@ mod test {
         };
 
         let main_def_bar = {
-            let mut main_b = FunctionBuilder::new("main", Signature::new(vec![], i64_t())).unwrap();
+            let mut main_b = FunctionBuilder::new("main", Signature::new([], [i64_t()])).unwrap();
             let mut mb = main_b.module_root_builder();
             let foo1 = mb.declare("foo", foo_sig.clone().into()).unwrap();
             let foo2 = mb.declare("foo", foo_sig.clone().into()).unwrap();
@@ -1244,9 +1244,9 @@ mod test {
             (mb.finish_hugr().unwrap(), node)
         };
 
-        let old_sig = Signature::new_endo(usize_t());
+        let old_sig = Signature::new_endo([usize_t()]);
         let (orig_host, orig_fn) = mk_def_or_decl("foo", old_sig.clone(), host_defn);
-        let new_sig = Signature::new_endo(INT_TYPES[3].clone());
+        let new_sig = Signature::new_endo([INT_TYPES[3].clone()]);
         let (inserted, inserted_fn) = mk_def_or_decl("foo", new_sig.clone(), inserted_defn);
 
         let pol = NameLinkingPolicy::default();
@@ -1289,7 +1289,7 @@ mod test {
             let mut mb = ModuleBuilder::new();
             let cst = mb.add_constant(Value::from(ConstUsize::new(cst)));
             let mut fb = mb
-                .define_function_vis("foo", Signature::new(vec![], usize_t()), Visibility::Public)
+                .define_function_vis("foo", Signature::new([], [usize_t()]), Visibility::Public)
                 .unwrap();
             let c = fb.load_const(&cst);
             fb.finish_with_outputs([c]).unwrap();
@@ -1342,15 +1342,15 @@ mod test {
     fn insert_link() {
         let insert = {
             let mut mb = ModuleBuilder::new();
-            let reached = mb.declare("reached", endo_sig(usize_t()).into()).unwrap();
+            let reached = mb.declare("reached", endo_sig([usize_t()]).into()).unwrap();
             // This would conflict signature, but is not reached:
             let unreached = mb
-                .declare("unreached", inout_sig(vec![], usize_t()).into())
+                .declare("unreached", inout_sig([], [usize_t()]).into())
                 .unwrap();
-            let mut outer = mb.define_function("outer", endo_sig(usize_t())).unwrap();
+            let mut outer = mb.define_function("outer", endo_sig([usize_t()])).unwrap();
             // ...as this first call is outside the region we insert:
             let [i] = outer.call(&unreached, &[], []).unwrap().outputs_arr();
-            let mut dfb = outer.dfg_builder(endo_sig(usize_t()), [i]).unwrap();
+            let mut dfb = outer.dfg_builder(endo_sig([usize_t()]), [i]).unwrap();
             let [i] = dfb.input_wires_arr();
             let call = dfb.call(&reached, &[], [i]).unwrap();
             let dfg = dfb.finish_with_outputs(call.outputs()).unwrap();
@@ -1359,7 +1359,7 @@ mod test {
             h.set_entrypoint(dfg.node());
             h
         };
-        let mut fb = FunctionBuilder::new("main", endo_sig(usize_t())).unwrap();
+        let mut fb = FunctionBuilder::new("main", endo_sig([usize_t()])).unwrap();
         let [i] = fb.input_wires_arr();
         let cst = fb.add_load_value(ConstUsize::new(42));
         let mut host = fb.finish_hugr_with_outputs([cst]).unwrap();
@@ -1387,8 +1387,8 @@ mod test {
 
     #[rstest]
     fn no_new_names_module(#[values(Visibility::Public, Visibility::Private)] vis: Visibility) {
-        let pub_sig = endo_sig(usize_t());
-        let bar_sig = Signature::new(vec![usize_t(); 2], usize_t());
+        let pub_sig = endo_sig([usize_t()]);
+        let bar_sig = Signature::new(vec![usize_t(); 2], [usize_t()]);
         let existing = {
             let mut mb = ModuleBuilder::new();
             mb.declare("pub_func", pub_sig.clone().into()).unwrap();
@@ -1443,14 +1443,16 @@ mod test {
     #[rstest]
     fn no_new_names_entrypoint(#[values(true, false)] call_new: bool) {
         let (insert, new_func) = {
-            let mut dfb = DFGBuilder::new(inout_sig(vec![], usize_t())).unwrap();
+            let mut dfb = DFGBuilder::new(inout_sig([], [usize_t()])).unwrap();
             let mut mb = dfb.module_root_builder();
             let cst_used = mb.add_constant(Value::from(ConstUsize::new(5)));
             mb.add_constant(Value::from(ConstUsize::new(10)));
 
-            let nf = mb.declare("new_func", endo_sig(usize_t()).into()).unwrap();
+            let nf = mb
+                .declare("new_func", endo_sig([usize_t()]).into())
+                .unwrap();
             let pf = mb
-                .define_function_vis("pub_func", endo_sig(usize_t()), Visibility::Public)
+                .define_function_vis("pub_func", endo_sig([usize_t()]), Visibility::Public)
                 .unwrap();
             let [i] = pf.input_wires_arr();
             let pf = pf.finish_with_outputs([i]).unwrap();
@@ -1469,8 +1471,9 @@ mod test {
 
         let (backup, ex_main) = {
             let mut mb = ModuleBuilder::new();
-            mb.declare("pub_func", endo_sig(usize_t()).into()).unwrap();
-            let fb = mb.define_function("main", endo_sig(usize_t())).unwrap();
+            mb.declare("pub_func", endo_sig([usize_t()]).into())
+                .unwrap();
+            let fb = mb.define_function("main", endo_sig([usize_t()])).unwrap();
             let ins = fb.input_wires();
             let main = fb.finish_with_outputs(ins).unwrap();
             (mb.finish_hugr().unwrap(), main.node())

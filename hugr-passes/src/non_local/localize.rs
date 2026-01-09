@@ -323,7 +323,7 @@ fn add_control_prefixes<H: HugrMut>(
         let mut cond = ConditionalBuilder::new(
             old_sum_rows.clone(),
             just_types(needed_sources.values()).collect_vec(),
-            new_control_type.clone(),
+            [new_control_type.clone()],
         )
         .unwrap();
         for (i, new_sources) in variant_source_prefixes.into_iter().enumerate() {

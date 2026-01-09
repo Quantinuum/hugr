@@ -165,12 +165,12 @@ mod tests {
 
     #[rstest]
     fn test_insert_cut() {
-        let dfg_b = DFGBuilder::new(Signature::new_endo(vec![bool_t(), qb_t()])).unwrap();
+        let dfg_b = DFGBuilder::new(Signature::new_endo([bool_t(), qb_t()])).unwrap();
         let inputs = dfg_b.input().outputs();
         let mut h = dfg_b.finish_hugr_with_outputs(inputs).unwrap();
         let [i, o] = h.get_io(h.entrypoint()).unwrap();
 
-        let mut dfg_b = DFGBuilder::new(Signature::new_endo(vec![bool_t(), qb_t()])).unwrap();
+        let mut dfg_b = DFGBuilder::new(Signature::new_endo([bool_t(), qb_t()])).unwrap();
         let [b, q] = dfg_b.input().outputs_arr();
         let noop1 = dfg_b.add_dataflow_op(Noop::new(bool_t()), [b]).unwrap();
         let noop2 = dfg_b.add_dataflow_op(Noop::new(qb_t()), [q]).unwrap();
