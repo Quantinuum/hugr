@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.25.3](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.2...hugr-core-v0.25.3) - 2026-01-09
+
+### Bug Fixes
+
+- more nondeterminism in linking ([#2792](https://github.com/Quantinuum/hugr/pull/2792))
+
+### Documentation
+
+- Add collection extension ops to the spec ([#2767](https://github.com/Quantinuum/hugr/pull/2767))
+
 ## [0.25.2](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.1...hugr-core-v0.25.2) - 2025-12-30
 
 ### Bug Fixes
