@@ -10,7 +10,7 @@ use hugr_core::hugr::views::SiblingSubgraph;
 use hugr_core::hugr::views::sibling_subgraph::TopoConvexChecker;
 use hugr_core::ops::{OpTrait, OpType};
 use hugr_core::types::Type;
-use hugr_core::{HugrView, Node, SimpleReplacement};
+use hugr_core::{HugrView, Node, PortIndex, SimpleReplacement, Wire};
 use itertools::Itertools;
 
 use crate::ComposablePass;
@@ -209,38 +209,34 @@ fn remove_pack_unpack<'h, T: HugrView>(
     unpack_nodes: Vec<T::Node>,
     num_other_outputs: usize,
 ) -> SimpleReplacement<T::Node> {
-    let num_unpack_outputs = tuple_types.len() * unpack_nodes.len();
-
     let parent = hugr.get_parent(pack_node).expect("pack_node has no parent");
     let checker = convex_checker.get_or_insert_with(|| TopoConvexChecker::new(hugr, parent));
 
+    // We need to list the **connected** output ports from the unpack nodes.
+    // SiblingSubgraph ignores disconnected outputs, so we need these when building the replacement.
+    let unpack_output_wires: Vec<Wire<T::Node>> = unpack_nodes
+        .iter()
+        .flat_map(|unpack_node| {
+            hugr.node_outputs(*unpack_node)
+                .filter(|port| hugr.is_linked(*unpack_node, *port))
+                .map(|port| Wire::new(*unpack_node, port))
+        })
+        .collect_vec();
     let mut nodes = unpack_nodes;
     nodes.push(pack_node);
     let subcirc = SiblingSubgraph::try_from_nodes_with_checker(nodes, hugr, checker).unwrap();
     let subcirc_signature = subcirc.signature(hugr);
 
-    // The output port order in `SiblingSubgraph::try_from_nodes` is not too well defined.
-    // Check that the outputs are in the expected order.
-    debug_assert!(
-        itertools::equal(
-            subcirc_signature.output().iter(),
-            tuple_types
-                .iter()
-                .cycle()
-                .take(num_unpack_outputs)
-                .chain(itertools::repeat_n(
-                    &Type::new_tuple(tuple_types.to_vec()),
-                    num_other_outputs
-                ))
-        ),
-        "Unpacked tuple values must come before tupled values"
-    );
-
     let mut replacement = DFGBuilder::new(subcirc_signature).unwrap();
-    let mut outputs = Vec::with_capacity(num_unpack_outputs + num_other_outputs);
+    let mut replacement_outputs = Vec::with_capacity(unpack_output_wires.len() + num_other_outputs);
 
     // Wire the inputs directly to the unpack outputs
-    outputs.extend(replacement.input_wires().cycle().take(num_unpack_outputs));
+    let replacement_inputs = replacement.input_wires().collect_vec();
+    replacement_outputs.extend(
+        unpack_output_wires
+            .iter()
+            .map(|out_wire| replacement_inputs[out_wire.source().index()]),
+    );
 
     // If needed, re-add the tuple pack node and connect its output to the tuple outputs.
     if num_other_outputs > 0 {
@@ -249,12 +245,12 @@ fn remove_pack_unpack<'h, T: HugrView>(
             .add_dataflow_op(op, replacement.input_wires())
             .unwrap()
             .outputs_arr();
-        outputs.extend(std::iter::repeat_n(tuple, num_other_outputs));
+        replacement_outputs.extend(std::iter::repeat_n(tuple, num_other_outputs));
     }
 
     // These should never fail, as we are defining the replacement ourselves.
     let replacement = replacement
-        .finish_hugr_with_outputs(outputs)
+        .finish_hugr_with_outputs(replacement_outputs)
         .unwrap_or_else(|e| {
             panic!("Failed to create replacement for removing tuple pack/unpack operations. {e}")
         });
@@ -268,10 +264,12 @@ fn remove_pack_unpack<'h, T: HugrView>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use hugr_core::builder::FunctionBuilder;
     use hugr_core::extension::prelude::{UnpackTuple, bool_t, qb_t};
 
     use hugr_core::Hugr;
     use hugr_core::ops::handle::NodeHandle;
+    use hugr_core::std_extensions::arithmetic::float_types::float64_type;
     use hugr_core::types::Signature;
     use rstest::{fixture, rstest};
 
@@ -387,6 +385,28 @@ mod test {
         h.finish_hugr_with_outputs([b1, b2, tuple]).unwrap()
     }
 
+    /// A pack operation followed by an unpack that discards its first output.
+    ///
+    /// The unpack operation can be removed, but the pack operation cannot.
+    ///
+    /// This is a minimal error case for <https://github.com/Quantinuum/tket2/issues/1347>.
+    #[fixture]
+    fn unpack_discard_first() -> Hugr {
+        let mut h = FunctionBuilder::new(
+            "test",
+            Signature::new(vec![bool_t(), float64_type()], vec![float64_type()]),
+        )
+        .unwrap();
+        let [b, f] = h.input_wires_arr();
+
+        let tuple = h.make_tuple([b, f]).unwrap();
+
+        let op = UnpackTuple::new(vec![bool_t(), float64_type()].into());
+        let [_b, f] = h.add_dataflow_op(op, [tuple]).unwrap().outputs_arr();
+
+        h.finish_hugr_with_outputs([f]).unwrap()
+    }
+
     #[rstest]
     #[case::unused(unused_pack(), 1, 2)]
     #[case::simple(simple_pack_unpack(), 1, 2)]
@@ -395,6 +415,7 @@ mod test {
     // TODO: Remove this once <https://github.com/CQCL/hugr/issues/1974>, and update the `UntuplePass` docs.
     #[should_panic(expected = "UnsupportedEdgeKind(Node(7), Port(Incoming, 2))")]
     #[case::ordered(ordered_pack_unpack(), 1, 2)]
+    #[case::unpack_discard_first(unpack_discard_first(), 1, 2)]
     fn test_pack_unpack(
         #[case] mut hugr: Hugr,
         #[case] expected_rewrites: usize,
