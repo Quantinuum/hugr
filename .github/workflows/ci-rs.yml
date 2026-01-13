@@ -193,9 +193,6 @@ jobs:
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
-      - name: List cargo `target` directory size before tests
-        run: |
-          du -h -d1 target
       - name: Build with no features
         run: cargo nextest r --verbose  --no-default-features --no-run
       - name: Tests with no features
@@ -359,6 +356,9 @@ jobs:
           name: rust
           flags: rust
           token: ${{ secrets.CODECOV_TOKEN }}
+      - name: List cargo `target` directory size after tests
+        run: |
+          du -h -d1 target
 
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.
