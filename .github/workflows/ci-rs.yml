@@ -207,9 +207,6 @@ jobs:
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
         run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
-      - name: List cargo `target` directory size after tests
-        run: |
-          du -h -d1 target
 
   # Run tests on the minimum supported rust version, with minimal dependency versions
   tests-msrv:
@@ -261,6 +258,9 @@ jobs:
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
         run: cargo minimal-versions --direct test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+      - name: List cargo `target` directory size after tests
+        run: |
+          du -h -d3 target
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
@@ -358,7 +358,7 @@ jobs:
           token: ${{ secrets.CODECOV_TOKEN }}
       - name: List cargo `target` directory size after tests
         run: |
-          du -h -d1 target
+          du -h -d3 target
 
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.
