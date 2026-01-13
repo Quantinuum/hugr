@@ -193,6 +193,9 @@ jobs:
         uses: KyleMayes/install-llvm-action@v2
         with:
           version: ${{ env.LLVM_VERSION }}
+      - name: List cargo `target` directory size before tests
+        run: |
+          du -h -d1 target
       - name: Build with no features
         run: cargo nextest r --verbose  --no-default-features --no-run
       - name: Tests with no features
@@ -207,6 +210,9 @@ jobs:
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
         run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+      - name: List cargo `target` directory size after tests
+        run: |
+          du -h -d1 target
 
   # Run tests on the minimum supported rust version, with minimal dependency versions
   tests-msrv:
