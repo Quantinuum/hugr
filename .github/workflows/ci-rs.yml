@@ -14,11 +14,7 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  # Minimize the `target` directory size to avoid filling the github runner disk space
-  #
-  # See here for some other suggestions for reducing disk usage.
-  # <https://matklad.github.io/2021/09/04/fast-rust-builds.html#CI-Workflow>
-  RUSTFLAGS: "--cfg=ci_run -C incremental=false"
+  RUSTFLAGS: "--cfg=ci_run"
   MIRIFLAGS: "-Zmiri-permissive-provenance" # Required due to warnings in bitvec 1.0.1
   CI: true # insta snapshots behave differently on ci
   SCCACHE_GHA_ENABLED: "true"
