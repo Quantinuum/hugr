@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.25.4](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.3...hugr-passes-v0.25.4) - 2026-01-14
+
+### Bug Fixes
+
+- UnpackTuple error on disconnected outputs ([#2813](https://github.com/Quantinuum/hugr/pull/2813))
+
 ## [0.25.3](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.2...hugr-passes-v0.25.3) - 2026-01-09
 
 ### Bug Fixes
