@@ -22,6 +22,7 @@ env:
   MIRIFLAGS: "-Zmiri-permissive-provenance" # Required due to warnings in bitvec 1.0.1
   CI: true # insta snapshots behave differently on ci
   SCCACHE_GHA_ENABLED: "true"
+  SCCACHE_RECACHE: "true"
   RUSTC_WRAPPER: "sccache"
   HUGR_TEST_SCHEMA: "1"
   # different strings for install action and feature name
