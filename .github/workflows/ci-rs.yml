@@ -260,6 +260,7 @@ jobs:
         run: cargo minimal-versions --direct test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
       - name: List cargo `target` directory size after tests
         run: |
+          echo "Target directory size:"
           du -h -d3 target
 
   # Ensure that serialized extensions match rust implementation
