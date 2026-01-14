@@ -258,6 +258,10 @@ jobs:
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
         run: cargo minimal-versions --direct test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+      - name: List cargo `target` directory size after tests
+        run: |
+          echo "Target directory size:"
+          du -h -d3 target
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
@@ -337,13 +341,21 @@ jobs:
           version: ${{ env.LLVM_VERSION }}
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Run tests with coverage instrumentation
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
+      - name: Run tests with no features
         run: |
-          cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report  --no-default-features --doctests
-          cargo llvm-cov --no-report  --all-features --doctests
-          cargo llvm-cov --no-report  -p hugr-llvm --features llvm14-0 --doctests
-          cargo llvm-cov --no-report  -p hugr-persistent --doctests
+          cargo nextest r --no-default-features
+          # Avoid filling the github runner disk space
+          cargo clean
+      - name: Clean existing coverage data
+        run: cargo llvm-cov clean --workspace
+      - name: Run tests with all features, with coverage instrumentation
+        run: cargo llvm-cov --no-report --all-features --doctests
+      - name: Run hugr-llvm tests, with coverage instrumentation
+        run: cargo llvm-cov --no-report -p hugr-llvm --features llvm14-0 --doctests
+      - name: Run hugr-persistent tests, with coverage instrumentation
+        run: cargo llvm-cov --no-report -p hugr-persistent --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
@@ -353,6 +365,12 @@ jobs:
           name: rust
           flags: rust
           token: ${{ secrets.CODECOV_TOKEN }}
+      - name: List cargo `target` directory size after tests
+        run: |
+          echo "Disk usage:"
+          df -h
+          echo "Target directory size:"
+          du -h -d3 target
 
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.
