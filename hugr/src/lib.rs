@@ -127,7 +127,7 @@
 //! ```
 
 // These modules are re-exported as-is. If more control is needed, define a new module in this crate with the desired exports.
-// The doc inline directive is necessary for renamed modules to appear as if they were defined in this crate
+// The doc inline directive is necessary for renamed modules to appear as if they were defined in this crate.
 pub use hugr_core::{
     builder, core, envelope, extension, metadata, ops, package, std_extensions, types, utils,
 };
