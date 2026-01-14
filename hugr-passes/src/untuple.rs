@@ -10,7 +10,7 @@ use hugr_core::hugr::views::SiblingSubgraph;
 use hugr_core::hugr::views::sibling_subgraph::TopoConvexChecker;
 use hugr_core::ops::{OpTrait, OpType};
 use hugr_core::types::Type;
-use hugr_core::{HugrView, Node, PortIndex, SimpleReplacement, Wire};
+use hugr_core::{HugrView, Node, PortIndex, SimpleReplacement};
 use itertools::Itertools;
 
 use crate::ComposablePass;
@@ -212,31 +212,27 @@ fn remove_pack_unpack<'h, T: HugrView>(
     let parent = hugr.get_parent(pack_node).expect("pack_node has no parent");
     let checker = convex_checker.get_or_insert_with(|| TopoConvexChecker::new(hugr, parent));
 
-    // We need to list the **connected** output ports from the unpack nodes.
-    // SiblingSubgraph ignores disconnected outputs, so we need these when building the replacement.
-    let unpack_output_wires: Vec<Wire<T::Node>> = unpack_nodes
-        .iter()
-        .flat_map(|unpack_node| {
-            hugr.node_outputs(*unpack_node)
-                .filter(|port| hugr.is_linked(*unpack_node, *port))
-                .map(|port| Wire::new(*unpack_node, port))
-        })
-        .collect_vec();
-    let mut nodes = unpack_nodes;
+    let mut nodes = unpack_nodes.clone();
     nodes.push(pack_node);
     let subcirc = SiblingSubgraph::try_from_nodes_with_checker(nodes, hugr, checker).unwrap();
     let subcirc_signature = subcirc.signature(hugr);
 
     let mut replacement = DFGBuilder::new(subcirc_signature).unwrap();
-    let mut replacement_outputs = Vec::with_capacity(unpack_output_wires.len() + num_other_outputs);
 
     // Wire the inputs directly to the unpack outputs
+    // We need to list the **connected** output ports from the unpack nodes.
+    // SiblingSubgraph ignores disconnected outputs, so we need these when building the replacement.
+    let mut replacement_outputs =
+        Vec::with_capacity(unpack_nodes.len() * tuple_types.len() + num_other_outputs);
     let replacement_inputs = replacement.input_wires().collect_vec();
-    replacement_outputs.extend(
-        unpack_output_wires
-            .iter()
-            .map(|out_wire| replacement_inputs[out_wire.source().index()]),
-    );
+    for unpack_node in unpack_nodes {
+        for out_port in hugr.node_outputs(unpack_node) {
+            if hugr.is_linked(unpack_node, out_port) {
+                let input = replacement_inputs[out_port.index()];
+                replacement_outputs.push(input);
+            }
+        }
+    }
 
     // If needed, re-add the tuple pack node and connect its output to the tuple outputs.
     if num_other_outputs > 0 {
