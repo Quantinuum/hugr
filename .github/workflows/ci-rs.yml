@@ -14,7 +14,11 @@ on:
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
-  RUSTFLAGS: "--cfg=ci_run"
+  # Minimize the `target` directory size to avoid filling the github runner disk space
+  #
+  # See here for some other suggestions for reducing disk usage.
+  # <https://matklad.github.io/2021/09/04/fast-rust-builds.html#CI-Workflow>
+  RUSTFLAGS: "--cfg=ci_run -C incremental=false"
   MIRIFLAGS: "-Zmiri-permissive-provenance" # Required due to warnings in bitvec 1.0.1
   CI: true # insta snapshots behave differently on ci
   SCCACHE_GHA_ENABLED: "true"
@@ -345,16 +349,16 @@ jobs:
       - name: Run tests with no features
         run: |
           cargo nextest r --no-default-features
-      - name: Run tests with coverage instrumentation
-        run: |
-          cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report --all-features --doctests
-          # Test non-default packages
-          cargo llvm-cov --no-report -p hugr-llvm --features llvm14-0 --doctests
-          cargo llvm-cov --no-report -p hugr-persistent --doctests
-        env:
-          # Minimize binary size to avoid filling the github runner disk space
-          RUSTFLAGS: "${{ env.RUSTFLAGS }} -C opt-level=s"
+          # Avoid filling the github runner disk space
+          cargo clean
+      - name: Clean existing coverage data
+        run: cargo llvm-cov clean --workspace
+      - name: Run tests with all features, with coverage instrumentation
+        run: cargo llvm-cov --no-report --all-features --doctests
+      - name: Run hugr-llvm tests, with coverage instrumentation
+        run: cargo llvm-cov --no-report -p hugr-llvm --features llvm14-0 --doctests
+      - name: Run hugr-persistent tests, with coverage instrumentation
+        run: cargo llvm-cov --no-report -p hugr-persistent --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
