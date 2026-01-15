@@ -57,8 +57,8 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             self.validate_node(node)?;
         }
 
-        // Hierarchy and children. No type variables declared outside the root.
-        self.validate_subtree(self.hugr.entrypoint(), &[])?;
+        // Hierarchy and children. No type variables declared by the module root.
+        self.validate_subtree(self.hugr.module_root(), &[])?;
 
         self.validate_linkage()?;
         // In tests we take the opportunity to verify that the hugr
@@ -345,16 +345,15 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             if let Some(second_child) = first_two_children
                 .next()
                 .map(|child| self.hugr.get_optype(child))
+                && !flags.allowed_second_child.is_superset(second_child.tag())
             {
-                if !flags.allowed_second_child.is_superset(second_child.tag()) {
-                    return Err(ValidationError::InvalidInitialChild {
-                        parent: node,
-                        parent_optype: Box::new(op_type.clone()),
-                        optype: Box::new(second_child.clone()),
-                        expected: flags.allowed_second_child,
-                        position: "second",
-                    });
-                }
+                return Err(ValidationError::InvalidInitialChild {
+                    parent: node,
+                    parent_optype: Box::new(op_type.clone()),
+                    optype: Box::new(second_child.clone()),
+                    expected: flags.allowed_second_child,
+                    position: "second",
+                });
             }
             // Additional validations running over the full list of children optypes
             let children_optypes = all_children.map(|c| (c, self.hugr.get_optype(c)));
@@ -600,13 +599,9 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         }
 
         // Check port connections.
-        //
-        // Root nodes are ignored, as they cannot have connected edges.
-        if node != self.hugr.entrypoint() {
-            for dir in Direction::BOTH {
-                for port in self.hugr.node_ports(node, dir) {
-                    self.validate_port(node, port, op_type, var_decls)?;
-                }
+        for dir in Direction::BOTH {
+            for port in self.hugr.node_ports(node, dir) {
+                self.validate_port(node, port, op_type, var_decls)?;
             }
         }
 

@@ -38,7 +38,7 @@ jobs:
       llvm: ${{ steps.filter.outputs.llvm }}
       model: ${{ steps.filter.outputs.model }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/check-changes
         id: filter
 
@@ -47,7 +47,7 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -74,7 +74,7 @@ jobs:
     permissions:
       checks: write
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -103,7 +103,7 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust stable, no features)
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -129,7 +129,7 @@ jobs:
     name: tests (Rust stable, all features)
 
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -161,7 +161,7 @@ jobs:
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v6
         with:
           name: hugr_binary
           path: target/debug/hugr
@@ -180,7 +180,7 @@ jobs:
         rust: [beta]
     name: tests (Rust ${{ matrix.rust }})
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -215,13 +215,13 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust MSRV, min dependencies)
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install MSRV toolchain
         id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.85"
+          toolchain: "1.89"
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -240,7 +240,7 @@ jobs:
           cargo binstall cargo-minimal-versions --force
       - name: Pin transitive dependencies not compatible with our MSRV
         # Add new dependencies as needed if the check fails due to
-        # "package `XXX` cannot be built because it requires rustc YYY or newer, while the currently active rustc version is 1.85.0"
+        # "package `XXX` cannot be built because it requires rustc YYY or newer, while the currently active rustc version is 1.89.0"
         run: |
           # rm Cargo.lock
           # cargo add -p hugr half@2.4.1
@@ -258,6 +258,10 @@ jobs:
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
         run: cargo minimal-versions --direct test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+      - name: List cargo `target` directory size after tests
+        run: |
+          echo "Target directory size:"
+          du -h -d3 target
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
@@ -266,9 +270,9 @@ jobs:
     name: Check standard extensions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - name: Download the hugr binary
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v7
         with:
           name: hugr_binary
           path: ${{ github.workspace }}/target/debug
@@ -292,7 +296,7 @@ jobs:
     name: Keep hugr-model capnp schema updated
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -324,12 +328,11 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust nightly, coverage)
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: mozilla-actions/sccache-action@v0.0.9
       - uses: dtolnay/rust-toolchain@master
         with:
           # Nightly is required to count doctests coverage
-          # TODO: Pinned due to <https://github.com/CQCL/hugr/issues/2227>
           toolchain: "nightly"
           components: llvm-tools-preview
       - name: Install LLVM and Clang
@@ -338,13 +341,21 @@ jobs:
           version: ${{ env.LLVM_VERSION }}
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Run tests with coverage instrumentation
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
+      - name: Run tests with no features
         run: |
-          cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report  --no-default-features --doctests
-          cargo llvm-cov --no-report  --all-features --doctests
-          cargo llvm-cov --no-report  -p hugr-llvm --features llvm14-0 --doctests
-          cargo llvm-cov --no-report  -p hugr-persistent --doctests
+          cargo nextest r --no-default-features
+          # Avoid filling the github runner disk space
+          cargo clean
+      - name: Clean existing coverage data
+        run: cargo llvm-cov clean --workspace
+      - name: Run tests with all features, with coverage instrumentation
+        run: cargo llvm-cov --no-report --all-features --doctests
+      - name: Run hugr-llvm tests, with coverage instrumentation
+        run: cargo llvm-cov --no-report -p hugr-llvm --features llvm14-0 --doctests
+      - name: Run hugr-persistent tests, with coverage instrumentation
+        run: cargo llvm-cov --no-report -p hugr-persistent --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
@@ -354,6 +365,12 @@ jobs:
           name: rust
           flags: rust
           token: ${{ secrets.CODECOV_TOKEN }}
+      - name: List cargo `target` directory size after tests
+        run: |
+          echo "Disk usage:"
+          df -h
+          echo "Target directory size:"
+          du -h -d3 target
 
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.

@@ -1,5 +1,137 @@
 # Changelog
 
+## [0.25.4](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.3...hugr-v0.25.4) - 2026-01-14
+
+### Bug Fixes
+
+- UnpackTuple error on disconnected outputs ([#2813](https://github.com/Quantinuum/hugr/pull/2813))
+
+## [0.25.3](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.2...hugr-v0.25.3) - 2026-01-09
+
+### Bug Fixes
+
+- *(hugr-passes)* Recursive replacement on NodeTemplate::LinkedHugr ([#2800](https://github.com/Quantinuum/hugr/pull/2800))
+- more nondeterminism in linking ([#2792](https://github.com/Quantinuum/hugr/pull/2792))
+
+### Documentation
+
+- Add collection extension ops to the spec ([#2767](https://github.com/Quantinuum/hugr/pull/2767))
+
+### Refactor
+
+- *(ReplaceTypes)* [tiny] correct computation of containing_func ([#2807](https://github.com/Quantinuum/hugr/pull/2807))
+
+## [0.25.2](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.1...hugr-v0.25.2) - 2025-12-30
+
+### Bug Fixes
+
+- *(determinism)* use BTreeMap in ModuleGraph ([#2783](https://github.com/Quantinuum/hugr/pull/2783))
+
+### New Features
+
+- Re-export hugr_core::hugr::linking from hugr:: ([#2781](https://github.com/Quantinuum/hugr/pull/2781))
+
+## [0.25.1](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.0...hugr-v0.25.1) - 2025-12-29
+
+### Bug Fixes
+
+- two problems in array linearization from #2749 ([#2779](https://github.com/Quantinuum/hugr/pull/2779))
+
+## [0.25.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.24.3...hugr-v0.25.0) - 2025-12-22
+
+This release includes various breaking refactors and improvements:
+- A lot of work has been done towards linking Hugrs. Now module-rooted Hugrs can
+  be linked together using configurable policies.
+- `ValueArray` has been removed.
+- A type-safe API for accessing metadata on nodes has been added.
+- Envelopes now have an extensive API for progressively describing a package,
+  and failing gracefully on errors.
+- The MSRV has been bumped to Rust 1.89, and the public pyo3 dependency has been
+  updated to 0.27.
+- Multiple deprecated definitions have been removed.
+
+### Bug Fixes
+
+- *(hugr-core)* [**breaking**] Return error instead of panicking in `MakeRegisteredOp::to_extension_op()` ([#2701](https://github.com/Quantinuum/hugr/pull/2701))
+- register packaged extensions before model_ast import ([#2702](https://github.com/Quantinuum/hugr/pull/2702))
+- ModuleGraph misses static edges to non-container entrypoints ([#2745](https://github.com/Quantinuum/hugr/pull/2745))
+
+### Documentation
+
+- Improve instructions for patch release ([#2720](https://github.com/Quantinuum/hugr/pull/2720))
+
+### New Features
+
+- *(hugr-passes)* [**breaking**] normalize_cfgs inlines entry DFG ([#2649](https://github.com/Quantinuum/hugr/pull/2649))
+- *(hugr-passes)* ReplaceTypes: recurse on replacements, much deprecation ([#2442](https://github.com/Quantinuum/hugr/pull/2442))
+- *(hugr-passes)* Add a pass to remove redundant order edges ([#2739](https://github.com/Quantinuum/hugr/pull/2739))
+- *(hugr-passes)* [**breaking**] add NodeTemplate::LinkedHugr, deprecate ::Call ([#2749](https://github.com/Quantinuum/hugr/pull/2749))
+- Return description output to python on error ([#2681](https://github.com/Quantinuum/hugr/pull/2681))
+- Add hugr-core StaticGraph, deprecate hugr-passes CallGraph ([#2698](https://github.com/Quantinuum/hugr/pull/2698))
+- [**breaking**] Remove `RootCheckable` ([#2704](https://github.com/Quantinuum/hugr/pull/2704))
+- Add method to link Hugr modules (linking pt3) ([#2529](https://github.com/Quantinuum/hugr/pull/2529))
+- `insert_link_hugr` adds entrypoint subtree and links, with reachability (linking pt4) ([#2555](https://github.com/Quantinuum/hugr/pull/2555))
+- [**breaking**] Upgrade pyo3 dependency to 0.27 ([#2736](https://github.com/Quantinuum/hugr/pull/2736))
+- [**breaking**] Bump MSRV to Rust 1.89 ([#2747](https://github.com/Quantinuum/hugr/pull/2747))
+- [**breaking**] Allow disconnecting specific edges in a hugr ([#2737](https://github.com/Quantinuum/hugr/pull/2737))
+- Optype iterators over value ports ([#2738](https://github.com/Quantinuum/hugr/pull/2738))
+- [**breaking**] GeneratorDesc metadata definition ([#2759](https://github.com/Quantinuum/hugr/pull/2759))
+- [**breaking**] Type-safe access for node metadata ([#2755](https://github.com/Quantinuum/hugr/pull/2755))
+
+### Refactor
+
+- [**breaking**] move envelope reading to dedicated module with dedicated errors ([#2689](https://github.com/Quantinuum/hugr/pull/2689))
+- Direct import of model representation to Python ([#2683](https://github.com/Quantinuum/hugr/pull/2683))
+- *(linking.rs)* [**breaking**] (tiny) avoid type_complexity ([#2721](https://github.com/Quantinuum/hugr/pull/2721))
+- [**breaking**] Remove multiple deprecated definitions ([#2751](https://github.com/Quantinuum/hugr/pull/2751))
+- [**breaking**] Delete ValueArray ([#2760](https://github.com/Quantinuum/hugr/pull/2760))
+- Deprecate Value::Function and inline_constant_functions ([#2770](https://github.com/Quantinuum/hugr/pull/2770))
+
+### Testing
+
+- Make Hugr valid in replace_types::op_to_call ([#2732](https://github.com/Quantinuum/hugr/pull/2732))
+
+## [0.24.3](https://github.com/CQCL/hugr/compare/hugr-v0.24.2...hugr-v0.24.3) - 2025-11-06
+
+### Bug Fixes
+
+- BorrowArray discard handler allows elements to be borrowed ([#2666](https://github.com/CQCL/hugr/pull/2666))
+
+## [0.24.2](https://github.com/CQCL/hugr/compare/hugr-v0.24.1...hugr-v0.24.2) - 2025-11-03
+
+### Bug Fixes
+
+- ReplaceTypes: operate on whole Hugr, with set_regions ([#2662](https://github.com/CQCL/hugr/pull/2662))
+
+## [0.24.1](https://github.com/CQCL/hugr/compare/hugr-v0.24.0...hugr-v0.24.1) - 2025-11-03
+
+### Bug Fixes
+
+- validation outside entrypoint, normalize_cfgs w/ nonlocal edges ([#2633](https://github.com/CQCL/hugr/pull/2633))
+- SiblingSubgraph::try_from_nodes for non-entrypoint region ([#2655](https://github.com/CQCL/hugr/pull/2655))
+- Correct conversion of `table::Term::Tuple` to `ast::Term` ([#2653](https://github.com/CQCL/hugr/pull/2653))
+
+### New Features
+
+- track package descriptions when loading ([#2639](https://github.com/CQCL/hugr/pull/2639))
+- *(cli)* describe sub-command ([#2650](https://github.com/CQCL/hugr/pull/2650))
+
+## [0.24.0](https://github.com/CQCL/hugr/compare/hugr-v0.23.0...hugr-v0.24.0) - 2025-10-13
+
+### Bug Fixes
+
+- Preserve offset for CFG edges when serializing to JSON ([#2606](https://github.com/CQCL/hugr/pull/2606))
+
+### New Features
+
+- Add handler for copying / discarding borrow arrays to default lineariser ([#2602](https://github.com/CQCL/hugr/pull/2602))
+- LLVM lowering for borrow arrays using bitmasks ([#2574](https://github.com/CQCL/hugr/pull/2574))
+- *(py, core, llvm)* add `is_borrowed` op for BorrowArray ([#2610](https://github.com/CQCL/hugr/pull/2610))
+
+### Refactor
+
+- [**breaking**] consistent inout order in borrow array ([#2621](https://github.com/CQCL/hugr/pull/2621))
+
 ## [0.23.0](https://github.com/CQCL/hugr/compare/hugr-v0.22.4...hugr-v0.23.0) - 2025-09-30
 
 ### Bug Fixes

@@ -56,7 +56,7 @@ represent (typed) data or control dependencies.
   unconnected.
 - Control-flow support with ability to capture both LLVM SSACFG style
   programs and programs from future front-ends designed to target
-  HUGR. These include the [guppylang](https://github.com/CQCL/guppylang)
+  HUGR. These include the [guppylang](https://github.com/quantinuum/guppylang)
   Python eDSL for quantum-classical programming,
   and BRAT (which already uses an internal graph-like
   representation for classical functional programs and quantum
@@ -157,8 +157,10 @@ EdgeKind ::= Value(Locality, AnyType)
              | Hierarchy | Order | ControlFlow
 ```
 
-Note that a port is associated with a node and zero or more Dataflow edges.
-Incoming ports are associated with exactly one edge, or many `ControlFlow` edges.
+Note that a port is associated with a node and zero or more Dataflow or `ControlFlow` edges.
+Incoming ports are associated with exactly one Dataflow edge, or any number of
+`ControlFlow` edges. Outgoing ports are associated with any number of Dataflow
+edges, or exactly one `ControlFlow` edge.
 All Dataflow edges associated with a port have the same type; thus a port has a
 well defined type, matching that of its adjoining edges. The incoming and
 outgoing ports of a node are each ordered independently, meaning that the first
@@ -170,7 +172,8 @@ The sequences of incoming and outgoing port types (carried on `Value` edges) of 
 Note that the locality is not fixed or even specified by the signature.
 
 A source port with a `CopyableType` may have any number of edges associated with
-it (including zero, which means "discard"). Any other port
+it (including zero, which means "discard"). A target port for a `ControlFlow`
+edge may also have any number of `ControlFlow` edges associated with it. Any other port
 must have exactly one edge associated with it. This captures the property of
 linear types that the value is used exactly once.
 
@@ -190,8 +193,7 @@ The root node has no non-hierarchy edges (and this supersedes any other requirem
 edges of specific node types).
 
 A *sibling graph* is a subgraph of the HUGR containing all nodes with
-a particular parent, plus any `Order`, `Value` `Static`, and `ControlFlow` edges between
-them.
+a particular parent, plus any edges between them.
 
 #### `Value` edges
 
@@ -406,7 +408,7 @@ with inputs the same as the CFG-node; the second child is an
 The remaining children are either `DFB`s or [scoped definitions](#scoped-definitions).
 
 The first output of the graph contained in a `DFB` has type
-`Sum(\#t(0),...,#t(n-1))`, where the node has `n` successors, and the
+`Sum(#t(0),...,#t(n-1))`, where the node has `n` successors, and the
 remaining outputs are a row `#x`. `#t(i)` with `#x` appended matches the
 inputs of successor `i`.
 
@@ -418,14 +420,19 @@ Some normalizations are possible:
 - If the entry node has only one successor and that successor is the
   exit node, the CFG node itself can be removed.
 
-The CFG in the example below has three inputs: one (call it `v`) of type "P"
-(not specified, but with a conversion to boolean represented by the nodes labelled "P?1" and "P?2"), one of
-type "qubit" and one (call it `t`) of type "angle".
+The CFG in the example below takes three inputs:
 
-The CFG has the effect of performing an `Rz` rotation on the qubit with angle
-`x`. where `x` is the constant `C` if `v` and `H(v)` are both true and `G(F(t))`
-otherwise. (`H` is a function from type "P" to type "P" and `F` and `G` are
-functions from type "angle" to type "angle".)
+- A value `v` of type "P" (its exact structure isn’t specified, but it can be converted to a boolean—this conversion is represented by the nodes labeled "P?1" and "P?2").
+- A value of type "qubit".
+- A value `t` of type "angle".
+
+The CFG applies an `Rz` rotation to the qubit. The rotation angle `x` is determined as follows:
+
+- If both `v` and `H(v)` evaluate to true, then `x` is the constant `C`.
+- Otherwise, `x` is `G(F(t))`.
+
+Here, `H` maps values of type "P" to "P", and both `F` and `G` map values of type "angle" to "angle".
+
 
 The `DFB` nodes are labelled `Entry` and `BB1` to `BB4`. Note that the first
 output of each of these is a sum type, whose arity is the number of outgoing
@@ -630,7 +637,8 @@ analysis required to move computations out of a CFG-node into
 Conditional- and TailLoop-nodes). Note that such conversion could be
 done for only a subpart of the HUGR at a time.
 
-The following CFG is equivalent to the previous example. In this diagram:
+The following CFG is equivalent to the example given in the
+[Control Flow Graphs](#control-flow-graphs) section. In this diagram:
 
 - the thick arrow from "angle source" to "F" is an `Ext` edge (from an
   ancestral DFG into the CFG's entry block);
@@ -700,115 +708,45 @@ flowchart
 #### Panic
 
 - Any operation may panic, e.g. integer divide when denominator is
-  zero
+  zero.
 - Panicking aborts the current graph, and recursively the container
   node also panics, etc.
 - Nodes that are independent of the panicking node may have executed
   or not, at the discretion of the runtime/compiler.
 - If there are multiple nodes that may panic where neither has
-  dependences on the other (including Order edges), it is at the
-  discretion of the compiler as to which one panics first
-
-#### `ErrorType`
-
-- A type which operations can use to indicate an error occurred.
-
-#### Catch
-
-- At some point we expect to add a first-order `catch` node, somewhat
-  like a DFG-node. This contains a DSG, and (like a DFG node) has
-  inputs matching the child DSG; but one output, of type
-  `Sum(#O,#(ErrorType))` where O is the outputs of the child DSG.
-- It is also possible to define a higher-order `catch` operation in an
-  extension, taking a graph argument.
+  dependencies on the other (including Order edges), it is at the
+  discretion of the compiler as to which one panics first.
 
 ### Extensible metadata
 
 Each node in the HUGR may have arbitrary metadata attached to it. This
 is preserved during graph modifications, and,
 [when possible](#metadata-updates-on-replacement), copied when rewriting.
-Additionally the metadata may record references to other nodes; these
-references are updated along with node indices.
-
-The metadata could either be built into the hugr itself (metadata as
-node weights) or separated from it (keep a separate map from node ID to
-metadata). The advantages of the first approach are:
-
-- just one object to have around, not two;
-- reassignment of node IDs doesn't mess with metadata.
-
-The advantages of the second approach are:
-
-- Metadata should make no difference to the semantics of the hugr (by
-  definition, otherwise it isn't metadata but data), so it makes sense
-  to be separated from the core structure.
-- We can be more agile with the details, such as formatting and
-  versioning.
-
-The problem of reassignment can be solved by having an API function that
-operates on both together atomically. We will therefore tentatively
-adopt the second approach, keeping metadata and hugr in separate
-structures.
 
 For each node, the metadata is a dictionary keyed by strings. Keys are
 used to identify applications or users so these do not (accidentally)
-interfere with each other's metadata; for example a reverse-DNS system
-(`com.quantinuum.username....` or `com.quantinuum.tket....`). The values
-are tuples of (1) any serializable struct, and (2) a list of node
-indices. References from the serialized struct to other nodes should
-indirect through the list of node indices stored with the struct.
-
-**TODO**: Specify format, constraints, and serialization. Is YAML syntax
-appropriate?
+interfere with each other's metadata; we use a reverse-DNS system
+(`com.quantinuum.tket....`). The values
+are required to be serializable.
 
 There is an API to add metadata, or extend existing metadata, or read
 existing metadata, given the node ID.
-
-**TODO** Examples illustrating this API.
-
+<!---
 **TODO** Do we want to reserve any top-level metadata keys, e.g. `Name`,
 `Ports` (for port metadata) or `History` (for use by the rewrite
 engine)?
-
+-->
 Reserved metadata keys used by the HUGR tooling are prefixed with `core.`.
 Use of this prefix by external tooling may cause issues.
+Keys used by the reference implementation are described in the separate [metadata documentation](metadata.md).
 
-#### Generator Metadata
-Tooling generating HUGR can specify some reserved metadata keys to be used for debugging
-purposes.
-
-The key `core.generator` when used on the module root node is
-used to specify the tooling used to generate the module.
-The associated value must be an object/dictionary containing the fields `name`
-and `version`, each with string values. Extra fields may be used to include
-additional data about generating tooling that may be useful for debugging. Example:
-
-```json
-{
-  "core.generator": { "name": "my_compiler", "version": "1.0.0" }
-}
-```
-
-The key `core.used_extensions` when used on the module root node is
-used to specify the names and versions of all the extensions used in the module.
-Some of these may correspond to extensions packaged with the module, but they
-may also be extensions the consuming tooling has pre-loaded. They can be used by the
-tooling to check for extension version mismatches. The value associated with the key
-must be an array of objects/dictionaries containing the keys `name` and `version`, each
-with string values. Example:
-```json
-{
-  "core.used_extensions": [{ "name": "my_ext", "version": "2.2.3" }]
-}
-```
-
-
+<!---
 
 **TODO** Do we allow per-port metadata (using the same mechanism?)
 
 **TODO** What about references to ports? Should we add a list of port
 indices after the list of node indices?
-
+-->
 ## Type System
 
 There are two classes of type: `AnyType` $\supset$ `CopyableType`. Types in these
@@ -1579,7 +1517,7 @@ at the [crates.io registry](https://crates.io/crates/hugr).
 The HUGR is represented internally using structures from the `portgraph`
 crate. A base PortGraph is composed with hierarchy (as an alternate
 implementation of `Hierarchy` relationships) and weight components. The
-implementation of this design document is [available on GitHub](https://github.com/CQCL/hugr).
+implementation of this design document is [available on GitHub](https://github.com/quantinuum/hugr).
 
 ## Standard Library
 
@@ -1601,15 +1539,15 @@ so must be supported by all third-party tooling.
 
 `qubit`: a linear (non-copyable) qubit type.
 
-`error`: error type. See [`ErrorType`](#errortype).
+`error`: an error type which operations use as a variant of sum to indicate when an error may occur. See [Arithmetic Extensions](#arithmetic-extensions) for some examples.
 
-### Operations
+#### Operations
 
-| Name              | Inputs           | Outputs       | Meaning                                                           |
-|-------------------|------------------|---------------|------------------------------------------------------------------ |
-| `print`           | `string`         | -             | Append the string to the program's output stream[^1] (atomically) |
-| `new_array<N, T>` | `T` x N          | `array<N, T>` | Create an array from all the inputs                               |
-| `panic`           | `ErrorType`, ... | ...           | Immediately end execution and pass contents of error to context. Inputs following the `ErrorType`, and all outputs, are arbitrary; these only exist so that structural constraints such as linearity can be satisfied. |
+| Name              | Inputs       | Outputs       | Meaning                                                                                                                                                                                                            |
+|-------------------|--------------|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `print`           | `string`     | -             | Append the string to the program's output stream[^1] (atomically).                                                                                                                                                 |
+| `new_array<N, T>` | `T` x N      | `array<N, T>` | Create an array from all the inputs.                                                                                                                                                                               |
+| `panic`           | `error`, ... | ...           | Immediately end execution and pass contents of error to context. Inputs following the `error`, and all outputs, are arbitrary; these only exist so that structural constraints such as linearity can be satisfied. |
 
 [^1] The existence of an output stream, and the processing of it either during
 or after program execution, is runtime-dependent. If no output stream exists
@@ -1676,14 +1614,14 @@ This extension defines operations on the integer types.
 
 Casts:
 
-| Name                   | Inputs   | Outputs                  | Meaning                                                                                      |
-| ---------------------- | -------- | ------------------------ | -------------------------------------------------------------------------------------------- |
-| `iwiden_u<M,N>`( \* )  | `int<M>` | `int<N>`                 | widen an unsigned integer to a wider one with the same value (where M \<= N)                 |
-| `iwiden_s<M,N>`( \* )  | `int<M>` | `int<N>`                 | widen a signed integer to a wider one with the same value (where M \<= N)                    |
-| `inarrow_u<M,N>`( \* ) | `int<M>` | `Sum(#(int<N>), #(ErrorType))` | narrow an unsigned integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N) |
-| `inarrow_s<M,N>`( \* ) | `int<M>` | `Sum(#(int<N>), #(ErrorType))` | narrow a signed integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N)    |
-| `itobool` ( \* )       | `int<1>` | `bool`                   | convert to `bool` (1 is true, 0 is false)                                                    |
-| `ifrombool` ( \* )     | `bool`   | `int<1>`                 | convert from `bool` (1 is true, 0 is false)                                                  |
+| Name                   | Inputs   | Outputs                    | Meaning                                                                                      |
+| ---------------------- | -------- |----------------------------| -------------------------------------------------------------------------------------------- |
+| `iwiden_u<M,N>`( \* )  | `int<M>` | `int<N>`                   | widen an unsigned integer to a wider one with the same value (where M \<= N)                 |
+| `iwiden_s<M,N>`( \* )  | `int<M>` | `int<N>`                   | widen a signed integer to a wider one with the same value (where M \<= N)                    |
+| `inarrow_u<M,N>`( \* ) | `int<M>` | `Sum(#(int<N>), #(error))` | narrow an unsigned integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N) |
+| `inarrow_s<M,N>`( \* ) | `int<M>` | `Sum(#(int<N>), #(error))` | narrow a signed integer to a narrower one with the same value if possible, and an error otherwise (where M \>= N)    |
+| `itobool` ( \* )       | `int<1>` | `bool`                     | convert to `bool` (1 is true, 0 is false)                                                    |
+| `ifrombool` ( \* )     | `bool`   | `int<1>`                   | convert from `bool` (1 is true, 0 is false)                                                  |
 
 Comparisons:
 
@@ -1702,39 +1640,39 @@ Comparisons:
 
 Other operations:
 
-| Name                         | Inputs             | Outputs                                | Meaning                                                                                                                                                      |
-|------------------------------|--------------------|----------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| `imax_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | maximum of unsigned integers                                                                                                                                 |
-| `imax_s<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | maximum of signed integers                                                                                                                                   |
-| `imin_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | minimum of unsigned integers                                                                                                                                 |
-| `imin_s<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | minimum of signed integers                                                                                                                                   |
-| `iadd<N>`                    | `int<N>`, `int<N>` | `int<N>`                               | addition modulo 2^N (signed and unsigned versions are the same op)                                                                                           |
-| `isub<N>`                    | `int<N>`, `int<N>` | `int<N>`                               | subtraction modulo 2^N (signed and unsigned versions are the same op)                                                                                        |
-| `ineg<N>`                    | `int<N>`           | `int<N>`                               | negation modulo 2^N (signed and unsigned versions are the same op)                                                                                           |
-| `imul<N>`                    | `int<N>`, `int<N>` | `int<N>`                               | multiplication modulo 2^N (signed and unsigned versions are the same op)                                                                                     |
-| `idivmod_checked_u<N>`( \* ) | `int<N>`, `int<N>` | `Sum(#(int<N>, int<N>), #(ErrorType))` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^N, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 is an error)                                   |
-| `idivmod_u<N>`               | `int<N>`, `int<N>` | `(int<N>, int<N>)`                     | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^N, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 will call panic)                               |
-| `idivmod_checked_s<N>`( \* ) | `int<N>`, `int<N>` | `Sum(#(int<N>, int<N>), #(ErrorType))` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^N, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 is an error)     |
-| `idivmod_s<N>`( \* )         | `int<N>`, `int<N>` | `(int<N>, int<N>)`                     | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^N, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 will call panic) |
-| `idiv_checked_u<N>` ( \* )   | `int<N>`, `int<N>` | `Sum(#(int<N>),#( ErrorType))`         | as `idivmod_checked_u` but discarding the second output                                                                                                      |
-| `idiv_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | as `idivmod_u` but discarding the second output                                                                                                              |
-| `imod_checked_u<N>` ( \* )   | `int<N>`, `int<N>` | `Sum(#(int<N>), #(ErrorType))`         | as `idivmod_checked_u` but discarding the first output                                                                                                       |
-| `imod_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | as `idivmod_u` but discarding the first output                                                                                                               |
-| `idiv_checked_s<N>`( \* )    | `int<N>`, `int<N>` | `Sum(#(int<N>), #(ErrorType))`         | as `idivmod_checked_s` but discarding the second output                                                                                                      |
-| `idiv_s<N>`                  | `int<N>`, `int<N>` | `int<N>`                               | as `idivmod_s` but discarding the second output                                                                                                              |
-| `imod_checked_s<N>`( \* )    | `int<N>`, `int<N>` | `Sum(#(int<N>), #(ErrorType))`         | as `idivmod_checked_s` but discarding the first output                                                                                                       |
-| `imod_s<N>`                  | `int<N>`, `int<M>` | `int<M>`                               | as `idivmod_s` but discarding the first output                                                                                                               |
-| `iabs<N>`                    | `int<N>`           | `int<N>`                               | convert signed to unsigned by taking absolute value                                                                                                          |
-| `iand<N>`                    | `int<N>`, `int<N>` | `int<N>`                               | bitwise AND                                                                                                                                                  |
-| `ior<N>`                     | `int<N>`, `int<N>` | `int<N>`                               | bitwise OR                                                                                                                                                   |
-| `ixor<N>`                    | `int<N>`, `int<N>` | `int<N>`                               | bitwise XOR                                                                                                                                                  |
-| `inot<N>`                    | `int<N>`           | `int<N>`                               | bitwise NOT                                                                                                                                                  |
-| `ishl<N>`( \* )              | `int<N>`, `int<N>` | `int<N>`                               | shift first input left by k bits where k is unsigned interpretation of second input (leftmost bits dropped, rightmost bits set to zero)                      |
-| `ishr<N>`( \* )              | `int<N>`, `int<N>` | `int<N>`                               | shift first input right by k bits where k is unsigned interpretation of second input (rightmost bits dropped, leftmost bits set to zero)                     |
-| `irotl<N>`( \* )             | `int<N>`, `int<N>` | `int<N>`                               | rotate first input left by k bits where k is unsigned interpretation of second input (leftmost bits replace rightmost bits)                                  |
-| `irotr<N>`( \* )             | `int<N>`, `int<N>` | `int<N>`                               | rotate first input right by k bits where k is unsigned interpretation of second input (rightmost bits replace leftmost bits)                                 |
-| `itostring_u<N>`             | `int<N>`           | `string`                               | decimal string representation of unsigned integer                                                                                                            |
-| `itostring_s<N>`             | `int<N>`           | `string`                               | decimal string representation of signed integer                                                                                                              |
+| Name                         | Inputs             | Outputs                            | Meaning                                                                                                                                                      |
+|------------------------------|--------------------|------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| `imax_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | maximum of unsigned integers                                                                                                                                 |
+| `imax_s<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | maximum of signed integers                                                                                                                                   |
+| `imin_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | minimum of unsigned integers                                                                                                                                 |
+| `imin_s<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | minimum of signed integers                                                                                                                                   |
+| `iadd<N>`                    | `int<N>`, `int<N>` | `int<N>`                           | addition modulo 2^N (signed and unsigned versions are the same op)                                                                                           |
+| `isub<N>`                    | `int<N>`, `int<N>` | `int<N>`                           | subtraction modulo 2^N (signed and unsigned versions are the same op)                                                                                        |
+| `ineg<N>`                    | `int<N>`           | `int<N>`                           | negation modulo 2^N (signed and unsigned versions are the same op)                                                                                           |
+| `imul<N>`                    | `int<N>`, `int<N>` | `int<N>`                           | multiplication modulo 2^N (signed and unsigned versions are the same op)                                                                                     |
+| `idivmod_checked_u<N>`( \* ) | `int<N>`, `int<N>` | `Sum(#(int<N>, int<N>), #(error))` | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^N, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 is an error)                                   |
+| `idivmod_u<N>`               | `int<N>`, `int<N>` | `(int<N>, int<N>)`                 | given unsigned integers 0 \<= n \< 2^N, 0 \<= m \< 2^N, generates unsigned q, r where q\*m+r=n, 0\<=r\<m (m=0 will call panic)                               |
+| `idivmod_checked_s<N>`( \* ) | `int<N>`, `int<N>` | `Sum(#(int<N>, int<N>), #(error))` | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^N, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 is an error)     |
+| `idivmod_s<N>`( \* )         | `int<N>`, `int<N>` | `(int<N>, int<N>)`                 | given signed integer -2^{N-1} \<= n \< 2^{N-1} and unsigned 0 \<= m \< 2^N, generates signed q and unsigned r where q\*m+r=n, 0\<=r\<m (m=0 will call panic) |
+| `idiv_checked_u<N>` ( \* )   | `int<N>`, `int<N>` | `Sum(#(int<N>), #(error))`         | as `idivmod_checked_u` but discarding the second output                                                                                                      |
+| `idiv_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | as `idivmod_u` but discarding the second output                                                                                                              |
+| `imod_checked_u<N>` ( \* )   | `int<N>`, `int<N>` | `Sum(#(int<N>), #(error))`         | as `idivmod_checked_u` but discarding the first output                                                                                                       |
+| `imod_u<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | as `idivmod_u` but discarding the first output                                                                                                               |
+| `idiv_checked_s<N>`( \* )    | `int<N>`, `int<N>` | `Sum(#(int<N>), #(error))`         | as `idivmod_checked_s` but discarding the second output                                                                                                      |
+| `idiv_s<N>`                  | `int<N>`, `int<N>` | `int<N>`                           | as `idivmod_s` but discarding the second output                                                                                                              |
+| `imod_checked_s<N>`( \* )    | `int<N>`, `int<N>` | `Sum(#(int<N>), #(error))`         | as `idivmod_checked_s` but discarding the first output                                                                                                       |
+| `imod_s<N>`                  | `int<N>`, `int<M>` | `int<M>`                           | as `idivmod_s` but discarding the first output                                                                                                               |
+| `iabs<N>`                    | `int<N>`           | `int<N>`                           | convert signed to unsigned by taking absolute value                                                                                                          |
+| `iand<N>`                    | `int<N>`, `int<N>` | `int<N>`                           | bitwise AND                                                                                                                                                  |
+| `ior<N>`                     | `int<N>`, `int<N>` | `int<N>`                           | bitwise OR                                                                                                                                                   |
+| `ixor<N>`                    | `int<N>`, `int<N>` | `int<N>`                           | bitwise XOR                                                                                                                                                  |
+| `inot<N>`                    | `int<N>`           | `int<N>`                           | bitwise NOT                                                                                                                                                  |
+| `ishl<N>`( \* )              | `int<N>`, `int<N>` | `int<N>`                           | shift first input left by k bits where k is unsigned interpretation of second input (leftmost bits dropped, rightmost bits set to zero)                      |
+| `ishr<N>`( \* )              | `int<N>`, `int<N>` | `int<N>`                           | shift first input right by k bits where k is unsigned interpretation of second input (rightmost bits dropped, leftmost bits set to zero)                     |
+| `irotl<N>`( \* )             | `int<N>`, `int<N>` | `int<N>`                           | rotate first input left by k bits where k is unsigned interpretation of second input (leftmost bits replace rightmost bits)                                  |
+| `irotr<N>`( \* )             | `int<N>`, `int<N>` | `int<N>`                           | rotate first input right by k bits where k is unsigned interpretation of second input (rightmost bits replace leftmost bits)                                 |
+| `itostring_u<N>`             | `int<N>`           | `string`                           | decimal string representation of unsigned integer                                                                                                            |
+| `itostring_s<N>`             | `int<N>`           | `string`                           | decimal string representation of signed integer                                                                                                              |
 
 
 #### `arithmetic.float.types`
@@ -1779,14 +1717,92 @@ implementation-dependent.
 
 Conversions between integers and floats:
 
-| Name           | Inputs    | Outputs                  | Meaning               |
-| -------------- | --------- | ------------------------ | --------------------- |
-| `trunc_u<N>`   | `float64` | `Sum(#(int<N>), #(ErrorType))` | float to unsigned int, rounding towards zero. Returns an error when the float is non-finite. |
-| `trunc_s<N>`   | `float64` | `Sum(#(int<N>), #(ErrorType))` | float to signed int, rounding towards zero. Returns an error when the float is non-finite. |
-| `convert_u<N>` | `int<N>`  | `float64`                | unsigned int to float |
-| `convert_s<N>` | `int<N>`  | `float64`                | signed int to float   |
-| `bytecast_int64_to_float64` | `int<6>`  | `float64`   | reinterpret an int64 as a float64 based on its bytes, with the same endianness. |
-| `bytecast_float64_to_int64` | `float64` | `int64`     | reinterpret an float64 as an int based on its bytes, with the same endianness. |
+| Name           | Inputs    | Outputs                    | Meaning               |
+| -------------- | --------- |----------------------------| --------------------- |
+| `trunc_u<N>`   | `float64` | `Sum(#(int<N>), #(error))` | float to unsigned int, rounding towards zero. Returns an error when the float is non-finite. |
+| `trunc_s<N>`   | `float64` | `Sum(#(int<N>), #(error))` | float to signed int, rounding towards zero. Returns an error when the float is non-finite. |
+| `convert_u<N>` | `int<N>`  | `float64`                  | unsigned int to float |
+| `convert_s<N>` | `int<N>`  | `float64`                  | signed int to float   |
+| `bytecast_int64_to_float64` | `int<6>`  | `float64`     | reinterpret an int64 as a float64 based on its bytes, with the same endianness. |
+| `bytecast_float64_to_int64` | `float64` | `int64`       | reinterpret an float64 as an int based on its bytes, with the same endianness. |
+
+### Collections Extensions
+
+There are multiple extensions defining types, values and operations to work with collections of data:
+
+- `collections.array`: The standard linear and fixed-length array type, parametrized by length and element type.
+- `collections.borrow_arr`: A linear and fixed-length array type that provides additional unsafe operations for borrowing elements from the array, parametrized by length and element type.
+- `collections.static_array`: An array type for modeling globally available constant arrays of copyable values, parametrized only by element type.
+- `collections.list`: A variable-length list type, parametrized by element type.
+
+
+#### `collections.array`
+
+This extension provides the `array` type and value with the following operations:
+
+
+| Operation       | Inputs          | Outputs         | Meaning         |
+|-----------------|-----------------|-----------------|-----------------|
+| `new_array`     | `elem_ty^SIZE` | `array<SIZE, elemty>` | Make a new array, given distinct inputs equal to its length. `SIZE` must be statically known (not a variable). |
+| `get`           | `array<size, elemty>`, `usize` | `option<elemty>`, `array` | Copy an element out of the array (**copyable** elements only). Return none if the index is out of bounds. |
+| `set`           | `array<size, elemty>`, `usize`, `elemty` | `either<elemty, array>` | Exchange an element of the array with an external value. Tagged for failure/success if index is out of bounds respectively. |
+| `swap`          | `array<size, elemty>`, `usize`, `usize` | `either<array, array>` | Exchange the elements at two indices within the array. Tagged for failure/success if index is out of bounds respectively. |
+| `pop_left`      | `array<SIZE, elemty>` | `option<elemty, array<SIZE-1, elemty>>` | Pop an element from the left of the array. `SIZE` must be statically known (not a variable). Return none if the input array is size 0. |
+| `pop_right`     | `array<SIZE, elemty>` | `option<elemty, array<SIZE-1, elemty>>` | Pop an element from the right of the array. `SIZE` must be statically known (not a variable). Return none if the input array is size 0. |
+| `discard_empty` | `array<0, elemty>` | `()`  | Discard an empty array. |
+| `discard`       | `array<SIZE, elemty>` | `()`  | Discard an array with **copyable** elements. |
+| `clone`         | `array<SIZE, elemty>` | `array<SIZE, elemty>`, `array<SIZE, elemty>` | Clone an array with **copyable** elements. |
+| `unpack`        | `array<SIZE, elemty>` | `elemty^SIZE` | Unpack an array into its individual elements. `SIZE` must be statically known (not a variable). |
+| `repeat`        | `(() -> elemty)` | `array<SIZE, elemty>` | Create a new array whose elements are initialised by calling the given function `SIZE` times. |
+| `scan`          | `array<SIZE, elemty_src>`,  `(elemty_src, list<acc_ty> -> elemty_dest, list<acc_ty>)`, `list<acc_ty>` | `array<SIZE, elemty_dest>`, `list<acc_ty>`  | A combination of map and foldl. Apply a function to each element of the array with an accumulator that is passed through from start to finish. Return the resulting array and the final state of the accumulator. |
+
+
+#### `collections.borrow_arr`
+
+This extension contains the `borrow_array` type and value. It has all the operations that the array extension does (see previous section), with additional unsafe operations to deal with borrowing elements. Borrowing means taking elements out of an array while relying on the underlying implementation to keep track of which elements have already been taken out.
+
+| Operation             | Inputs                | Outputs               | Meaning               |
+|-----------------------|-----------------------|-----------------------|-----------------------|
+| `borrow`              | `borrow_array<size, elemty>`, `usize`| `borrow_array<size, elemty>`, `elemty` | Borrow an element from the array at the given index. The element already being borrowed should result in a panic. |
+| `return`              | `borrow_array<size, elemty>`, `usize`, `elemty` | `borrow_array<size, elemty>`| Return an element to the array at the given index. There already being an element at this index should result in a panic. |
+| `discard_all_borrowed`| `borrow_array<size, elemty>`| `()`| Discard an array where all elements have been borrowed. Should panic if there are still elements in the array. |
+| `new_all_borrowed`   | `()` | `borrow_array<size, elemty>`| Create a new borrow array where all elements are borrowed. |
+| `is_borrowed`         | `borrow_array<size, elemty>`, `usize` | `bool`, `borrow_array<size, elemty>` | Check if the element at the given index is borrowed. |
+
+There are also conversion operations to convert borrow arrays to and from standard arrays:
+
+| Operation    | Inputs       | Outputs      | Meaning      |
+|--------------|--------------|--------------|--------------|
+| `from_array` | `array<size, elemty>` | `borrow_array<size, elemty>` | Turn an array into a borrow array. |
+| `to_array`   | `borrow_array<size, elemty>` | `array<size, elemty>` | Turn a borrow array into an array. |
+
+#### `collections.static_array`
+
+
+This extension contains the `static_array` type and value for modelling constant statically sized arrays. The only way of obtaining a value of type `static_array` is by creating a `StaticArrayValue`. There are only two operations provided:
+
+
+| Operation    | Inputs       | Outputs      | Meaning      |
+|--------------|--------------|--------------|--------------|
+| `get`        | `static_array<elemty>`, `usize` | `option<elemty>`| Get the element at the given index. Return none if the index is out of bounds. |
+| `len`        | `static_array<elemty>` | `usize` | Gets the length of the array. |
+
+
+
+#### `collections.list`
+
+This extension contains the `list` type and value. Lists are dynamically sized, with all elements having the same type.
+
+| Operation | Inputs | Outputs | Meaning |
+|-----------|--------|---------|---------|
+| `pop`     | `list<elemty>` | `list<elemty>`, `option<elemty>` | Pop from the end of a list. Return the new list and the popped value (or none if the list was empty). |
+| `push`    | `list<elemty>`, `elemty` | `list<elemty>` | Push to the end of a list. Return the new list. |
+| `get`     | `list<elemty>`, `usize` | `option<elemty>` | Look up an element in a list by index. |
+| `set`     | `list<elemty>`, `usize`, `elemty` | `list<elemty>`, `either<elemty, elemty>`,  | Replace the element at the given index, and return the old value. If the index is out of bounds, return the input value as an error. |
+| `insert`  | `list<elemty>`, `usize`, `elemty` | `list<elemty>`, `either<elem_ty, ()>` | Insert an element at the given index. Elements at higher indices are shifted one position to the right. Return an error with the element if the index is out of bounds. |
+| `length`  | `list<elemty>` | `list<elemty>`, `usize` | Get the length of a list. |
+
+
 
 ## Glossary
 

@@ -9,10 +9,10 @@ _check_nextest_installed:
 
 # Prepare the environment for development, installing all the dependencies and
 # setting up the pre-commit hooks.
-setup:
+setup: && _check_nextest_installed
     uv sync
     [[ -n "${HUGR_JUST_INHIBIT_GIT_HOOKS:-}" ]] || uv run pre-commit install -t pre-commit
-    _check_nextest_installed
+
 # Run the pre-commit checks.
 check:
     HUGR_TEST_SCHEMA=1 uv run pre-commit run --all-files
@@ -32,8 +32,7 @@ test-rust *TEST_ARGS: _check_nextest_installed
 # Run all python tests.
 test-python *TEST_ARGS:
     uv run maturin develop --uv
-    cargo build -p hugr-cli
-    HUGR_RENDER_DOT=1 uv run pytest -n auto {{TEST_ARGS}}
+    HUGR_RENDER_DOT=1 uv run pytest {{TEST_ARGS}}
 
 # Run all the benchmarks.
 bench language="[rust|python]": (_run_lang language \

@@ -238,7 +238,7 @@ pub const CORE_TUPLE_TYPE: &str = "core.tuple";
 /// - **Result:** `(core.fn ?inputs ?outputs ?ext)`
 pub const CORE_CALL: &str = "core.call";
 
-/// Operation to call a functiion known at runtime.
+/// Operation to call a function known at runtime.
 ///
 /// - **Parameter:** `?inputs : (core.list core.type)`
 /// - **Parameter:** `?outputs : (core.list core.type)`
@@ -370,8 +370,10 @@ pub enum ScopeClosure {
 }
 
 #[cfg(feature = "pyo3")]
-impl<'py> pyo3::FromPyObject<'py> for ScopeClosure {
-    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for ScopeClosure {
+    type Error = pyo3::PyErr;
+
+    fn extract(ob: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
         let value: usize = ob.getattr("value")?.extract()?;
         match value {
             0 => Ok(Self::Open),
@@ -413,8 +415,10 @@ pub enum RegionKind {
 }
 
 #[cfg(feature = "pyo3")]
-impl<'py> pyo3::FromPyObject<'py> for RegionKind {
-    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for RegionKind {
+    type Error = pyo3::PyErr;
+
+    fn extract(ob: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
         let value: usize = ob.getattr("value")?.extract()?;
         match value {
             0 => Ok(Self::DataFlow),
@@ -463,8 +467,10 @@ impl AsRef<str> for VarName {
 }
 
 #[cfg(feature = "pyo3")]
-impl<'py> pyo3::FromPyObject<'py> for VarName {
-    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for VarName {
+    type Error = pyo3::PyErr;
+
+    fn extract(ob: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
         let name: String = ob.extract()?;
         Ok(Self::new(name))
     }
@@ -499,8 +505,10 @@ impl AsRef<str> for SymbolName {
 }
 
 #[cfg(feature = "pyo3")]
-impl<'py> pyo3::FromPyObject<'py> for SymbolName {
-    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for SymbolName {
+    type Error = pyo3::PyErr;
+
+    fn extract(ob: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
         let name: String = ob.extract()?;
         Ok(Self::new(name))
     }
@@ -531,8 +539,10 @@ impl AsRef<str> for LinkName {
 }
 
 #[cfg(feature = "pyo3")]
-impl<'py> pyo3::FromPyObject<'py> for LinkName {
-    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+impl<'py> pyo3::FromPyObject<'_, 'py> for LinkName {
+    type Error = pyo3::PyErr;
+
+    fn extract(ob: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
         let name: String = ob.extract()?;
         Ok(Self::new(name))
     }
@@ -567,18 +577,20 @@ pub enum Literal {
 }
 
 #[cfg(feature = "pyo3")]
-impl<'py> pyo3::FromPyObject<'py> for Literal {
-    fn extract_bound(ob: &pyo3::Bound<'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
-        if pyo3::types::PyString::is_type_of(ob) {
+impl<'py> pyo3::FromPyObject<'_, 'py> for Literal {
+    type Error = pyo3::PyErr;
+
+    fn extract(ob: pyo3::Borrowed<'_, 'py, pyo3::PyAny>) -> pyo3::PyResult<Self> {
+        if pyo3::types::PyString::is_type_of(&ob) {
             let value: String = ob.extract()?;
             Ok(Literal::Str(value.into()))
-        } else if pyo3::types::PyInt::is_type_of(ob) {
+        } else if pyo3::types::PyInt::is_type_of(&ob) {
             let value: u64 = ob.extract()?;
             Ok(Literal::Nat(value))
-        } else if pyo3::types::PyFloat::is_type_of(ob) {
+        } else if pyo3::types::PyFloat::is_type_of(&ob) {
             let value: f64 = ob.extract()?;
             Ok(Literal::Float(value.into()))
-        } else if pyo3::types::PyBytes::is_type_of(ob) {
+        } else if pyo3::types::PyBytes::is_type_of(&ob) {
             let value: Vec<u8> = ob.extract()?;
             Ok(Literal::Bytes(value.into()))
         } else {

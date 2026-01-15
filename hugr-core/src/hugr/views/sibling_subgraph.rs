@@ -27,7 +27,7 @@ use crate::ops::{NamedOp, OpTag, OpTrait, OpType};
 use crate::types::{Signature, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
-use super::root_checked::RootCheckable;
+use super::RootChecked;
 
 /// A non-empty convex subgraph of a HUGR sibling graph.
 ///
@@ -110,15 +110,12 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     /// This will return an [`InvalidSubgraph::EmptySubgraph`] error if the
     /// subgraph is empty.
     pub fn try_new_dataflow_subgraph<'h, H, Root>(
-        dfg_graph: impl RootCheckable<&'h H, Root>,
+        dfg_graph: RootChecked<&'h H, Root>,
     ) -> Result<Self, InvalidSubgraph<N>>
     where
         H: 'h + Clone + HugrView<Node = N>,
         Root: ContainerHandle<N, ChildrenHandle = DataflowOpID>,
     {
-        let Ok(dfg_graph) = dfg_graph.try_into_checked() else {
-            return Err(InvalidSubgraph::NonDataflowRegion);
-        };
         let dfg_graph = dfg_graph.into_hugr();
 
         let parent = HugrView::entrypoint(&dfg_graph);
@@ -740,7 +737,18 @@ fn make_pg_subgraph<'h, H: HugrView>(
     portgraph::view::Subgraph<CheckerRegion<'h, H>>,
     H::RegionPortgraphNodes,
 ) {
-    let (region, node_map) = hugr.region_portgraph(hugr.entrypoint());
+    // Pick the hugr region that contains the boundary nodes.
+    // If the nodes are not in the same region, we'll fail the convexity check later on.
+    let mut io_nodes = inputs
+        .iter()
+        .flat_map(|inps| inps.iter().map(|(n, _)| *n))
+        .chain(outputs.iter().map(|(n, _)| *n));
+    let hugr_region = io_nodes
+        .next()
+        .and_then(|n| hugr.get_parent(n))
+        .unwrap_or(hugr.entrypoint());
+
+    let (region, node_map) = hugr.region_portgraph(hugr_region);
 
     // Ordering of the edges here is preserved and becomes ordering of the
     // signature.
@@ -1511,6 +1519,8 @@ fn has_unique_linear_ports<H: HugrView>(host: &H, ports: &OutgoingPorts<H::Node>
 
 #[cfg(test)]
 mod tests {
+    use std::collections::BTreeSet;
+
     use cool_asserts::assert_matches;
     use rstest::{fixture, rstest};
 
@@ -1638,7 +1648,9 @@ mod tests {
     fn construct_simple_replacement() -> Result<(), InvalidSubgraph> {
         let (mut hugr, func_root) = build_hugr().unwrap();
         let func = hugr.with_entrypoint(func_root);
-        let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func)?;
+        let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
+            RootChecked::try_new(&func).expect("Root should be FuncDefn."),
+        )?;
         assert!(sub.validate(&func, Default::default()).is_ok());
 
         let empty_dfg = {
@@ -1659,11 +1671,36 @@ mod tests {
         Ok(())
     }
 
+    /// Make a sibling subgraph from a constant and a LoadConst node.
+    #[test]
+    fn construct_load_const_subgraph() -> Result<(), InvalidSubgraph> {
+        let (hugr, func_root) = build_hugr().unwrap();
+
+        let const_node = hugr
+            .children(func_root)
+            .find(|&n| hugr.get_optype(n).is_const())
+            .unwrap();
+        let load_const_node = hugr
+            .children(func_root)
+            .find(|&n| hugr.get_optype(n).is_load_constant())
+            .unwrap();
+        let nodes: BTreeSet<_> = BTreeSet::from_iter([const_node, load_const_node]);
+
+        let sub = SiblingSubgraph::try_from_nodes(vec![const_node, load_const_node], &hugr)?;
+
+        let subgraph_nodes: BTreeSet<_> = sub.nodes().iter().copied().collect();
+        assert_eq!(subgraph_nodes, nodes);
+
+        Ok(())
+    }
+
     #[test]
     fn test_signature() -> Result<(), InvalidSubgraph> {
         let (hugr, dfg) = build_hugr().unwrap();
         let func = hugr.with_entrypoint(dfg);
-        let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func)?;
+        let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
+            RootChecked::try_new(&func).expect("Root should be FuncDefn."),
+        )?;
         assert!(sub.validate(&func, Default::default()).is_ok());
         assert_eq!(
             sub.signature(&func),
@@ -1696,10 +1733,12 @@ mod tests {
         let (hugr, func_root) = build_hugr().unwrap();
         let func = hugr.with_entrypoint(func_root);
         assert_eq!(
-            SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func)
-                .unwrap()
-                .nodes()
-                .len(),
+            SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
+                RootChecked::try_new(&func).expect("Root should be FuncDefn.")
+            )
+            .unwrap()
+            .nodes()
+            .len(),
             4
         );
     }
@@ -1812,8 +1851,10 @@ mod tests {
     fn preserve_signature() {
         let (hugr, func_root) = build_hugr_classical().unwrap();
         let func_graph = hugr.with_entrypoint(func_root);
-        let func =
-            SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func_graph).unwrap();
+        let func = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
+            RootChecked::try_new(&func_graph).expect("Root should be FuncDefn."),
+        )
+        .unwrap();
         let func_defn = hugr.get_optype(func_root).as_func_defn().unwrap();
         assert_eq!(func_defn.signature(), &func.signature(&func_graph).into());
     }
@@ -1822,8 +1863,10 @@ mod tests {
     fn extract_subgraph() {
         let (hugr, func_root) = build_hugr().unwrap();
         let func_graph = hugr.with_entrypoint(func_root);
-        let subgraph =
-            SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(&func_graph).unwrap();
+        let subgraph = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
+            RootChecked::try_new(&func_graph).expect("Root should be FuncDefn."),
+        )
+        .unwrap();
         let extracted = subgraph.extract_subgraph(&hugr, "region");
 
         extracted.validate().unwrap();
@@ -1847,7 +1890,10 @@ mod tests {
             .outputs();
         let outw = [outw1].into_iter().chain(outw2);
         let h = builder.finish_hugr_with_outputs(outw).unwrap();
-        let subg = SiblingSubgraph::try_new_dataflow_subgraph::<_, DfgID>(&h).unwrap();
+        let subg = SiblingSubgraph::try_new_dataflow_subgraph::<_, DfgID>(
+            RootChecked::try_new(&h).expect("Root should be DFG."),
+        )
+        .unwrap();
         assert_eq!(subg.nodes().len(), 2);
     }
 
@@ -2142,9 +2188,10 @@ mod tests {
 
     #[rstest]
     fn test_call_subgraph_from_dfg(hugr_call_subgraph: Hugr) {
-        let subg =
-            SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(&hugr_call_subgraph)
-                .unwrap();
+        let subg = SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(
+            RootChecked::try_new(&hugr_call_subgraph).expect("Root should be DFG container."),
+        )
+        .unwrap();
 
         assert_eq!(subg.function_calls.len(), 1);
         assert_eq!(subg.function_calls[0].len(), 2);

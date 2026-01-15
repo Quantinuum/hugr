@@ -1,6 +1,6 @@
 [package]
 name = "hugr-passes"
-version = "0.23.0"
+version = "0.25.4"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -19,10 +19,15 @@ workspace = true
 bench = false
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.23.0" }
+hugr-core = { path = "../hugr-core", version = "0.25.4" }
 portgraph = { workspace = true }
 ascent = { version = "0.8.0" }
-derive_more = { workspace = true, features = ["display", "error", "from"] }
+derive_more = { workspace = true, features = [
+    "add_assign",
+    "display",
+    "error",
+    "from",
+] }
 itertools = { workspace = true }
 pastey = { workspace = true }
 thiserror = { workspace = true }

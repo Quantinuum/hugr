@@ -1,5 +1,6 @@
 //! The Hugr data structure, and its basic component handles.
 
+// When adding new public modules, add them to the public re-exports in `/hugr/src/hugr.rs`.
 pub mod hugrmut;
 pub(crate) mod ident;
 pub mod internal;
@@ -26,12 +27,13 @@ use thiserror::Error;
 
 pub use self::views::HugrView;
 use crate::core::NodeIndex;
-use crate::envelope::{self, EnvelopeConfig, EnvelopeError};
+use crate::envelope::{self, EnvelopeConfig, ReadError, WriteError};
 use crate::extension::resolution::{
     ExtensionResolutionError, WeakExtensionRegistry, resolve_op_extensions,
     resolve_op_types_extensions,
 };
 use crate::extension::{EMPTY_REG, ExtensionRegistry, ExtensionSet};
+use crate::metadata::RawMetadataValue;
 use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
 pub use crate::ops::{DEFAULT_OPTYPE, OpType};
 use crate::package::Package;
@@ -82,13 +84,8 @@ impl AsMut<Hugr> for Hugr {
     }
 }
 
-/// Arbitrary metadata entry for a node.
-///
-/// Each entry is associated to a string key.
-pub type NodeMetadata = serde_json::Value;
-
 /// The container of all the metadata entries for a node.
-pub type NodeMetadataMap = serde_json::Map<String, NodeMetadata>;
+pub type NodeMetadataMap = serde_json::Map<String, RawMetadataValue>;
 
 /// Public API for HUGRs.
 impl Hugr {
@@ -159,11 +156,11 @@ impl Hugr {
     pub fn load(
         reader: impl io::BufRead,
         extensions: Option<&ExtensionRegistry>,
-    ) -> Result<Self, EnvelopeError> {
+    ) -> Result<Self, ReadError> {
         let pkg = Package::load(reader, extensions)?;
         match pkg.modules.into_iter().exactly_one() {
             Ok(hugr) => Ok(hugr),
-            Err(e) => Err(EnvelopeError::ExpectedSingleHugr { count: e.count() }),
+            Err(e) => Err(ReadError::ExpectedSingleHugr { count: e.count() }),
         }
     }
 
@@ -180,7 +177,7 @@ impl Hugr {
     pub fn load_str(
         envelope: impl AsRef<str>,
         extensions: Option<&ExtensionRegistry>,
-    ) -> Result<Self, EnvelopeError> {
+    ) -> Result<Self, ReadError> {
         Self::load(envelope.as_ref().as_bytes(), extensions)
     }
 
@@ -190,11 +187,7 @@ impl Hugr {
     /// an adequate [`ExtensionRegistry`] to be loaded (see [`Hugr::load`]).
     /// Use [`Hugr::store_with_exts`] to include additional extensions in the
     /// Envelope.
-    pub fn store(
-        &self,
-        writer: impl io::Write,
-        config: EnvelopeConfig,
-    ) -> Result<(), EnvelopeError> {
+    pub fn store(&self, writer: impl io::Write, config: EnvelopeConfig) -> Result<(), WriteError> {
         self.store_with_exts(writer, config, &EMPTY_REG)
     }
 
@@ -208,7 +201,7 @@ impl Hugr {
         writer: impl io::Write,
         config: EnvelopeConfig,
         extensions: &ExtensionRegistry,
-    ) -> Result<(), EnvelopeError> {
+    ) -> Result<(), WriteError> {
         envelope::write_envelope_impl(writer, [self], extensions, config)
     }
 
@@ -222,7 +215,7 @@ impl Hugr {
     /// an adequate [`ExtensionRegistry`] to be loaded (see [`Hugr::load_str`]).
     /// Use [`Hugr::store_str_with_exts`] to include additional extensions in the
     /// Envelope.
-    pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, EnvelopeError> {
+    pub fn store_str(&self, config: EnvelopeConfig) -> Result<String, WriteError> {
         self.store_str_with_exts(config, &EMPTY_REG)
     }
 
@@ -239,11 +232,9 @@ impl Hugr {
         &self,
         config: EnvelopeConfig,
         extensions: &ExtensionRegistry,
-    ) -> Result<String, EnvelopeError> {
+    ) -> Result<String, WriteError> {
         if !config.format.ascii_printable() {
-            return Err(EnvelopeError::NonASCIIFormat {
-                format: config.format,
-            });
+            return Err(WriteError::non_ascii_format(config.format));
         }
 
         let mut buf = Vec::new();
@@ -549,7 +540,6 @@ pub(crate) mod test {
     use super::*;
 
     use crate::builder::{Container, Dataflow, DataflowSubContainer, ModuleBuilder};
-    use crate::envelope::{EnvelopeError, PackageEncodingError};
     use crate::extension::prelude::bool_t;
     use crate::ops::OpaqueOp;
     use crate::ops::handle::NodeHandle;
@@ -632,12 +622,7 @@ pub(crate) mod test {
             BufReader::new(File::open(test_file!("hugr-0.hugr")).unwrap()),
             None,
         );
-        assert_matches!(
-            hugr,
-            Err(EnvelopeError::PackageEncoding {
-                source: PackageEncodingError::JsonEncoding(_)
-            })
-        );
+        assert_matches!(hugr, Err(ReadError::Payload { .. }));
     }
 
     #[test]

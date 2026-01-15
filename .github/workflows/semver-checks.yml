@@ -16,14 +16,14 @@ jobs:
       rust: ${{ steps.filter.outputs.rust }}
       python: ${{ steps.filter.outputs.python }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v6
       - uses: ./.github/actions/check-changes
         id: filter
 
   rs-semver-checks:
     needs: [changes]
     if: ${{ needs.changes.outputs.rust == 'true' }}
-    uses: CQCL/hugrverse-actions/.github/workflows/rs-semver-checks.yml@main
+    uses: quantinuum/hugrverse-actions/.github/workflows/rs-semver-checks.yml@main
     with:
       apt-dependencies: llvm-14
     secrets:

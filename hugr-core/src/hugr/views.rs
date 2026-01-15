@@ -11,15 +11,15 @@ pub mod sibling_subgraph;
 #[cfg(test)]
 mod tests;
 
+use serde::de::Deserialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
 pub use self::petgraph::PetgraphWrapper;
-#[expect(deprecated)]
-use self::render::{MermaidFormatter, RenderConfig};
+use self::render::MermaidFormatter;
 pub use nodes_iter::NodesIter;
 pub use rerooted::Rerooted;
-pub use root_checked::{InvalidSignature, RootCheckable, RootChecked, check_tag};
+pub use root_checked::{InvalidSignature, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
 
 use itertools::Itertools;
@@ -28,9 +28,10 @@ use portgraph::{LinkView, PortView};
 
 use super::internal::{HugrInternals, HugrMutInternals};
 use super::validate::ValidationContext;
-use super::{Hugr, HugrMut, Node, NodeMetadata, ValidationError};
+use super::{Hugr, HugrMut, Node, ValidationError};
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
+use crate::metadata::{Metadata, RawMetadataValue};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
@@ -100,13 +101,27 @@ pub trait HugrView: HugrInternals {
     fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
 
     /// Returns the metadata associated with a node.
+    ///
+    /// For a non type-safe accessor use [`HugrView::get_metadata_any`] instead.
     #[inline]
-    fn get_metadata(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&NodeMetadata> {
-        if self.contains_node(node) {
-            self.node_metadata_map(node).get(key.as_ref())
-        } else {
-            None
+    fn get_metadata<M: Metadata>(&self, node: Self::Node) -> Option<<M as Metadata>::Type<'_>> {
+        self.get_metadata_any(node, <M as Metadata>::KEY)
+            .and_then(|value| <<M as Metadata>::Type<'_> as Deserialize>::deserialize(value).ok())
+    }
+
+    /// Returns a metadata entry associated with a node and a string key.
+    ///
+    /// When possible, prefer using the type-safe accessor [`HugrView::get_metadata`] instead.
+    #[inline]
+    fn get_metadata_any(
+        &self,
+        node: Self::Node,
+        key: impl AsRef<str>,
+    ) -> Option<&RawMetadataValue> {
+        if !self.contains_node(node) {
+            return None;
         }
+        self.node_metadata_map(node).get(key.as_ref())
     }
 
     /// Returns the operation type of a node.
@@ -392,17 +407,6 @@ pub trait HugrView: HugrInternals {
         self.mermaid_string_with_formatter(self.mermaid_format())
     }
 
-    /// Return the mermaid representation of the underlying hierarchical graph.
-    ///
-    /// The hierarchy is represented using subgraphs. Edges are labelled with
-    /// their source and target ports.
-    ///
-    /// For a more detailed representation, use the [`HugrView::dot_string`]
-    /// format instead.
-    #[deprecated(note = "Use `mermaid_format` instead", since = "0.20.2")]
-    #[expect(deprecated)]
-    fn mermaid_string_with_config(&self, config: RenderConfig<Self::Node>) -> String;
-
     /// Return the mermaid representation of the underlying hierarchical graph
     /// according to the provided [`MermaidFormatter`] formatting options.
     ///
@@ -411,24 +415,7 @@ pub trait HugrView: HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    ///
-    /// ## Deprecation of [`RenderConfig`]
-    /// While the deprecated [HugrView::mermaid_string_with_config] exists, this
-    /// will by default try to convert the formatter options to a [`RenderConfig`],
-    /// but this may panic if the configuration is not supported. Users are
-    /// encouraged to provide an implementation of this method overriding the default
-    /// and no longer rely on [HugrView::mermaid_string_with_config].
-    fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String {
-        #[expect(deprecated)]
-        let config = match RenderConfig::try_from(formatter) {
-            Ok(config) => config,
-            Err(e) => {
-                panic!("Unsupported format option: {e}");
-            }
-        };
-        #[expect(deprecated)]
-        self.mermaid_string_with_config(config)
-    }
+    fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String;
 
     /// Construct a mermaid representation of the underlying hierarchical graph.
     ///
@@ -675,11 +662,6 @@ impl HugrView for Hugr {
     #[inline]
     fn all_neighbours(&self, node: Node) -> impl Iterator<Item = Node> + Clone {
         self.graph.all_neighbours(node.into_portgraph()).map_into()
-    }
-
-    #[expect(deprecated)]
-    fn mermaid_string_with_config(&self, config: RenderConfig) -> String {
-        self.mermaid_string_with_formatter(MermaidFormatter::from_render_config(config, self))
     }
 
     fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String {

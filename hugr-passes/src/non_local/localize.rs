@@ -188,12 +188,12 @@ impl<N: HugrNode> ExtraSourceReqs<N> {
         };
         for ch in hugr.children(node).collect::<Vec<_>>() {
             for (inp, _) in hugr.in_value_types(ch).collect::<Vec<_>>() {
-                if let Some((src_n, src_p)) = hugr.single_linked_output(ch, inp) {
-                    if hugr.get_parent(src_n) != Some(node) {
-                        hugr.disconnect(ch, inp);
-                        let new_p = nlocals.get(&Wire::new(src_n, src_p)).unwrap();
-                        hugr.connect(new_p.node(), new_p.source(), ch, inp);
-                    }
+                if let Some((src_n, src_p)) = hugr.single_linked_output(ch, inp)
+                    && hugr.get_parent(src_n) != Some(node)
+                {
+                    hugr.disconnect(ch, inp);
+                    let new_p = nlocals.get(&Wire::new(src_n, src_p)).unwrap();
+                    hugr.connect(new_p.node(), new_p.source(), ch, inp);
                 }
             }
             self.thread_node(hugr, ch, &nlocals);

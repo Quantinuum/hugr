@@ -113,8 +113,8 @@ impl<'c> Emission<'c> {
 
     /// JIT and execute the function named `entry` in the inner module.
     ///
-    /// Safely handles panics ocurring in the program and returns the produced
-    /// panic message, or an empty string if no panic ocurred.
+    /// Safely handles panics occurring in the program and returns the produced
+    /// panic message, or an empty string if no panic occurred.
     ///
     /// For this to work, [`Emission::exec_panicking`] must be used together with the
     /// [`PanicTestPreludeCodegen`].

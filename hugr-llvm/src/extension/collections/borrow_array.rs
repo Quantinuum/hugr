@@ -599,20 +599,16 @@ impl MaskCheck {
             None,
             |ctx, [mask_ptr, idx]| {
                 // Compute mask bitarray block index via `idx // BLOCK_SIZE`
-                let mask_ptr = mask_ptr.into_pointer_value();
-                let idx = idx.into_int_value();
                 let usize_t = usize_ty(&ctx.typing_session());
-                let block_size = usize_t.const_int(usize_t.get_bit_width() as u64, false);
-                let builder = ctx.builder();
-                let block_idx = builder.build_int_unsigned_div(idx, block_size, "")?;
-                let block_ptr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[block_idx], "")? };
-                let block = builder.build_load(block_ptr, "")?.into_int_value();
+                let (
+                    BlockData {
+                        block_ptr,
+                        block,
+                        idx_in_block,
+                    },
+                    bit,
+                ) = inspect_mask_idx_bit(ctx, mask_ptr, idx)?;
 
-                // Extract bit from the block at position `idx % BLOCK_SIZE`
-                let idx_in_block = builder.build_int_unsigned_rem(idx, block_size, "")?;
-                let block_shifted = builder.build_right_shift(block, idx_in_block, false, "")?;
-                let bit =
-                    builder.build_int_truncate(block_shifted, ctx.iw_context().bool_type(), "")?;
                 let panic_bb = ctx.build_positioned_new_block("panic", None, |ctx, panic_bb| {
                     let err: &ConstError = match self {
                         MaskCheck::CheckNotBorrowed | MaskCheck::Borrow => &ERR_ALREADY_BORROWED,
@@ -649,6 +645,38 @@ impl MaskCheck {
         )?;
         Ok(())
     }
+}
+
+struct BlockData<'c> {
+    block_ptr: PointerValue<'c>,
+    block: IntValue<'c>,
+    idx_in_block: IntValue<'c>,
+}
+
+fn inspect_mask_idx_bit<'c, H: HugrView<Node = Node>>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    mask_ptr: BasicValueEnum<'c>,
+    idx: BasicValueEnum<'c>,
+) -> Result<(BlockData<'c>, IntValue<'c>)> {
+    let usize_t = usize_ty(&ctx.typing_session());
+    let mask_ptr = mask_ptr.into_pointer_value();
+    let idx = idx.into_int_value();
+    let block_size = usize_t.const_int(usize_t.get_bit_width() as u64, false);
+    let builder = ctx.builder();
+    let block_idx = builder.build_int_unsigned_div(idx, block_size, "")?;
+    let block_ptr = unsafe { builder.build_in_bounds_gep(mask_ptr, &[block_idx], "")? };
+    let block = builder.build_load(block_ptr, "")?.into_int_value();
+    let idx_in_block = builder.build_int_unsigned_rem(idx, block_size, "")?;
+    let block_shifted = builder.build_right_shift(block, idx_in_block, false, "")?;
+    let bit = builder.build_int_truncate(block_shifted, ctx.iw_context().bool_type(), "")?;
+    Ok((
+        BlockData {
+            block_ptr,
+            block,
+            idx_in_block,
+        },
+        bit,
+    ))
 }
 
 struct MaskInfo<'a> {
@@ -785,6 +813,27 @@ fn build_mask_padding1d<'c, H: HugrView<Node = Node>>(
     };
     builder.build_store(block_addr, new_block)?;
     Ok(())
+}
+
+/// Emits a check that returns whether a specific array element is borrowed (true) or not (false).
+pub fn build_is_borrowed_bit<'c, H: HugrView<Node = Node>>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    mask_ptr: PointerValue<'c>,
+    idx: IntValue<'c>,
+) -> Result<inkwell::values::IntValue<'c>> {
+    // Wrap the check into a function instead of inlining
+    const FUNC_NAME: &str = "__barray_is_borrowed";
+    get_or_make_function(
+        ctx,
+        FUNC_NAME,
+        [mask_ptr.into(), idx.into()],
+        Some(ctx.iw_context().bool_type().into()),
+        |ctx, [mask_ptr, idx]| {
+            let (_, bit) = inspect_mask_idx_bit(ctx, mask_ptr, idx)?;
+            Ok(Some(bit.into()))
+        },
+    )
+    .map(|v| v.expect("i1 return value").into_int_value())
 }
 
 /// Emits a check that no array elements have been borrowed.
@@ -1421,7 +1470,7 @@ pub fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
         let v = builder
             .build_call(func_ptr, &[], "")?
             .try_as_basic_value()
-            .left()
+            .basic()
             .ok_or(anyhow!("BArrayOpDef::repeat function must return a value"))?;
         let elem_addr = unsafe { builder.build_in_bounds_gep(ptr, &[idx], "")? };
         builder.build_store(elem_addr, v)?;
@@ -1530,7 +1579,7 @@ pub fn emit_barray_unsafe_op<'c, H: HugrView<Node = Node>>(
             let elem_addr =
                 unsafe { builder.build_in_bounds_gep(elems_ptr, &[offset_index_v], "")? };
             let elem_v = builder.build_load(elem_addr, "")?;
-            outputs.finish(builder, [elem_v, array_v])
+            outputs.finish(builder, [array_v, elem_v])
         }
         BArrayUnsafeOpDef::r#return => {
             let [array_v, index_v, elem_v] = inputs
@@ -1569,6 +1618,20 @@ pub fn emit_barray_unsafe_op<'c, H: HugrView<Node = Node>>(
             let elem_ty = ctx.llvm_type(hugr_elem_ty)?;
             let (_, array_v) = build_barray_alloc(ctx, ccg, elem_ty, size, true)?;
             outputs.finish(ctx.builder(), [array_v.into()])
+        }
+        BArrayUnsafeOpDef::is_borrowed => {
+            let [array_v, index_v] = inputs
+                .try_into()
+                .map_err(|_| anyhow!("BArrayUnsafeOpDef::is_borrowed expects two arguments"))?;
+            let BArrayFatPtrComponents {
+                mask_ptr, offset, ..
+            } = decompose_barray_fat_pointer(builder, array_v)?;
+            let index_v = index_v.into_int_value();
+            build_bounds_check(ccg, ctx, size, index_v)?;
+            let offset_index_v = ctx.builder().build_int_add(index_v, offset, "")?;
+            // let bit = build_is_borrowed_check(ctx, mask_ptr, offset_index_v)?;
+            let bit = build_is_borrowed_bit(ctx, mask_ptr, offset_index_v)?;
+            outputs.finish(ctx.builder(), [array_v, bit.into()])
         }
         _ => todo!(),
     }
@@ -1627,6 +1690,8 @@ mod test {
     use hugr_core::extension::prelude::either_type;
     use hugr_core::ops::Tag;
     use hugr_core::std_extensions::STD_REG;
+    use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
+    use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
     use hugr_core::std_extensions::collections::array::ArrayOpBuilder;
     use hugr_core::std_extensions::collections::array::op_builder::build_all_borrow_array_ops;
     use hugr_core::std_extensions::collections::borrow_array::{
@@ -2490,7 +2555,7 @@ mod test {
                 let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
                 for &i in indices {
                     let i = builder.add_load_value(ConstUsize::new(i));
-                    let (val, arr) = builder
+                    let (arr, val) = builder
                         .add_borrow_array_borrow(int_ty.clone(), size, array, i)
                         .unwrap();
                     r = builder.add_iadd(6, r, val).unwrap();
@@ -2505,7 +2570,7 @@ mod test {
                 }
                 for &i in indices {
                     let i = builder.add_load_value(ConstUsize::new(i));
-                    let (val, arr) = builder
+                    let (arr, val) = builder
                         .add_borrow_array_borrow(int_ty.clone(), size, array, i)
                         .unwrap();
                     r = builder.add_iadd(6, r, val).unwrap();
@@ -2559,7 +2624,7 @@ mod test {
                 let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
                 for i in 0..size {
                     let i = builder.add_load_value(ConstUsize::new(i));
-                    let (val, arr) = builder
+                    let (arr, val) = builder
                         .add_borrow_array_borrow(int_ty.clone(), size, array, i)
                         .unwrap();
                     r = builder.add_iadd(6, r, val).unwrap();
@@ -2634,7 +2699,7 @@ mod test {
         // - Pops specified numbers from the left to introduce an offset
         // - Converts it into a regular array
         // - Converts it back into a borrow array
-        // - Borrows alls elements, sums them up, and returns the sum
+        // - Borrows all elements, sums them up, and returns the sum
 
         let int_ty = int_type(6);
         let hugr = SimpleHugrConfig::new()
@@ -2664,7 +2729,7 @@ mod test {
                 let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
                 for i in 0..size {
                     let i = builder.add_load_value(ConstUsize::new(i));
-                    let (val, arr) = builder
+                    let (arr, val) = builder
                         .add_borrow_array_borrow(int_ty.clone(), size, barray, i)
                         .unwrap();
                     r = builder.add_iadd(6, r, val).unwrap();
@@ -2721,13 +2786,13 @@ mod test {
                 array = builder
                     .add_borrow_array_borrow(int_ty.clone(), size, array, i1)
                     .unwrap()
-                    .1;
+                    .0;
                 array = build_pops(&mut builder, int_ty.clone(), size, array, num_pops);
                 size -= num_pops;
                 array = builder
                     .add_borrow_array_borrow(int_ty.clone(), size, array, i2)
                     .unwrap()
-                    .1;
+                    .0;
                 builder
                     .add_borrow_array_discard(int_ty.clone(), size, array)
                     .unwrap();
@@ -2886,7 +2951,7 @@ mod test {
                 );
                 let barray = builder.add_load_value(barray);
                 let idx = builder.add_load_value(ConstUsize::new(0));
-                let (_, barray) = builder
+                let (barray, _) = builder
                     .add_borrow_array_borrow(int_ty.clone(), size, barray, idx)
                     .unwrap();
                 let array = builder
@@ -2907,5 +2972,115 @@ mod test {
         });
         let msg = "Some array elements have been borrowed";
         assert_eq!(&exec_ctx.exec_hugr_panicking(hugr, "main"), msg);
+    }
+
+    #[rstest]
+    fn exec_is_borrowed_basic(mut exec_ctx: TestContext) {
+        // We build a HUGR that:
+        // - Creates a borrow array [1,2,3]
+        // - Borrows index 1
+        // - Checks is_borrowed for indices 0, 1
+        // - Returns 1 if [false, true], else 0
+        let int_ty = int_type(6);
+        let size = 3;
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(int_ty.clone())
+            .with_extensions(exec_registry())
+            .finish(|mut builder| {
+                let barray = borrow_array::BArrayValue::new(
+                    int_ty.clone(),
+                    (1..=3)
+                        .map(|i| ConstInt::new_u(6, i).unwrap().into())
+                        .collect_vec(),
+                );
+                let barray = builder.add_load_value(barray);
+                let idx1 = builder.add_load_value(ConstUsize::new(1));
+                let (barray, _) = builder
+                    .add_borrow_array_borrow(int_ty.clone(), size, barray, idx1)
+                    .unwrap();
+
+                let idx0 = builder.add_load_value(ConstUsize::new(0));
+                let (arr, b0_bools) =
+                    [idx0, idx1]
+                        .iter()
+                        .fold((barray, Vec::new()), |(arr, mut bools), idx| {
+                            let (arr, b) = builder
+                                .add_is_borrowed(int_ty.clone(), size, arr, *idx)
+                                .unwrap();
+                            bools.push(b);
+                            (arr, bools)
+                        });
+                let [b0, b1] = b0_bools.try_into().unwrap();
+
+                let b0 = builder.add_not(b0).unwrap(); // flip b0 to true
+                let and01 = builder.add_and(b0, b1).unwrap();
+                // convert bool to i1
+                let i1 = builder
+                    .add_dataflow_op(ConvertOpDef::ifrombool.without_log_width(), [and01])
+                    .unwrap()
+                    .out_wire(0);
+                // widen i1 to i64
+                let i_64 = builder
+                    .add_dataflow_op(IntOpDef::iwiden_u.with_two_log_widths(0, 6), [i1])
+                    .unwrap()
+                    .out_wire(0);
+                builder
+                    .add_borrow_array_discard(int_ty.clone(), size, arr)
+                    .unwrap();
+                builder.finish_hugr_with_outputs([i_64]).unwrap()
+            });
+
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_logic_extensions()
+                .add_conversion_extensions()
+                .add_default_borrow_array_extensions(DefaultPreludeCodegen)
+                .add_default_int_extensions()
+        });
+        assert_eq!(1, exec_ctx.exec_hugr_u64(hugr, "main"));
+    }
+
+    #[rstest]
+    fn exec_discard_part_borrowed(mut exec_ctx: TestContext) {
+        use hugr_passes::replace_types::{DelegatingLinearizer, Linearizer};
+        // Builds a HUGR that:
+        // - Creates a borrow array [1,2,3]
+        // - Borrows index 1
+        // - Discards the borrow array using the ReplaceTypes linearizer
+        // And then runs this, i.e. to check that it does not panic.
+        let inn_arr_ty = borrow_array_type(2, usize_t());
+        let arr_ty = borrow_array_type(3, inn_arr_ty.clone());
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(int_type(6))
+            .with_extensions(exec_registry())
+            .finish(|mut builder| {
+                let inner_arrays = [1, 3, 5].map(|i| {
+                    let elems = [i, i + 1].map(|v| builder.add_load_value(ConstUsize::new(v)));
+                    builder.add_new_borrow_array(usize_t(), elems).unwrap()
+                });
+                let outer = builder
+                    .add_new_borrow_array(inn_arr_ty.clone(), inner_arrays)
+                    .unwrap();
+                let idx = builder.add_load_value(ConstUsize::new(0));
+                let (outer, inner) = builder
+                    .add_borrow_array_borrow(inn_arr_ty, 3, outer, idx)
+                    .unwrap();
+                builder
+                    .add_borrow_array_discard(usize_t(), 2, inner)
+                    .unwrap();
+                let dl = DelegatingLinearizer::default();
+                let nt = dl.copy_discard_op(&arr_ty, 0).unwrap();
+                nt.add(&mut builder, [outer]).unwrap();
+                let res = builder.add_load_value(ConstInt::new_u(6, 17).unwrap());
+                builder.finish_hugr_with_outputs([res]).unwrap()
+            });
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_logic_extensions()
+                .add_conversion_extensions()
+                .add_default_borrow_array_extensions(DefaultPreludeCodegen)
+                .add_default_int_extensions()
+        });
+        assert_eq!(17, exec_ctx.exec_hugr_u64(hugr, "main"));
     }
 }
