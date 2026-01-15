@@ -317,7 +317,7 @@ mod test {
         let db = {
             let pfty = PolyFuncType::new(
                 [TypeBound::Copyable.into()],
-                Signature::new(tv0(), pair_type(tv0())),
+                Signature::new([tv0()], [pair_type(tv0())]),
             );
             let mut fb = mb.define_function("double", pfty)?;
             let [elem] = fb.input_wires_arr();
@@ -334,7 +334,7 @@ mod test {
         };
 
         let tr = {
-            let sig = Signature::new(tv0(), Type::new_tuple(vec![tv0(); 3]));
+            let sig = Signature::new([tv0()], [Type::new_tuple(vec![tv0(); 3])]);
             let mut fb = mb.define_function(
                 "triple",
                 PolyFuncType::new([TypeBound::Copyable.into()], sig),
@@ -351,7 +351,7 @@ mod test {
         };
         let mn = {
             let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
-            let mut fb = mb.define_function("main", Signature::new(usize_t(), outs))?;
+            let mut fb = mb.define_function("main", Signature::new([usize_t()], outs))?;
             let [elem] = fb.input_wires_arr();
             let [res1] = fb
                 .call(tr.handle(), &[usize_t().into()], [elem])?
@@ -433,7 +433,7 @@ mod test {
         // mono_func returns constant 1 usize
         let mono_func = {
             let mut fb = mb
-                .define_function("get_usz", Signature::new(vec![], usize_t()))
+                .define_function("get_usz", Signature::new([], [usize_t()]))
                 .unwrap();
             let cst0 = fb.add_load_value(ConstUsize::new(1));
             fb.finish_with_outputs([cst0]).unwrap()
@@ -444,8 +444,8 @@ mod test {
             let pf2t = PolyFuncType::new(
                 [TypeParam::max_nat_type(), TypeBound::Linear.into()],
                 Signature::new(
-                    BorrowArray::ty_parametric(sv(0), tv(1)).unwrap(),
-                    vec![tv(1), BorrowArray::ty_parametric(sv(0), tv(1)).unwrap()],
+                    [BorrowArray::ty_parametric(sv(0), tv(1)).unwrap()],
+                    [tv(1), BorrowArray::ty_parametric(sv(0), tv(1)).unwrap()],
                 ),
             );
             let mut pf2 = mb.define_function("pf2", pf2t).unwrap();
@@ -466,8 +466,8 @@ mod test {
         let pf1t = PolyFuncType::new(
             [TypeParam::max_nat_type()],
             Signature::new(
-                BorrowArray::ty_parametric(sv(0), arr2u()).unwrap(),
-                usize_t(),
+                [BorrowArray::ty_parametric(sv(0), arr2u()).unwrap()],
+                [usize_t()],
             ),
         );
         let mut pf1 = mb.define_function("pf1", pf1t).unwrap();
@@ -589,7 +589,7 @@ mod test {
                         "foo",
                         PolyFuncType::new(
                             [TypeBound::Linear.into()],
-                            Signature::new_endo(Type::new_var_use(0, TypeBound::Linear)),
+                            Signature::new_endo([Type::new_var_use(0, TypeBound::Linear)]),
                         ),
                     )
                     .unwrap();
@@ -599,13 +599,13 @@ mod test {
 
             let _main = {
                 let mut builder = module_builder
-                    .define_function("main", Signature::new_endo(Type::UNIT))
+                    .define_function("main", Signature::new_endo([Type::UNIT]))
                     .unwrap();
                 let func_ptr = builder
                     .load_func(foo.handle(), &[Type::UNIT.into()])
                     .unwrap();
                 let [r] = {
-                    let signature = Signature::new_endo(Type::UNIT);
+                    let signature = Signature::new_endo([Type::UNIT]);
                     builder
                         .add_dataflow_op(
                             CallIndirect { signature },

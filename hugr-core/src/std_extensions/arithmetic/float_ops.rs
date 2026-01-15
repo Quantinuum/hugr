@@ -74,8 +74,8 @@ impl MakeOpDef for FloatOps {
             fmax | fmin | fadd | fsub | fmul | fdiv | fpow => {
                 Signature::new(vec![float64_type(); 2], vec![float64_type()])
             }
-            fneg | fabs | ffloor | fceil | fround => Signature::new_endo(vec![float64_type()]),
-            ftostring => Signature::new(vec![float64_type()], string_type()),
+            fneg | fabs | ffloor | fceil | fround => Signature::new_endo([float64_type()]),
+            ftostring => Signature::new(vec![float64_type()], [string_type()]),
         }
         .into()
     }

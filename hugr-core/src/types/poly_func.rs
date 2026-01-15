@@ -216,8 +216,10 @@ pub(crate) mod test {
 
         // Valid schema...
         let good_array = array_type_parametric(size_var.clone(), ty_var.clone())?;
-        let good_ts =
-            PolyFuncTypeBase::new_validated(type_params.clone(), Signature::new_endo(good_array))?;
+        let good_ts = PolyFuncTypeBase::new_validated(
+            type_params.clone(),
+            Signature::new_endo([good_array]),
+        )?;
 
         // Sanity check (good args)
         good_ts.instantiate(&[5u64.into(), usize_t().into()])?;
@@ -251,7 +253,7 @@ pub(crate) mod test {
             &Arc::downgrade(&array::EXTENSION),
         ));
         let bad_ts =
-            PolyFuncTypeBase::new_validated(type_params.clone(), Signature::new_endo(bad_array));
+            PolyFuncTypeBase::new_validated(type_params.clone(), Signature::new_endo([bad_array]));
         assert_eq!(bad_ts.err(), Some(arg_err));
 
         Ok(())
@@ -262,7 +264,7 @@ pub(crate) mod test {
         // Variables in args have different bounds from variable declaration
         let tv = TypeArg::new_var_use(0, TypeBound::Copyable.into());
         let list_def = list::EXTENSION.get_type(&list::LIST_TYPENAME).unwrap();
-        let body_type = Signature::new_endo(Type::new_extension(list_def.instantiate([tv])?));
+        let body_type = Signature::new_endo([Type::new_extension(list_def.instantiate([tv])?)]);
         for decl in [
             Term::new_list_type(Term::max_nat_type()),
             Term::StringType,
@@ -315,13 +317,13 @@ pub(crate) mod test {
         let make_scheme = |tp: TypeParam| {
             PolyFuncTypeBase::new_validated(
                 [tp.clone()],
-                Signature::new_endo(Type::new_extension(CustomType::new(
+                Signature::new_endo([Type::new_extension(CustomType::new(
                     TYPE_NAME,
                     [TypeArg::new_var_use(0, tp)],
                     EXT_ID,
                     TypeBound::Linear,
                     &Arc::downgrade(&ext),
-                ))),
+                ))]),
             )
         };
         for decl in accepted {
@@ -388,7 +390,7 @@ pub(crate) mod test {
         // Declared as row variable, used as type variable
         let e = PolyFuncTypeBase::new_validated(
             [decl.clone()],
-            Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Linear)]),
+            Signature::new_endo([Type::new_var_use(0, TypeBound::Linear)]),
         )
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
@@ -402,10 +404,7 @@ pub(crate) mod test {
         let rty = TypeRV::new_row_var_use(0, TypeBound::Linear);
         let pf = PolyFuncTypeBase::new_validated(
             [TypeParam::new_list_type(TP_ANY)],
-            FuncValueType::new(
-                vec![usize_t().into(), rty.clone()],
-                vec![TypeRV::new_tuple(rty)],
-            ),
+            FuncValueType::new([usize_t().into(), rty.clone()], [TypeRV::new_tuple([rty])]),
         )
         .unwrap();
 
@@ -428,17 +427,17 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables_inner() {
-        let inner_fty = Type::new_function(FuncValueType::new_endo(TypeRV::new_row_var_use(
+        let inner_fty = Type::new_function(FuncValueType::new_endo([TypeRV::new_row_var_use(
             0,
             TypeBound::Copyable,
-        )));
+        )]));
         let pf = PolyFuncTypeBase::new_validated(
             [Term::new_list_type(TypeBound::Copyable)],
             Signature::new(vec![usize_t(), inner_fty.clone()], vec![inner_fty]),
         )
         .unwrap();
 
-        let inner3 = Type::new_function(Signature::new_endo(vec![usize_t(), bool_t(), usize_t()]));
+        let inner3 = Type::new_function(Signature::new_endo([usize_t(), bool_t(), usize_t()]));
         let t3 = pf
             .instantiate(&[Term::new_list([
                 usize_t().into(),

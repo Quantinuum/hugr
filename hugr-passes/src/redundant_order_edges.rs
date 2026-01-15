@@ -218,7 +218,7 @@ mod tests {
     /// - noop3 -> nested_op
     #[test]
     fn test_redundant_order_edges() {
-        let mut hugr = FunctionBuilder::new("f", Signature::new_endo(vec![bool_t()])).unwrap();
+        let mut hugr = FunctionBuilder::new("f", Signature::new_endo([bool_t()])).unwrap();
         let op = Noop::new(bool_t());
 
         let [input, output] = hugr.io();
