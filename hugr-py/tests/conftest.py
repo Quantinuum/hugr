@@ -187,8 +187,6 @@ def validate(
     # These should correspond to the formats supported by `hugr convert`.
     LOAD_FORMATS = ["json", "model-exts"]
 
-    cmd = [*_base_command(), "validate", "-"]
-
     # validate text and binary formats
     for write_fmt in WRITE_FORMATS:
         serial = h.to_bytes(FORMATS[write_fmt])
