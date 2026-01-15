@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.1](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.0...hugr-py-v0.15.1) (2026-01-15)
+
+
+### Features
+
+* **py:** add qualified_name method to TypeDef ([#2804](https://github.com/Quantinuum/hugr/issues/2804)) ([b2231b3](https://github.com/Quantinuum/hugr/commit/b2231b377d2c655d14b7528640a66c9fe02a2c1e)), closes [#2426](https://github.com/Quantinuum/hugr/issues/2426)
+
 ## [0.15.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.14.2...hugr-py-v0.15.0) (2026-01-02)
 
 
