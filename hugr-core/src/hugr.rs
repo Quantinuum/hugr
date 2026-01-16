@@ -10,6 +10,8 @@ pub mod serialize;
 pub mod validate;
 pub mod views;
 
+use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::io;
 use std::iter;
@@ -322,11 +324,28 @@ impl Hugr {
         node.into()
     }
 
-    /// Produce a canonical ordering of the descendant nodes of a root,
-    /// following the graph hierarchy.
+    /// Whether the node's children form either a dataflow sibling graph or a
+    /// control-flow sibling graph. (For these nodes the positions of the first
+    /// two children have semantic significance.)
+    fn contains_dsg_or_csg(&self, node: Node) -> bool {
+        matches!(
+            self.get_optype(node),
+            OpType::FuncDefn(_)
+                | OpType::DFG(_)
+                | OpType::DataflowBlock(_)
+                | OpType::TailLoop(_)
+                | OpType::CFG(_)
+                | OpType::Case(_)
+        )
+    }
+
+    /// Produce an almost (but not perfectly) canonical ordering of the
+    /// descendant nodes of a root, following the graph hierarchy.
     ///
     /// This starts with the root, and then proceeds in BFS order through the
-    /// contained regions.
+    /// contained regions, ordering sibling nodes according to a partial order
+    /// that is somewhat arbitrary but fine-grained enough to be practically
+    /// useful for testing.
     ///
     /// Used by [`HugrMut::canonicalize_nodes`] and the serialization code.
     fn canonical_order(&self, root: Node) -> impl Iterator<Item = Node> + '_ {
@@ -334,11 +353,61 @@ impl Hugr {
         let mut queue = VecDeque::from([root]);
         iter::from_fn(move || {
             let node = queue.pop_front()?;
-            for child in self.children(node) {
+            let mut children = self.children(node).collect_vec();
+            let sort_fn = |a: &Node, b: &Node| {
+                let n_a_inp = self.input_neighbours(*a).count();
+                let n_b_inp = self.input_neighbours(*b).count();
+                let n_a_out = self.output_neighbours(*a).count();
+                let n_b_out = self.output_neighbours(*b).count();
+                if n_a_inp < n_b_inp {
+                    Ordering::Less
+                } else if n_a_inp > n_b_inp {
+                    Ordering::Greater
+                } else if n_a_out < n_b_out {
+                    Ordering::Less
+                } else if n_a_out > n_b_out {
+                    Ordering::Greater
+                } else {
+                    self.get_optype(*a)
+                        .partial_cmp(self.get_optype(*b))
+                        .unwrap_or_else(|| a.cmp(b))
+                }
+            };
+            if self.contains_dsg_or_csg(node) {
+                children[2..].sort_by(sort_fn);
+            } else {
+                children.sort_by(sort_fn);
+            }
+            for child in children {
                 queue.push_back(child);
             }
             Some(node)
         })
+    }
+
+    /// Order siblings by node index throughout the hierarchy, ignoring (i.e.
+    /// keeping fixed) the first two nodes in each control-flow sibling graph
+    /// (since these must be the entry and exit blocks) and in each dataflow
+    /// sibling graph (since these must be the input and output nodes).
+    fn order_siblings_by_node_index(&mut self) {
+        let mut node_children: HashMap<Node, Vec<Node>> = HashMap::default();
+        for node in self.nodes() {
+            let mut children = self.children(node).collect_vec();
+            if self.contains_dsg_or_csg(node) {
+                children[2..].sort();
+            } else {
+                children.sort();
+            }
+            node_children.insert(node, children);
+        }
+        for (node, children) in &node_children {
+            self.hierarchy.detach_children(node.into_portgraph());
+            for child in children {
+                self.hierarchy
+                    .push_child(child.into_portgraph(), node.into_portgraph())
+                    .ok();
+            }
+        }
     }
 
     /// Compact the nodes indices of the hugr to be contiguous, and order them as a breadth-first
@@ -387,10 +456,12 @@ impl Hugr {
         self.module_root = portgraph::NodeIndex::new(0);
         self.entrypoint = new_entrypoint.unwrap();
 
-        // Finish by compacting the copy nodes.
+        // Compact the copy nodes.
         // The operation nodes will be left in place.
         // This step is not strictly necessary.
         self.graph.compact_nodes(|_, _| {});
+
+        self.order_siblings_by_node_index();
     }
 }
 
