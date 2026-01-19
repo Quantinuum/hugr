@@ -54,6 +54,7 @@ impl ConvertArgs {
     ///
     /// * `input_override` - Optional reader to use instead of the CLI input argument.
     /// * `output_override` - Optional writer to use instead of the CLI output argument.
+    #[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
     pub fn run_convert_with_io<R: Read, W: Write>(
         &mut self,
         input_override: Option<R>,

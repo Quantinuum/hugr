@@ -69,6 +69,7 @@ pub enum EnvelopeFormat {
     ///
     /// Uses a printable ascii value as the discriminant so the envelope can be
     /// read as text.
+    #[deprecated(note = "JSON encoding/decoding will be removed")]
     PackageJson = 63, // '?' in ascii
 }
 
@@ -93,6 +94,7 @@ impl EnvelopeFormat {
     ///
     /// If true, the encoded envelope can be read as text.
     #[must_use]
+    #[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
     pub fn ascii_printable(self) -> bool {
         matches!(
             self,
@@ -145,6 +147,7 @@ impl EnvelopeConfig {
 
     /// Default configuration for a plain-text envelope.
     #[must_use]
+    #[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
     pub const fn text() -> Self {
         Self {
             format: EnvelopeFormat::PackageJson,
@@ -350,6 +353,7 @@ mod tests {
     #[case(EnvelopeFormat::ModelWithExtensions)]
     #[case(EnvelopeFormat::ModelText)]
     #[case(EnvelopeFormat::ModelTextWithExtensions)]
+    #[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
     #[case(EnvelopeFormat::PackageJson)]
     fn header_round_trip(#[case] format: EnvelopeFormat) {
         // With zstd compression

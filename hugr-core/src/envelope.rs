@@ -36,6 +36,7 @@
 //!
 
 pub mod description;
+#[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
 mod header;
 mod package_json;
 mod reader;
@@ -331,7 +332,9 @@ pub(crate) mod test {
     #[cfg_attr(all(miri, feature = "zstd"), ignore)] // FFI calls (required to compress with zstd) are not supported in miri
     fn compressed_roundtrip(#[case] package: Package) {
         let mut buffer = Vec::new();
+
         let config = EnvelopeConfig {
+            #[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
             format: EnvelopeFormat::PackageJson,
             zstd: Some(ZstdConfig::default()),
         };

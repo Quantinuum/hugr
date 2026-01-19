@@ -22,6 +22,7 @@ trait Serializer {
 
 struct JsonSer;
 impl Serializer for JsonSer {
+    #[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
     fn serialize(&self, hugr: &Hugr) -> Vec<u8> {
         let cfg = EnvelopeConfig::new(EnvelopeFormat::PackageJson).disable_compression();
 

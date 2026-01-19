@@ -60,6 +60,7 @@ fn test_envelope_file(test_envelope_text: (String, Package)) -> NamedTempFile {
 }
 
 #[rstest]
+#[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
 fn test_convert_to_json(test_envelope_file: NamedTempFile, mut convert_cmd: Command) {
     // Create output file
     let output_file = assert_fs::NamedTempFile::new("output.hugr").unwrap();
@@ -184,6 +185,7 @@ fn test_convert_model_text_format(test_envelope_file: NamedTempFile, mut convert
 }
 
 #[rstest]
+#[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
 fn test_format_roundtrip(test_package: Package) {
     // Test conversion between all formats in a roundtrip
     // Start with JSON format
@@ -267,6 +269,7 @@ fn test_format_conflicts(mut convert_cmd: Command) {
 }
 
 #[rstest]
+#[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
 fn test_convert_programmatic_api(test_package: Package) {
     // Test the programmatic API (no CLI process spawning)
 

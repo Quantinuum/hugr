@@ -41,6 +41,7 @@ pub(super) fn write_envelope<'h>(
 }
 
 /// Internal implementation of write to call with/without the zstd compression wrapper.
+#[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
 fn write_impl<'h>(
     writer: impl Write,
     hugrs: impl IntoIterator<Item = &'h Hugr>,
@@ -178,6 +179,7 @@ pub(crate) enum ModelBinaryWriteError {
 }
 
 #[cfg(test)]
+#[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
 mod test {
     use super::*;
     use crate::extension::ExtensionRegistry;

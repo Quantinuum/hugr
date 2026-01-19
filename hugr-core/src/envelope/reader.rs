@@ -123,6 +123,7 @@ impl<R: BufRead> EnvelopeReader<R> {
         }
     }
 
+    #[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
     fn read_impl(&mut self) -> Result<Package, PayloadError> {
         let mut package = match self.header().format {
             EnvelopeFormat::PackageJson => self.decode_json()?,
@@ -174,6 +175,7 @@ impl<R: BufRead> EnvelopeReader<R> {
     /// Read a Package in json format from an io reader.
     /// Returns package and the combined extension registry
     /// of the provided registry and the package extensions.
+    #[deprecated(note = "JSON encoding/decoding will be removed")]
     fn decode_json(&mut self) -> Result<Package, PackageEncodingError> {
         let super::package_json::PackageDeser {
             modules,
@@ -338,6 +340,7 @@ mod test {
     }
 
     #[test]
+    #[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
     fn test_read_invalid_json_payload() {
         let header = EnvelopeHeader {
             format: EnvelopeFormat::PackageJson,
@@ -375,6 +378,7 @@ mod test {
     }
 
     #[test]
+    #[expect(deprecated)] // remove when EnvelopeFormat::PackageJson is removed
     fn test_partial_description_on_error() {
         let header = EnvelopeHeader {
             format: EnvelopeFormat::PackageJson,

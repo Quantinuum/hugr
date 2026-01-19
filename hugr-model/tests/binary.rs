@@ -19,6 +19,11 @@ pub fn binary_roundtrip(input: &str) {
 }
 
 #[test]
+pub fn test_empty() {
+    binary_roundtrip(include_str!("fixtures/model-empty.edn"));
+}
+
+#[test]
 pub fn test_add() {
     binary_roundtrip(include_str!("fixtures/model-add.edn"));
 }

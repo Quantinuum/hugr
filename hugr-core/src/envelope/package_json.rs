@@ -8,6 +8,7 @@ use crate::extension::resolution::ExtensionResolutionError;
 use crate::{Extension, Hugr};
 
 /// Write the Package in json format into an io writer.
+#[deprecated(note = "JSON encoding/decoding will be removed")]
 pub(super) fn to_json_writer<'h>(
     hugrs: impl IntoIterator<Item = &'h Hugr>,
     extensions: &ExtensionRegistry,
