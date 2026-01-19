@@ -44,6 +44,21 @@ class TypeParam(Protocol):
         """Convert the type parameter to a model Term."""
         raise NotImplementedError(self)
 
+    def used_extensions(self) -> ExtensionRegistry:
+        """Get the set of extensions required to define this type parameter.
+
+        Raises:
+            UnresolvedExtensionError: if a type parameter contains a
+                :class:`Opaque` type that has not been resolved.
+
+        Example:
+            >>> ConstParam(ty=Qubit).used_extensions().ids()
+            {'prelude'}
+        """
+        from hugr.ext import ExtensionRegistry
+
+        return ExtensionRegistry()
+
 
 @runtime_checkable
 class TypeArg(Protocol):
@@ -162,7 +177,7 @@ def row_used_extensions(row: TypeRow) -> ExtensionRegistry:
 
     reg = ExtensionRegistry()
     for ty in row:
-        reg = reg.extend(ty.used_extensions())
+        reg.extend(ty.used_extensions())
     return reg
 
 
@@ -265,6 +280,9 @@ class ListParam(TypeParam):
         item_type = self.param.to_model()
         return model.Apply("core.list", [item_type])
 
+    def used_extensions(self) -> ExtensionRegistry:
+        return self.param.used_extensions()
+
 
 @dataclass(frozen=True)
 class TupleParam(TypeParam):
@@ -282,6 +300,14 @@ class TupleParam(TypeParam):
         item_types = model.List([param.to_model() for param in self.params])
         return model.Apply("core.tuple", [item_types])
 
+    def used_extensions(self) -> ExtensionRegistry:
+        from hugr.ext import ExtensionRegistry
+
+        reg = ExtensionRegistry()
+        for param in self.params:
+            reg.extend(param.used_extensions())
+        return reg
+
 
 @dataclass(frozen=True)
 class ConstParam(TypeParam):
@@ -298,6 +324,9 @@ class ConstParam(TypeParam):
     def to_model(self) -> model.Term:
         ty = cast(model.Term, self.ty.to_model())
         return model.Apply("core.const", [ty])
+
+    def used_extensions(self) -> ExtensionRegistry:
+        return self.ty.used_extensions()
 
 
 # ------------------------------------------
@@ -493,7 +522,7 @@ class TupleConcatArg(TypeArg):
 
     def used_extensions(self) -> ExtensionRegistry:
         reg = super().used_extensions()
-        for arg in self.elems:
+        for arg in self.tuples:
             reg.extend(arg.used_extensions())
         return reg
 
@@ -851,7 +880,11 @@ class PolyFuncType(Type):
         raise TypeError(error)
 
     def used_extensions(self) -> ExtensionRegistry:
-        return self.body.used_extensions()
+        reg = row_used_extensions(self.body.input)
+        reg.extend(row_used_extensions(self.body.output))
+        for param in self.params:
+            reg.extend(param.used_extensions())
+        return reg
 
 
 @dataclass
@@ -903,6 +936,10 @@ class ExtType(Type):
     def used_extensions(self) -> ExtensionRegistry:
         reg = super().used_extensions()
         reg.add_extension(self.type_def.get_extension())
+
+        for arg in self.args:
+            reg.extend(arg.used_extensions())
+
         return reg
 
 
