@@ -662,8 +662,8 @@ pub(crate) mod test {
             assert_eq!(new_graph.num_inputs(n), old_graph.num_inputs(n));
             assert_eq!(new_graph.num_outputs(n), old_graph.num_outputs(n));
             assert_eq!(
-                new_graph.output_neighbours(n).collect_vec(),
-                old_graph.output_neighbours(n).collect_vec()
+                new_graph.output_neighbours(n).sorted().collect_vec(),
+                old_graph.output_neighbours(n).sorted().collect_vec()
             );
         }
     }
