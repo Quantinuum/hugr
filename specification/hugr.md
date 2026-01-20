@@ -343,9 +343,9 @@ express control flow, i.e. conditional or repeated evaluation.
 
 These are parents to multiple `Case` nodes; the children have no edges.
 The first input to the Conditional-node is of Sum type (see below), whose
-arity matches the number of children of the Conditional-node. At runtime
-the constructor (tag) selects which child to execute; the elements of the tagged row
-of the Sum, with all remaining inputs to Conditional
+arity matches the number of children of the Conditional node. At runtime
+the sum's tag is inspected to select which child to execute; the elements of
+the tagged row of the Sum, with all remaining inputs to Conditional
 appended, are sent to this child, and all outputs of the child are the
 outputs of the Conditional; that child is evaluated, but the others are
 not. That is, Conditional-nodes act as "if-then-else" followed by a
