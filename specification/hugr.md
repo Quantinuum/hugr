@@ -357,17 +357,17 @@ flowchart
     subgraph Conditional
         direction LR
         subgraph Case0["Case 0"]
-            C0I["case 0 inputs + other inputs"] --> op0["operations"]
-            op0 --> C0O["outputs"]
+            C0I["Input"] --#Input0:#Other--> op0["operations"]
+            op0 --#Output--> C0O["Output"]
         end
         subgraph Case1["Case 1"]
-            C1I["case 1 inputs + other inputs"] --> op1["operations"]
-            op1 --> C1O["outputs"]
+            C1I["Input"] --#Input1:#Other--> op1["operations"]
+            op1 --#Output--> C1O["Output"]
         end
         Case0 ~~~ Case1
     end
-    Sum["case 0 inputs | case 1 inputs"] --> Conditional
-    OI["other inputs"] --> Conditional
+    Sum["case 0 inputs | case 1 inputs"] --Sum(#Input0,#Input1)--> Conditional
+    OI["other inputs"] --#Other--> Conditional
     Conditional --> outputs
 ```
 
