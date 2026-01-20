@@ -418,20 +418,26 @@ flowchart TB
     direction LR
         DFG
   end
-    TI0 -- #Return --> TIT
-    TIT -- #Input --> TO0
-    TI1 -- #Continue --> TIT1
-    TIT1 -- #Output --> TO1
-    Case0 ~~~ Case1
-    Process L_Process_CO_0@-- #Xtra --> CO
-    CI L_CI_Process_0@-- #Input:#Xtra --> Process
-    Process L_Process_Conditional_0@-- Sum(#Return,#Continue) --> Conditional
-    Conditional -- Sum(#Input,#Output) --> CO
 
+ 0["Loop inputs"]
+ 1["Other inputs"]
+ 2["Output"]
+ 0 -- #Input --> TailLoop
+ 1 -- #Xtra --> TailLoop
+ TailLoop -- #Output --> 2
+ TI0 -- #Return --> TIT
+ TIT -- #Input --> TO0
+ TI1 -- #Continue --> TIT1
+ TIT1 -- #Output --> TO1
+ Case0 ~~~ Case1
+ Process L_Process_CO_0@-- #Xtra --> CO
+ CI L_CI_Process_0@-- #Input:#Xtra --> Process
+ Process L_Process_Conditional_0@-- Sum(#Return,#Continue) --> Conditional
+ Conditional -- Sum(#Input,#Output) --> CO
 
-    L_Process_CO_0@{ curve: natural }
-    L_CI_Process_0@{ curve: natural }
-    L_Process_Conditional_0@{ curve: natural }
+ L_Process_CO_0@{ curve: natural }
+ L_CI_Process_0@{ curve: natural }
+ L_Process_Conditional_0@{ curve: natural }
 ```
 
 ##### Control Flow Graphs
