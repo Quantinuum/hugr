@@ -623,16 +623,6 @@ class MakeTuple(AsExtOp, _PartialOp):
         return "MakeTuple"
 
     def used_extensions(self) -> ExtensionRegistry:
-        """Get the set of extensions required to define this operation.
-
-        Example:
-            >>> out = Output()
-            >>> out.used_extensions().ids()
-            set()
-            >>> out._set_in_types([tys.Qubit])
-            >>> out.used_extensions().ids()
-            {'prelude'}
-        """
         from hugr import std
         from hugr.ext import ExtensionRegistry
 
@@ -698,6 +688,17 @@ class UnpackTuple(AsExtOp, _PartialOp):
     def name(self) -> str:
         return "UnpackTuple"
 
+    def used_extensions(self) -> ExtensionRegistry:
+        from hugr import std
+        from hugr.ext import ExtensionRegistry
+
+        reg = ExtensionRegistry()
+        reg.add_extension(std.PRELUDE)
+        if self._types is not None:
+            reg.extend(tys.row_used_extensions(self._types))
+
+        return reg
+
 
 @dataclass(frozen=True)
 class Tag(DataflowOp):
@@ -727,7 +728,7 @@ class Tag(DataflowOp):
         )
 
     def used_extensions(self) -> ExtensionRegistry:
-        return self.outer_signature().used_extensions()
+        return self.sum_ty.used_extensions()
 
     def __repr__(self) -> str:
         if len(self.sum_ty.variant_rows) == 2:
