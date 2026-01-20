@@ -19,13 +19,14 @@ from typing_extensions import Self
 import hugr._serialization.ops as sops
 from hugr import tys, val
 from hugr.hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
-from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
+from hugr.utils import UnresolvedExtensionError, comma_sep_repr, comma_sep_str, ser_it
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
 
     from hugr import ext
     from hugr._serialization.ops import BaseOp
+    from hugr.ext import ExtensionRegistry
     from hugr.tys import Visibility
 
 
@@ -78,6 +79,18 @@ class Op(Protocol):
     def name(self) -> str:
         """Name of the operation."""
         return str(self)
+
+    def used_extensions(self) -> ExtensionRegistry:
+        """Get the set of extensions required to define this operation.
+
+        Example:
+            >>> import hugr.tys as tys
+            >>> tys.TypeTypeArg(ty=tys.Qubit).used_extensions().ids()
+            {'prelude'}
+        """
+        from hugr.ext import ExtensionRegistry
+
+        return ExtensionRegistry()
 
 
 @runtime_checkable
@@ -257,6 +270,15 @@ class Input(DataflowOp):
     def name(self) -> str:
         return "Input"
 
+    def used_extensions(self) -> ExtensionRegistry:
+        """Get the set of extensions required to define this operation.
+
+        Example:
+            >>> Input([tys.Qubit]).used_extensions().ids()
+            {'prelude'}
+        """
+        return tys.row_used_extensions(self.types)
+
 
 @dataclass()
 class Output(DataflowOp, _PartialOp):
@@ -294,6 +316,24 @@ class Output(DataflowOp, _PartialOp):
 
     def name(self) -> str:
         return "Output"
+
+    def used_extensions(self) -> ExtensionRegistry:
+        """Get the set of extensions required to define this operation.
+
+        Example:
+            >>> out = Output()
+            >>> out.used_extensions().ids()
+            set()
+            >>> out._set_in_types([tys.Qubit])
+            >>> out.used_extensions().ids()
+            {'prelude'}
+        """
+        from hugr.ext import ExtensionRegistry
+
+        if self._types is None:
+            return ExtensionRegistry()
+
+        return tys.row_used_extensions(self._types)
 
 
 @runtime_checkable
@@ -391,6 +431,9 @@ class AsExtOp(DataflowOp, Protocol):
             return name
         return f"{name}<{comma_sep_str(self.type_args())}>"
 
+    def used_extensions(self) -> ExtensionRegistry:
+        return self.ext_op.used_extensions()
+
 
 @dataclass(frozen=True, eq=False)
 class Custom(DataflowOp):
@@ -448,6 +491,13 @@ class Custom(DataflowOp):
     def name(self) -> str:
         return f"Custom({self.op_name})"
 
+    def used_extensions(self) -> ExtensionRegistry:
+        msg = (
+            "Custom operations do not have a known set of extensions."
+            "Call resolve() before this method."
+        )
+        raise UnresolvedExtensionError(msg)
+
 
 @dataclass(frozen=True, eq=False)
 class ExtOp(AsExtOp):
@@ -504,6 +554,13 @@ class ExtOp(AsExtOp):
             msg = "Polymorphic signature must be cached."
             raise ValueError(msg)
         return poly_func.body
+
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = self.outer_signature().used_extensions()
+        reg.add_extension(self._op_def.get_extension())
+        for arg in self.args:
+            reg.extend(arg.used_extensions())
+        return reg
 
 
 class RegisteredOp(AsExtOp):
@@ -565,6 +622,17 @@ class MakeTuple(AsExtOp, _PartialOp):
     def name(self) -> str:
         return "MakeTuple"
 
+    def used_extensions(self) -> ExtensionRegistry:
+        from hugr import std
+        from hugr.ext import ExtensionRegistry
+
+        reg = ExtensionRegistry()
+        reg.add_extension(std.PRELUDE)
+        if self._types is not None:
+            reg.extend(tys.row_used_extensions(self._types))
+
+        return reg
+
 
 @dataclass()
 class UnpackTuple(AsExtOp, _PartialOp):
@@ -620,6 +688,17 @@ class UnpackTuple(AsExtOp, _PartialOp):
     def name(self) -> str:
         return "UnpackTuple"
 
+    def used_extensions(self) -> ExtensionRegistry:
+        from hugr import std
+        from hugr.ext import ExtensionRegistry
+
+        reg = ExtensionRegistry()
+        reg.add_extension(std.PRELUDE)
+        if self._types is not None:
+            reg.extend(tys.row_used_extensions(self._types))
+
+        return reg
+
 
 @dataclass(frozen=True)
 class Tag(DataflowOp):
@@ -647,6 +726,9 @@ class Tag(DataflowOp):
         return tys.FunctionType(
             input=self.sum_ty.variant_rows[self.tag], output=[self.sum_ty]
         )
+
+    def used_extensions(self) -> ExtensionRegistry:
+        return self.sum_ty.used_extensions()
 
     def __repr__(self) -> str:
         if len(self.sum_ty.variant_rows) == 2:
@@ -791,6 +873,12 @@ class DFG(DfParentOp, DataflowOp):
     def name(self) -> str:
         return "DFG"
 
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = tys.row_used_extensions(self.inputs)
+        if self._outputs is not None:
+            reg.extend(tys.row_used_extensions(self._outputs))
+        return reg
+
 
 @dataclass()
 class CFG(DataflowOp):
@@ -836,6 +924,12 @@ class CFG(DataflowOp):
 
     def _inputs(self) -> tys.TypeRow:
         return self.inputs
+
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = tys.row_used_extensions(self.inputs)
+        if self._outputs is not None:
+            reg.extend(tys.row_used_extensions(self._outputs))
+        return reg
 
 
 @dataclass
@@ -905,6 +999,14 @@ class DataflowBlock(DfParentOp):
     def name(self) -> str:
         return "DataflowBlock"
 
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = tys.row_used_extensions(self.inputs)
+        if self._sum is not None:
+            reg.extend(self._sum.used_extensions())
+        if self.other_outputs is not None:
+            reg.extend(tys.row_used_extensions(self.other_outputs))
+        return reg
+
 
 @dataclass
 class ExitBlock(Op):
@@ -934,6 +1036,10 @@ class ExitBlock(Op):
     def name(self) -> str:
         return "ExitBlock"
 
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = tys.row_used_extensions(self.cfg_outputs)
+        return reg
+
 
 @dataclass
 class Const(Op):
@@ -959,6 +1065,9 @@ class Const(Op):
 
     def __repr__(self) -> str:
         return f"Const({self.val})"
+
+    def used_extensions(self) -> ExtensionRegistry:
+        return self.val.type_().used_extensions()
 
 
 @dataclass
@@ -1001,6 +1110,13 @@ class LoadConst(DataflowOp):
 
     def name(self) -> str:
         return "LoadConst"
+
+    def used_extensions(self) -> ExtensionRegistry:
+        from hugr.ext import ExtensionRegistry
+
+        if self._typ is None:
+            return ExtensionRegistry()
+        return self._typ.used_extensions()
 
 
 @dataclass()
@@ -1061,6 +1177,14 @@ class Conditional(DataflowOp):
         """Input row of the outer signature."""
         return [self.sum_ty, *self.other_inputs]
 
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = tys.row_used_extensions(self.other_inputs)
+        for row in self.sum_ty.variant_rows:
+            reg.extend(tys.row_used_extensions(row))
+        if self._outputs is not None:
+            reg.extend(tys.row_used_extensions(self._outputs))
+        return reg
+
 
 @dataclass
 class Case(DfParentOp):
@@ -1099,6 +1223,12 @@ class Case(DfParentOp):
 
     def name(self) -> str:
         return "Case"
+
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = tys.row_used_extensions(self.inputs)
+        if self._outputs is not None:
+            reg.extend(tys.row_used_extensions(self._outputs))
+        return reg
 
 
 @dataclass
@@ -1155,6 +1285,13 @@ class TailLoop(DfParentOp, DataflowOp):
 
     def name(self) -> str:
         return "TailLoop"
+
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = tys.row_used_extensions(self.just_inputs)
+        reg.extend(tys.row_used_extensions(self.rest))
+        if self._just_outputs is not None:
+            reg.extend(tys.row_used_extensions(self._just_outputs))
+        return reg
 
 
 @dataclass
@@ -1221,6 +1358,14 @@ class FuncDefn(DfParentOp):
     def name(self) -> str:
         return f"FuncDefn({self.f_name})"
 
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = tys.row_used_extensions(self.inputs)
+        for param in self.params:
+            reg.extend(param.used_extensions())
+        if self._outputs is not None:
+            reg.extend(tys.row_used_extensions(self._outputs))
+        return reg
+
 
 @dataclass
 class FuncDecl(Op):
@@ -1251,6 +1396,9 @@ class FuncDecl(Op):
 
     def name(self) -> str:
         return f"FuncDecl({self.f_name})"
+
+    def used_extensions(self) -> ExtensionRegistry:
+        return self.signature.used_extensions()
 
 
 @dataclass
@@ -1306,6 +1454,12 @@ class _CallOrLoad:
                 raise NoConcreteFunc(msg)
             self.instantiation = instantiation
             self.type_args = list(type_args)
+
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = self.signature.used_extensions()
+        for arg in self.type_args:
+            reg.extend(arg.used_extensions())
+        return reg
 
 
 class Call(_CallOrLoad, DataflowOp):
@@ -1402,6 +1556,13 @@ class CallIndirect(DataflowOp, _PartialOp):
 
     def name(self) -> str:
         return "CallIndirect"
+
+    def used_extensions(self) -> ExtensionRegistry:
+        from hugr.ext import ExtensionRegistry
+
+        if self._signature is None:
+            return ExtensionRegistry()
+        return self._signature.used_extensions()
 
 
 class LoadFunc(_CallOrLoad, DataflowOp):
@@ -1534,3 +1695,6 @@ class AliasDefn(Op):
 
     def name(self) -> str:
         return f"AliasDefn({self.alias})"
+
+    def used_extensions(self) -> ExtensionRegistry:
+        return self.definition.used_extensions()

@@ -8,12 +8,19 @@ from typing import TYPE_CHECKING, Literal, Protocol, cast, runtime_checkable
 
 import hugr._serialization.tys as stys
 import hugr.model as model
-from hugr.utils import comma_sep_repr, comma_sep_str, comma_sep_str_paren, ser_it
+from hugr.utils import (
+    UnresolvedExtensionError,
+    comma_sep_repr,
+    comma_sep_str,
+    comma_sep_str_paren,
+    ser_it,
+)
 
 if TYPE_CHECKING:
     from collections.abc import Iterable, Sequence
 
     from hugr import ext
+    from hugr.ext import ExtensionRegistry
 
 
 ExtensionId = stys.ExtensionId
@@ -37,6 +44,21 @@ class TypeParam(Protocol):
         """Convert the type parameter to a model Term."""
         raise NotImplementedError(self)
 
+    def used_extensions(self) -> ExtensionRegistry:
+        """Get the set of extensions required to define this type parameter.
+
+        Raises:
+            UnresolvedExtensionError: if a type parameter contains an
+                :class:`Opaque` type that has not been resolved.
+
+        Example:
+            >>> ConstParam(ty=Qubit).used_extensions().ids()
+            {'prelude'}
+        """
+        from hugr.ext import ExtensionRegistry
+
+        return ExtensionRegistry()
+
 
 @runtime_checkable
 class TypeArg(Protocol):
@@ -56,6 +78,24 @@ class TypeArg(Protocol):
     def to_model(self) -> model.Term | model.Splice:
         """Convert the type argument to a model Term."""
         raise NotImplementedError(self)
+
+    def used_extensions(self) -> ExtensionRegistry:
+        """Get the set of extensions required to define this type argument.
+
+        Raises:
+            UnresolvedExtensionError: if a type argument contains an
+                :class:`Opaque` type that has not been resolved.
+
+        Example:
+            >>> tt = TypeTypeArg(ty=Qubit)
+            >>> tt.used_extensions().ids()
+            {'prelude'}
+            >>> ListArg([tt]).used_extensions().ids()
+            {'prelude'}
+        """
+        from hugr.ext import ExtensionRegistry
+
+        return ExtensionRegistry()
 
 
 @runtime_checkable
@@ -97,9 +137,52 @@ class Type(Protocol):
         """Convert the type to a model Term."""
         raise NotImplementedError(self)
 
+    def used_extensions(self) -> ExtensionRegistry:
+        """Get the set of extensions required to define this type.
+
+        Note that :class:`Opaque` types do not know their extension, so they
+        will raise an error. Use :meth:`resolve` to get the actual type
+        before calling this method.
+
+        Raises:
+            UnresolvedExtensionError: if the type contains an :class:`Opaque` type
+                and has not been resolved.
+
+        Example:
+            >>> Qubit.used_extensions().ids()
+            {'prelude'}
+        """
+        from hugr.ext import ExtensionRegistry
+
+        return ExtensionRegistry()
+
 
 #: Row of types.
 TypeRow = list[Type]
+
+
+def row_used_extensions(row: TypeRow) -> ExtensionRegistry:
+    """Get the set of extensions required to define a row of types.
+
+    Note that :class:`Opaque` types do not know their extension, so they
+    will raise an error. Use :meth:`resolve` to get the actual type
+    before calling this function.
+
+    Raises:
+        UnresolvedExtensionError: if the type contains an :class:`Opaque` type
+            and has not been resolved.
+
+    Example:
+        >>> row_used_extensions([Qubit, USize()]).ids()
+        {'prelude'}
+    """
+    from hugr.ext import ExtensionRegistry
+
+    reg = ExtensionRegistry()
+    for ty in row:
+        reg.extend(ty.used_extensions())
+    return reg
+
 
 # --------------------------------------------
 # --------------- TypeParam ------------------
@@ -200,6 +283,9 @@ class ListParam(TypeParam):
         item_type = self.param.to_model()
         return model.Apply("core.list", [item_type])
 
+    def used_extensions(self) -> ExtensionRegistry:
+        return self.param.used_extensions()
+
 
 @dataclass(frozen=True)
 class TupleParam(TypeParam):
@@ -217,6 +303,14 @@ class TupleParam(TypeParam):
         item_types = model.List([param.to_model() for param in self.params])
         return model.Apply("core.tuple", [item_types])
 
+    def used_extensions(self) -> ExtensionRegistry:
+        from hugr.ext import ExtensionRegistry
+
+        reg = ExtensionRegistry()
+        for param in self.params:
+            reg.extend(param.used_extensions())
+        return reg
+
 
 @dataclass(frozen=True)
 class ConstParam(TypeParam):
@@ -233,6 +327,9 @@ class ConstParam(TypeParam):
     def to_model(self) -> model.Term:
         ty = cast(model.Term, self.ty.to_model())
         return model.Apply("core.const", [ty])
+
+    def used_extensions(self) -> ExtensionRegistry:
+        return self.ty.used_extensions()
 
 
 # ------------------------------------------
@@ -257,6 +354,9 @@ class TypeTypeArg(TypeArg):
 
     def to_model(self) -> model.Term | model.Splice:
         return self.ty.to_model()
+
+    def used_extensions(self) -> ExtensionRegistry:
+        return self.ty.used_extensions()
 
 
 @dataclass(frozen=True)
@@ -342,6 +442,12 @@ class ListArg(TypeArg):
     def to_model(self) -> model.Term:
         return model.List([elem.to_model() for elem in self.elems])
 
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = super().used_extensions()
+        for arg in self.elems:
+            reg.extend(arg.used_extensions())
+        return reg
+
 
 @dataclass(frozen=True)
 class ListConcatArg(TypeArg):
@@ -373,6 +479,12 @@ class ListConcatArg(TypeArg):
             case _:
                 return self
 
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = super().used_extensions()
+        for arg in self.lists:
+            reg.extend(arg.used_extensions())
+        return reg
+
 
 @dataclass(frozen=True)
 class TupleArg(TypeArg):
@@ -391,6 +503,12 @@ class TupleArg(TypeArg):
 
     def to_model(self) -> model.Term:
         return model.Tuple([elem.to_model() for elem in self.elems])
+
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = super().used_extensions()
+        for arg in self.elems:
+            reg.extend(arg.used_extensions())
+        return reg
 
 
 @dataclass(frozen=True)
@@ -423,6 +541,12 @@ class TupleConcatArg(TypeArg):
             case _:
                 return self
 
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = super().used_extensions()
+        for arg in self.tuples:
+            reg.extend(arg.used_extensions())
+        return reg
+
 
 @dataclass(frozen=True)
 class VariableArg(TypeArg):
@@ -439,6 +563,9 @@ class VariableArg(TypeArg):
 
     def to_model(self) -> model.Term:
         return model.Var(str(self.idx))
+
+    def used_extensions(self) -> ExtensionRegistry:
+        return self.param.used_extensions()
 
 
 # ----------------------------------------------
@@ -513,6 +640,13 @@ class Sum(Type):
             [model.List([typ.to_model() for typ in row]) for row in self.variant_rows]
         )
         return model.Apply("core.adt", [variants])
+
+    def used_extensions(self) -> ExtensionRegistry:
+        types = [ty for row in self.variant_rows for ty in row]
+        reg = super().used_extensions()
+        for ty in types:
+            reg.extend(ty.used_extensions())
+        return reg
 
 
 @dataclass(eq=False, repr=False)
@@ -627,6 +761,13 @@ class USize(Type):
     def to_model(self) -> model.Term:
         return model.Apply("prelude.usize")
 
+    def used_extensions(self) -> ExtensionRegistry:
+        from hugr.std.prelude import PRELUDE_EXTENSION
+
+        reg = super().used_extensions()
+        reg.add_extension(PRELUDE_EXTENSION)
+        return reg
+
 
 @dataclass(frozen=True)
 class Alias(Type):
@@ -713,6 +854,11 @@ class FunctionType(Type):
         outputs = model.List([output.to_model() for output in self.output])
         return model.Apply("core.fn", [inputs, outputs])
 
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = row_used_extensions(self.input)
+        reg.extend(row_used_extensions(self.output))
+        return reg
+
 
 @dataclass(frozen=True)
 class PolyFuncType(Type):
@@ -756,6 +902,13 @@ class PolyFuncType(Type):
         # A `PolyFuncType` should not be a `Type`.
         error = "PolyFuncType used as a Type"
         raise TypeError(error)
+
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = row_used_extensions(self.body.input)
+        reg.extend(row_used_extensions(self.body.output))
+        for param in self.params:
+            reg.extend(param.used_extensions())
+        return reg
 
 
 @dataclass
@@ -803,6 +956,15 @@ class ExtType(Type):
 
     def to_model(self) -> model.Term:
         return self._to_opaque().to_model()
+
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = super().used_extensions()
+        reg.add_extension(self.type_def.get_extension())
+
+        for arg in self.args:
+            reg.extend(arg.used_extensions())
+
+        return reg
 
 
 def _type_str(name: str, args: Sequence[TypeArg]) -> str:
@@ -855,6 +1017,10 @@ class Opaque(Type):
 
         return model.Apply(f"{self.extension}.{self.id}", args)
 
+    def used_extensions(self) -> ExtensionRegistry:
+        msg = "Opaque types do not know their extension. Call `resolve` first."
+        raise UnresolvedExtensionError(msg)
+
 
 @dataclass
 class _QubitDef(Type):
@@ -869,6 +1035,13 @@ class _QubitDef(Type):
 
     def to_model(self) -> model.Term:
         return model.Apply("prelude.qubit", [])
+
+    def used_extensions(self) -> ExtensionRegistry:
+        from hugr.std.prelude import PRELUDE_EXTENSION
+
+        reg = super().used_extensions()
+        reg.add_extension(PRELUDE_EXTENSION)
+        return reg
 
 
 #: Qubit type.
