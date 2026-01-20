@@ -48,7 +48,7 @@ class TypeParam(Protocol):
         """Get the set of extensions required to define this type parameter.
 
         Raises:
-            UnresolvedExtensionError: if a type parameter contains a
+            UnresolvedExtensionError: if a type parameter contains an
                 :class:`Opaque` type that has not been resolved.
 
         Example:
@@ -83,11 +83,14 @@ class TypeArg(Protocol):
         """Get the set of extensions required to define this type argument.
 
         Raises:
-            UnresolvedExtensionError: if a type argument contains a
+            UnresolvedExtensionError: if a type argument contains an
                 :class:`Opaque` type that has not been resolved.
 
         Example:
-            >>> TypeTypeArg(ty=Qubit).used_extensions().ids()
+            >>> tt = TypeTypeArg(ty=Qubit)
+            >>> tt.used_extensions().ids()
+            {'prelude'}
+            >>> ListArg([tt]).used_extensions().ids()
             {'prelude'}
         """
         from hugr.ext import ExtensionRegistry
@@ -439,6 +442,12 @@ class ListArg(TypeArg):
     def to_model(self) -> model.Term:
         return model.List([elem.to_model() for elem in self.elems])
 
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = super().used_extensions()
+        for arg in self.elems:
+            reg.extend(arg.used_extensions())
+        return reg
+
 
 @dataclass(frozen=True)
 class ListConcatArg(TypeArg):
@@ -470,6 +479,12 @@ class ListConcatArg(TypeArg):
             case _:
                 return self
 
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = super().used_extensions()
+        for arg in self.lists:
+            reg.extend(arg.used_extensions())
+        return reg
+
 
 @dataclass(frozen=True)
 class TupleArg(TypeArg):
@@ -488,6 +503,12 @@ class TupleArg(TypeArg):
 
     def to_model(self) -> model.Term:
         return model.Tuple([elem.to_model() for elem in self.elems])
+
+    def used_extensions(self) -> ExtensionRegistry:
+        reg = super().used_extensions()
+        for arg in self.elems:
+            reg.extend(arg.used_extensions())
+        return reg
 
 
 @dataclass(frozen=True)
@@ -542,6 +563,9 @@ class VariableArg(TypeArg):
 
     def to_model(self) -> model.Term:
         return model.Var(str(self.idx))
+
+    def used_extensions(self) -> ExtensionRegistry:
+        return self.param.used_extensions()
 
 
 # ----------------------------------------------
