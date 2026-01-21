@@ -343,9 +343,9 @@ express control flow, i.e. conditional or repeated evaluation.
 
 These are parents to multiple `Case` nodes; the children have no edges.
 The first input to the Conditional-node is of Sum type (see below), whose
-arity matches the number of children of the Conditional-node. At runtime
-the constructor (tag) selects which child to execute; the elements of the tagged row
-of the Sum, with all remaining inputs to Conditional
+arity matches the number of children of the Conditional node. At runtime
+the sum's tag is inspected to select which child to execute; the elements of
+the tagged row of the Sum, with all remaining inputs to Conditional
 appended, are sent to this child, and all outputs of the child are the
 outputs of the Conditional; that child is evaluated, but the others are
 not. That is, Conditional-nodes act as "if-then-else" followed by a
@@ -357,17 +357,17 @@ flowchart
     subgraph Conditional
         direction LR
         subgraph Case0["Case 0"]
-            C0I["case 0 inputs + other inputs"] --> op0["operations"]
-            op0 --> C0O["outputs"]
+            C0I["Input"] --#Input0:#Other--> op0["operations"]
+            op0 --#Output--> C0O["Output"]
         end
         subgraph Case1["Case 1"]
-            C1I["case 1 inputs + other inputs"] --> op1["operations"]
-            op1 --> C1O["outputs"]
+            C1I["Input"] --#Input1:#Other--> op1["operations"]
+            op1 --#Output--> C1O["Output"]
         end
         Case0 ~~~ Case1
     end
-    Sum["case 0 inputs | case 1 inputs"] --> Conditional
-    OI["other inputs"] --> Conditional
+    Sum["case 0 inputs | case 1 inputs"] --Sum(#Input0,#Input1)--> Conditional
+    OI["other inputs"] --#Other--> Conditional
     Conditional --> outputs
 ```
 
@@ -375,19 +375,70 @@ flowchart
 
 These provide tail-controlled loops. The dataflow sibling graph within the
 TailLoop-node defines the loop body: this computes a row of outputs, whose
-first element has type `Sum(#I, #O)` and the remainder is a row `#X`
+first element has type `Sum(#Input, #Output)` and the remainder is a row `#Extra`
 (perhaps empty). Inputs to the contained graph and to the TailLoop node itself
-are the row `#I:#X`, where `:` indicates row concatenation (with the row
+are the row `#Input:#Extra`, where `:` indicates row concatenation (with the row
 inside the `Sum`).
 
 Evaluation of the node begins by feeding the node inputs into the child graph
-and evaluating it.  The `Sum` produced controls iteration of the loop:
+and evaluating it.  The `Sum` produced by the child graph controls iteration of
+the loop:
 
-- The first variant (`#I`) means that these values, along with the other
- sibling-graph outputs `#X`, are fed back into the top of the loop,
+- The first variant (`#Input`) means that these values, along with the other
+ sibling-graph outputs `#Extra`, are fed back into the top of the loop,
  and the body is evaluated again (thus perhaps many times)
-- The second variant (`#O`) means that evaluation of the `TailLoop` node
- terminates, returning all the values produced as a row of outputs `#O:#X`.
+- The second variant (`#Output`) means that evaluation of the `TailLoop` node
+ terminates, returning all the values produced as a row of outputs
+ `#Output:#Extra`.
+
+```mermaid
+flowchart TB
+ subgraph Case0["Case0"]
+        TI0["Input"]
+        TIT["Tag"]
+        TO0["Output"]
+  end
+ subgraph Case1["Case1"]
+        TI1["Input"]
+        TIT1["Tag"]
+        TO1["Output"]
+  end
+ subgraph Conditional["Conditional"]
+    direction LR
+        Case0
+        Case1
+  end
+ subgraph DFG["DFG"]
+        Process["Process"]
+        Conditional
+        CI["Input"]
+        CO["Output"]
+  end
+ subgraph TailLoop["TailLoop"]
+    direction LR
+        DFG
+  end
+
+ 0["Loop inputs"]
+ 1["Other inputs"]
+ 2["Output"]
+ 0 -- #Input --> TailLoop
+ 1 -- #Extra --> TailLoop
+ TailLoop -- #Output --> 2
+ TI0 -- #Return --> TIT
+ TIT -- #Input --> TO0
+ TI1 -- #Continue --> TIT1
+ TIT1 -- #Output --> TO1
+ Case0 ~~~ Case1
+ Process L_Process_CO_0@-- #Extra --> CO
+ CI L_CI_Process_0@-- #Input:#Extra --> Process
+ Process L_Process_Conditional_0@-- Sum(#Return,#Continue) --> Conditional
+ Conditional -- Sum(#Input,#Output) --> CO
+
+ L_Process_CO_0@{ curve: natural }
+ L_CI_Process_0@{ curve: natural }
+ L_Process_Conditional_0@{ curve: natural }
+```
 
 ##### Control Flow Graphs
 

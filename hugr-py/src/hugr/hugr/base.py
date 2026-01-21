@@ -63,6 +63,7 @@ if TYPE_CHECKING:
     import graphviz as gv  # type: ignore[import-untyped]
 
     from hugr import ext
+    from hugr.ext import ExtensionRegistry
     from hugr.val import Value
 
     from .render import RenderConfig
@@ -1216,3 +1217,25 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         from .render import DotRenderer
 
         DotRenderer(config).store(self, filename=filename, format=format, root=root)
+
+    def used_extensions(self) -> ExtensionRegistry:
+        """Get the set of extensions required to define this Hugr.
+
+        Raises:
+            UnresolvedExtensionError: if the Hugr contains an :class:`Opaque` type
+                that has not been resolved. Call :meth:`resolve` first.
+
+        Example:
+            >>> from hugr.build import Dfg
+            >>> Dfg(tys.Qubit).hugr.used_extensions().ids()
+            {'prelude'}
+        """
+        from hugr.ext import ExtensionRegistry
+
+        registry = ExtensionRegistry()
+
+        for node in self:
+            reg = self[node].op.used_extensions()
+            registry.extend(reg)
+
+        return registry
