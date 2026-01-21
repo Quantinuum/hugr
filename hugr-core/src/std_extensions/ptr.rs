@@ -59,8 +59,8 @@ impl MakeOpDef for PtrOpDef {
             ptr_custom_type(Type::new_var_use(0, TypeBound::Copyable), extension_ref).into();
         let inner_t = Type::new_var_use(0, TypeBound::Copyable);
         let body = match self {
-            PtrOpDef::New => Signature::new(inner_t, ptr_t),
-            PtrOpDef::Read => Signature::new(ptr_t, inner_t),
+            PtrOpDef::New => Signature::new([inner_t], [ptr_t]),
+            PtrOpDef::Read => Signature::new([ptr_t], [inner_t]),
             PtrOpDef::Write => Signature::new(vec![ptr_t, inner_t], type_row![]),
         };
 

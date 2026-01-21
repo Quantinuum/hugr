@@ -543,7 +543,7 @@ impl Extension {
     ///         ext.add_op(
     ///             "MyOp".into(),
     ///             "Some operation".into(),
-    ///             Signature::new_endo(vec![]),
+    ///             Signature::new_endo([]),
     ///             extension_ref,
     ///         );
     ///     },
@@ -695,7 +695,7 @@ pub(super) mod test {
             const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
             let list_of_var =
                 Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
-            let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo(vec![list_of_var]));
+            let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo([list_of_var]));
 
             let def = ext.add_op(OP_NAME, "desc".into(), type_scheme, extension_ref)?;
             def.add_lower_func(LowerFunc::FixedHugr {
@@ -828,7 +828,7 @@ pub(super) mod test {
                 String::new(),
                 PolyFuncTypeRV::new(
                     vec![TypeBound::Linear.into()],
-                    Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Linear)]),
+                    Signature::new_endo([Type::new_var_use(0, TypeBound::Linear)]),
                 ),
                 extension_ref,
             )?;
@@ -836,7 +836,7 @@ pub(super) mod test {
             let args = [tv.clone().into()];
             let decls = [TypeBound::Copyable.into()];
             def.validate_args(&args, &decls).unwrap();
-            assert_eq!(def.compute_signature(&args), Ok(Signature::new_endo(tv)));
+            assert_eq!(def.compute_signature(&args), Ok(Signature::new_endo([tv])));
             // But not with an external row variable
             let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Copyable).into();
             assert_eq!(
