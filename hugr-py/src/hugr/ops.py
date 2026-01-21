@@ -557,7 +557,7 @@ class ExtOp(AsExtOp):
 
     def used_extensions(self) -> ExtensionRegistry:
         reg = self.outer_signature().used_extensions()
-        reg.add_extension(self._op_def.get_extension())
+        reg.register_updated(self._op_def.get_extension())
         for arg in self.args:
             reg.extend(arg.used_extensions())
         return reg
@@ -627,7 +627,7 @@ class MakeTuple(AsExtOp, _PartialOp):
         from hugr.ext import ExtensionRegistry
 
         reg = ExtensionRegistry()
-        reg.add_extension(std.PRELUDE)
+        reg.register_updated(std.PRELUDE)
         if self._types is not None:
             reg.extend(tys.row_used_extensions(self._types))
 
@@ -693,7 +693,7 @@ class UnpackTuple(AsExtOp, _PartialOp):
         from hugr.ext import ExtensionRegistry
 
         reg = ExtensionRegistry()
-        reg.add_extension(std.PRELUDE)
+        reg.register_updated(std.PRELUDE)
         if self._types is not None:
             reg.extend(tys.row_used_extensions(self._types))
 
