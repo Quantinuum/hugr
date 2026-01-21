@@ -858,8 +858,6 @@ For example, a polymorphic FuncDefn might declare a row variable X of kind
 `Sum([#(X, usize)])`. A call that instantiates said type-parameter with
 `TypeArg::List([usize, unit])` would then have output `Sum([#(usize, unit, usize)])`.
 
-See [Declarative Format](#declarative-format) for more examples.
-
 Note that since a row variable does not have kind Type, it cannot be used as the type of an edge.
 
 ## Extension System
@@ -913,8 +911,8 @@ compiling, and linking C++ code.
 
 We can do something similar in Rust, and we wouldn't even need to parse
 another format, sufficiently nice rust macros/proc\_macros should
-provide a human-friendly-enough definition experience.  However, we also
-provide a declarative YAML format, below.
+provide a human-friendly-enough definition experience.  These extensions can be
+serialized as JSON for use in other tools.
 
 Ultimately though, we cannot avoid the "stringly" type problem if we
 want *runtime* extensibility - extensions that can be specified and used
@@ -922,8 +920,7 @@ at runtime. In many cases this is desirable.
 
 ### Extension Implementation
 
-To strike a balance then, every extension provides declarative structs containing
-named **TypeDef**s and **OpDef**s---see [Declarative Format](#declarative-format).
+Extensions may provide a number of named **TypeDef**s and **OpDef**s.
 These are (potentially polymorphic) definitions of types and operations, respectively---polymorphism arises because both may
 declare any number of TypeParams, as per [Polymorphism](#polymorphism). To use a TypeDef as a type,
 it must be instantiated with TypeArgs appropriate for its TypeParams, and similarly
@@ -948,14 +945,14 @@ introduces the possibility of failure (see full details in [appendix](#appendix-
 When serializing the node, we also serialize the type arguments; we can also serialize
 the resulting (computed) type with the operation, and this will be useful when the type
 is computed by binary code, to allow the operation to be treated opaquely by tools that
-do not have the binary code available. (That is: the YAML definition, including all types
+do not have the binary code available. (That is: the serialized JSON, including all types
 but only OpDefs that do not have binary `compute_signature`, can be sent with the HUGR).
 
 This mechanism allows new operations to be passed through tools that do not understand
 what the operations *do*---that is, new operations may be be defined independently of
 any tool, but without providing any way for the tooling to treat them as anything other
 than a black box. Similarly, tools may understand that operations may consume/produce
-values of new types---whose *existence* is carried in the YAML---but the *semantics*
+values of new types---whose *existence* is carried in the JSON---but the *semantics*
 of each operation and/or type are necessarily specific to both operation *and* tool
 (e.g. compiler or runtime).
 
@@ -977,123 +974,6 @@ Whether a particular OpDef provides binary code for `try_lower` is independent
 of whether it provides a binary `compute_signature`, but it will not generally
 be possible to provide a HUGR for an operation whose type cannot be expressed
 using a polymorphic type scheme.
-
-### Declarative format
-
-The declarative format needs to specify some required data that is
-needed by the compiler to correctly treat the operation (the minimum
-case is opaque operations that should be left untouched). However, we
-wish to also leave it expressive enough to specify arbitrary extra data
-that may be used by compiler extensions. This suggests a flexible
-standard format such as YAML would be suitable. (The internal Rust structs
-may also be used directly.) Here we provide an
-illustrative example:
-
-See [Type System](#type-system) for more on Extensions.
-
-```yaml
-# may need some top level data, e.g. namespace?
-
-# Import other header files to use their custom types
-  # TODO: allow qualified, and maybe locally-scoped
-imports: [Quantum, Array]
-
-extensions:
-- name: MyGates
-  # Declare custom types
-  types:
-  - name: QubitVector
-    description: "A vector of qubits"
-    # Opaque types can take type arguments, with specified names
-    params: [["size", USize]]
-  operations:
-  - name: measure
-    description: "measure a qubit"
-    signature:
-      # The first element of each pair is an optional parameter name.
-      inputs: [[null, Q]]  # Q is defined in Quantum extension
-      outputs: [[null, Q], ["measured", B]]
-  - name: ZZPhase
-    description: "Apply a parametric ZZPhase gate"
-    signature:
-      inputs: [[null, Q], [null, Q], ["angle", Angle]]
-      outputs: [[null, Q], [null, Q]]
-    misc:
-      # extra data that may be used by some compiler passes
-      # and is passed to try_lower and compute_signature
-      equivalent: [0, 1]
-      basis: [Z, Z]
-  - name: SU2
-    description: "One qubit unitary matrix"
-    params: # per-node values passed to the type-scheme interpreter, but not used in signature
-      matrix: Opaque(complex_matrix,2,2)
-    signature:
-      inputs: [[null, Q]]
-      outputs: [[null, Q]]
-  - name: MatMul
-    description: "Multiply matrices of statically-known size"
-    params:  # per-node values passed to type-scheme-interpreter and used in signature
-      i: USize
-      j: USize
-      k: USize
-    signature:
-      inputs: [["a", Array<i>(Array<j>(F64))], ["b", Array<j>(Array<k>(F64))]]
-      outputs: [[null, Array<i>(Array<k>(F64))]]
-      #alternative inputs: [["a", Opaque(complex_matrix,i,j)], ["b", Opaque(complex_matrix,j,k)]]
-      #alternative outputs: [[null, Opaque(complex_matrix,i,k)]]
-  - name: max_float
-    description: "Variable number of inputs"
-    params:
-      n: USize
-    signature:
-      # Where an element of a signature has three subelements, the third is the number of repeats
-      inputs: [[null, F64, n]] # (defaulting to 1 if omitted)
-      outputs: [[null, F64, 1]]
-  - name: ArrayConcat
-    description: "Concatenate two arrays. Extension provides a compute_signature implementation."
-    params:
-      t: Type  # Classic or Quantum
-      i: USize
-      j: USize
-    # inputs could be: Array<i>(t), Array<j>(t)
-    # outputs would be, in principle: Array<i+j>(t)
-    # - but default type scheme interpreter does not support such addition
-    # Hence, no signature block => will look up a compute_signature in registry.
-  - name: TupleConcat
-    description: "Concatenate two tuples"
-    params:
-      a: List[Type]
-      b: List[Type]
-    signature:
-      inputs: [[null, Sum(a)], [null, Sum(b)]] # Sums with single variant are tuples
-      outputs: [[null, Sum([a,b])]] # Tuple of elements of a concatenated with elements of b
-  - name: GraphOp
-    description: "Involves running an argument Graph. E.g. run it some variable number of times."
-    params:
-      - r: ExtensionSet
-    signature:
-      inputs: [[null, Function[r](USize -> USize)], ["arg", USize]]
-      outputs: [[null, USize]]
-      extensions: [r] # Indicates that running this operation also invokes extensions r
-    lowering:
-      file: "graph_op_hugr.bin"
-      extensions: ["arithmetic.int", r] # r is the ExtensionSet in "params"
-```
-
-**Implementation note** Reading this format into Rust is made easy by `serde` and
-[serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
-Serialization section). It is also trivial to serialize these
-definitions in to the overall HUGR serialization format.
-
-Note the only required fields are `name` and `description`. `signature` is optional, but if present
-must have children `inputs` and `outputs`, each lists, and may have `extensions`.
-
-The optional `misc` field is used for arbitrary YAML, which is read in as-is and passed to compiler
- passes and (if no `signature` is present) the`compute_signature` function; e.g. a pass can use the `basis` information to perform commutation.
-
-The optional `params` field can be used to specify the types of static+const arguments to each operation
----for example the matrix needed to define an SU2 operation. If `params` are not specified
-then it is assumed empty.
 
 ## Replacement and Pattern Matching
 
