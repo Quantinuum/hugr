@@ -3,6 +3,8 @@
 import hugr
 import hugr.ops as ops
 import hugr.tys as tys
+from hugr import ext
+
 from hugr.build import Dfg
 from hugr.std.collections.list import List
 from hugr.std.int import INT_T, INT_TYPES_EXTENSION
@@ -73,3 +75,42 @@ def test_type_arguments() -> None:
 
     exts = h.hugr.used_extensions().ids()
     assert set(exts) == {hugr.std.collections.list.EXTENSION.name, "prelude"}
+
+
+def test_op_signature_contains_same_extension() -> None:
+    """Test that used_extensions() works when an op's signature contains
+    types from the same extension as the operation itself.
+
+    Regression test for https://github.com/Quantinuum/hugr/issues/2829
+    """
+
+    # Create an extension with a custom type
+    my_ext = ext.Extension("test.self_referential", ext.Version(0, 1, 0))
+    my_type_def = my_ext.add_type_def(
+        ext.TypeDef(
+            name="MyType",
+            description="A custom type",
+            params=[],
+            bound=ext.ExplicitBound(tys.TypeBound.Copyable),
+        )
+    )
+
+    # Create an ExtType from this extension's type definition
+    my_type = tys.ExtType(my_type_def, args=[])
+
+    # Add an operation to the same extension that uses MyType in its signature
+    my_ext.add_op_def(
+        ext.OpDef(
+            name="ProcessMyType",
+            description="An operation that uses MyType",
+            signature=ext.OpDefSig(tys.FunctionType([my_type], [my_type])),
+        )
+    )
+
+    # Create an ExtOp from this definition
+    op = ops.ExtOp(my_ext.get_op("ProcessMyType"), args=[])
+
+    # This would have failed with ExtensionRegistry.ExtensionExists before the fix
+    # because the signature contains my_type (from my_ext) and we also add my_ext
+    exts = op.used_extensions()
+    assert my_ext.name in exts.ids()
