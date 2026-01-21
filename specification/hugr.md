@@ -375,9 +375,9 @@ flowchart
 
 These provide tail-controlled loops. The dataflow sibling graph within the
 TailLoop-node defines the loop body: this computes a row of outputs, whose
-first element has type `Sum(#Input, #Output)` and the remainder is a row `#Xtra`
+first element has type `Sum(#Input, #Output)` and the remainder is a row `#Extra`
 (perhaps empty). Inputs to the contained graph and to the TailLoop node itself
-are the row `#Input:#Xtra`, where `:` indicates row concatenation (with the row
+are the row `#Input:#Extra`, where `:` indicates row concatenation (with the row
 inside the `Sum`).
 
 Evaluation of the node begins by feeding the node inputs into the child graph
@@ -385,11 +385,11 @@ and evaluating it.  The `Sum` produced by the child graph controls iteration of
 the loop:
 
 - The first variant (`#Input`) means that these values, along with the other
- sibling-graph outputs `#Xtra`, are fed back into the top of the loop,
+ sibling-graph outputs `#Extra`, are fed back into the top of the loop,
  and the body is evaluated again (thus perhaps many times)
 - The second variant (`#Output`) means that evaluation of the `TailLoop` node
  terminates, returning all the values produced as a row of outputs
- `#Output:#Xtra`.
+ `#Output:#Extra`.
 
 ```mermaid
 flowchart TB
@@ -423,15 +423,15 @@ flowchart TB
  1["Other inputs"]
  2["Output"]
  0 -- #Input --> TailLoop
- 1 -- #Xtra --> TailLoop
+ 1 -- #Extra --> TailLoop
  TailLoop -- #Output --> 2
  TI0 -- #Return --> TIT
  TIT -- #Input --> TO0
  TI1 -- #Continue --> TIT1
  TIT1 -- #Output --> TO1
  Case0 ~~~ Case1
- Process L_Process_CO_0@-- #Xtra --> CO
- CI L_CI_Process_0@-- #Input:#Xtra --> Process
+ Process L_Process_CO_0@-- #Extra --> CO
+ CI L_CI_Process_0@-- #Input:#Extra --> Process
  Process L_Process_Conditional_0@-- Sum(#Return,#Continue) --> Conditional
  Conditional -- Sum(#Input,#Output) --> CO
 
