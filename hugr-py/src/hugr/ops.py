@@ -112,8 +112,7 @@ class Op(Protocol):
                 If None, opaque operations and types will raise an error.
 
         Example:
-            >>> import hugr.tys as tys
-            >>> tys.TypeTypeArg(ty=tys.Qubit).used_extensions().ids()
+            >>> Input([tys.Qubit]).used_extensions().ids()
             {'prelude'}
         """
         _, reg = self._resolve_used_extensions(resolve_from)
@@ -493,9 +492,10 @@ class Custom(DataflowOp):
         If extension or operation is not found, returns itself.
         """
         try:
-            op, reg = self._resolve_used_extensions(registry)
-        except UnresolvedExtensionError as _:
+            op, _ = self._resolve_used_extensions(registry)
+        except UnresolvedExtensionError:
             return self
+        assert isinstance(op, ExtOp)
         return op
 
     def _resolve_used_extensions(
@@ -513,7 +513,7 @@ class Custom(DataflowOp):
             ExtensionRegistry.ExtensionNotFound,
         ) as e:
             raise UnresolvedExtensionError(
-                self.op_name, self.extension, registry.ids()
+                self.op_name, self.extension, list(registry.ids())
             ) from e
 
         op = ExtOp(op_def, self.signature, self.args)
@@ -588,16 +588,22 @@ class ExtOp(AsExtOp):
         reg.register_updated(self._op_def.get_extension())
 
         # Signature
-        new_signature = self.signature
+        new_signature: tys.FunctionType | None = self.signature
+        changed = False
         if self.signature is not None:
-            new_signature, sig_reg = self.signature._resolve_used_extensions(registry)
+            resolved_sig, sig_reg = self.signature._resolve_used_extensions(registry)
+            assert isinstance(resolved_sig, tys.FunctionType)
+            new_signature = resolved_sig
             reg.extend(sig_reg)
             if new_signature is not self.signature:
                 changed = True
+        else:
+            # Get extensions from the default signature in the OpDef
+            _, sig_reg = self.outer_signature()._resolve_used_extensions(registry)
+            reg.extend(sig_reg)
 
         # Args
-        new_args = []
-        changed = new_signature is not self.signature
+        new_args: list[tys.TypeArg] = []
         for arg in self.args:
             resolved_arg, arg_reg = arg._resolve_used_extensions(registry)
             new_args.append(resolved_arg)
@@ -1067,7 +1073,9 @@ class DataflowBlock(DfParentOp):
     ) -> tuple[Op, ExtensionRegistry]:
         reg = tys._resolve_typerow_exts_inplace(self.inputs, registry)
         if self._sum is not None:
-            self._sum, sum_reg = self._sum._resolve_used_extensions(registry)
+            resolved_sum, sum_reg = self._sum._resolve_used_extensions(registry)
+            assert isinstance(resolved_sum, tys.Sum)
+            self._sum = resolved_sum
             reg.extend(sum_reg)
         if self._other_outputs is not None:
             reg.extend(tys._resolve_typerow_exts_inplace(self._other_outputs, registry))
@@ -1194,7 +1202,7 @@ class LoadConst(DataflowOp):
         if self._typ is None:
             return (self, ExtensionRegistry())
 
-        self._typ, reg = self._typ_resolve_.used_extensions(registry)
+        self._typ, reg = self._typ._resolve_used_extensions(registry)
         return (self, reg)
 
 
@@ -1259,8 +1267,11 @@ class Conditional(DataflowOp):
     def _resolve_used_extensions(
         self, registry: ExtensionRegistry | None = None
     ) -> tuple[Op, ExtensionRegistry]:
-        self.sum_ty, reg = self.sum_ty._resolve_used_extensions(registry)
-        reg = tys._resolve_typerow_exts_inplace(self.other_inputs, registry)
+        resolved_sum, reg = self.sum_ty._resolve_used_extensions(registry)
+        assert isinstance(resolved_sum, tys.Sum)
+        self.sum_ty = resolved_sum
+
+        reg.extend(tys._resolve_typerow_exts_inplace(self.other_inputs, registry))
         if self._outputs is not None:
             reg.extend(tys._resolve_typerow_exts_inplace(self._outputs, registry))
         return (self, reg)
@@ -1487,7 +1498,9 @@ class FuncDecl(Op):
     def _resolve_used_extensions(
         self, registry: ExtensionRegistry | None = None
     ) -> tuple[Op, ExtensionRegistry]:
-        self.signature, reg = self.signature._resolve_used_extensions(registry)
+        resolved_sig, reg = self.signature._resolve_used_extensions(registry)
+        assert isinstance(resolved_sig, tys.PolyFuncType)
+        self.signature = resolved_sig
         return (self, reg)
 
 
@@ -1547,11 +1560,19 @@ class _CallOrLoad:
 
     def _resolve_used_extensions(
         self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionRegistry]:
-        self.signature, reg = self.signature._resolve_used_extensions(registry)
-        self.instantiation, reg = self.instantiation._resolve_used_extensions(registry)
-        for i, arg in enumerate(self.type_args):
-            self.type_args[i], arg_reg = arg._resolve_used_extensions(registry)
+    ) -> tuple[Self, ExtensionRegistry]:
+        resolved_sig, reg = self.signature._resolve_used_extensions(registry)  # type: ignore[attr-defined]
+        assert isinstance(resolved_sig, tys.PolyFuncType)
+        self.signature = resolved_sig  # type: ignore[attr-defined]
+
+        resolved_inst, inst_reg = self.instantiation._resolve_used_extensions(registry)  # type: ignore[attr-defined]
+        assert isinstance(resolved_inst, tys.FunctionType)
+        self.instantiation = resolved_inst  # type: ignore[attr-defined]
+        reg.extend(inst_reg)
+
+        for i, arg in enumerate(self.type_args):  # type: ignore[attr-defined]
+            resolved_arg, arg_reg = arg._resolve_used_extensions(registry)
+            self.type_args[i] = resolved_arg  # type: ignore[attr-defined]
             reg.extend(arg_reg)
         return (self, reg)
 
@@ -1658,7 +1679,9 @@ class CallIndirect(DataflowOp, _PartialOp):
 
         if self._signature is None:
             return (self, ExtensionRegistry())
-        self._signature, reg = self._signature._resolve_used_extensions(registry)
+        resolved_sig, reg = self._signature._resolve_used_extensions(registry)
+        assert isinstance(resolved_sig, tys.FunctionType)
+        self._signature = resolved_sig
         return (self, reg)
 
 

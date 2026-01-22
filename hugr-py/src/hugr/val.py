@@ -176,7 +176,10 @@ class Sum(Value):
     def _resolve_used_extensions_inplace(
         self, registry: ExtensionRegistry | None = None
     ) -> ExtensionRegistry:
-        self.typ, reg = self.typ._resolve_used_extensions(registry)
+        resolved_typ, reg = self.typ._resolve_used_extensions(registry)
+        assert isinstance(resolved_typ, tys.Sum)
+        self.typ = resolved_typ
+
         for val in self.vals:
             reg.extend(val._resolve_used_extensions_inplace(registry))
         return reg
@@ -358,8 +361,7 @@ class Function(Value):
     def _resolve_used_extensions_inplace(
         self, registry: ExtensionRegistry | None = None
     ) -> ExtensionRegistry:
-        self.body, reg = self.body.used_extensions(registry)
-        return reg
+        return self.body.used_extensions(registry)
 
 
 @dataclass

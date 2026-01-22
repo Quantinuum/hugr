@@ -135,7 +135,13 @@ class Type(Protocol):
     @deprecated("Call `used_extensions` on the hugr instead.")
     def resolve(self, registry: ext.ExtensionRegistry) -> Type:
         """Resolve types in the type using the given registry."""
-        resolved, _ = self._resolve_used_extensions(registry)
+        from hugr.utils import UnresolvedExtensionError
+
+        try:
+            resolved, _ = self._resolve_used_extensions(registry)
+        except UnresolvedExtensionError:
+            return self
+
         return resolved
 
     def to_model(self) -> model.Term | model.Splice:
@@ -980,6 +986,7 @@ class PolyFuncType(Type):
                 changed = True
             reg.extend(param_reg)
         if changed:
+            assert type(resolved_body) is FunctionType
             return (PolyFuncType(new_params, resolved_body), reg)
         return (self, reg)
 
@@ -1099,9 +1106,8 @@ class Opaque(Type):
         try:
             type_def = registry.get_extension(self.extension).get_type(self.id)
         except (ExtensionRegistry.ExtensionNotFound, Extension.TypeNotFound) as e:
-            available_extensions = [] if registry is None else registry.ids()
             raise UnresolvedExtensionError(
-                self.id, self.extension, available_extensions
+                self.id, self.extension, list(registry.ids())
             ) from e
 
         # Successfully got the type_def - resolve to ExtType

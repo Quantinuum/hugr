@@ -94,6 +94,13 @@ class IntVal(val.ExtensionValue):
     def __str__(self) -> str:
         return f"{self.v}"
 
+    def _resolve_used_extensions_inplace(
+        self, registry: ext.ExtensionRegistry | None = None
+    ) -> ext.ExtensionRegistry:
+        reg = ext.ExtensionRegistry()
+        reg.add_extension(INT_TYPES_EXTENSION)
+        return reg
+
     def to_model(self) -> model.Term:
         unsigned = _to_unsigned(self.v, 1 << self.width)
         return model.Apply(

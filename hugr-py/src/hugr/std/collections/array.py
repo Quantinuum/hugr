@@ -96,7 +96,9 @@ class ArrayVal(val.ExtensionValue):
     def _resolve_used_extensions_inplace(
         self, registry: ExtensionRegistry | None = None
     ) -> ExtensionRegistry:
-        self.ty, reg = self.ty._resolve_used_extensions(registry)
+        resolved_ty, reg = self.ty._resolve_used_extensions(registry)
+        assert isinstance(resolved_ty, Array)
+        self.ty = resolved_ty
         for value in self.v:
             reg.extend(value._resolve_used_extensions_inplace(registry))
         return reg

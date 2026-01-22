@@ -1256,4 +1256,5 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Args:
             registry: The extension registry to resolve against.
         """
-        return self.used_extensions(resolve_from=registry)
+        self.used_extensions(resolve_from=registry)
+        return self
