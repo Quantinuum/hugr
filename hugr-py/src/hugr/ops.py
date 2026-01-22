@@ -98,7 +98,9 @@ class Op(Protocol):
             A tuple containing the resolved operation and the set of extensions
             required to define it.
         """
-        ...
+        from hugr.ext import ExtensionRegistry
+
+        return (self, ExtensionRegistry())
 
     def used_extensions(
         self, resolve_from: ExtensionRegistry | None = None
@@ -498,7 +500,7 @@ class Custom(DataflowOp):
 
     def _resolve_used_extensions(
         self, registry: ExtensionRegistry | None = None
-    ) -> tuple[ExtOp, ExtensionRegistry]:
+    ) -> tuple[Op, ExtensionRegistry]:
         from hugr.ext import Extension, ExtensionRegistry
 
         if registry is None:
@@ -509,8 +511,10 @@ class Custom(DataflowOp):
         except (
             Extension.OperationNotFound,
             ExtensionRegistry.ExtensionNotFound,
-        ):
-            return self
+        ) as e:
+            raise UnresolvedExtensionError(
+                self.op_name, self.extension, registry.ids()
+            ) from e
 
         op = ExtOp(op_def, self.signature, self.args)
         return op._resolve_used_extensions(registry)
@@ -578,12 +582,33 @@ class ExtOp(AsExtOp):
     def _resolve_used_extensions(
         self, registry: ExtensionRegistry | None = None
     ) -> tuple[Op, ExtensionRegistry]:
-        self.signature, reg = self.signature._resolve_used_extensions(registry)
+        from hugr.ext import ExtensionRegistry
+
+        reg = ExtensionRegistry()
         reg.register_updated(self._op_def.get_extension())
-        for i, arg in enumerate(self.args):
-            self.args[i], arg_reg = arg._resolve_used_extensions(registry)
+
+        # Signature
+        new_signature = self.signature
+        if self.signature is not None:
+            new_signature, sig_reg = self.signature._resolve_used_extensions(registry)
+            reg.extend(sig_reg)
+            if new_signature is not self.signature:
+                changed = True
+
+        # Args
+        new_args = []
+        changed = new_signature is not self.signature
+        for arg in self.args:
+            resolved_arg, arg_reg = arg._resolve_used_extensions(registry)
+            new_args.append(resolved_arg)
             reg.extend(arg_reg)
-        return (self, reg)
+            if resolved_arg is not arg:
+                changed = True
+
+        if changed:
+            return (ExtOp(self._op_def, new_signature, new_args), reg)
+        else:
+            return (self, reg)
 
 
 class RegisteredOp(AsExtOp):

@@ -121,12 +121,14 @@ def test_op_signature_contains_same_extension() -> None:
 def test_opaque_type_without_resolve() -> None:
     """Test that Opaque types raise UnresolvedExtensionError without resolve_from."""
     with pytest.raises(UnresolvedExtensionError):
-        TEST_TYPE_OPAQUE.used_extensions()
+        TEST_TYPE_OPAQUE._resolve_used_extensions()
 
 
-def test_opaque_type_with_resolve(test_ext_registry: ext.ExtensionRegistry) -> None:
+def test_opaque_type_with_resolve() -> None:
     """Test that Opaque types can be resolved with resolve_from."""
-    exts = TEST_TYPE_OPAQUE.used_extensions(resolve_from=test_ext_registry)
+    test_ext_registry = ext.ExtensionRegistry()
+    test_ext_registry.add_extension(TEST_EXT)
+    _, exts = TEST_TYPE_OPAQUE._resolve_used_extensions(test_ext_registry)
     assert TEST_EXT.name in exts.ids()
 
 
@@ -136,15 +138,15 @@ def test_custom_op_without_resolve() -> None:
         TEST_OP_OPAQUE.used_extensions()
 
 
-def test_custom_op_with_resolve(test_ext_registry: ext.ExtensionRegistry) -> None:
+def test_custom_op_with_resolve() -> None:
     """Test that Custom operations can be resolved with resolve_from."""
+    test_ext_registry = ext.ExtensionRegistry()
+    test_ext_registry.add_extension(TEST_EXT)
     exts = TEST_OP_OPAQUE.used_extensions(resolve_from=test_ext_registry)
     assert TEST_EXT.name in exts.ids()
 
 
-def test_hugr_with_opaque_type_resolve(
-    test_ext_registry: ext.ExtensionRegistry,
-) -> None:
+def test_hugr_with_opaque_type_resolve() -> None:
     """Test that Hugr.used_extensions can resolve opaque types."""
     # Create a DFG with the opaque type
     h = Dfg(TEST_TYPE_OPAQUE)
@@ -156,19 +158,23 @@ def test_hugr_with_opaque_type_resolve(
         h.hugr.used_extensions()
 
     # With resolve_from, should work
+    test_ext_registry = ext.ExtensionRegistry()
+    test_ext_registry.add_extension(TEST_EXT)
     exts = h.hugr.used_extensions(resolve_from=test_ext_registry)
     assert TEST_EXT.name in exts.ids()
 
 
-def test_nested_opaque_type_resolve(test_ext_registry: ext.ExtensionRegistry) -> None:
+def test_nested_opaque_type_resolve() -> None:
     """Test resolution of opaque types nested in Sum types."""
     # Create a Sum type with the opaque type
     sum_ty = tys.Sum([[TEST_TYPE_OPAQUE], [tys.Bool]])
 
     # Without resolve_from, this should raise
     with pytest.raises(UnresolvedExtensionError):
-        sum_ty.used_extensions()
+        sum_ty._resolve_used_extensions()
 
     # With resolve_from, should work
-    exts = sum_ty.used_extensions(resolve_from=test_ext_registry)
+    test_ext_registry = ext.ExtensionRegistry()
+    test_ext_registry.add_extension(TEST_EXT)
+    _, exts = sum_ty._resolve_used_extensions(test_ext_registry)
     assert TEST_EXT.name in exts.ids()
