@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import hugr.tys as tys
 from hugr import val
 from hugr.std import _load_extension
 from hugr.utils import comma_sep_str
+
+if TYPE_CHECKING:
+    from hugr.ext import ExtensionRegistry
 
 EXTENSION = _load_extension("collections.list")
 
@@ -56,3 +60,11 @@ class ListVal(val.ExtensionValue):
 
     def __str__(self) -> str:
         return f"[{comma_sep_str(self.v)}]"
+
+    def _resolve_used_extensions_inplace(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionRegistry:
+        self.ty, reg = self.ty._resolve_used_extensions(registry)
+        for value in self.v:
+            reg.extend(value._resolve_used_extensions_inplace(registry))
+        return reg

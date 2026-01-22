@@ -11,6 +11,19 @@ R = TypeVar("R", bound=Hashable)
 class UnresolvedExtensionError(Exception):
     """Expected element to have resolved extensions. Call `resolve` to ensure this."""
 
+    def __init__(
+        self, operation: str, extension: str, available_extensions: list[str]
+    ) -> None:
+        msg = (
+            f"Operation {operation} requires extension {extension}, "
+            + "but it could not be found in the extension list used during resolution. "
+            + f"The available extensions are: {', '.join(available_extensions)}"
+        )
+        super().__init__(msg)
+        self.operation = operation
+        self.extension = extension
+        self.available_extensions = available_extensions
+
 
 class NotBijection(Exception):
     """Initial map is not a bijection."""

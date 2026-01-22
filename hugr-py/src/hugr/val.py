@@ -14,6 +14,7 @@ from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from hugr.ext import ExtensionRegistry
     from hugr.hugr import Hugr
 
 
@@ -38,6 +39,26 @@ class Value(Protocol):
         ...  # pragma: no cover
 
     def to_model(self) -> model.Term: ...
+
+    def _resolve_used_extensions_inplace(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionRegistry:
+        """Resolve the extensions required to define this value.
+
+        The value is modified in-place.
+
+        Args:
+            registry: A registry to resolve unresolved extensions from.
+                If None, opaque operations and types will raise an error.
+
+        Raises:
+            UnresolvedExtensionError: if the value contains an opaque type
+                or that could not be resolved from the registry.
+
+        Returns:
+            The set of extensions required to define the value.
+        """
+        ...
 
 
 @dataclass
@@ -151,6 +172,14 @@ class Sum(Value):
                 model.Tuple(values),
             ],
         )
+
+    def _resolve_used_extensions_inplace(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionRegistry:
+        self.typ, reg = self.typ._resolve_used_extensions(registry)
+        for val in self.vals:
+            reg.extend(val._resolve_used_extensions_inplace(registry))
+        return reg
 
 
 @dataclass(eq=False, repr=False)
@@ -326,6 +355,12 @@ class Function(Value):
         module = self.body.to_model()
         return model.Func(module.root)
 
+    def _resolve_used_extensions_inplace(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionRegistry:
+        self.body, reg = self.body.used_extensions(registry)
+        return reg
+
 
 @dataclass
 class Extension(Value):
@@ -351,6 +386,12 @@ class Extension(Value):
         type = cast(model.Term, self.typ.to_model())
         json = sops.CustomConst(c=self.name, v=self.val).model_dump_json()
         return model.Apply("compat.const_json", [type, model.Literal(json)])
+
+    def _resolve_used_extensions_inplace(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionRegistry:
+        self.typ, reg = self.typ._resolve_used_extensions(registry)
+        return reg
 
     def __str__(self) -> str:
         return f"{self.name}({self.val})"

@@ -34,7 +34,6 @@ from hugr.ops import (
     Call,
     Conditional,
     Const,
-    Custom,
     DataflowBlock,
     DataflowOp,
     ExitBlock,
@@ -988,16 +987,6 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         else:
             return p.offset
 
-    def resolve_extensions(self, registry: ext.ExtensionRegistry) -> Hugr:
-        """Resolve extension types and operations in the HUGR by matching them to
-        extensions in the registry.
-        """
-        for node in self:
-            op = self[node].op
-            if isinstance(op, Custom):
-                self[node].op = op.resolve(registry)
-        return self
-
     def _connect_df_entrypoint_outputs(self) -> None:
         """If this Hugr was created by wrapping a dataflow operation entrypoint in a
         function, connect the entrypoint outputs to the function outputs.
@@ -1218,12 +1207,26 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
         DotRenderer(config).store(self, filename=filename, format=format, root=root)
 
-    def used_extensions(self) -> ExtensionRegistry:
-        """Get the set of extensions required to define this Hugr.
+    def used_extensions(
+        self, resolve_from: ext.ExtensionRegistry | None = None
+    ) -> ExtensionRegistry:
+        """Get the extensions used by this HUGR, optionally resolving unresolved
+        types and operations.
+
+        This method modifies the HUGR in-place when resolve_from is provided,
+        replacing Custom operations with ExtOp operations and opaque types with
+        ExtType when their extensions are found in the registry.
+
+        Args:
+            resolve_from: Optional extension registry to resolve against.
+                If None, opaque types and Custom ops will raise an error.
 
         Raises:
-            UnresolvedExtensionError: if the Hugr contains an :class:`Opaque` type
-                that has not been resolved. Call :meth:`resolve` first.
+            UnresolvedExtensionError: if the Hugr contains an opaque type
+                or custom operation that could not be resolved.
+
+        Returns:
+            The set of extensions required to define this Hugr.
 
         Example:
             >>> from hugr.build import Dfg
@@ -1232,10 +1235,25 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         """
         from hugr.ext import ExtensionRegistry
 
-        registry = ExtensionRegistry()
+        result = ExtensionRegistry()
 
         for node in self:
-            reg = self[node].op.used_extensions()
-            registry.extend(reg)
+            op = self[node].op
+            # _resolve_used_extensions returns the resolved op and the extensions
+            resolved_op, reg = op._resolve_used_extensions(resolve_from)
+            if resolved_op is not op:
+                self[node].op = resolved_op
+            result.extend(reg)
 
-        return registry
+        return result
+
+    @deprecated("Use `used_extensions` instead.")
+    def resolve_extensions(self, registry: ext.ExtensionRegistry) -> Hugr:
+        """Resolve extension references in the types and operations of the HUGR.
+
+        This is an alias for :meth:`used_extensions` for backwards compatibility.
+
+        Args:
+            registry: The extension registry to resolve against.
+        """
+        return self.used_extensions(resolve_from=registry)

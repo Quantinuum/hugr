@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import hugr.model as model
 from hugr import tys, val
 from hugr.std import _load_extension
 from hugr.utils import comma_sep_str
+
+if TYPE_CHECKING:
+    from hugr.ext import ExtensionRegistry
 
 EXTENSION = _load_extension("collections.borrow_arr")
 
@@ -92,3 +95,11 @@ class BorrowArrayVal(val.ExtensionValue):
                 model.List([value.to_model() for value in self.v]),
             ],
         )
+
+    def _resolve_used_extensions_inplace(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionRegistry:
+        self.ty, reg = self.ty._resolve_used_extensions(registry)
+        for value in self.v:
+            reg.extend(value._resolve_used_extensions_inplace(registry))
+        return reg
