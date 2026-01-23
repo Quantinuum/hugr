@@ -97,7 +97,9 @@ class ArrayVal(val.ExtensionValue):
         self, registry: ExtensionRegistry | None = None
     ) -> ExtensionResolutionResult:
         resolved_ty, result = self.ty._resolve_used_extensions(registry)
-        assert isinstance(resolved_ty, Array)
+        assert isinstance(
+            resolved_ty, Array
+        ), "HUGR internal error, expected resolved type to be array."
         self.ty = resolved_ty
         for value in self.v:
             result.extend(value._resolve_used_extensions_inplace(registry))

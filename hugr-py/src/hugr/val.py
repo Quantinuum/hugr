@@ -173,7 +173,9 @@ class Sum(Value):
         self, registry: ExtensionRegistry | None = None
     ) -> ExtensionResolutionResult:
         resolved_typ, result = self.typ._resolve_used_extensions(registry)
-        assert isinstance(resolved_typ, tys.Sum)
+        assert isinstance(
+            resolved_typ, tys.Sum
+        ), "HUGR internal error, expected resolved type to be sum."
         self.typ = resolved_typ
 
         for val in self.vals:

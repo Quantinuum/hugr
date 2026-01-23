@@ -595,7 +595,9 @@ class ExtOp(AsExtOp):
         new_signature: tys.FunctionType | None = self.signature
         if self.signature is not None:
             resolved_sig, sig_result = self.signature._resolve_used_extensions(registry)
-            assert isinstance(resolved_sig, tys.FunctionType)
+            assert isinstance(
+                resolved_sig, tys.FunctionType
+            ), "HUGR internal error, expected resolved signature to be function type."
             new_signature = resolved_sig
             result.extend(sig_result)
         else:
@@ -1067,7 +1069,9 @@ class DataflowBlock(DfParentOp):
         result = tys._resolve_typerow_exts_inplace(self.inputs, registry)
         if self._sum is not None:
             resolved_sum, sum_result = self._sum._resolve_used_extensions(registry)
-            assert isinstance(resolved_sum, tys.Sum)
+            assert isinstance(
+                resolved_sum, tys.Sum
+            ), "HUGR internal error, expected resolved type to be sum."
             self._sum = resolved_sum
             result.extend(sum_result)
         if self._other_outputs is not None:
@@ -1265,7 +1269,9 @@ class Conditional(DataflowOp):
         self, registry: ExtensionRegistry | None = None
     ) -> tuple[Op, ExtensionResolutionResult]:
         resolved_sum, result = self.sum_ty._resolve_used_extensions(registry)
-        assert isinstance(resolved_sum, tys.Sum)
+        assert isinstance(
+            resolved_sum, tys.Sum
+        ), "HUGR internal error, expected resolved type to be sum."
         self.sum_ty = resolved_sum
 
         result.extend(tys._resolve_typerow_exts_inplace(self.other_inputs, registry))
@@ -1500,7 +1506,9 @@ class FuncDecl(Op):
         self, registry: ExtensionRegistry | None = None
     ) -> tuple[Op, ExtensionResolutionResult]:
         resolved_sig, result = self.signature._resolve_used_extensions(registry)
-        assert isinstance(resolved_sig, tys.PolyFuncType)
+        assert isinstance(
+            resolved_sig, tys.PolyFuncType
+        ), "HUGR internal error, expected resolved signature to be poly function type."
         self.signature = resolved_sig
         return (self, result)
 
@@ -1563,13 +1571,17 @@ class _CallOrLoad:
         self, registry: ExtensionRegistry | None = None
     ) -> tuple[Self, ExtensionResolutionResult]:
         resolved_sig, result = self.signature._resolve_used_extensions(registry)
-        assert isinstance(resolved_sig, tys.PolyFuncType)
+        assert isinstance(
+            resolved_sig, tys.PolyFuncType
+        ), "HUGR internal error, expected resolved signature to be poly function type."
         self.signature = resolved_sig  # type: ignore[attr-defined]
 
         resolved_inst, inst_result = self.instantiation._resolve_used_extensions(
             registry
         )
-        assert isinstance(resolved_inst, tys.FunctionType)
+        assert isinstance(
+            resolved_inst, tys.FunctionType
+        ), "HUGR internal error, expected resolved instantiation to be function type."
         self.instantiation = resolved_inst
         result.extend(inst_result)
 
@@ -1683,7 +1695,9 @@ class CallIndirect(DataflowOp, _PartialOp):
         if self._signature is None:
             return (self, ExtensionResolutionResult())
         resolved_sig, result = self._signature._resolve_used_extensions(registry)
-        assert isinstance(resolved_sig, tys.FunctionType)
+        assert isinstance(
+            resolved_sig, tys.FunctionType
+        ), "HUGR internal error, expected resolved signature to be function type."
         self._signature = resolved_sig
         return (self, result)
 
