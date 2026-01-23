@@ -71,6 +71,7 @@ pub trait IOTrait {
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct Input {
     /// Input value types
+    #[serde(with="crate::types::serialize::ser_type_row")]
     pub types: TypeRow,
 }
 
@@ -89,6 +90,7 @@ impl IOTrait for Input {
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct Output {
     /// Output value types
+    #[serde(with="crate::types::serialize::ser_type_row")]
     pub types: TypeRow,
 }
 

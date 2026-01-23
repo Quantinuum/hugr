@@ -14,10 +14,13 @@ use super::{OpTrait, StaticTag, impl_op_name};
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct TailLoop {
     /// Types that are only input
+    #[serde(with="crate::types::serialize::ser_type_row")]
     pub just_inputs: TypeRow,
     /// Types that are only output
+    #[serde(with="crate::types::serialize::ser_type_row")]
     pub just_outputs: TypeRow,
     /// Types that are appended to both input and output
+    #[serde(with="crate::types::serialize::ser_type_row")]
     pub rest: TypeRow,
 }
 
@@ -92,8 +95,10 @@ pub struct Conditional {
     /// The possible rows of the Sum input
     pub sum_rows: Vec<TypeRow>,
     /// Remaining input types
+    #[serde(with="crate::types::serialize::ser_type_row")]
     pub other_inputs: TypeRow,
     /// Output types
+    #[serde(with="crate::types::serialize::ser_type_row")]
     pub outputs: TypeRow,
 }
 impl_op_name!(Conditional);
@@ -163,7 +168,9 @@ impl DataflowOpTrait for CFG {
 /// A CFG basic block node. The signature is that of the internal Dataflow graph.
 #[allow(missing_docs)]
 pub struct DataflowBlock {
+    #[serde(with="crate::types::serialize::ser_type_row")]
     pub inputs: TypeRow,
+    #[serde(with="crate::types::serialize::ser_type_row")]
     pub other_outputs: TypeRow,
     pub sum_rows: Vec<TypeRow>,
 }
