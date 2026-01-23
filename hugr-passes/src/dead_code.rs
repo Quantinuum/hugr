@@ -7,6 +7,7 @@ use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
 use crate::ComposablePass;
+use crate::composable::Scoped;
 
 /// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
@@ -169,6 +170,8 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         res
     }
 }
+
+impl<H: HugrMut> Scoped for DeadCodeElimPass<H> {}
 
 impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
     type Error = DeadCodeElimError<H::Node>;

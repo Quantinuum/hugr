@@ -11,6 +11,7 @@ use itertools::Itertools;
 use petgraph::visit::Walker;
 
 use crate::ComposablePass;
+use crate::composable::Scoped;
 
 /// A pass for removing order edges in a Hugr region that are already implied by
 /// other order or dataflow dependencies.
@@ -162,6 +163,8 @@ impl RedundantOrderEdgesPass {
         Ok(RedundantOrderEdgesResult { edges_removed })
     }
 }
+
+impl Scoped for RedundantOrderEdgesPass {}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for RedundantOrderEdgesPass {
     type Error = HugrError;
