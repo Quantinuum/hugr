@@ -8,7 +8,7 @@ use hugr_core::{
     types::{EdgeKind, Type},
 };
 
-use crate::ComposablePass;
+use crate::{ComposablePass, composable::Scoped};
 
 mod localize;
 use localize::ExtraSourceReqs;
@@ -21,6 +21,8 @@ pub struct LocalizeEdges;
 #[derive(derive_more::Error, derive_more::Display, derive_more::From, Debug, PartialEq)]
 #[non_exhaustive]
 pub enum LocalizeEdgesError {}
+
+impl Scoped for LocalizeEdges {}
 
 impl<H: HugrMut> ComposablePass<H> for LocalizeEdges {
     type Error = LocalizeEdgesError;

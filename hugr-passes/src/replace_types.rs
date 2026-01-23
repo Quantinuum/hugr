@@ -26,6 +26,7 @@ use hugr_core::types::{
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Wire};
 
 use crate::ComposablePass;
+use crate::composable::Scoped;
 
 mod linearize;
 pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linearizer};
@@ -759,6 +760,8 @@ impl ReplaceTypes {
         Ok(())
     }
 }
+
+impl Scoped for ReplaceTypes {}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
     type Error = ReplaceTypesError;

@@ -13,8 +13,8 @@ use hugr_core::{
 use hugr_core::hugr::{HugrView, OpType, hugrmut::HugrMut};
 use itertools::Itertools as _;
 
-use crate::ComposablePass;
 use crate::composable::{ValidatePassError, validate_if_test};
+use crate::{ComposablePass, composable::Scoped};
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
@@ -198,6 +198,8 @@ fn instantiate(
 /// whenever the names of their parents are unique, but this is not guaranteed.
 #[derive(Debug, Clone)]
 pub struct MonomorphizePass;
+
+impl Scoped for MonomorphizePass {}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for MonomorphizePass {
     type Error = Infallible;

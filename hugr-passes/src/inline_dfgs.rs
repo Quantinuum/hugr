@@ -10,13 +10,15 @@ use hugr_core::{
 };
 use itertools::Itertools;
 
-use crate::ComposablePass;
+use crate::{ComposablePass, composable::Scoped};
 
 /// Inlines all DFG nodes nested below the entrypoint.
 ///
 /// See [InlineDFG] for a rewrite to inline single DFGs.
 #[derive(Debug, Clone)]
 pub struct InlineDFGsPass;
+
+impl Scoped for InlineDFGsPass {}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for InlineDFGsPass {
     type Error = Infallible;
