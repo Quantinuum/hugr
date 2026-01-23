@@ -8,7 +8,6 @@ use std::any::Any;
 use std::hash::{Hash, Hasher};
 
 use downcast_rs::{Downcast, impl_downcast};
-use serde_with::serde_as;
 use thiserror::Error;
 
 use crate::IncomingPort;
@@ -172,11 +171,10 @@ fn deserialize_dyn_custom_const(
 impl_downcast!(CustomConst);
 impl_box_clone!(CustomConst, CustomConstBoxClone);
 
-#[serde_as]
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// A constant value stored as a serialized blob that can report its own type.
 pub struct CustomSerialized {
-    #[serde_as(as = "crate::types::serialize::SerSimpleType")]
+    #[serde(with = "crate::types::serialize::sertype")]
     typ: Type,
     value: serde_json::Value,
 }
