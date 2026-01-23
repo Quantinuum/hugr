@@ -266,3 +266,24 @@ pub(crate) mod sertype {
         Ok(sertype.into())
     }
 }
+
+pub(crate) mod ser_type_row {
+    use itertools::Itertools as _;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    use super::SerSimpleType;
+    use crate::types::{Term, TypeRow};
+
+    pub fn serialize<S: Serializer>(tys: &TypeRow, s: S) -> Result<S::Ok, S::Error> {
+        let items = tys.into_iter().map(|ty|
+            ty.clone().try_into().unwrap()).collect::<Vec<SerSimpleType>>();
+        items.serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deser: D) -> Result<TypeRow, D::Error> {
+        let sertypes: Vec<SerSimpleType> = Deserialize::deserialize(deser)?;
+        Ok(TypeRow::from(
+            sertypes.into_iter().map_into().collect::<Vec<Term>>()
+        ))
+    }
+}

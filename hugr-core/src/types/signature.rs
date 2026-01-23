@@ -26,11 +26,13 @@ pub struct Signature {
     ///
     /// Each *element* must [check_term_type] against [Term::RuntimeType] of
     /// [TypeBound::Linear], hence the arity is fixed as the length of the row.
+    #[serde(with = "crate::types::serialize::ser_type_row")]
     pub input: TypeRow,
     /// Value outputs of the function.
     ///
     /// /// Each *element* must [check_term_type] against [Term::RuntimeType] of
     /// [TypeBound::Linear], hence the arity is fixed as the length of the row.
+    #[serde(with = "crate::types::serialize::ser_type_row")]
     pub output: TypeRow,
 }
 
