@@ -1247,11 +1247,11 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
         return result
 
-    @deprecated("Use `used_extensions` instead.")
     def resolve_extensions(self, registry: ext.ExtensionRegistry) -> Hugr:
         """Resolve extension references in the types and operations of the HUGR.
 
-        This is an alias for :meth:`used_extensions` for backwards compatibility.
+        This is an alias for :meth:`used_extensions` that discards the computed
+        extensions.
 
         Args:
             registry: The extension registry to resolve against.
