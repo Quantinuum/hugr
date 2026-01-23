@@ -14,7 +14,6 @@ use hugr_core::{HugrView, Node, SimpleReplacement};
 use itertools::Itertools;
 
 use crate::ComposablePass;
-use crate::composable::Scoped;
 
 /// Configuration enum for the untuple rewrite pass.
 ///
@@ -123,8 +122,6 @@ impl UntuplePass {
         res
     }
 }
-
-impl Scoped for UntuplePass {}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for UntuplePass {
     type Error = UntupleError;
