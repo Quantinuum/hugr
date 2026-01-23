@@ -9,7 +9,7 @@ use super::custom::CustomType;
 use crate::extension::SignatureError;
 use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
-use crate::types::type_param::{TermTypeError, TermVar, UpperBound};
+use crate::types::type_param::{SeqPart, TermTypeError, TermVar, UpperBound};
 use crate::types::{Term, Type};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -287,36 +287,60 @@ pub(crate) mod ser_type_row {
     }
 }
 
+fn term_to_ssts(t: Term) -> Vec<SerSimpleType> {
+    t.into_list_parts()
+        .map(|part| match part {
+            SeqPart::Item(t) => {
+                let s = SerSimpleType::try_from(t).unwrap();
+                assert!(!matches!(s, SerSimpleType::R { .. }));
+                s
+            }
+            SeqPart::Splice(t) => {
+                let s = SerSimpleType::try_from(t).unwrap();
+                assert!(matches!(s, SerSimpleType::R { .. }));
+                s
+            }
+        })
+        .collect()
+}
+
+fn term_from_ssts(items: Vec<SerSimpleType>) -> Term {
+    let list_parts = items.into_iter().map(|s| match s {
+        SerSimpleType::R { i, b } => SeqPart::Splice(Term::new_row_var_use(i, b)),
+        s => SeqPart::Item(Term::from(s)),
+    });
+    Term::new_list_from_parts(list_parts)
+}
+
 pub(crate) mod ser_type_row_rv {
-    use crate::types::{Term, serialize::SerSimpleType, type_param::SeqPart};
+    use super::{SerSimpleType, term_from_ssts, term_to_ssts};
+    use crate::types::Term;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
     pub fn serialize<S: Serializer>(tys: &Term, s: S) -> Result<S::Ok, S::Error> {
-        let items = tys
-            .clone()
-            .into_list_parts()
-            .map(|part| match part {
-                SeqPart::Item(t) => {
-                    let s = SerSimpleType::try_from(t).unwrap();
-                    assert!(!matches!(s, SerSimpleType::R { .. }));
-                    s
-                }
-                SeqPart::Splice(t) => {
-                    let s = SerSimpleType::try_from(t).unwrap();
-                    assert!(matches!(s, SerSimpleType::R { .. }));
-                    s
-                }
-            })
-            .collect::<Vec<SerSimpleType>>();
-        items.serialize(s)
+        term_to_ssts(tys.clone()).serialize(s)
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(deser: D) -> Result<Term, D::Error> {
         let sertypes: Vec<SerSimpleType> = Deserialize::deserialize(deser)?;
-        let list_parts = sertypes.into_iter().map(|s| match s {
-            SerSimpleType::R { i, b } => SeqPart::Splice(Term::new_row_var_use(i, b)),
-            s => SeqPart::Item(Term::from(s)),
-        });
-        Ok(Term::new_list_from_parts(list_parts))
+        Ok(term_from_ssts(sertypes))
+    }
+}
+
+pub(crate) mod ser_sum_rows {
+    use super::{SerSimpleType, term_from_ssts, term_to_ssts};
+    use crate::types::TypeRow;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(rows: &TypeRow, s: S) -> Result<S::Ok, S::Error> {
+        let rows: Vec<Vec<SerSimpleType>> = rows.into_iter().cloned().map(term_to_ssts).collect();
+        rows.serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deser: D) -> Result<TypeRow, D::Error> {
+        let rows: Vec<Vec<SerSimpleType>> = Deserialize::deserialize(deser)?;
+        Ok(TypeRow::from(
+            rows.into_iter().map(term_from_ssts).collect::<Vec<_>>(),
+        ))
     }
 }

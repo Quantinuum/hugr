@@ -186,6 +186,7 @@ pub struct GeneralSum {
     //`Term::ListType(Term::ListType(Term::RuntimeType))`, but then many functions like
     // `len` and `variants` would be impossible. (We might want a separate "FixedAritySum"
     // rust type supporting those, with try_from(SumType).)
+    #[serde(with = "crate::types::serialize::ser_sum_rows")]
     rows: TypeRow,
     /// Caches the bound. Falls back to [TypeBound::Linear] if any are not even runtime types
     /// (this is checked in validation)
