@@ -15,15 +15,12 @@ use hugr_core::{
 };
 use value_handle::ValueHandle;
 
+use crate::dataflow::{
+    ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
+    partial_from_const,
+};
 use crate::dead_code::{DeadCodeElimError, DeadCodeElimPass, PreserveNode};
 use crate::{ComposablePass, composable::validate_if_test};
-use crate::{
-    composable::Scoped,
-    dataflow::{
-        ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
-        partial_from_const,
-    },
-};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
@@ -91,8 +88,6 @@ impl ConstantFoldPass {
         self
     }
 }
-
-impl Scoped for ConstantFoldPass {}
 
 impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
     type Error = ConstFoldError;

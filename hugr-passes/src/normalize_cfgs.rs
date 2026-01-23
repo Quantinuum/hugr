@@ -19,7 +19,6 @@ use hugr_core::ops::{
 use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 
 use crate::ComposablePass;
-use crate::composable::Scoped;
 
 /// Merge any basic blocks that are direct children of the specified [`CFG`]-entrypoint
 /// Hugr.
@@ -117,8 +116,6 @@ impl<N> NormalizeCFGPass<N> {
         &mut self.cfgs
     }
 }
-
-impl<H> Scoped for NormalizeCFGPass<H> {}
 
 impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
     type Error = NormalizeCFGError;

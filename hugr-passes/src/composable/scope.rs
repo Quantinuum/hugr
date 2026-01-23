@@ -89,31 +89,6 @@ pub enum PassScope {
     PreserveEntrypoint,
 }
 
-/// Trait for things (typically [ComposablePass]es) that can be assigned a [PassScope]
-///
-/// [ComposablePass]: super::ComposablePass
-pub trait Scoped: Sized {
-    /// Set the scope configuration used to run the pass.
-    ///
-    /// See [`PassScope`] for more details.
-    ///
-    /// In `hugr 0.25.*`, this configuration is only a guidance, and may be
-    /// ignored by the pass by using the default implementation.
-    ///
-    /// From `hugr >=0.26.0`, passes must respect the scope configuration.
-    //
-    // For hugr passes, this is tracked by <https://github.com/Quantinuum/hugr/issues/2771>
-    fn with_scope(self, scope: &PassScope) -> Self {
-        // Currently passes are not required to respect the scope configuration.
-        // <https://github.com/Quantinuum/hugr/issues/2771>
-        //
-        // deprecated: Remove default implementation in hugr 0.26.0,
-        // ensure all passes follow the scope configuration.
-        let _ = scope;
-        self
-    }
-}
-
 /// Whether a pass may modify a particular node
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
 pub enum InScope {

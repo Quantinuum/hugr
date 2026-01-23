@@ -12,7 +12,7 @@ use petgraph::visit::{Dfs, Walker};
 
 use crate::{
     ComposablePass,
-    composable::{Scoped, ValidatePassError, validate_if_test},
+    composable::{ValidatePassError, validate_if_test},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -68,8 +68,6 @@ impl RemoveDeadFuncsPass {
         self
     }
 }
-
-impl Scoped for RemoveDeadFuncsPass {}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
     type Error = RemoveDeadFuncsError;
