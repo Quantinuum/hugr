@@ -4,17 +4,135 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 
-use crate::{extension::SignatureError, types::FuncValueType};
+use crate::extension::SignatureError;
+use crate::types::{FuncValueType, Signature};
 
-use super::signature::FuncTypeBase;
 use super::type_param::{TypeArg, TypeParam, check_term_types};
-use super::{Substitutable, Substitution, Term, TypeRow};
+use super::{Substitutable, Substitution};
 
-/// A polymorphic type scheme, i.e. of a [`FuncDecl`], [`FuncDefn`] or [`OpDef`].
+/// A polymorphic type scheme, for a function ([`FuncDecl`] or [`FuncDefn`]).
+/// Number of inputs and outputs fixed (no row variables) so that [`Input`]
+/// and [`Output`] nodes can be wired up.
+///
+/// [`FuncDefn`]: crate::ops::FuncDefn
+/// [`FuncDecl`]: crate::ops::FuncDecl
+/// [`Input`]: crate::ops::Input
+/// [`Output`]: crate::ops::Output
+
+#[derive(
+    Clone,
+    PartialEq,
+    Debug,
+    Default,
+    Eq,
+    Hash,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+#[display("{}{body}", self.display_params())]
+pub struct PolyFuncType {
+    /// The declared type parameters, i.e., these must be instantiated with
+    /// the same number of [`TypeArg`]s before the function can be called. This
+    /// defines the indices used by variables inside the body.
+    params: Vec<TypeParam>,
+    /// Template for the function. May contain variables up to length of [`Self::params`]
+    body: Signature,
+}
+
+macro_rules! poly_func_type_general {
+    ($pf: ty, $ft: ty) => {
+        impl From<$ft> for $pf {
+            fn from(body: $ft) -> Self {
+                Self {
+                    params: vec![],
+                    body,
+                }
+            }
+        }
+
+        impl TryFrom<$pf> for $ft {
+            /// If this PolyfuncType(RV) is not monomorphic, fail with its binders
+            type Error = Vec<TypeParam>;
+
+            fn try_from(value: $pf) -> Result<Self, Self::Error> {
+                if value.params.is_empty() {
+                    Ok(value.body)
+                } else {
+                    Err(value.params)
+                }
+            }
+        }
+
+        impl $pf {
+            /// The type parameters, aka binders, over which this type is polymorphic
+            pub fn params(&self) -> &[TypeParam] {
+                &self.params
+            }
+
+            /// The body of the type, a function type.
+            pub fn body(&self) -> &$ft {
+                &self.body
+            }
+
+            /// Create a new `PolyFuncType`(`RV``) given the kinds of the variables it declares
+            /// and the underlying [$ft]
+            pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<$ft>) -> Self {
+                Self {
+                    params: params.into(),
+                    body: body.into(),
+                }
+            }
+
+            /// Helper function for the Display implementation
+            fn display_params(&self) -> Cow<'static, str> {
+                if self.params.is_empty() {
+                    return Cow::Borrowed("");
+                }
+                let params_list = self
+                    .params
+                    .iter()
+                    .enumerate()
+                    .map(|(i, param)| format!("(#{i} : {param})"))
+                    .join(" ");
+                Cow::Owned(format!("∀ {params_list}. ",))
+            }
+
+            /// Returns a mutable reference to the body of the function type.
+            pub fn body_mut(&mut self) -> &mut $ft {
+                &mut self.body
+            }
+
+            /// Instantiates a PolyFuncType(RV) (with no free variables,
+            /// as ensured by [`Self::validate`]), into a monomorphic type.
+            ///
+            /// # Errors
+            /// If there is not exactly one [`TypeArg`] for each binder ([`Self::params`]),
+            /// or an arg does not fit into its corresponding [`TypeParam`]
+            pub fn instantiate(&self, args: &[TypeArg]) -> Result<$ft, SignatureError> {
+                // Check that args are applicable, and that we have a value for each binder,
+                // i.e. each possible free variable within the body.
+                check_term_types(args, &self.params)?;
+                Ok(self.body.substitute(&Substitution(args)))
+            }
+
+            /// Validates this instance, checking that the types in the body are
+            /// wellformed with respect to the registry, and the type variables declared.
+            pub fn validate(&self) -> Result<(), SignatureError> {
+                self.body.validate(&self.params)
+            }
+        }
+    };
+}
+
+poly_func_type_general!(PolyFuncType, Signature);
+
+/// The polymorphic type of an [`OpDef`], whose number of input and outputs may vary,
+/// as the inputs and outputs may include variables ranging over lists of types
+/// which may be instantiated with different numbers of types.
+///
 /// (Nodes/operations in the Hugr are not polymorphic.)
 ///
-/// [`FuncDecl`]: crate::ops::module::FuncDecl
-/// [`FuncDefn`]: crate::ops::module::FuncDefn
 /// [`OpDef`]: crate::extension::OpDef
 #[derive(
     Clone,
@@ -28,45 +146,13 @@ use super::{Substitutable, Substitution, Term, TypeRow};
     serde::Deserialize,
 )]
 #[display("{}{body}", self.display_params())]
-pub struct PolyFuncTypeBase<T> {
+pub struct PolyFuncTypeRV {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [`TypeArg`]s before the function can be called. This
     /// defines the indices used by variables inside the body.
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [`Self::params`]
-    body: FuncTypeBase<T>,
-}
-
-impl Default for PolyFuncTypeRV {
-    fn default() -> Self {
-        Self {
-            params: vec![],
-            body: FuncValueType::default(),
-        }
-    }
-}
-
-/// The polymorphic type of a [`Call`]-able function ([`FuncDecl`] or [`FuncDefn`]).
-/// Number of inputs and outputs fixed.
-///
-/// [`Call`]: crate::ops::Call
-/// [`FuncDefn`]: crate::ops::FuncDefn
-/// [`FuncDecl`]: crate::ops::FuncDecl
-pub type PolyFuncType = PolyFuncTypeBase<TypeRow>;
-
-/// The polymorphic type of an [`OpDef`], whose number of input and outputs
-/// may vary according to how [`RowVariable`]s therein are instantiated.
-///
-/// [`OpDef`]: crate::extension::OpDef
-pub type PolyFuncTypeRV = PolyFuncTypeBase<Term>;
-
-impl<T> From<FuncTypeBase<T>> for PolyFuncTypeBase<T> {
-    fn from(body: FuncTypeBase<T>) -> Self {
-        Self {
-            params: vec![],
-            body,
-        }
-    }
+    body: FuncValueType,
 }
 
 impl From<PolyFuncType> for PolyFuncTypeRV {
@@ -78,89 +164,7 @@ impl From<PolyFuncType> for PolyFuncTypeRV {
     }
 }
 
-impl<T> TryFrom<PolyFuncTypeBase<T>> for FuncTypeBase<T> {
-    /// If the `PolyFuncTypeBase` is not monomorphic, fail with its binders
-    type Error = Vec<TypeParam>;
-
-    fn try_from(value: PolyFuncTypeBase<T>) -> Result<Self, Self::Error> {
-        if value.params.is_empty() {
-            Ok(value.body)
-        } else {
-            Err(value.params)
-        }
-    }
-}
-
-impl<T> PolyFuncTypeBase<T> {
-    /// The type parameters, aka binders, over which this type is polymorphic
-    pub fn params(&self) -> &[TypeParam] {
-        &self.params
-    }
-
-    /// The body of the type, a function type.
-    pub fn body(&self) -> &FuncTypeBase<T> {
-        &self.body
-    }
-
-    /// Create a new `PolyFuncTypeBase` given the kinds of the variables it declares
-    /// and the underlying [`FuncTypeBase`].
-    pub fn new(params: impl Into<Vec<TypeParam>>, body: impl Into<FuncTypeBase<T>>) -> Self {
-        Self {
-            params: params.into(),
-            body: body.into(),
-        }
-    }
-
-    /// Helper function for the Display implementation
-    fn display_params(&self) -> Cow<'static, str> {
-        if self.params.is_empty() {
-            return Cow::Borrowed("");
-        }
-        let params_list = self
-            .params
-            .iter()
-            .enumerate()
-            .map(|(i, param)| format!("(#{i} : {param})"))
-            .join(" ");
-        Cow::Owned(format!("∀ {params_list}. ",))
-    }
-
-    /// Returns a mutable reference to the body of the function type.
-    pub fn body_mut(&mut self) -> &mut FuncTypeBase<T> {
-        &mut self.body
-    }
-}
-
-impl<T: Substitutable> PolyFuncTypeBase<T> {
-    /// Instantiates an outer [`PolyFuncTypeBase`], i.e. with no free variables
-    /// (as ensured by [`Self::validate`]), into a monomorphic type.
-    ///
-    /// # Errors
-    /// If there is not exactly one [`TypeArg`] for each binder ([`Self::params`]),
-    /// or an arg does not fit into its corresponding [`TypeParam`]
-    pub fn instantiate(&self, args: &[TypeArg]) -> Result<FuncTypeBase<T>, SignatureError> {
-        // Check that args are applicable, and that we have a value for each binder,
-        // i.e. each possible free variable within the body.
-        check_term_types(args, &self.params)?;
-        Ok(self.body.substitute(&Substitution(args)))
-    }
-}
-
-impl PolyFuncType {
-    /// Validates this instance, checking that the types in the body are
-    /// wellformed with respect to the registry, and the type variables declared.
-    pub fn validate(&self) -> Result<(), SignatureError> {
-        self.body.validate(&self.params)
-    }
-}
-
-impl PolyFuncTypeRV {
-    /// Validates this instance, checking that the types in the body are
-    /// wellformed with respect to the registry, and the type variables declared.
-    pub fn validate(&self) -> Result<(), SignatureError> {
-        self.body.validate(&self.params)
-    }
-}
+poly_func_type_general!(PolyFuncTypeRV, FuncValueType);
 
 #[cfg(test)]
 pub(crate) mod test {
