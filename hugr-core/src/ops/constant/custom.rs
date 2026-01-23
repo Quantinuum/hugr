@@ -8,6 +8,7 @@ use std::any::Any;
 use std::hash::{Hash, Hasher};
 
 use downcast_rs::{Downcast, impl_downcast};
+use serde::{Deserialize, Deserializer};
 use thiserror::Error;
 
 use crate::IncomingPort;
@@ -174,7 +175,7 @@ impl_box_clone!(CustomConst, CustomConstBoxClone);
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// A constant value stored as a serialized blob that can report its own type.
 pub struct CustomSerialized {
-    #[serde(serialize_with = "into_sertype")]
+    #[serde(serialize_with = "into_sertype", deserialize_with = "from_sertype")]
     typ: Type,
     value: serde_json::Value,
 }
@@ -184,6 +185,11 @@ fn into_sertype<S: serde::Serializer>(ty: &Type, s: S) -> Result<S::Ok, S::Error
     crate::types::serialize::SerSimpleType::try_from(ty.clone())
         .unwrap()
         .serialize(s)
+}
+
+fn from_sertype<'de, D: Deserializer<'de>>(deser: D) -> Result<Type, D::Error> {
+    let sertype: crate::types::serialize::SerSimpleType = Deserialize::deserialize(deser)?;
+    Ok(sertype.into())
 }
 
 #[derive(Debug, Error)]
