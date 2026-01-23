@@ -1070,13 +1070,17 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return hugr
 
     @staticmethod
-    def from_bytes(envelope: bytes) -> Hugr:
+    def from_bytes(
+        envelope: bytes, extensions: ExtensionRegistry | None = None
+    ) -> Hugr:
         """Deserialize a byte string to a Hugr object.
 
         Some envelope formats can be read from a string. See :meth:`from_str`.
 
         Args:
             envelope: The byte string representing a Hugr envelope.
+            extensions: If not None, an extension registry to resolve the custom
+                operations and types.
 
         Returns:
             The deserialized Hugr object.
@@ -1084,17 +1088,23 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Raises:
             ValueError: If the envelope does not contain exactly one module.
         """
-        return read_envelope_hugr(envelope)
+        hugr = read_envelope_hugr(envelope)
+        if extensions is not None:
+            # TODO: This can be done during deserialization
+            hugr.resolve_extensions(extensions)
+        return hugr
 
     @staticmethod
-    def from_str(envelope: str) -> Hugr:
+    def from_str(envelope: str, extensions: ExtensionRegistry | None = None) -> Hugr:
         """Deserialize a string to a Hugr object.
 
-        Not all envelope formats can be read from a string.
-        See :meth:`from_bytes` for a more general method.
+        Not all envelope formats can be read from a string. See
+        :meth:`from_bytes` for a more general method.
 
         Args:
             envelope: The string representing a Hugr envelope.
+            extensions: If not None, an extension registry to resolve the custom
+                operations and types.
 
         Returns:
             The deserialized Hugr object.
@@ -1102,7 +1112,11 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Raises:
             ValueError: If the envelope does not contain exactly one module.
         """
-        return read_envelope_hugr_str(envelope)
+        hugr = read_envelope_hugr_str(envelope)
+        if extensions is not None:
+            # TODO: This can be done during deserialization
+            hugr.resolve_extensions(extensions)
+        return hugr
 
     @staticmethod
     def from_model(module: model.Module) -> Hugr:
