@@ -1,7 +1,6 @@
 //! Abstract and concrete Signature types.
 
 use itertools::Either;
-use serde_with::serde_as;
 
 use std::fmt::{self, Display};
 
@@ -48,7 +47,6 @@ pub struct Signature {
 /// on wires of a Hugr (see [`Type::new_function`]) but not a valid node type.
 ///
 /// [`OpDef`]: crate::extension::OpDef
-#[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FuncValueType {
     /// Value inputs of the function.
@@ -57,7 +55,7 @@ pub struct FuncValueType {
     /// hence there may be variables ranging over lists of types, and so the
     /// arity may vary according to the length of list with whose those variables
     /// are instantiated.
-    #[serde_as(as = "Vec<crate::types::serialize::SerSimpleType>")]
+    #[serde(with = "crate::types::serialize::ser_type_row_rv")]
     pub input: Term,
     /// Value outputs of the function.
     ///
@@ -65,7 +63,7 @@ pub struct FuncValueType {
     /// hence there may be variables ranging over lists of types, and so the
     /// arity may vary according to the length of list with whose those variables
     /// are instantiated.
-    #[serde_as(as = "Vec<crate::types::serialize::SerSimpleType>")]
+    #[serde(with = "crate::types::serialize::ser_type_row_rv")]
     pub output: Term,
 }
 

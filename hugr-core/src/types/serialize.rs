@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use ordered_float::OrderedFloat;
-use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{FuncValueType, SumType, TypeBound};
 
@@ -10,7 +9,7 @@ use super::custom::CustomType;
 use crate::extension::SignatureError;
 use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
-use crate::types::type_param::{SeqPart, TermTypeError, TermVar, UpperBound};
+use crate::types::type_param::{TermTypeError, TermVar, UpperBound};
 use crate::types::{Term, Type};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
@@ -288,8 +287,11 @@ pub(crate) mod ser_type_row {
     }
 }
 
-impl serde_with::SerializeAs<Term> for Vec<SerSimpleType> {
-    fn serialize_as<S: Serializer>(tys: &Term, s: S) -> Result<S::Ok, S::Error> {
+pub(crate) mod ser_type_row_rv {
+    use crate::types::{Term, serialize::SerSimpleType, type_param::SeqPart};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(tys: &Term, s: S) -> Result<S::Ok, S::Error> {
         let items = tys
             .clone()
             .into_list_parts()
@@ -308,10 +310,8 @@ impl serde_with::SerializeAs<Term> for Vec<SerSimpleType> {
             .collect::<Vec<SerSimpleType>>();
         items.serialize(s)
     }
-}
 
-impl<'de> serde_with::DeserializeAs<'de, Term> for Vec<SerSimpleType> {
-    fn deserialize_as<D: Deserializer<'de>>(deser: D) -> Result<Term, D::Error> {
+    pub fn deserialize<'de, D: Deserializer<'de>>(deser: D) -> Result<Term, D::Error> {
         let sertypes: Vec<SerSimpleType> = Deserialize::deserialize(deser)?;
         let list_parts = sertypes.into_iter().map(|s| match s {
             SerSimpleType::R { i, b } => SeqPart::Splice(Term::new_row_var_use(i, b)),
