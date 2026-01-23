@@ -14,7 +14,7 @@ from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from hugr.ext import ExtensionRegistry
+    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
     from hugr.hugr import Hugr
 
 
@@ -42,21 +42,17 @@ class Value(Protocol):
 
     def _resolve_used_extensions_inplace(
         self, registry: ExtensionRegistry | None = None
-    ) -> ExtensionRegistry:
+    ) -> ExtensionResolutionResult:
         """Resolve the extensions required to define this value.
 
         The value is modified in-place.
 
         Args:
             registry: A registry to resolve unresolved extensions from.
-                If None, opaque operations and types will raise an error.
-
-        Raises:
-            UnresolvedExtensionError: if the value contains an opaque type
-                or that could not be resolved from the registry.
+                If None, opaque operations and types will not be resolved.
 
         Returns:
-            The set of extensions required to define the value.
+            The resolution result containing used and unresolved extensions.
         """
         ...
 
@@ -175,14 +171,14 @@ class Sum(Value):
 
     def _resolve_used_extensions_inplace(
         self, registry: ExtensionRegistry | None = None
-    ) -> ExtensionRegistry:
-        resolved_typ, reg = self.typ._resolve_used_extensions(registry)
+    ) -> ExtensionResolutionResult:
+        resolved_typ, result = self.typ._resolve_used_extensions(registry)
         assert isinstance(resolved_typ, tys.Sum)
         self.typ = resolved_typ
 
         for val in self.vals:
-            reg.extend(val._resolve_used_extensions_inplace(registry))
-        return reg
+            result.extend(val._resolve_used_extensions_inplace(registry))
+        return result
 
 
 @dataclass(eq=False, repr=False)
@@ -360,7 +356,7 @@ class Function(Value):
 
     def _resolve_used_extensions_inplace(
         self, registry: ExtensionRegistry | None = None
-    ) -> ExtensionRegistry:
+    ) -> ExtensionResolutionResult:
         return self.body.used_extensions(registry)
 
 
@@ -391,9 +387,9 @@ class Extension(Value):
 
     def _resolve_used_extensions_inplace(
         self, registry: ExtensionRegistry | None = None
-    ) -> ExtensionRegistry:
-        self.typ, reg = self.typ._resolve_used_extensions(registry)
-        return reg
+    ) -> ExtensionResolutionResult:
+        self.typ, result = self.typ._resolve_used_extensions(registry)
+        return result
 
     def __str__(self) -> str:
         return f"{self.name}({self.val})"

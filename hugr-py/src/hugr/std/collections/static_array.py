@@ -10,7 +10,7 @@ from hugr.std import _load_extension
 from hugr.utils import comma_sep_str
 
 if TYPE_CHECKING:
-    from hugr.ext import ExtensionRegistry
+    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
 
 EXTENSION = _load_extension("collections.static_array")
 
@@ -71,10 +71,10 @@ class StaticArrayVal(val.ExtensionValue):
 
     def _resolve_used_extensions_inplace(
         self, registry: ExtensionRegistry | None = None
-    ) -> ExtensionRegistry:
-        resolved_ty, reg = self.ty._resolve_used_extensions(registry)
+    ) -> ExtensionResolutionResult:
+        resolved_ty, result = self.ty._resolve_used_extensions(registry)
         assert isinstance(resolved_ty, StaticArray)
         self.ty = resolved_ty
         for value in self.v:
-            reg.extend(value._resolve_used_extensions_inplace(registry))
-        return reg
+            result.extend(value._resolve_used_extensions_inplace(registry))
+        return result

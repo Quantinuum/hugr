@@ -8,8 +8,6 @@ from hugr import ext
 from hugr.build import Dfg
 from hugr.std.collections.list import List
 from hugr.std.int import INT_T, INT_TYPES_EXTENSION
-from hugr.utils import UnresolvedExtensionError
-import pytest
 
 from .conftest import H, QUANTUM_EXT, TEST_EXT, TEST_TYPE_OPAQUE, TEST_OP_OPAQUE
 
@@ -119,9 +117,9 @@ def test_op_signature_contains_same_extension() -> None:
 
 
 def test_opaque_type_without_resolve() -> None:
-    """Test that Opaque types raise UnresolvedExtensionError without resolve_from."""
-    with pytest.raises(UnresolvedExtensionError):
-        TEST_TYPE_OPAQUE._resolve_used_extensions()
+    """Test that Opaque types are tracked as unresolved without resolve_from."""
+    _, result = TEST_TYPE_OPAQUE._resolve_used_extensions()
+    assert TEST_EXT.name in result.unresolved_extensions
 
 
 def test_opaque_type_with_resolve() -> None:
@@ -133,9 +131,9 @@ def test_opaque_type_with_resolve() -> None:
 
 
 def test_custom_op_without_resolve() -> None:
-    """Test that Custom ops raise UnresolvedExtensionError without resolve_from."""
-    with pytest.raises(UnresolvedExtensionError):
-        TEST_OP_OPAQUE.used_extensions()
+    """Test that Custom ops are tracked as unresolved without resolve_from."""
+    result = TEST_OP_OPAQUE.used_extensions()
+    assert TEST_EXT.name in result.unresolved_extensions
 
 
 def test_custom_op_with_resolve() -> None:
@@ -153,9 +151,9 @@ def test_hugr_with_opaque_type_resolve() -> None:
     (inp,) = h.inputs()
     h.set_outputs(inp)
 
-    # Without resolve_from, this should raise
-    with pytest.raises(UnresolvedExtensionError):
-        h.hugr.used_extensions()
+    # Without resolve_from, unresolved extensions are tracked
+    result_no_resolve = h.hugr.used_extensions()
+    assert TEST_EXT.name in result_no_resolve.unresolved_extensions
 
     # With resolve_from, should work
     test_ext_registry = ext.ExtensionRegistry()
@@ -169,9 +167,9 @@ def test_nested_opaque_type_resolve() -> None:
     # Create a Sum type with the opaque type
     sum_ty = tys.Sum([[TEST_TYPE_OPAQUE], [tys.Bool]])
 
-    # Without resolve_from, this should raise
-    with pytest.raises(UnresolvedExtensionError):
-        sum_ty._resolve_used_extensions()
+    # Without resolve_from, unresolved extensions are tracked
+    _, result = sum_ty._resolve_used_extensions()
+    assert TEST_EXT.name in result.unresolved_extensions
 
     # With resolve_from, should work
     test_ext_registry = ext.ExtensionRegistry()

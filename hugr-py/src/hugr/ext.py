@@ -511,3 +511,34 @@ class ExtensionRegistry:
 
     def __str__(self) -> str:
         return "ExtensionRegistry(" + ", ".join(self.extensions.keys()) + ")"
+
+
+@dataclass
+class ExtensionResolutionResult:
+    """Result of resolving extensions in a HUGR.
+
+    Args:
+        used_extensions: The extensions used by the HUGR.
+        unresolved_extensions: A set of extension IDs referenced in the HUGR but
+            not found in the given registry.
+    """
+
+    used_extensions: ExtensionRegistry = field(default_factory=ExtensionRegistry)
+    unresolved_extensions: set[ExtensionId] = field(default_factory=set)
+
+    def ids(self) -> set[ExtensionId]:
+        """Get the set of used extension IDs.
+
+        This includes both resolved and unresolved extensions referenced in the
+        HUGR.
+        """
+        return self.used_extensions.ids() | self.unresolved_extensions
+
+    def extend(self, other: ExtensionResolutionResult) -> None:
+        """Add the extensions from another result to this result.
+
+        Args:
+            other: The result of resolving extensions to add.
+        """
+        self.used_extensions.extend(other.used_extensions)
+        self.unresolved_extensions.update(other.unresolved_extensions)

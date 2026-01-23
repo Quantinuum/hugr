@@ -1223,7 +1223,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
     def used_extensions(
         self, resolve_from: ext.ExtensionRegistry | None = None
-    ) -> ExtensionRegistry:
+    ) -> ext.ExtensionResolutionResult:
         """Get the extensions used by this HUGR, optionally resolving unresolved
         types and operations.
 
@@ -1233,31 +1233,27 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
         Args:
             resolve_from: Optional extension registry to resolve against.
-                If None, opaque types and Custom ops will raise an error.
-
-        Raises:
-            UnresolvedExtensionError: if the Hugr contains an opaque type
-                or custom operation that could not be resolved.
+                If None, opaque types and Custom ops will not be resolved.
 
         Returns:
-            The set of extensions required to define this Hugr.
+            The result of resolving the extensions, containing the used
+            extensions and a list of referenced but unresolved extensions.
 
         Example:
             >>> from hugr.build import Dfg
             >>> Dfg(tys.Qubit).hugr.used_extensions().ids()
             {'prelude'}
         """
-        from hugr.ext import ExtensionRegistry
+        from hugr.ext import ExtensionResolutionResult
 
-        result = ExtensionRegistry()
+        result = ExtensionResolutionResult()
 
         for node in self:
             op = self[node].op
             # _resolve_used_extensions returns the resolved op and the extensions
-            resolved_op, reg = op._resolve_used_extensions(resolve_from)
-            if resolved_op is not op:
-                self[node].op = resolved_op
-            result.extend(reg)
+            resolved_op, op_result = op._resolve_used_extensions(resolve_from)
+            self[node].op = resolved_op
+            result.extend(op_result)
 
         return result
 
