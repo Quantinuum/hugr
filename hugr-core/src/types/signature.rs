@@ -55,6 +55,7 @@ pub struct FuncValueType {
     /// hence there may be variables ranging over lists of types, and so the
     /// arity may vary according to the length of list with whose those variables
     /// are instantiated.
+    #[serde(with = "crate::types::serialize::ser_type_row_rv")]
     pub input: Term,
     /// Value outputs of the function.
     ///
@@ -62,6 +63,7 @@ pub struct FuncValueType {
     /// hence there may be variables ranging over lists of types, and so the
     /// arity may vary according to the length of list with whose those variables
     /// are instantiated.
+    #[serde(with = "crate::types::serialize::ser_type_row_rv")]
     pub output: Term,
 }
 

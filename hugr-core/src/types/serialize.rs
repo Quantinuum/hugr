@@ -35,33 +35,30 @@ impl TryFrom<Type> for SerSimpleType {
         if value == usize_t() {
             return Ok(SerSimpleType::I);
         }
-        Ok(match value {
-            Term::RuntimeExtension(o) => SerSimpleType::Opaque(o),
+        match value {
+            Term::RuntimeExtension(o) => Ok(SerSimpleType::Opaque(o)),
             //TypeEnum::Alias(a) => SerSimpleType::Alias(a),
-            Term::RuntimeFunction(sig) => SerSimpleType::G(sig),
+            Term::RuntimeFunction(sig) => Ok(SerSimpleType::G(sig)),
             Term::Variable(tv) => {
-                let Term::RuntimeType(b) = &*tv.cached_decl else {
-                    return Err(SignatureError::TypeArgMismatch(
-                        TermTypeError::InvalidValue(tv.cached_decl),
-                    ));
+                let i = tv.index();
+                match &*tv.cached_decl {
+                    Term::RuntimeType(b) => return Ok(SerSimpleType::V { i, b: *b }),
+                    Term::ListType(b) => match &**b {
+                        Term::RuntimeType(b) => return Ok(SerSimpleType::R { i, b: *b }),
+                        _ => (),
+                    },
+                    _ => (),
                 };
-                SerSimpleType::V {
-                    i: tv.index(),
-                    b: *b,
-                }
+                Err(SignatureError::TypeArgMismatch(
+                    TermTypeError::InvalidValue(tv.cached_decl),
+                ))
             }
-            // This would need supporting at the Type*Row* level - turning a Term::List
-            // into SeqParts and looking for SeqPart::Splice's containing the row variables
-            /*TypeEnum::RowVar(rv) => {
-                let RowVariable(idx, bound) = rv.as_rv();
-                SerSimpleType::R { i: *idx, b: *bound }
-            }*/
-            Term::RuntimeSum(st) => SerSimpleType::Sum(st),
+            Term::RuntimeSum(st) => Ok(SerSimpleType::Sum(st)),
             _ => {
                 todo!("Only Custom types, functions, sums and variables supported ATM");
                 return Err(SignatureError::InvalidTypeArgs);
             }
-        })
+        }
     }
 }
 
@@ -275,15 +272,51 @@ pub(crate) mod ser_type_row {
     use crate::types::{Term, TypeRow};
 
     pub fn serialize<S: Serializer>(tys: &TypeRow, s: S) -> Result<S::Ok, S::Error> {
-        let items = tys.into_iter().map(|ty|
-            ty.clone().try_into().unwrap()).collect::<Vec<SerSimpleType>>();
+        let items = tys
+            .into_iter()
+            .map(|ty| ty.clone().try_into().unwrap())
+            .collect::<Vec<SerSimpleType>>();
         items.serialize(s)
     }
 
     pub fn deserialize<'de, D: Deserializer<'de>>(deser: D) -> Result<TypeRow, D::Error> {
         let sertypes: Vec<SerSimpleType> = Deserialize::deserialize(deser)?;
         Ok(TypeRow::from(
-            sertypes.into_iter().map_into().collect::<Vec<Term>>()
+            sertypes.into_iter().map_into().collect::<Vec<Term>>(),
         ))
+    }
+}
+
+pub(crate) mod ser_type_row_rv {
+    use crate::types::{Term, serialize::SerSimpleType, type_param::SeqPart};
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    pub fn serialize<S: Serializer>(tys: &Term, s: S) -> Result<S::Ok, S::Error> {
+        let items = tys
+            .clone()
+            .into_list_parts()
+            .map(|part| match part {
+                SeqPart::Item(t) => {
+                    let s = SerSimpleType::try_from(t).unwrap();
+                    assert!(!matches!(s, SerSimpleType::R { .. }));
+                    s
+                }
+                SeqPart::Splice(t) => {
+                    let s = SerSimpleType::try_from(t).unwrap();
+                    assert!(matches!(s, SerSimpleType::R { .. }));
+                    s
+                }
+            })
+            .collect::<Vec<SerSimpleType>>();
+        items.serialize(s)
+    }
+
+    pub fn deserialize<'de, D: Deserializer<'de>>(deser: D) -> Result<Term, D::Error> {
+        let sertypes: Vec<SerSimpleType> = Deserialize::deserialize(deser)?;
+        let list_parts = sertypes.into_iter().map(|s| match s {
+            SerSimpleType::R { i, b } => SeqPart::Splice(Term::new_row_var_use(i, b)),
+            s => SeqPart::Item(Term::from(s)),
+        });
+        Ok(Term::new_list_from_parts(list_parts))
     }
 }
