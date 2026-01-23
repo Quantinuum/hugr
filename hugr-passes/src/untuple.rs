@@ -11,20 +11,28 @@ use hugr_core::hugr::views::sibling_subgraph::TopoConvexChecker;
 use hugr_core::ops::{OpTrait, OpType};
 use hugr_core::types::Type;
 use hugr_core::{HugrView, Node, SimpleReplacement};
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
-use crate::ComposablePass;
+use crate::{ComposablePass, PassScope};
 
 /// Configuration enum for the untuple rewrite pass.
 ///
 /// Indicates whether the pattern match should traverse the HUGR recursively.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[deprecated(note = "Use PassScope instead")]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UntupleRecursive {
     /// Traverse the HUGR recursively, i.e. consider the entire subtree
     Recursive,
     /// Do not traverse the HUGR recursively, i.e. consider only the sibling subgraph
-    #[default]
     NonRecursive,
+}
+
+#[expect(deprecated)] // Remove along with UntupleRecursive
+#[expect(clippy::derivable_impls)] // derive(Default) generates deprecation warning
+impl Default for UntupleRecursive {
+    fn default() -> Self {
+        UntupleRecursive::NonRecursive
+    }
 }
 
 /// A pass that removes unnecessary `MakeTuple` operations immediately followed
@@ -44,12 +52,29 @@ pub enum UntupleRecursive {
 ///
 /// - Order edges are not supported yet. The pass currently panics if it encounters
 ///   a pack/unpack pair with connected order edges. See <https://github.com/CQCL/hugr/issues/1974>.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct UntuplePass {
-    /// Whether to traverse the HUGR recursively.
-    recursive: UntupleRecursive,
-    /// Parent node under which to operate; None indicates the Hugr root
-    parent: Option<Node>,
+    /// Either a [PassScope] controlling which parts of the Hugr to process;
+    /// or a flag for recursiveness, and the parent node under which to operate
+    /// (None indicating the Hugr root)
+    #[expect(deprecated)] // remove Right half and just use PassScope
+    scope: Either<PassScope, (UntupleRecursive, Option<Node>)>,
+}
+
+impl Default for UntuplePass {
+    fn default() -> Self {
+        // TODO Move to PassScope::Default() when UntupleRecursive is removed
+        Self {
+            scope: Either::Right((Default::default(), Default::default())),
+        }
+    }
+}
+
+#[expect(deprecated)] // Remove along with UntupleRecursive
+impl From<UntupleRecursive> for bool {
+    fn from(value: UntupleRecursive) -> Self {
+        value == UntupleRecursive::Recursive
+    }
 }
 
 #[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
@@ -68,26 +93,78 @@ pub struct UntupleResult {
 }
 
 impl UntuplePass {
-    /// Create a new untuple pass with the given configuration.
+    /// Create a new untuple pass with the given recursiveness and that
+    /// will run on the entrypoint region/subtree.
     #[must_use]
+    #[deprecated(note = "Use new_scoped or default instead")]
+    #[expect(deprecated)] // Remove along with UntupleRecursive
     pub fn new(recursive: UntupleRecursive) -> Self {
         Self {
-            recursive,
-            parent: None,
+            scope: Either::Right((recursive, None)),
+        }
+    }
+
+    /// Create a new untuple pass with the given configuration
+    #[must_use]
+    pub fn new_scoped(scope: PassScope) -> Self {
+        Self {
+            scope: Either::Left(scope),
         }
     }
 
     /// Sets the parent node to optimize (overwrites any previous setting)
+    ///
+    /// If the pass was previously configured by [Self::with_scope] then
+    /// implicitly `[Self::set_recursive]`'s with thee [PassScope::recursive]
+    #[deprecated(note = "Use with_scope instead")]
+    #[expect(deprecated)] // Remove along with UntupleRecursive
     pub fn set_parent(mut self, parent: impl Into<Option<Node>>) -> Self {
-        self.parent = parent.into();
+        match &mut self.scope {
+            Either::Left(p) => {
+                let rec = if p.recursive() {
+                    UntupleRecursive::Recursive
+                } else {
+                    UntupleRecursive::NonRecursive
+                };
+                self.scope = Either::Right((rec, parent.into()))
+            }
+            Either::Right((_, p)) => *p = parent.into(),
+        };
         self
     }
 
     /// Sets whether the pass should traverse the HUGR recursively.
+    ///
+    /// If the pass was last configured via [Self::with_scope], overrides that,
+    /// with `set_parent` of default `None`.
     #[must_use]
+    #[deprecated(note = "Use with_scope")]
+    #[expect(deprecated)] // Remove along with UntupleRecursive
     pub fn recursive(mut self, recursive: UntupleRecursive) -> Self {
-        self.recursive = recursive;
+        let parent = self.scope.right().and_then(|(_, p)| p);
+        self.scope = Either::Right((recursive, parent));
         self
+    }
+
+    /// Find tuple pack operations followed by tuple unpack operations
+    /// beneath a specified parent and according to this instance's recursiveness
+    /// ([Self::recursive] or [Self::with_scope] + [PassScope::recursive])
+    /// and generate rewrites to remove them.
+    ///
+    /// The returned rewrites are guaranteed to be independent of each other.
+    ///
+    /// Returns an iterator over the rewrites.
+    #[deprecated(note = "Use all_rewrites")]
+    pub fn find_rewrites<H: HugrView>(
+        &self,
+        hugr: &H,
+        parent: H::Node,
+    ) -> Vec<SimpleReplacement<H::Node>> {
+        let recursive = match &self.scope {
+            Either::Left(scope) => scope.recursive(),
+            Either::Right((rec, _)) => (*rec).into(),
+        };
+        find_rewrites(hugr, parent, recursive)
     }
 
     /// Find tuple pack operations followed by tuple unpack operations
@@ -96,31 +173,47 @@ impl UntuplePass {
     /// The returned rewrites are guaranteed to be independent of each other.
     ///
     /// Returns an iterator over the rewrites.
-    pub fn find_rewrites<H: HugrView>(
+    pub fn all_rewrites<H: HugrView<Node = Node>>(
         &self,
         hugr: &H,
-        parent: H::Node,
     ) -> Vec<SimpleReplacement<H::Node>> {
-        let mut res = Vec::new();
-        let mut children_queue = VecDeque::new();
-        children_queue.push_back(parent);
+        let (recursive, parent) = match &self.scope {
+            Either::Left(scope) => {
+                let Some(root) = scope.root(hugr) else {
+                    return vec![];
+                };
+                (scope.recursive(), root)
+            }
+            Either::Right((rec, parent)) => ((*rec).into(), parent.unwrap_or(hugr.entrypoint())),
+        };
+        find_rewrites(hugr, parent, recursive)
+    }
+}
 
-        // Required to create SimpleReplacements.
-        let mut convex_checker: Option<TopoConvexChecker<H>> = None;
+fn find_rewrites<H: HugrView>(
+    hugr: &H,
+    parent: H::Node,
+    recursive: bool,
+) -> Vec<SimpleReplacement<H::Node>> {
+    let mut res = Vec::new();
+    let mut children_queue = VecDeque::new();
+    children_queue.push_back(parent);
 
-        while let Some(parent) = children_queue.pop_front() {
-            for node in hugr.children(parent) {
-                let op = hugr.get_optype(node);
-                if let Some(rw) = make_rewrite(hugr, &mut convex_checker, node, op) {
-                    res.push(rw);
-                }
-                if self.recursive == UntupleRecursive::Recursive && op.is_container() {
-                    children_queue.push_back(node);
-                }
+    // Required to create SimpleReplacements.
+    let mut convex_checker: Option<TopoConvexChecker<H>> = None;
+
+    while let Some(parent) = children_queue.pop_front() {
+        for node in hugr.children(parent) {
+            let op = hugr.get_optype(node);
+            if let Some(rw) = make_rewrite(hugr, &mut convex_checker, node, op) {
+                res.push(rw);
+            }
+            if recursive && op.is_container() {
+                children_queue.push_back(node);
             }
         }
-        res
     }
+    res
 }
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for UntuplePass {
@@ -128,13 +221,19 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for UntuplePass {
     type Result = UntupleResult;
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
-        let rewrites = self.find_rewrites(hugr, self.parent.unwrap_or(hugr.entrypoint()));
+        let rewrites = self.all_rewrites(hugr);
         let rewrites_applied = rewrites.len();
         // The rewrites are independent, so we can always apply them all.
         for rewrite in rewrites {
             hugr.apply_patch(rewrite)?;
         }
         Ok(UntupleResult { rewrites_applied })
+    }
+
+    /// Overrides any [Self::set_parent] or [Self::recursive]
+    fn with_scope(mut self, scope: &crate::PassScope) -> Self {
+        self.scope = Either::Left(scope.clone());
+        self
     }
 }
 
@@ -399,14 +498,16 @@ mod test {
         #[case] mut hugr: Hugr,
         #[case] expected_rewrites: usize,
         #[case] remaining_nodes: usize,
+        #[values(true, false)] use_scope: bool,
     ) {
-        let pass = UntuplePass::default().recursive(UntupleRecursive::NonRecursive);
-
         let parent = hugr.entrypoint();
-        let res = pass
-            .set_parent(parent)
-            .run(&mut hugr)
-            .unwrap_or_else(|e| panic!("{e}"));
+        let pass = if use_scope {
+            UntuplePass::new_scoped(PassScope::EntrypointFlat)
+        } else {
+            #[expect(deprecated)] // Remove use_scope==false case along with UntupleRecursive
+            UntuplePass::default().set_parent(parent)
+        };
+        let res = pass.run(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(res.rewrites_applied, expected_rewrites);
         assert_eq!(hugr.children(parent).count(), remaining_nodes);
     }

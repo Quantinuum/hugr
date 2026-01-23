@@ -307,8 +307,8 @@ mod test {
 
     use crate::const_fold::{ConstFoldError, ConstantFoldPass};
     use crate::dead_code::DeadCodeElimError;
-    use crate::untuple::{UntupleRecursive, UntupleResult};
-    use crate::{DeadCodeElimPass, ReplaceTypes, UntuplePass};
+    use crate::untuple::UntupleResult;
+    use crate::{DeadCodeElimPass, PassScope, ReplaceTypes, UntuplePass};
 
     use super::{ComposablePass, IfThen, ValidatePassError, ValidatingPass, validate_if_test};
 
@@ -416,7 +416,7 @@ mod test {
             fb.finish_hugr_with_outputs(untup.outputs()).unwrap()
         };
 
-        let untup = UntuplePass::new(UntupleRecursive::Recursive);
+        let untup = UntuplePass::new_scoped(PassScope::EntrypointRecursive);
         {
             // Change usize_t to INT_TYPES[6], and if that did anything (it will!), then Untuple
             let mut repl = ReplaceTypes::default();
