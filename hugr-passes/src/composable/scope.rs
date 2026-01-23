@@ -59,7 +59,7 @@ pub enum PassScope {
     /// - `root`: the [HugrView::module_root]
     /// - `preserve_interface`: The function children of the module root,
     // TODO ALAN or also the constants?
-    /// and the entrypoint if it is not the module root.
+    ///   and the entrypoint if it is not the module root.
     /// - `recursive`: `true`.
     PreserveAll,
     /// Run the pass on the whole Hugr, keeping intact every public function,

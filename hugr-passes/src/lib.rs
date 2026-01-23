@@ -20,7 +20,7 @@ mod half_node;
 mod monomorphize;
 
 // Main pass interfaces
-pub use composable::{ComposablePass, PassScope};
+pub use composable::{ComposablePass, InScope, PassScope};
 
 // Pass re-exports
 pub use dead_code::DeadCodeElimPass;
