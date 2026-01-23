@@ -1,6 +1,7 @@
 //! Abstract and concrete Signature types.
 
 use itertools::Either;
+use serde_with::serde_as;
 
 use std::fmt::{self, Display};
 
@@ -20,19 +21,20 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 /// the edges required to/from a node or within a [`FuncDefn`].
 ///
 /// [`FuncDefn`]: crate::ops::FuncDefn
+#[serde_as]
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
     /// Value inputs of the function.
     ///
     /// Each *element* must [check_term_type] against [Term::RuntimeType] of
     /// [TypeBound::Linear], hence the arity is fixed as the length of the row.
-    #[serde(with = "crate::types::serialize::ser_type_row")]
+    #[serde_as(as = "crate::types::serialize::SerTypeRow")]
     pub input: TypeRow,
     /// Value outputs of the function.
     ///
     /// /// Each *element* must [check_term_type] against [Term::RuntimeType] of
     /// [TypeBound::Linear], hence the arity is fixed as the length of the row.
-    #[serde(with = "crate::types::serialize::ser_type_row")]
+    #[serde_as(as = "crate::types::serialize::SerTypeRow")]
     pub output: TypeRow,
 }
 

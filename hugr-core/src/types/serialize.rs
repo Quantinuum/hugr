@@ -199,6 +199,12 @@ impl From<TermSer> for Term {
     }
 }
 
+
+/// Helper for use with [serde_with::serde_as] to serialize
+/// a [TypeRow] *all of whose elements are types* in legacy Json
+// ALAN TODO just do this by default for all TypeRows? (Unless overridden?)
+pub(crate) enum SerTypeRow {}
+
 /// Helper type that serialises lists as JSON arrays for compatibility.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
@@ -261,29 +267,6 @@ pub(crate) mod sertype {
     pub fn deserialize<'de, D: Deserializer<'de>>(deser: D) -> Result<Term, D::Error> {
         let sertype: SerSimpleType = Deserialize::deserialize(deser)?;
         Ok(sertype.into())
-    }
-}
-
-pub(crate) mod ser_type_row {
-    use itertools::Itertools as _;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    use super::SerSimpleType;
-    use crate::types::{Term, TypeRow};
-
-    pub fn serialize<S: Serializer>(tys: &TypeRow, s: S) -> Result<S::Ok, S::Error> {
-        let items = tys
-            .into_iter()
-            .map(|ty| ty.clone().try_into().unwrap())
-            .collect::<Vec<SerSimpleType>>();
-        items.serialize(s)
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(deser: D) -> Result<TypeRow, D::Error> {
-        let sertypes: Vec<SerSimpleType> = Deserialize::deserialize(deser)?;
-        Ok(TypeRow::from(
-            sertypes.into_iter().map_into().collect::<Vec<Term>>(),
-        ))
     }
 }
 

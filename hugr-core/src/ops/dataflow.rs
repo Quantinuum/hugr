@@ -2,6 +2,8 @@
 
 use std::borrow::Cow;
 
+use serde_with::serde_as;
+
 use super::{OpTag, OpTrait, impl_op_name};
 
 use crate::extension::SignatureError;
@@ -67,11 +69,12 @@ pub trait IOTrait {
 
 /// An input node.
 /// The outputs of this node are the inputs to the function.
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct Input {
     /// Input value types
-    #[serde(with="crate::types::serialize::ser_type_row")]
+    #[serde_as(as = "crate::types::serialize::SerTypeRow")]
     pub types: TypeRow,
 }
 
@@ -86,11 +89,12 @@ impl IOTrait for Input {
 }
 
 /// An output node. The inputs are the outputs of the function.
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct Output {
     /// Output value types
-    #[serde(with="crate::types::serialize::ser_type_row")]
+    #[serde_as(as = "crate::types::serialize::SerTypeRow")]
     pub types: TypeRow,
 }
 

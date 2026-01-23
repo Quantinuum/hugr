@@ -172,6 +172,33 @@ impl DerefMut for TypeRow {
     }
 }
 
+mod serialize {
+    use super::TypeRow;
+    use crate::types::Term;
+    use crate::types::serialize::{SerSimpleType, SerTypeRow};
+    use itertools::Itertools as _;
+    use serde::{Deserialize, Deserializer, Serialize, Serializer};
+
+    impl serde_with::SerializeAs<TypeRow> for SerTypeRow {
+        fn serialize_as<S: Serializer>(tys: &TypeRow, s: S) -> Result<S::Ok, S::Error> {
+            let elems: Vec<SerSimpleType> = tys
+                .into_iter()
+                .map(|ty| ty.clone().try_into().unwrap())
+                .collect();
+            elems.serialize(s)
+        }
+    }
+
+    impl<'de> serde_with::DeserializeAs<'de, TypeRow> for SerTypeRow {
+        fn deserialize_as<D: Deserializer<'de>>(deser: D) -> Result<TypeRow, D::Error> {
+            let sertypes: Vec<SerSimpleType> = Deserialize::deserialize(deser)?;
+            Ok(TypeRow::from(
+                sertypes.into_iter().map_into().collect::<Vec<Term>>(),
+            ))
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::*;
