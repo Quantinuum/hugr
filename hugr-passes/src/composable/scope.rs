@@ -6,8 +6,8 @@
 //! See [`PassScope`] for more details.
 
 use hugr_core::ops::OpType;
-use hugr_core::{HugrView, Node, Visibility};
-use itertools::Itertools as _;
+use hugr_core::{HugrView, Visibility};
+use itertools::{Either, Itertools};
 
 /// Scope configuration for a pass.
 ///
@@ -15,7 +15,7 @@ use itertools::Itertools as _;
 ///
 /// Each variant defines three properties: [PassScope::root],
 /// [PassScope::preserve_interface], and [PassScope::recursive].
-/// 
+///
 /// From these, [PassScope::regions] and [PassScope::in_scope] can be derived.
 ///
 /// A pass will always optimize the entrypoint region, unless it is set to the
@@ -26,13 +26,13 @@ use itertools::Itertools as _;
 #[non_exhaustive]
 pub enum PassScope {
     /// Run the pass only on the entrypoint region.
-    /// 
+    ///
     /// If the entrypoint is the module root, does nothing.
     ///
     /// The pass is not expected to optimize descendant regions but may do so if it wishes.
     // ALAN we could be much stricter here, and declare only the immediate children of
     // the root as being in scope....?
-    /// 
+    ///
     /// - `root`: The entrypoint node, if it is not the module root.
     /// - `preserve_interface`: the entrypoint node
     /// - `recursive`: `false`.
@@ -45,10 +45,10 @@ pub enum PassScope {
     /// even with the same entrypoint *may* have an effect. Moreover, sequences of passes are not
     /// guaranteed to be idempotent even if the individual steps
     /// are, as later passes may allow earlier passes to have an effect again.
-    /// 
+    ///
     /// If the entrypoint is the module root, does nothing.
     // ALAN alternative is that if the entrypoint is the module root, equivalent to `PreserveAll` ??
-    /// 
+    ///
     /// - `root`: The entrypoint node, if it is not the module root.
     /// - `preserve_interface`: the entrypoint node
     /// - `recursive`: `true`.
@@ -76,13 +76,13 @@ pub enum PassScope {
     #[default]
     PreservePublic,
     /// Run the pass on the whole Hugr, but preserving behaviour only of the entrypoint.
-    /// 
+    ///
     /// If the entrypoint is the module root, the pass does nothing.
     // ALAN there are alternatives - optimize everything away (!), or treat as e.g. `PreserveAll`
-    /// 
+    ///
     /// Note this may change behaviour and/or delete even public functions,
     /// so should only be used after linking (e.g. for making an executable).
-    /// 
+    ///
     /// - `root`: if the [HugrView::module_root], unless the entrypoint is the module root
     /// - `preserve_interface`: the entrypoint node
     /// - `recursive`: `true`.
@@ -91,66 +91,68 @@ pub enum PassScope {
 
 /// Whether a pass may modify a particular node
 #[derive(Clone, Copy, Debug, Eq, PartialEq)]
-enum InScope {
+pub enum InScope {
     /// The pass may modify the node arbitrarily, including changing its interface,
     /// behaviour, and/or removing it altogether
     Yes,
     /// The pass may modify the interior of the node - its [OpType], and its descendants -
     /// but must maintain the same ports (including static [Function] ports and [ControlFlow] ports),
     /// function name and [Visibility], and behaviour.
-    /// 
+    ///
     /// [Function]: [hugr_core::types::EdgeKind::Function]
     /// [ControlFlow]: [EdgeKind::ControlFlow]
     PreserveInterface,
     /// The pass may not modify this node
-    No
+    No,
 }
 
 impl PassScope {
     /// Returns the root of the subtree that may be optimized by the pass.
-    /// 
+    ///
     /// If `None`, the pass may not do anything. (This can be the case for some
     /// entrypoint-specific scopes when the entrypoint is the module root. Use a global
     /// scope, e.g. [PassScope::PreserveAll] or [PassScope::PreservePublic], instead.)
     ///
     /// Otherwise, will be either the module root (for a global pass) or the entrypoint.
-    /// 
+    ///
     /// The pass should not touch anything outside this root, must respect
     /// [Self::preserve_interface] within it, and if [`Self::recursive`]
     ///  is `true`, should also optimize the descendant regions of the root.
-    pub fn root<'a, H: HugrView<Node = Node>>(
-        &'a self,
-        hugr: &'a H,
-    ) -> Option<H::Node> {
+    pub fn root<'a, H: HugrView>(&'a self, hugr: &'a H) -> Option<H::Node> {
         let ep = hugr.entrypoint();
         match self {
             Self::EntrypointFlat | Self::EntrypointRecursive => {
                 (ep != hugr.module_root()).then_some(ep)
             }
             Self::PreserveAll | Self::PreservePublic => Some(hugr.module_root()),
-            Self::PreserveEntrypoint => (ep != hugr.module_root()).then_some(hugr.module_root())
+            Self::PreserveEntrypoint => (ep != hugr.module_root()).then_some(hugr.module_root()),
         }
     }
 
     /// Returns a list of nodes, in the subtree beneath [Self::root], for which
     /// the pass must preserve the observable semantics (ports, execution behaviour,
     /// linking).
-    pub fn preserve_interface<'a, H: HugrView<Node = Node>>(
+    pub fn preserve_interface<'a, H: HugrView>(
         &'a self,
         hugr: &'a H,
     ) -> impl Iterator<Item = H::Node> {
         let ep = hugr.entrypoint();
-        (ep != hugr.module_root()).then_some(ep).into_iter().chain(hugr.children(hugr.module_root()).filter(move |n| {
-            if *n == ep {return false};
-            let (Self::PreserveAll | Self::PreservePublic) = self else {return false};
+        (ep != hugr.module_root()).then_some(ep).into_iter().chain(
+            hugr.children(hugr.module_root()).filter(move |n| {
+                if *n == ep {
+                    return false;
+                };
+                let (Self::PreserveAll | Self::PreservePublic) = self else {
+                    return false;
+                };
                 let vis = match hugr.get_optype(*n) {
                     OpType::FuncDecl(fd) => fd.visibility(),
                     OpType::FuncDefn(fd) => fd.visibility(),
-                    _ => return false
+                    _ => return false,
                 };
                 self == &Self::PreserveAll || vis == &Visibility::Public
-            
-        }))
+            }),
+        )
     }
 
     /// Return every region (every container node) in the Hugr to be optimized by the pass.
@@ -158,22 +160,20 @@ impl PassScope {
     /// This computes all the regions to be optimized at once. In general, it is
     /// more efficient to traverse the Hugr incrementally starting from
     /// [PassScope::root] instead.
-    pub fn regions<'a, H: HugrView<Node = Node>>(&'a self, hugr: &'a H) -> Vec<H::Node> {
-        let mut regions = self.root(hugr).into_iter().collect_vec();
-
-        if self.recursive() {
-            let mut index = 0;
-            while index < regions.len() {
-                let region = regions[index];
-                let child_regions = hugr
-                    .children(region)
-                    .filter(|&child| hugr.first_child(child).is_some());
-                regions.extend(child_regions);
-                index += 1;
+    // ALAN deliberately not counting the module root as a "region" here, but should I?
+    pub fn regions<'a, H: HugrView>(&'a self, hugr: &'a H) -> impl Iterator<Item = H::Node> {
+        self.root(hugr).into_iter().flat_map(|r| {
+            if self.recursive() {
+                let mut iter = hugr.descendants(r);
+                if r == hugr.module_root() {
+                    assert_eq!(iter.next(), Some(hugr.module_root())); // skip
+                }
+                Either::Left(iter.filter(|n| hugr.first_child(*n).is_some()))
+            } else {
+                assert_ne!(r, hugr.module_root());
+                Either::Right(std::iter::once(r))
             }
-        }
-
-        regions
+        })
     }
 
     /// Returns whether the node may be modified by the pass.
@@ -181,7 +181,7 @@ impl PassScope {
     /// Nodes outside the `root` subtree are never in scope.
     /// Nodes inside the subtree may be either [InScope::Yes] or [InScope::PreserveInterface].
     // ALAN for non-recursive passes we *could* say that grandchildren of the root, and their descendants, are out of scope?
-    pub fn in_scope<H: HugrView<Node = Node>>(&self, hugr: &H, node: H::Node) -> InScope {
+    pub fn in_scope<H: HugrView>(&self, hugr: &H, node: H::Node) -> InScope {
         // The root module node is never in scope.
         if node == hugr.module_root() {
             return InScope::No;
@@ -193,10 +193,12 @@ impl PassScope {
             if r != hugr.module_root() {
                 let mut anc = Some(node);
                 while let Some(n) = anc {
-                    if n == r { break 'in_subtree };
+                    if n == r {
+                        break 'in_subtree;
+                    };
                     anc = hugr.get_parent(n);
                 }
-                return InScope::No
+                return InScope::No;
             }
         }
         if self.preserve_interface(hugr).contains(&node) {
@@ -220,12 +222,12 @@ mod test {
     use hugr_core::hugr::hugrmut::HugrMut;
     use rstest::{fixture, rstest};
 
-    use hugr_core::Hugr;
     use hugr_core::builder::{Container, Dataflow, HugrBuilder, ModuleBuilder, SubContainer};
     use hugr_core::ops::Value;
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::std_extensions::arithmetic::int_types::ConstInt;
     use hugr_core::types::Signature;
+    use hugr_core::{Hugr, Node};
 
     use super::*;
 
@@ -320,78 +322,95 @@ mod test {
         // the pass should not be applied to any regions.
         hugr.hugr.set_entrypoint(hugr.module_root);
         assert_eq!(scope.root(&hugr.hugr), None);
-        assert_eq!(scope.regions(&hugr.hugr), vec![]);
+        assert_eq!(scope.regions(&hugr.hugr).next(), None);
         for n in hugr.hugr.nodes() {
             assert_eq!(scope.in_scope(&hugr.hugr, n), InScope::No);
         }
 
         // Public function with a nested DFG
         hugr.hugr.set_entrypoint(hugr.public_func);
-        assert_eq!(
-            scope.root(&hugr.hugr),
-            Some(hugr.public_func)
-        );
-        let expected_regions =
-            match recursive {
-            true =>
-                vec![hugr.public_func, hugr.public_func_nested]
-            ,
+        assert_eq!(scope.root(&hugr.hugr), Some(hugr.public_func));
+        let expected_regions = match recursive {
+            true => vec![hugr.public_func, hugr.public_func_nested],
             false => vec![hugr.public_func],
         };
-         assert_eq!(
-                scope.regions(&hugr.hugr), expected_regions);
+        assert_eq!(scope.regions(&hugr.hugr).collect_vec(), expected_regions);
 
         assert_eq!(scope.in_scope(&hugr.hugr, hugr.module_root), InScope::No);
-        assert_eq!(scope.in_scope(&hugr.hugr, hugr.public_func), InScope::PreserveInterface);
-        assert_eq!(scope.in_scope(&hugr.hugr, hugr.public_func_nested), InScope::Yes);
-        for n in [hugr.module_root, hugr.private_func, hugr.public_func_decl, hugr.private_func_decl, hugr.const_def] {
+        assert_eq!(
+            scope.in_scope(&hugr.hugr, hugr.public_func),
+            InScope::PreserveInterface
+        );
+        assert_eq!(
+            scope.in_scope(&hugr.hugr, hugr.public_func_nested),
+            InScope::Yes
+        );
+        for n in [
+            hugr.module_root,
+            hugr.private_func,
+            hugr.public_func_decl,
+            hugr.private_func_decl,
+            hugr.const_def,
+        ] {
             assert_eq!(scope.in_scope(&hugr.hugr, n), InScope::No);
         }
 
         // DFG inside a function
         hugr.hugr.set_entrypoint(hugr.public_func_nested);
+        assert_eq!(scope.root(&hugr.hugr), Some(hugr.public_func_nested));
         assert_eq!(
-            scope.root(&hugr.hugr),
-            Some(hugr.public_func_nested)
+            scope.regions(&hugr.hugr).collect_vec(),
+            [hugr.public_func_nested]
         );
-        assert_eq!(scope.regions(&hugr.hugr), vec![hugr.public_func_nested]);
         for n in [
-         hugr.module_root,
-         hugr.public_func,
-        hugr.private_func,
-         hugr.public_func_decl,
-        hugr.private_func_decl,
-         hugr.const_def] {
+            hugr.module_root,
+            hugr.public_func,
+            hugr.private_func,
+            hugr.public_func_decl,
+            hugr.private_func_decl,
+            hugr.const_def,
+        ] {
             assert_eq!(scope.in_scope(&hugr.hugr, n), InScope::No)
         }
-        assert_eq!(scope.in_scope(&hugr.hugr, hugr.public_func_nested), InScope::PreserveInterface);
+        assert_eq!(
+            scope.in_scope(&hugr.hugr, hugr.public_func_nested),
+            InScope::PreserveInterface
+        );
     }
 
     #[rstest]
     fn scope_all(hugr: TestHugr) {
-        let preserve = [hugr.public_func, hugr.private_func, hugr.public_func_decl, hugr.private_func_decl];
+        let preserve = [
+            hugr.public_func,
+            hugr.private_func,
+            hugr.public_func_decl,
+            hugr.private_func_decl,
+        ];
         scope_preserve(hugr, PassScope::PreserveAll, preserve)
     }
 
-    fn scope_preserve(hugr: TestHugr, scope: PassScope, preserve: impl IntoIterator<Item=Node>) {
+    fn scope_preserve(hugr: TestHugr, scope: PassScope, preserve: impl IntoIterator<Item = Node>) {
         assert!(scope.recursive());
         let preserve = preserve.into_iter().collect::<HashSet<_>>();
+        assert_eq!(scope.root(&hugr.hugr), Some(hugr.module_root));
         assert_eq!(
-            scope.root(&hugr.hugr), Some(hugr.module_root));
-        assert_eq!(
-            scope.regions(&hugr.hugr),
-            vec![hugr.public_func, hugr.private_func, hugr.public_func_nested]
+            scope.regions(&hugr.hugr).collect_vec(),
+            [hugr.public_func, hugr.private_func, hugr.public_func_nested]
         );
         assert_eq!(scope.in_scope(&hugr.hugr, hugr.const_def), InScope::Yes); // ALAN is this what we want?
         assert_eq!(scope.in_scope(&hugr.hugr, hugr.module_root), InScope::No);
         for n in [
-        hugr.public_func,
-        hugr.private_func,
-        hugr.public_func_decl,
-        hugr.public_func_nested,
-        hugr.private_func_decl,
+            hugr.public_func,
+            hugr.private_func,
+            hugr.public_func_decl,
+            hugr.public_func_nested,
+            hugr.private_func_decl,
         ] {
-            let expected = if preserve.contains(&n) {InScope::PreserveInterface} else {InScope::Yes};
+            let expected = if preserve.contains(&n) {
+                InScope::PreserveInterface
+            } else {
+                InScope::Yes
+            };
             assert_eq!(scope.in_scope(&hugr.hugr, n), expected);
         }
         assert_eq!(preserve, scope.preserve_interface(&hugr.hugr).collect());
@@ -404,8 +423,14 @@ mod test {
     }
 
     #[rstest]
-    fn scope_global_entrypoint(hugr: TestHugr) {
+    fn scope_global_entrypoint(mut hugr: TestHugr) {
+        let scope = PassScope::PreserveEntrypoint;
+        hugr.hugr.set_entrypoint(hugr.hugr.module_root());
+        assert_eq!(scope.root(&hugr.hugr), None);
+        assert_eq!(scope.regions(&hugr.hugr).next(), None);
+
+        hugr.hugr.set_entrypoint(hugr.public_func_nested);
         let preserve = [hugr.public_func_nested];
-        scope_preserve(hugr, PassScope::PreserveEntrypoint, preserve);
+        scope_preserve(hugr, scope, preserve)
     }
 }
