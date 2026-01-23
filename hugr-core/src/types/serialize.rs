@@ -1,6 +1,7 @@
 use std::sync::Arc;
 
 use ordered_float::OrderedFloat;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
 use super::{FuncValueType, SumType, TypeBound};
 
@@ -251,17 +252,16 @@ mod base64 {
     }
 }
 
-pub(crate) mod sertype {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    use super::SerSimpleType;
-    use crate::types::Term;
-
-    pub fn serialize<S: Serializer>(ty: &Term, s: S) -> Result<S::Ok, S::Error> {
-        SerSimpleType::try_from(ty.clone()).unwrap().serialize(s)
+impl serde_with::SerializeAs<Term> for SerSimpleType {
+    fn serialize_as<S: Serializer>(ty: &Term, serializer: S) -> Result<S::Ok, S::Error> {
+        SerSimpleType::try_from(ty.clone())
+            .unwrap()
+            .serialize(serializer)
     }
+}
 
-    pub fn deserialize<'de, D: Deserializer<'de>>(deser: D) -> Result<Term, D::Error> {
+impl<'de> serde_with::DeserializeAs<'de, Term> for SerSimpleType {
+    fn deserialize_as<D: Deserializer<'de>>(deser: D) -> Result<Term, D::Error> {
         let sertype: SerSimpleType = Deserialize::deserialize(deser)?;
         Ok(sertype.into())
     }
