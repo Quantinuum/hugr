@@ -16,22 +16,51 @@ use crate::types::type_param::{TermTypeError, check_term_type};
 use crate::types::{Substitutable, Term, TypeBound};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
-// Default here works only for <TypeRow>
-#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-/// Base type for listing inputs and output types.
+/// The concept of "signature" in the spec - a list of inputs and outputs being
+/// the edges required to/from a node or within a [`FuncDefn`].
 ///
-/// The exact semantics depend on the use case:
-/// - If `T=`[`TypeRow`], describes the edges required to/from a node or inside a [`FuncDefn`]; see [Signature].
-/// - If `T=`[`Term`], describes the type of a higher-order [`function value`] or the inputs/outputs from an `OpDef`;
-///   see [FuncValueType].
-///
-/// [`function value`]: crate::types::Type::RuntimeFunction
 /// [`FuncDefn`]: crate::ops::FuncDefn
-pub struct FuncTypeBase<T> {
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct Signature {
     /// Value inputs of the function.
-    pub input: T,
+    ///
+    /// Each *element* must [check_term_type] against [Term::RuntimeType] of
+    /// [TypeBound::Linear], hence the arity is fixed as the length of the row.
+    pub input: TypeRow,
     /// Value outputs of the function.
-    pub output: T,
+    ///
+    /// /// Each *element* must [check_term_type] against [Term::RuntimeType] of
+    /// [TypeBound::Linear], hence the arity is fixed as the length of the row.
+    pub output: TypeRow,
+}
+
+/// A function value whose number of inputs and outputs may be unknown.
+///
+/// ([FuncValueType::input] and [FuncValueType::output] are arbitrary [Term]s.)
+///
+/// Each must type-check against [Term::ListType]`(`Term::RuntimeType`(`[TypeBound::Linear]`))`
+/// so can include variables containing unknown numbers of types.
+///
+/// Used for [`OpDef`]'s and may be used as a type (of function-pointer values)
+/// on wires of a Hugr (see [`Type::new_function`]) but not a valid node type.
+///
+/// [`OpDef`]: crate::extension::OpDef
+#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+pub struct FuncValueType {
+    /// Value inputs of the function.
+    ///
+    /// Must [check_term_type] against [Term::ListType] of [Term::RuntimeType],
+    /// hence there may be variables ranging over lists of types, and so the
+    /// arity may vary according to the length of list with whose those variables
+    /// are instantiated.
+    pub input: Term,
+    /// Value outputs of the function.
+    ///
+    /// Must [check_term_type] against [Term::ListType] of [Term::RuntimeType],
+    /// hence there may be variables ranging over lists of types, and so the
+    /// arity may vary according to the length of list with whose those variables
+    /// are instantiated.
+    pub output: Term,
 }
 
 impl Default for FuncValueType {
@@ -43,58 +72,59 @@ impl Default for FuncValueType {
     }
 }
 
-/// The concept of "signature" in the spec - the edges required to/from a node
-/// or within a [`FuncDefn`], also the target (value) of a call (static).
-///
-/// Each *element* of [Signature::input] and [Signature::output] must type-check against
-/// [Term::RuntimeType]`(`[TypeBound::Linear]`)`, hence the function's
-/// arity is fixed as the length of the `Vec`.
-///
-/// [`FuncDefn`]: crate::ops::FuncDefn
-pub type Signature = FuncTypeBase<TypeRow>;
-
-/// A function whose [FuncValueType::input] and [FuncValueType::output] are arbitrary [Term]s.
-///
-/// Each must type-check against [Term::ListType]`(`Term::RuntimeType`(`[TypeBound::Linear]`))`
-/// so can include variables containing unknown numbers of types.
-///
-/// Used for [`OpDef`]'s and may be used as a type (of function-pointer values)
-/// on wires of a Hugr (see [`Type::new_function`]) but not a valid node type.
-///
-/// [`OpDef`]: crate::extension::OpDef
-pub type FuncValueType = FuncTypeBase<Term>;
-
-impl<T: Substitutable> Substitutable for FuncTypeBase<T> {
-    fn substitute(&self, tr: &Substitution) -> Self {
-        Self {
-            input: self.input.substitute(tr),
-            output: self.output.substitute(tr),
+macro_rules! func_type_general {
+    ($ft: ty, $io: ty) => {
+        impl Substitutable for $ft {
+            fn substitute(&self, tr: &Substitution) -> Self {
+                Self {
+                    input: self.input.substitute(tr),
+                    output: self.output.substitute(tr),
+                }
+            }
         }
-    }
+
+        impl Transformable for $ft {
+            fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+                // TODO handle extension sets?
+                Ok(self.input.transform(tr)? | self.output.transform(tr)?)
+            }
+        }
+
+        impl Display for $ft {
+            fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+                self.input.fmt(f)?;
+                f.write_str(" -> ")?;
+                self.output.fmt(f)
+            }
+        }
+
+        impl $ft {
+            #[inline]
+            /// Returns a row of the value inputs of the function.
+            #[must_use]
+            pub fn input(&self) -> &$io {
+                &self.input
+            }
+
+            #[inline]
+            /// Returns a row of the value outputs of the function.
+            #[must_use]
+            pub fn output(&self) -> &$io {
+                &self.output
+            }
+
+            #[inline]
+            /// Returns a tuple with the input and output rows of the function.
+            #[must_use]
+            pub fn io(&self) -> (&$io, &$io) {
+                (&self.input, &self.output)
+            }
+        }
+    };
 }
 
-impl<T> FuncTypeBase<T> {
-    #[inline]
-    /// Returns a row of the value inputs of the function.
-    #[must_use]
-    pub fn input(&self) -> &T {
-        &self.input
-    }
-
-    #[inline]
-    /// Returns a row of the value outputs of the function.
-    #[must_use]
-    pub fn output(&self) -> &T {
-        &self.output
-    }
-
-    #[inline]
-    /// Returns a tuple with the input and output rows of the function.
-    #[must_use]
-    pub fn io(&self) -> (&T, &T) {
-        (&self.input, &self.output)
-    }
-}
+func_type_general!(Signature, TypeRow);
+func_type_general!(FuncValueType, Term);
 
 impl FuncValueType {
     /// Create a new FuncValueType with specified inputs and outputs.
@@ -291,13 +321,6 @@ impl Signature {
     }
 }
 
-impl<IO: Transformable> Transformable for FuncTypeBase<IO> {
-    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
-        // TODO handle extension sets?
-        Ok(self.input.transform(tr)? | self.output.transform(tr)?)
-    }
-}
-
 impl Signature {
     /// Returns the type of a value [`Port`]. Returns `None` if the port is out
     /// of bounds.
@@ -415,14 +438,6 @@ impl Signature {
     pub fn output_ports(&self) -> impl Iterator<Item = OutgoingPort> + use<> {
         self.ports(Direction::Outgoing)
             .map(|p| p.as_outgoing().unwrap())
-    }
-}
-
-impl<T: Display> Display for FuncTypeBase<T> {
-    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        self.input.fmt(f)?;
-        f.write_str(" -> ")?;
-        self.output.fmt(f)
     }
 }
 
