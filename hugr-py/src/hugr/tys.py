@@ -183,8 +183,7 @@ def _resolve_typerow_exts_inplace(
     result = ExtensionResolutionResult()
     for i, ty in enumerate(row):
         resolved_ty, ty_result = ty._resolve_used_extensions(registry)
-        if resolved_ty is not ty:
-            row[i] = resolved_ty
+        row[i] = resolved_ty
         result.extend(ty_result)
     return result
 
@@ -292,9 +291,7 @@ class ListParam(TypeParam):
         self, registry: ExtensionRegistry | None = None
     ) -> tuple[TypeParam, ExtensionResolutionResult]:
         resolved_param, result = self.param._resolve_used_extensions(registry)
-        if resolved_param is not self.param:
-            return (ListParam(resolved_param), result)
-        return (self, result)
+        return (ListParam(resolved_param), result)
 
 
 @dataclass(frozen=True)
@@ -347,9 +344,7 @@ class ConstParam(TypeParam):
         self, registry: ExtensionRegistry | None = None
     ) -> tuple[TypeParam, ExtensionResolutionResult]:
         resolved_ty, result = self.ty._resolve_used_extensions(registry)
-        if resolved_ty is not self.ty:
-            return (ConstParam(resolved_ty), result)
-        return (self, result)
+        return (ConstParam(resolved_ty), result)
 
 
 # ------------------------------------------
@@ -376,9 +371,7 @@ class TypeTypeArg(TypeArg):
         self, registry: ExtensionRegistry | None = None
     ) -> tuple[TypeArg, ExtensionResolutionResult]:
         resolved_ty, result = self.ty._resolve_used_extensions(registry)
-        if resolved_ty is not self.ty:
-            return (TypeTypeArg(resolved_ty), result)
-        return (self, result)
+        return (TypeTypeArg(resolved_ty), result)
 
 
 @dataclass(frozen=True)
@@ -606,9 +599,7 @@ class VariableArg(TypeArg):
         self, registry: ExtensionRegistry | None = None
     ) -> tuple[TypeArg, ExtensionResolutionResult]:
         resolved_param, result = self.param._resolve_used_extensions(registry)
-        if resolved_param is not self.param:
-            return (VariableArg(self.idx, resolved_param), result)
-        return (self, result)
+        return (VariableArg(self.idx, resolved_param), result)
 
 
 # ----------------------------------------------
