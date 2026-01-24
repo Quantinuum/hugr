@@ -1,6 +1,8 @@
 use std::sync::Arc;
 
 use ordered_float::OrderedFloat;
+use serde::Serialize;
+use serde_with::serde_as;
 
 use super::{FuncValueType, SumType, TypeBound};
 
@@ -10,7 +12,7 @@ use crate::extension::SignatureError;
 use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
 use crate::types::type_param::{SeqPart, TermTypeError, TermVar, UpperBound};
-use crate::types::{Term, Type};
+use crate::types::{GeneralSum, Term, Type, sum_bound};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -199,11 +201,41 @@ impl From<TermSer> for Term {
     }
 }
 
-
 /// Helper for use with [serde_with::serde_as] to serialize
 /// a [TypeRow] *all of whose elements are types* in legacy Json
 // ALAN TODO just do this by default for all TypeRows? (Unless overridden?)
 pub(crate) enum SerTypeRow {}
+
+/// Helper for use with [serde_with::serde_as] to serialize a [Term]
+/// that is an instance of [`Term::ListType`]([`Term::RuntimeType`](...))
+/// as a list of types + row variables
+pub(crate) enum SerTypeRowRV {}
+
+/// Helper to (de)serialize GeneralSums without storing the (cached) bound
+#[serde_as]
+#[derive(serde::Serialize, serde::Deserialize)]
+pub(super) struct SerGenSum {
+    #[serde_as(as = "Vec<crate::types::serialize::SerTypeRowRV>")]
+    rows: Vec<Term>,
+}
+
+impl From<GeneralSum> for SerGenSum {
+    fn from(value: GeneralSum) -> Self {
+        Self {
+            rows: value.rows.into_owned(),
+        }
+    }
+}
+
+impl From<SerGenSum> for GeneralSum {
+    fn from(value: SerGenSum) -> Self {
+        let bound = sum_bound(value.rows.iter());
+        Self {
+            rows: value.rows.into(),
+            bound,
+        }
+    }
+}
 
 /// Helper type that serialises lists as JSON arrays for compatibility.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -270,60 +302,35 @@ pub(crate) mod sertype {
     }
 }
 
-fn term_to_ssts(t: Term) -> Vec<SerSimpleType> {
-    t.into_list_parts()
-        .map(|part| match part {
-            SeqPart::Item(t) => {
-                let s = SerSimpleType::try_from(t).unwrap();
-                assert!(!matches!(s, SerSimpleType::R { .. }));
-                s
-            }
-            SeqPart::Splice(t) => {
-                let s = SerSimpleType::try_from(t).unwrap();
-                assert!(matches!(s, SerSimpleType::R { .. }));
-                s
-            }
-        })
-        .collect()
-}
-
-fn term_from_ssts(items: Vec<SerSimpleType>) -> Term {
-    let list_parts = items.into_iter().map(|s| match s {
-        SerSimpleType::R { i, b } => SeqPart::Splice(Term::new_row_var_use(i, b)),
-        s => SeqPart::Item(Term::from(s)),
-    });
-    Term::new_list_from_parts(list_parts)
-}
-
-pub(crate) mod ser_type_row_rv {
-    use super::{SerSimpleType, term_from_ssts, term_to_ssts};
-    use crate::types::Term;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    pub fn serialize<S: Serializer>(tys: &Term, s: S) -> Result<S::Ok, S::Error> {
-        term_to_ssts(tys.clone()).serialize(s)
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(deser: D) -> Result<Term, D::Error> {
-        let sertypes: Vec<SerSimpleType> = Deserialize::deserialize(deser)?;
-        Ok(term_from_ssts(sertypes))
+impl serde_with::SerializeAs<Term> for SerTypeRowRV {
+    fn serialize_as<S: serde::Serializer>(source: &Term, serializer: S) -> Result<S::Ok, S::Error> {
+        let items: Vec<SerSimpleType> = source
+            .clone()
+            .into_list_parts()
+            .map(|part| match part {
+                SeqPart::Item(t) => {
+                    let s = SerSimpleType::try_from(t).unwrap();
+                    assert!(!matches!(s, SerSimpleType::R { .. }));
+                    s
+                }
+                SeqPart::Splice(t) => {
+                    let s = SerSimpleType::try_from(t).unwrap();
+                    assert!(matches!(s, SerSimpleType::R { .. }));
+                    s
+                }
+            })
+            .collect();
+        items.serialize(serializer)
     }
 }
 
-pub(crate) mod ser_sum_rows {
-    use super::{SerSimpleType, term_from_ssts, term_to_ssts};
-    use crate::types::TypeRow;
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    pub fn serialize<S: Serializer>(rows: &TypeRow, s: S) -> Result<S::Ok, S::Error> {
-        let rows: Vec<Vec<SerSimpleType>> = rows.into_iter().cloned().map(term_to_ssts).collect();
-        rows.serialize(s)
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(deser: D) -> Result<TypeRow, D::Error> {
-        let rows: Vec<Vec<SerSimpleType>> = Deserialize::deserialize(deser)?;
-        Ok(TypeRow::from(
-            rows.into_iter().map(term_from_ssts).collect::<Vec<_>>(),
-        ))
+impl<'de> serde_with::DeserializeAs<'de, Term> for SerTypeRowRV {
+    fn deserialize_as<D: serde::Deserializer<'de>>(deser: D) -> Result<Term, D::Error> {
+        let items: Vec<SerSimpleType> = serde::Deserialize::deserialize(deser)?;
+        let list_parts = items.into_iter().map(|s| match s {
+            SerSimpleType::R { i, b } => SeqPart::Splice(Term::new_row_var_use(i, b)),
+            s => SeqPart::Item(Term::from(s)),
+        });
+        Ok(Term::new_list_from_parts(list_parts))
     }
 }

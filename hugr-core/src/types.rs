@@ -178,6 +178,10 @@ pub enum SumType {
 
 /// General case of a [SumType]. Prefer using [SumType::new] and friends.
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(
+    into = "crate::types::serialize::SerGenSum",
+    from = "crate::types::serialize::SerGenSum"
+)]
 pub struct GeneralSum {
     /// Each term here must be an instance of [Term::ListType]([Term::RuntimeType]), being
     /// the elements of exactly one variant. (Thus, this explicitly forbids sums with an
@@ -186,11 +190,9 @@ pub struct GeneralSum {
     //`Term::ListType(Term::ListType(Term::RuntimeType))`, but then many functions like
     // `len` and `variants` would be impossible. (We might want a separate "FixedAritySum"
     // rust type supporting those, with try_from(SumType).)
-    #[serde(with = "crate::types::serialize::ser_sum_rows")]
     rows: TypeRow,
     /// Caches the bound. Falls back to [TypeBound::Linear] if any are not even runtime types
     /// (this is checked in validation)
-    #[serde(skip)] // TODO recalculate on deserialization
     bound: TypeBound,
 }
 

@@ -49,6 +49,7 @@ pub struct Signature {
 /// on wires of a Hugr (see [`Type::new_function`]) but not a valid node type.
 ///
 /// [`OpDef`]: crate::extension::OpDef
+#[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FuncValueType {
     /// Value inputs of the function.
@@ -57,7 +58,7 @@ pub struct FuncValueType {
     /// hence there may be variables ranging over lists of types, and so the
     /// arity may vary according to the length of list with whose those variables
     /// are instantiated.
-    #[serde(with = "crate::types::serialize::ser_type_row_rv")]
+    #[serde_as(as = "crate::types::serialize::SerTypeRowRV")]
     pub input: Term,
     /// Value outputs of the function.
     ///
@@ -65,7 +66,7 @@ pub struct FuncValueType {
     /// hence there may be variables ranging over lists of types, and so the
     /// arity may vary according to the length of list with whose those variables
     /// are instantiated.
-    #[serde(with = "crate::types::serialize::ser_type_row_rv")]
+    #[serde_as(as = "crate::types::serialize::SerTypeRowRV")]
     pub output: Term,
 }
 
