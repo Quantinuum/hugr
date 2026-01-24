@@ -1182,13 +1182,13 @@ mod test {
     }
 
     mod proptest {
-
         use proptest::prelude::*;
+        use prop::{collection::vec, strategy::Union};
 
         use super::super::{TermVar, UpperBound};
         use crate::proptest::RecursionDepth;
         use crate::types::{
-            CustomType, FuncValueType, SumType, Term, Type, TypeBound,
+            CustomType, FuncValueType, SumType, Term, TypeBound,
             proptest_utils::any_serde_type_param,
         };
 
@@ -1209,20 +1209,11 @@ mod test {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-                use prop::collection::vec;
-                use prop::strategy::Union;
-                let mut strat = Union::new([
+                let strat = Union::new([
                     Just(Self::StringType).boxed(),
                     Just(Self::BytesType).boxed(),
                     Just(Self::FloatType).boxed(),
                     Just(Self::StringType).boxed(),
-                    any_with::<CustomType>(depth.into())
-                        .prop_map(Self::new_extension)
-                        .boxed(),
-                    any_with::<FuncValueType>(depth)
-                        .prop_map(Self::new_function)
-                        .boxed(),
-                    any_with::<SumType>(depth).prop_map(Self::from).boxed(),
                     any::<TypeBound>().prop_map(Self::from).boxed(),
                     any::<UpperBound>().prop_map(Self::from).boxed(),
                     any::<u64>().prop_map(Self::from).boxed(),
@@ -1233,32 +1224,37 @@ mod test {
                     any::<f64>()
                         .prop_map(|value| Self::Float(value.into()))
                         .boxed(),
-                    any_with::<Type>(depth).prop_map(Self::from).boxed(),
                 ]);
-                if !depth.leaf() {
-                    // we descend here because we these constructors contain Terms
-                    strat = strat
-                        .or(
-                            // TODO this is a bit dodgy, TypeArgVariables are supposed
-                            // to be constructed from TypeArg::new_var_use. We are only
-                            // using this instance for serialization now, but if we want
-                            // to generate valid TypeArgs this will need to change.
-                            any_with::<TermVar>(depth.descend())
-                                .prop_map(Self::Variable)
-                                .boxed(),
-                        )
-                        .or(any_with::<Self>(depth.descend())
-                            .prop_map(Self::new_list_type)
-                            .boxed())
-                        .or(any_with::<Self>(depth.descend())
-                            .prop_map(Self::new_tuple_type)
-                            .boxed())
-                        .or(vec(any_with::<Self>(depth.descend()), 0..3)
-                            .prop_map(Self::new_list)
-                            .boxed());
+                if depth.leaf() {
+                    return strat.boxed();
                 }
-
-                strat.boxed()
+                // we descend here because we these constructors contain Terms
+                let depth = depth.descend();
+                strat
+                    .or(
+                        // TODO this is a bit dodgy, TypeArgVariables are supposed
+                        // to be constructed from TypeArg::new_var_use. We are only
+                        // using this instance for serialization now, but if we want
+                        // to generate valid TypeArgs this will need to change.
+                        any_with::<TermVar>(depth).prop_map(Self::Variable).boxed(),
+                    )
+                    .or(any_with::<Self>(depth)
+                        .prop_map(Self::new_list_type)
+                        .boxed())
+                    .or(any_with::<Self>(depth)
+                        .prop_map(Self::new_tuple_type)
+                        .boxed())
+                    .or(vec(any_with::<Self>(depth), 0..3)
+                        .prop_map(Self::new_list)
+                        .boxed())
+                    .or(any_with::<CustomType>(depth.into())
+                        .prop_map(Self::new_extension)
+                        .boxed())
+                    .or(any_with::<FuncValueType>(depth)
+                        .prop_map(Self::new_function)
+                        .boxed())
+                    .or(any_with::<SumType>(depth).prop_map(Self::from).boxed())
+                    .boxed()
             }
         }
 
