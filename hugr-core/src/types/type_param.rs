@@ -121,6 +121,8 @@ pub enum Term {
     #[display("{}", _0.into_inner())]
     Float(OrderedFloat<f64>),
     /// A list of static terms. Instance of [`Term::ListType`].
+    /// Note, not a [TypeRow] because `impl Arbitrary for TypeRow` generates only types.
+    /// TODO ALAN....so should we serialize TypeRow as Vec<SerSimpleType> ?
     #[display("[{}]", {
         use itertools::Itertools as _;
         // extra space matching old Display for Type(Row) - TODO, change Vec<Type> to TypeRow?
@@ -1182,14 +1184,13 @@ mod test {
     }
 
     mod proptest {
-        use proptest::prelude::*;
         use prop::{collection::vec, strategy::Union};
+        use proptest::prelude::*;
 
         use super::super::{TermVar, UpperBound};
         use crate::proptest::RecursionDepth;
         use crate::types::{
-            CustomType, FuncValueType, SumType, Term, TypeBound,
-            proptest_utils::any_serde_type_param,
+            Term, TypeBound, proptest_utils::any_serde_type_param, test::proptest::any_type,
         };
 
         impl Arbitrary for TermVar {
@@ -1224,6 +1225,7 @@ mod test {
                     any::<f64>()
                         .prop_map(|value| Self::Float(value.into()))
                         .boxed(),
+                    any_type(depth),
                 ]);
                 if depth.leaf() {
                     return strat.boxed();
@@ -1247,13 +1249,6 @@ mod test {
                     .or(vec(any_with::<Self>(depth), 0..3)
                         .prop_map(Self::new_list)
                         .boxed())
-                    .or(any_with::<CustomType>(depth.into())
-                        .prop_map(Self::new_extension)
-                        .boxed())
-                    .or(any_with::<FuncValueType>(depth)
-                        .prop_map(Self::new_function)
-                        .boxed())
-                    .or(any_with::<SumType>(depth).prop_map(Self::from).boxed())
                     .boxed()
             }
         }

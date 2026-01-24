@@ -367,7 +367,9 @@ impl Value {
         let vs = items.into_iter().collect_vec();
         let tys = vs.iter().map(Self::get_type).collect_vec();
 
-        Self::sum(0, vs, SumType::new_tuple(tys)).expect("Tuple type is valid")
+        let sty = SumType::try_new([tys.clone()])
+            .unwrap_or_else(|_| panic!("Values {:?} tys {:?}", vs, tys));
+        Self::sum(0, vs, sty).expect("Tuple type is valid")
     }
 
     /// Returns a constant function defined by a Hugr.
@@ -885,9 +887,9 @@ pub(crate) mod test {
         use super::super::{OpaqueValue, Sum};
         use crate::{
             ops::{Value, constant::CustomSerialized},
-            std_extensions::arithmetic::int_types::ConstInt,
-            std_extensions::collections::list::ListValue,
-            types::{SumType, Type},
+            proptest::RecursionDepth,
+            std_extensions::{arithmetic::int_types::ConstInt, collections::list::ListValue},
+            types::{SumType, test::proptest::any_type},
         };
         use ::proptest::{collection::vec, prelude::*};
         impl Arbitrary for OpaqueValue {
@@ -905,12 +907,14 @@ pub(crate) mod test {
                     32, // Target around 32 total elements
                     3,  // Each collection is up to 3 elements long
                     |child_strat| {
-                        (any::<Type>(), vec(child_strat, 0..3)).prop_map(|(typ, children)| {
-                            Self::new(ListValue::new(
-                                typ,
-                                children.into_iter().map(|e| Value::Extension { e }),
-                            ))
-                        })
+                        (any_type(RecursionDepth::default()), vec(child_strat, 0..3)).prop_map(
+                            |(typ, children)| {
+                                Self::new(ListValue::new(
+                                    typ,
+                                    children.into_iter().map(|e| Value::Extension { e }),
+                                ))
+                            },
+                        )
                     },
                 )
                 .boxed()

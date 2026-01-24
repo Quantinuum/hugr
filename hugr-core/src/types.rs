@@ -853,12 +853,33 @@ pub(crate) mod test {
         );
     }
 
-    mod proptest {
-
+    pub(crate) mod proptest {
         use crate::proptest::RecursionDepth;
 
-        use crate::types::{SumType, TypeRow};
+        use crate::types::{CustomType, FuncValueType, SumType, Term, TypeBound, TypeRow};
         use proptest::prelude::*;
+        use proptest::strategy::Union;
+
+        pub(crate) fn any_type(depth: RecursionDepth) -> BoxedStrategy<Term> {
+            let strat = Union::new([
+                (any::<TypeBound>(), any::<usize>())
+                    .prop_map(|(b, i)| Term::new_var_use(i, b))
+                    .boxed(),
+                any_with::<CustomType>(depth.into())
+                    .prop_map(Term::new_extension)
+                    .boxed(),
+            ]);
+            if depth.leaf() {
+                return strat.boxed();
+            }
+            let depth = depth.descend();
+            strat
+                .or(any_with::<FuncValueType>(depth)
+                    .prop_map(Term::new_function)
+                    .boxed())
+                .or(any_with::<SumType>(depth).prop_map(Term::from).boxed())
+                .boxed()
+        }
 
         impl Arbitrary for super::SumType {
             type Parameters = RecursionDepth;

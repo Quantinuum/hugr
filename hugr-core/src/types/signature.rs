@@ -508,7 +508,7 @@ mod test {
             let input_strategy = any_with::<Term>(depth);
             let output_strategy = any_with::<Term>(depth);
             (input_strategy, output_strategy)
-                .prop_map(|(input, output)| FuncValueType::new(input, output))
+                .prop_map(|(input, output)| FuncValueType::new_unchecked(input, output))
                 .boxed()
         }
         type Strategy = BoxedStrategy<Self>;

@@ -526,14 +526,14 @@ mod proptest {
     use crate::{
         ops::constant::CustomSerialized,
         proptest::{any_serde_json_value, any_string},
-        types::Type,
+        types::CustomType,
     };
 
     impl Arbitrary for CustomSerialized {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            let typ = any::<Type>();
+            let typ = any::<CustomType>().prop_map_into();
             // here we manually construct a serialized `dyn CustomConst`.
             // The "c" and "v" come from the `typetag::serde` annotation on
             // `trait CustomConst`.

@@ -138,9 +138,9 @@ impl From<&'static [Type]> for TypeRow {
     }
 }
 
-/// Fallibly convert a [Term] to a [TypeRowRV].
+/// Fallibly convert a [Term] to a [TypeRow].
 ///
-/// This will fail if `arg` is of non-sequence kind (e.g. Type).
+/// This will fail if `arg` is not a [Term::List].
 impl TryFrom<Term> for TypeRow {
     type Error = SignatureError;
 
@@ -207,7 +207,7 @@ mod test {
     mod proptest {
         use super::super::TypeRow;
         use crate::proptest::RecursionDepth;
-        use crate::types::Type;
+        use crate::types::test::proptest::any_type;
         use ::proptest::prelude::*;
 
         impl Arbitrary for TypeRow {
@@ -218,7 +218,7 @@ mod test {
                 if depth.leaf() {
                     Just(TypeRow::new()).boxed()
                 } else {
-                    vec(any_with::<Type>(depth), 0..4)
+                    vec(any_type(depth.descend()), 0..4)
                         .prop_map(|ts| ts.clone().into())
                         .boxed()
                 }
