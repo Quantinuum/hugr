@@ -523,7 +523,8 @@ class Custom(DataflowOp):
         new_op = Custom(self.op_name, signature, self.extension, new_args)
 
         result.unresolved_extensions.add(self.extension)
-        result.unused_ops.add(new_op)
+        if (self.extension, self.op_name) not in result.unresolved_ops:
+            result.unresolved_ops[(self.extension, self.op_name)] = new_op
 
         return (new_op, result)
 

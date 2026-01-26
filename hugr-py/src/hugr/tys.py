@@ -1032,9 +1032,6 @@ class Opaque(Type):
     def __str__(self) -> str:
         return _type_str(self.id, self.args)
 
-    def __hash__(self) -> int:
-        return hash(self._to_serial())
-
     def to_model(self) -> model.Term:
         # This cast is only necessary because `Type` can both be an
         # actual type or a row variable.
@@ -1068,7 +1065,8 @@ class Opaque(Type):
         new_type = Opaque(self.id, self.bound, new_args, self.extension)
 
         result.unresolved_extensions.add(self.extension)
-        result.unused_types.add(new_type)
+        if (self.extension, self.id) not in result.unresolved_types:
+            result.unresolved_types[(self.extension, self.id)] = new_type
 
         return (new_type, result)
 

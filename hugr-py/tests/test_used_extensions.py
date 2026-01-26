@@ -144,13 +144,18 @@ def test_type_resolution(typ: tys.Type, extensions: list[ext.Extension]) -> None
     _, result = typ._resolve_used_extensions()
     for extension in extensions:
         assert extension.name in result.unresolved_extensions
+    if extensions:
+        assert (TEST_EXT.name, "TestType") in result.unresolved_types
+    assert not result.unresolved_ops
 
     test_registry = ext.ExtensionRegistry()
     for extension in extensions:
         test_registry.add_extension(extension)
-    _, exts = typ._resolve_used_extensions(test_registry)
+    _, result = typ._resolve_used_extensions(test_registry)
     for extension in extensions:
-        assert extension.name in exts.used_extensions.ids()
+        assert extension.name in result.used_extensions.ids()
+    assert not result.unresolved_types
+    assert not result.unresolved_ops
 
 
 @pytest.mark.parametrize(
@@ -182,13 +187,18 @@ def test_type_arg_resolution(arg: tys.TypeArg, extensions: list[ext.Extension]) 
     _, result = arg._resolve_used_extensions()
     for extension in extensions:
         assert extension.name in result.unresolved_extensions
+    if extensions:
+        assert (TEST_EXT.name, "TestType") in result.unresolved_types
+    assert not result.unresolved_ops
 
     test_registry = ext.ExtensionRegistry()
     for extension in extensions:
         test_registry.add_extension(extension)
-    _, exts = arg._resolve_used_extensions(test_registry)
+    _, result = arg._resolve_used_extensions(test_registry)
     for extension in extensions:
-        assert extension.name in exts.used_extensions.ids()
+        assert extension.name in result.used_extensions.ids()
+    assert not result.unresolved_types
+    assert not result.unresolved_ops
 
 
 @pytest.mark.parametrize(
@@ -214,13 +224,18 @@ def test_type_param_resolution(
     _, result = param._resolve_used_extensions()
     for extension in extensions:
         assert extension.name in result.unresolved_extensions
+    if extensions:
+        assert (TEST_EXT.name, "TestType") in result.unresolved_types
+    assert not result.unresolved_ops
 
     test_registry = ext.ExtensionRegistry()
     for extension in extensions:
         test_registry.add_extension(extension)
-    _, exts = param._resolve_used_extensions(test_registry)
+    _, result = param._resolve_used_extensions(test_registry)
     for extension in extensions:
-        assert extension.name in exts.used_extensions.ids()
+        assert extension.name in result.used_extensions.ids()
+    assert not result.unresolved_types
+    assert not result.unresolved_ops
 
 
 @pytest.mark.parametrize(
@@ -256,12 +271,24 @@ def test_op_resolution(op: ops.Op, extensions: list[ext.Extension]) -> None:
     for extension in extensions:
         assert extension.name in result.unresolved_extensions
 
+    if isinstance(op, ops.Custom):
+        assert (op.extension, op.op_name) in result.unresolved_ops
+        assert not result.unresolved_types
+    elif extensions:
+        assert not result.unresolved_ops
+        assert (TEST_EXT.name, "TestType") in result.unresolved_types
+    else:
+        assert not result.unresolved_ops
+        assert not result.unresolved_types
+
     test_ext_registry = ext.ExtensionRegistry()
     for extension in extensions:
         test_ext_registry.add_extension(extension)
-    _, exts = op._resolve_used_extensions(test_ext_registry)
+    _, result = op._resolve_used_extensions(test_ext_registry)
     for extension in extensions:
-        assert extension.name in exts.used_extensions.ids()
+        assert extension.name in result.used_extensions.ids()
+    assert not result.unresolved_ops
+    assert not result.unresolved_types
 
 
 @pytest.mark.parametrize(

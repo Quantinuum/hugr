@@ -269,9 +269,6 @@ class TypeArg(RootModel):
     def deserialize(self) -> tys.TypeArg:
         return self.root.deserialize()
 
-    def __hash__(self) -> int:
-        return hash(self.root.model_dump_json())
-
 
 # --------------------------------------------
 # --------------- Container ------------------
@@ -464,9 +461,6 @@ class Opaque(BaseType):
             args=deser_it(self.args),
             bound=self.bound,
         )
-
-    def __hash__(self) -> int:
-        return hash((self.t, self.extension, self.id, tuple(self.args), self.bound))
 
 
 class Alias(BaseType):
