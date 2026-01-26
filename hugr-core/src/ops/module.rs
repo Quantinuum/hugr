@@ -2,10 +2,12 @@
 
 use std::borrow::Cow;
 
+use serde_with::serde_as;
 use smol_str::SmolStr;
 #[cfg(test)]
 use {
-    crate::proptest::{any_nonempty_smolstr, any_nonempty_string},
+    crate::proptest::{RecursionDepth, any_nonempty_smolstr, any_nonempty_string},
+    crate::types::test::proptest::any_type,
     ::proptest_derive::Arbitrary,
 };
 
@@ -231,6 +233,7 @@ impl OpTrait for FuncDecl {
 }
 
 /// A type alias definition, used only for debug/metadata.
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct AliasDefn {
@@ -238,8 +241,11 @@ pub struct AliasDefn {
     #[cfg_attr(test, proptest(strategy = "any_nonempty_smolstr()"))]
     pub name: SmolStr,
     /// Aliased type
+    #[serde_as(as = "crate::types::serialize::SerType")]
+    #[cfg_attr(test, proptest(strategy = "any_type(RecursionDepth::default())"))]
     pub definition: Type,
 }
+
 impl_op_name!(AliasDefn);
 impl StaticTag for AliasDefn {
     const TAG: OpTag = OpTag::Alias;
