@@ -39,6 +39,7 @@ use itertools::Itertools;
 use jsonschema::{Draft, Validator};
 use portgraph::{Hierarchy, LinkMut, PortMut, UnmanagedDenseMap, multiportgraph::MultiPortGraph};
 use rstest::rstest;
+use serde_with::serde_as;
 
 /// A serde-serializable hugr. Used for testing.
 #[derive(Debug, serde::Serialize)]
@@ -50,8 +51,10 @@ pub(super) struct HugrSer<'h>(#[serde(serialize_with = "Hugr::serde_serialize")]
 pub(super) struct HugrDeser(#[serde(deserialize_with = "Hugr::serde_deserialize")] pub Hugr);
 
 /// Version 1 of the Testing HUGR serialization format, see `testing_hugr.py`.
+#[serde_as]
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
 struct SerTestingLatest {
+    #[serde_as(as = "Option<crate::types::serialize::SerType>")]
     typ: Option<crate::types::TypeRV>,
     sum_type: Option<crate::types::SumType>,
     poly_func_type: Option<crate::types::PolyFuncTypeRV>,

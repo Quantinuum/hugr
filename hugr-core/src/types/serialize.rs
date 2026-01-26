@@ -2,7 +2,7 @@ use std::sync::Arc;
 
 use ordered_float::OrderedFloat;
 use serde::Serialize;
-use serde_with::serde_as;
+use serde_with::{DeserializeAs, SerializeAs, serde_as};
 
 use super::{FuncValueType, SumType, TypeBound};
 
@@ -211,6 +211,24 @@ pub(crate) enum SerTypeRow {}
 /// as a list of types + row variables
 pub(crate) enum SerTypeRowRV {}
 
+/// Helper for use with [serde_with::serde_as] to serialize a [Term]
+/// that is an instance of [`Term::RuntimeType`](...)
+/// as a json [SerSimpleType]
+pub(crate) enum SerType {}
+
+impl SerializeAs<Term> for SerType {
+    fn serialize_as<S: serde::Serializer>(ty: &Term, s: S) -> Result<S::Ok, S::Error> {
+        SerSimpleType::try_from(ty.clone()).unwrap().serialize(s)
+    }
+}
+
+impl<'de> DeserializeAs<'de, Term> for SerType {
+    fn deserialize_as<D: serde::Deserializer<'de>>(deser: D) -> Result<Term, D::Error> {
+        let sertype: SerSimpleType = serde::Deserialize::deserialize(deser)?;
+        Ok(sertype.into())
+    }
+}
+
 /// Helper to (de)serialize GeneralSums without storing the (cached) bound
 #[serde_as]
 #[derive(serde::Serialize, serde::Deserialize)]
@@ -283,22 +301,6 @@ mod base64 {
             .decode(base64.as_bytes())
             .map(|v| v.into())
             .map_err(serde::de::Error::custom)
-    }
-}
-
-pub(crate) mod sertype {
-    use serde::{Deserialize, Deserializer, Serialize, Serializer};
-
-    use super::SerSimpleType;
-    use crate::types::Term;
-
-    pub fn serialize<S: Serializer>(ty: &Term, s: S) -> Result<S::Ok, S::Error> {
-        SerSimpleType::try_from(ty.clone()).unwrap().serialize(s)
-    }
-
-    pub fn deserialize<'de, D: Deserializer<'de>>(deser: D) -> Result<Term, D::Error> {
-        let sertype: SerSimpleType = Deserialize::deserialize(deser)?;
-        Ok(sertype.into())
     }
 }
 
