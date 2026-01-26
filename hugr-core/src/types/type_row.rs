@@ -182,7 +182,7 @@ mod serialize {
     impl serde_with::SerializeAs<TypeRow> for SerTypeRow {
         fn serialize_as<S: Serializer>(tys: &TypeRow, s: S) -> Result<S::Ok, S::Error> {
             let elems: Vec<SerSimpleType> = tys
-                .into_iter()
+                .iter()
                 .map(|ty| ty.clone().try_into().unwrap())
                 .collect();
             elems.serialize(s)

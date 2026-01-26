@@ -45,10 +45,11 @@ impl TryFrom<Type> for SerSimpleType {
                 let i = tv.index();
                 match &*tv.cached_decl {
                     Term::RuntimeType(b) => return Ok(SerSimpleType::V { i, b: *b }),
-                    Term::ListType(b) => match &**b {
-                        Term::RuntimeType(b) => return Ok(SerSimpleType::R { i, b: *b }),
-                        _ => (),
-                    },
+                    Term::ListType(b) => {
+                        if let Term::RuntimeType(b) = &**b {
+                            return Ok(SerSimpleType::R { i, b: *b });
+                        }
+                    }
                     _ => (),
                 };
                 Err(SignatureError::TypeArgMismatch(
@@ -56,9 +57,7 @@ impl TryFrom<Type> for SerSimpleType {
                 ))
             }
             Term::RuntimeSum(st) => Ok(SerSimpleType::Sum(st)),
-            _ => {
-                return Err(SignatureError::InvalidTypeArgs);
-            }
+            _ => Err(SignatureError::InvalidTypeArgs),
         }
     }
 }

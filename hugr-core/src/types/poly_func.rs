@@ -127,11 +127,11 @@ macro_rules! poly_func_type_general {
 
 poly_func_type_general!(PolyFuncType, Signature);
 
-/// The polymorphic type of an [`OpDef`], whose number of input and outputs may vary,
-/// as the inputs and outputs may include variables ranging over lists of types
-/// which may be instantiated with different numbers of types.
+/// The polymorphic type of an [`OpDef`], with variable number of inputs and outputs.
 ///
-/// (Nodes/operations in the Hugr are not polymorphic.)
+/// The inputs and outputs may splice in variables ranging over lists of types,
+/// which may be instantiated with different numbers of types. These will be fixed
+/// for any given node.
 ///
 /// [`OpDef`]: crate::extension::OpDef
 #[derive(
