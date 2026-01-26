@@ -500,7 +500,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
         let evaled_fn = TypeRV::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone()],
-            FuncValueType::new(Term::new_list_concat([[evaled_fn].into(), inputs]), outputs),
+            FuncValueType::new(Term::concat_lists([[evaled_fn].into(), inputs]), outputs),
         );
         ext.add_op("eval".into(), String::new(), pf, extension_ref)
             .unwrap();
@@ -514,8 +514,8 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
                     Type::new_function(FuncValueType::new(rv(1), rv(3))),
                 ],
                 [Type::new_function(FuncValueType::new(
-                    Term::new_list_concat([rv(0), rv(1)]),
-                    Term::new_list_concat([rv(2), rv(3)]),
+                    Term::concat_lists([rv(0), rv(1)]),
+                    Term::concat_lists([rv(2), rv(3)]),
                 ))],
             ),
         );
@@ -556,7 +556,7 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
     let tv = TypeRV::new_row_var_use(0, TypeBound::Linear);
     let inner_ft = Type::new_function(FuncValueType::new_endo(tv.clone()));
-    let ft_usz = Type::new_function(FuncValueType::new_endo(Term::new_list_concat([
+    let ft_usz = Type::new_function(FuncValueType::new_endo(Term::concat_lists([
         tv.clone(),
         [usize_t()].into(),
     ])));

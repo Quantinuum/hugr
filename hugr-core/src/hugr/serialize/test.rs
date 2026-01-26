@@ -570,7 +570,7 @@ fn polyfunctype2() -> PolyFuncTypeRV {
     let tv0 = TypeRV::new_row_var_use(0, TypeBound::Linear);
     let tv1 = TypeRV::new_row_var_use(1, TypeBound::Copyable);
     let params = [TypeBound::Linear, TypeBound::Copyable].map(TypeParam::new_list_type);
-    let inputs = Term::new_list_concat([
+    let inputs = Term::concat_lists([
         Term::new_list([TypeRV::new_function(FuncValueType::new(
             tv0.clone(),
             tv1.clone(),

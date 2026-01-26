@@ -4,6 +4,7 @@
 //!
 //! [`TypeDef`]: crate::extension::TypeDef
 
+use itertools::Itertools as _;
 use ordered_float::OrderedFloat;
 #[cfg(test)]
 use proptest_derive::Arbitrary;
@@ -347,8 +348,11 @@ impl Term {
 
     /// Creates a new concatenated list.
     #[inline]
-    pub fn new_list_concat(lists: impl IntoIterator<Item = Self>) -> Self {
-        Self::ListConcat(lists.into_iter().collect())
+    pub fn concat_lists(lists: impl IntoIterator<Item = Self>) -> Self {
+        match lists.into_iter().exactly_one() {
+            Ok(list) => list,
+            Err(e) => Self::ListConcat(e.collect()),
+        }
     }
 
     /// Creates a new tuple from its items.
@@ -525,7 +529,7 @@ impl Term {
         Self::new_seq_from_parts(
             parts.into_iter().flat_map(ListPartIter::new),
             TypeArg::List,
-            TypeArg::ListConcat,
+            TypeArg::concat_lists,
         )
     }
 
@@ -555,7 +559,7 @@ impl Term {
     /// # let b = Term::new_string("b");
     /// # let c = Term::new_string("c");
     /// let var = Term::new_var_use(0, Term::new_list_type(Term::StringType));
-    /// let term = Term::new_list_concat([
+    /// let term = Term::concat_lists([
     ///     Term::new_list([a.clone(), b.clone()]),
     ///     var.clone(),
     ///     Term::new_list([c.clone()])
@@ -574,8 +578,8 @@ impl Term {
     /// # let a = Term::new_string("a");
     /// # let b = Term::new_string("b");
     /// # let c = Term::new_string("c");
-    /// let term = Term::new_list_concat([
-    ///     Term::new_list_concat([
+    /// let term = Term::concat_lists([
+    ///     Term::concat_lists([
     ///         Term::new_list([a.clone()]),
     ///         Term::new_list([b.clone()])
     ///     ]),
@@ -989,13 +993,13 @@ mod test {
         let var = Term::new_var_use(0, Term::new_list_type(Term::StringType));
         let parts = [
             SeqPart::Splice(Term::new_list([a.clone(), b.clone()])),
-            SeqPart::Splice(Term::new_list_concat([Term::new_list([c.clone()])])),
+            SeqPart::Splice(Term::concat_lists([Term::new_list([c.clone()])])),
             SeqPart::Item(d.clone()),
             SeqPart::Splice(var.clone()),
         ];
         assert_eq!(
             Term::new_list_from_parts(parts),
-            Term::new_list_concat([Term::new_list([a, b, c, d]), var])
+            Term::concat_lists([Term::new_list([a, b, c, d]), var])
         );
     }
 
@@ -1049,7 +1053,7 @@ mod test {
         // but a *list* of the rowvar is a list of list of types, which is wrong
         check_seq(&[rowvar(0, TypeBound::Copyable)], &seq_param).unwrap_err();
         check(
-            Term::new_list_concat([
+            Term::concat_lists([
                 rowvar(1, TypeBound::Linear),
                 vec![usize_t()].into(),
                 rowvar(0, TypeBound::Copyable),
@@ -1059,7 +1063,7 @@ mod test {
         .unwrap();
         // Next one fails because a list of Copyable is required
         check(
-            Term::new_list_concat([
+            Term::concat_lists([
                 rowvar(1, TypeBound::Linear),
                 vec![usize_t()].into(),
                 rowvar(0, TypeBound::Copyable),
@@ -1107,7 +1111,7 @@ mod test {
         // Now say a row variable referring to *that* row was used
         // to instantiate an outer "row parameter" (list of type).
         let outer_param = Term::new_list_type(TypeBound::Linear);
-        let outer_arg = Term::new_list_concat([
+        let outer_arg = Term::concat_lists([
             TypeRV::new_row_var_use(0, TypeBound::Copyable),
             Term::new_list([usize_t()]),
         ]);
@@ -1129,7 +1133,7 @@ mod test {
             // The row variables here refer to `row_var_decl` above
             vec![usize_t()].into(),
             row_var_use.clone(),
-            Term::new_list_concat([row_var_use, Term::new_list([usize_t()])]),
+            Term::concat_lists([row_var_use, Term::new_list([usize_t()])]),
         ]);
         check_term_type(&good_arg, &outer_param).unwrap();
 
@@ -1181,6 +1185,33 @@ mod test {
         let serialized = serde_json::to_string(&bytes_arg).unwrap();
         let deserialized: Term = serde_json::from_str(&serialized).unwrap();
         assert_eq!(deserialized, bytes_arg);
+    }
+
+    #[test]
+    fn list_from_single_part_item() {
+        // arbitrary, not but worth cost of trying everything in a proptest
+        let term = Term::new_list([Term::new_string("foo")]);
+        assert_eq!(
+            Term::List(vec![term.clone()]),
+            Term::new_list_from_parts(std::iter::once(SeqPart::Item(term)))
+        );
+    }
+
+    #[test]
+    fn list_from_single_part_splice() {
+        // arbitrary, not but worth cost of trying everything in a proptest
+        let term = Term::new_list([Term::new_string("foo")]);
+        assert_eq!(
+            term.clone(),
+            Term::new_list_from_parts(std::iter::once(SeqPart::Splice(term)))
+        );
+    }
+
+    #[test]
+    fn list_concat_single_item() {
+        // arbitrary, not but worth cost of trying everything in a proptest
+        let term = Term::new_list([Term::new_string("foo")]);
+        assert_eq!(term.clone(), Term::concat_lists([term]));
     }
 
     mod proptest {
