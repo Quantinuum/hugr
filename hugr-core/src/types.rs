@@ -856,30 +856,8 @@ pub(crate) mod test {
     pub(crate) mod proptest {
         use crate::proptest::RecursionDepth;
 
-        use crate::types::{CustomType, FuncValueType, SumType, Term, TypeBound, TypeRow};
+        use crate::types::{SumType, TypeRow};
         use proptest::prelude::*;
-        use proptest::strategy::Union;
-
-        pub(crate) fn any_type(depth: RecursionDepth) -> BoxedStrategy<Term> {
-            let strat = Union::new([
-                (any::<TypeBound>(), any::<usize>())
-                    .prop_map(|(b, i)| Term::new_var_use(i, b))
-                    .boxed(),
-                any_with::<CustomType>(depth.into())
-                    .prop_map(Term::new_extension)
-                    .boxed(),
-            ]);
-            if depth.leaf() {
-                return strat.boxed();
-            }
-            let depth = depth.descend();
-            strat
-                .or(any_with::<FuncValueType>(depth)
-                    .prop_map(Term::new_function)
-                    .boxed())
-                .or(any_with::<SumType>(depth).prop_map(Term::from).boxed())
-                .boxed()
-        }
 
         impl Arbitrary for super::SumType {
             type Parameters = RecursionDepth;
@@ -901,13 +879,34 @@ pub(crate) mod test {
 #[cfg(test)]
 pub(super) mod proptest_utils {
     use proptest::collection::vec;
-    use proptest::prelude::{Strategy, any_with};
-
-    use super::serialize::{TermSer, TypeArgSer, TypeParamSer};
-    use super::type_param::Term;
+    use proptest::prelude::{BoxedStrategy, Strategy, any, any_with};
+    use proptest::strategy::Union;
 
     use crate::proptest::RecursionDepth;
-    use crate::types::serialize::ArrayOrTermSer;
+
+    use super::serialize::{ArrayOrTermSer, TermSer, TypeArgSer, TypeParamSer};
+    use super::{CustomType, FuncValueType, SumType, TypeBound, type_param::Term};
+
+    pub(crate) fn any_type(depth: RecursionDepth) -> BoxedStrategy<Term> {
+        let strat = Union::new([
+            (any::<usize>(), any::<TypeBound>())
+                .prop_map(|(i, b)| Term::new_var_use(i, b))
+                .boxed(),
+            any_with::<CustomType>(depth.into())
+                .prop_map(Term::new_extension)
+                .boxed(),
+        ]);
+        if depth.leaf() {
+            return strat.boxed();
+        }
+        let depth = depth.descend();
+        strat
+            .or(any_with::<FuncValueType>(depth)
+                .prop_map(Term::new_function)
+                .boxed())
+            .or(any_with::<SumType>(depth).prop_map(Term::from).boxed())
+            .boxed()
+    }
 
     fn term_is_serde_type_arg(t: &Term) -> bool {
         let TermSer::TypeArg(arg) = TermSer::from(t.clone()) else {

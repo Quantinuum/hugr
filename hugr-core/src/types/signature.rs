@@ -487,8 +487,8 @@ mod test {
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
     use crate::proptest::RecursionDepth;
     use crate::type_row;
-    use crate::types::test::{FnTransformer, proptest::any_type};
-    use crate::types::{CustomType, TypeRow, type_param::SeqPart};
+    use crate::types::test::FnTransformer;
+    use crate::types::{CustomType, TypeRow, proptest_utils::any_type, type_param::SeqPart};
 
     use super::*;
 

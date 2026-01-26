@@ -889,7 +889,7 @@ pub(crate) mod test {
             ops::{Value, constant::CustomSerialized},
             proptest::RecursionDepth,
             std_extensions::{arithmetic::int_types::ConstInt, collections::list::ListValue},
-            types::{SumType, test::proptest::any_type},
+            types::{SumType, proptest_utils::any_type},
         };
         use ::proptest::{collection::vec, prelude::*};
         impl Arbitrary for OpaqueValue {

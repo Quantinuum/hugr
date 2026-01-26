@@ -7,7 +7,7 @@ use smol_str::SmolStr;
 #[cfg(test)]
 use {
     crate::proptest::{RecursionDepth, any_nonempty_smolstr, any_nonempty_string},
-    crate::types::test::proptest::any_type,
+    crate::types::proptest_utils::any_type,
     ::proptest_derive::Arbitrary,
 };
 

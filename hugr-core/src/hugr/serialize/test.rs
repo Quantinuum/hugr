@@ -669,7 +669,7 @@ mod proptest {
     use super::{NodeSer, SimpleOpDef};
     use crate::ops::{OpType, OpaqueOp, Value};
     use crate::proptest::RecursionDepth;
-    use crate::types::{PolyFuncTypeRV, test::proptest::any_type};
+    use crate::types::{PolyFuncTypeRV, proptest_utils::any_type};
     use proptest::prelude::*;
 
     impl Arbitrary for NodeSer {

@@ -207,7 +207,7 @@ mod test {
     mod proptest {
         use super::super::TypeRow;
         use crate::proptest::RecursionDepth;
-        use crate::types::test::proptest::any_type;
+        use crate::types::proptest_utils::any_type;
         use ::proptest::prelude::*;
 
         impl Arbitrary for TypeRow {

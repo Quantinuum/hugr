@@ -16,7 +16,7 @@ use crate::{IncomingPort, type_row};
 #[cfg(test)]
 use {
     crate::proptest::RecursionDepth,
-    crate::types::{proptest_utils::any_serde_type_arg_vec, test::proptest::any_type},
+    crate::types::proptest_utils::{any_serde_type_arg_vec, any_type},
     proptest_derive::Arbitrary,
 };
 

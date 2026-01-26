@@ -1189,9 +1189,8 @@ mod test {
 
         use super::super::{TermVar, UpperBound};
         use crate::proptest::RecursionDepth;
-        use crate::types::{
-            Term, TypeBound, proptest_utils::any_serde_type_param, test::proptest::any_type,
-        };
+        use crate::types::proptest_utils::{any_serde_type_param, any_type};
+        use crate::types::{Term, TypeBound};
 
         impl Arbitrary for TermVar {
             type Parameters = RecursionDepth;
