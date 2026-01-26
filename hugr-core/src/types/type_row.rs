@@ -12,13 +12,15 @@ use crate::{extension::SignatureError, types::Substitutable, utils::display_list
 use delegate::delegate;
 use itertools::Itertools;
 
-/// List of types/terms. Like a `Vec<`[Term]`>` but allows sharing via `Cow`
-/// and static allocation via [type_row!].
+/// List of types. Like a `Vec<`[Term]`>` but serializes into legacy
+/// JSON format for types only (serialization will panic if elements
+/// are not [Term::RuntimeType]s or row variables thereof).
+///
+/// Also allows sharing via `Cow` and static allocation via [type_row!].
 ///
 /// [type_row!]: crate::type_row
-#[derive(Clone, PartialEq, Eq, Debug, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, PartialEq, Eq, Debug, Hash)]
 #[non_exhaustive]
-#[serde(transparent)]
 pub struct TypeRow {
     /// The datatypes in the row.
     types: Cow<'static, [Term]>,
@@ -182,13 +184,13 @@ impl DerefMut for TypeRow {
 mod serialize {
     use super::TypeRow;
     use crate::types::Term;
-    use crate::types::serialize::{SerSimpleType, SerTypeRow};
+    use crate::types::serialize::SerSimpleType;
     use itertools::Itertools as _;
     use serde::{Deserialize, Deserializer, Serialize, Serializer};
 
-    impl serde_with::SerializeAs<TypeRow> for SerTypeRow {
-        fn serialize_as<S: Serializer>(tys: &TypeRow, s: S) -> Result<S::Ok, S::Error> {
-            let elems: Vec<SerSimpleType> = tys
+    impl Serialize for TypeRow {
+        fn serialize<S: Serializer>(&self, s: S) -> Result<S::Ok, S::Error> {
+            let elems: Vec<SerSimpleType> = self
                 .iter()
                 .map(|ty| ty.clone().try_into().unwrap())
                 .collect();
@@ -196,10 +198,10 @@ mod serialize {
         }
     }
 
-    impl<'de> serde_with::DeserializeAs<'de, TypeRow> for SerTypeRow {
-        fn deserialize_as<D: Deserializer<'de>>(deser: D) -> Result<TypeRow, D::Error> {
+    impl<'de> Deserialize<'de> for TypeRow {
+        fn deserialize<D: Deserializer<'de>>(deser: D) -> Result<Self, D::Error> {
             let sertypes: Vec<SerSimpleType> = Deserialize::deserialize(deser)?;
-            Ok(TypeRow::from(
+            Ok(Self::from(
                 sertypes.into_iter().map_into().collect::<Vec<Term>>(),
             ))
         }

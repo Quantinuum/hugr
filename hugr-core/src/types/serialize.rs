@@ -199,11 +199,6 @@ impl From<TermSer> for Term {
     }
 }
 
-/// Helper for use with [serde_with::serde_as] to serialize
-/// a [TypeRow] *all of whose elements are types* in legacy Json
-// ALAN TODO just do this by default for all TypeRows? (Unless overridden?)
-pub(crate) enum SerTypeRow {}
-
 /// Helper for use with [serde_with::serde_as] to serialize a [Term]
 /// that is an instance of [`Term::ListType`]([`Term::RuntimeType`](...))
 /// as a list of types + row variables

@@ -2,14 +2,11 @@
 
 use std::borrow::Cow;
 
-use serde_with::serde_as;
-
 use super::dataflow::DataflowOpTrait;
 use super::{OpTag, impl_op_name};
 use crate::types::{EdgeKind, Signature, Substitutable, Type, TypeRow};
 
 /// An operation that creates a tagged sum value from one of its variants.
-#[serde_as]
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
@@ -19,7 +16,6 @@ pub struct Tag {
     /// The variants of the sum type.
     /// TODO this allows *none* of the variants to contain row variables, but
     /// we could allow variants *other than the tagged one* to contain rowvars.
-    #[serde_as(as = "Vec<crate::types::serialize::SerTypeRow>")]
     pub variants: Vec<TypeRow>,
 }
 

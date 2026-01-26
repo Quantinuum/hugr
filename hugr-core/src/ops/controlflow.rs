@@ -2,8 +2,6 @@
 
 use std::borrow::Cow;
 
-use serde_with::serde_as;
-
 use crate::Direction;
 use crate::types::{EdgeKind, Signature, Substitutable, Type, TypeRow};
 
@@ -12,18 +10,14 @@ use super::dataflow::{DataflowOpTrait, DataflowParent};
 use super::{OpTrait, StaticTag, impl_op_name};
 
 /// Tail-controlled loop.
-#[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct TailLoop {
     /// Types that are only input
-    #[serde_as(as = "crate::types::serialize::SerTypeRow")]
     pub just_inputs: TypeRow,
     /// Types that are only output
-    #[serde_as(as = "crate::types::serialize::SerTypeRow")]
     pub just_outputs: TypeRow,
     /// Types that are appended to both input and output
-    #[serde_as(as = "crate::types::serialize::SerTypeRow")]
     pub rest: TypeRow,
 }
 
@@ -92,18 +86,14 @@ impl DataflowParent for TailLoop {
 }
 
 /// Conditional operation, defined by child `Case` nodes for each branch.
-#[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 pub struct Conditional {
     /// The possible rows of the Sum input
-    #[serde_as(as = "Vec<crate::types::serialize::SerTypeRow>")]
     pub sum_rows: Vec<TypeRow>,
     /// Remaining input types
-    #[serde_as(as = "crate::types::serialize::SerTypeRow")]
     pub other_inputs: TypeRow,
     /// Output types
-    #[serde_as(as = "crate::types::serialize::SerTypeRow")]
     pub outputs: TypeRow,
 }
 impl_op_name!(Conditional);
@@ -168,28 +158,22 @@ impl DataflowOpTrait for CFG {
     }
 }
 
-#[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 /// A CFG basic block node. The signature is that of the internal Dataflow graph.
 #[allow(missing_docs)]
 pub struct DataflowBlock {
-    #[serde_as(as = "crate::types::serialize::SerTypeRow")]
     pub inputs: TypeRow,
-    #[serde_as(as = "crate::types::serialize::SerTypeRow")]
     pub other_outputs: TypeRow,
-    #[serde_as(as = "Vec<crate::types::serialize::SerTypeRow>")]
     pub sum_rows: Vec<TypeRow>,
 }
 
-#[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 /// The single exit node of the CFG. Has no children,
 /// stores the types of the CFG node output.
 pub struct ExitBlock {
     /// Output type row of the CFG.
-    #[serde_as(as = "crate::types::serialize::SerTypeRow")]
     pub cfg_outputs: TypeRow,
 }
 
