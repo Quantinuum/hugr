@@ -481,12 +481,14 @@ impl PartialEq<Signature> for FuncValueType {
 
 #[cfg(test)]
 mod test {
-    use proptest::prelude::{Arbitrary, BoxedStrategy, Strategy, any_with};
+    use proptest::prelude::{Arbitrary, BoxedStrategy, Strategy, any, any_with};
+    use proptest::{collection::vec, strategy::Union};
 
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
     use crate::proptest::RecursionDepth;
     use crate::type_row;
-    use crate::types::{CustomType, TypeRow, test::FnTransformer};
+    use crate::types::test::{FnTransformer, proptest::any_type};
+    use crate::types::{CustomType, TypeRow, type_param::SeqPart};
 
     use super::*;
 
@@ -505,9 +507,17 @@ mod test {
     impl Arbitrary for FuncValueType {
         type Parameters = RecursionDepth;
         fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-            let input_strategy = any_with::<Term>(depth);
-            let output_strategy = any_with::<Term>(depth);
-            (input_strategy, output_strategy)
+            let io_strategy = vec(
+                Union::new([
+                    any_type(depth).prop_map(SeqPart::Item).boxed(),
+                    (any::<usize>(), any::<TypeBound>())
+                        .prop_map(|(idx, bound)| SeqPart::Splice(Term::new_row_var_use(idx, bound)))
+                        .boxed(),
+                ]),
+                0..3,
+            )
+            .prop_map(Term::new_list_from_parts);
+            (io_strategy.clone(), io_strategy)
                 .prop_map(|(input, output)| FuncValueType::new_unchecked(input, output))
                 .boxed()
         }
