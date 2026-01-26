@@ -10,7 +10,7 @@ use crate::extension::simple_op::{
 use crate::extension::{CustomValidator, OpDef, SignatureFunc, ValidateJustArgs};
 use crate::ops::OpName;
 use crate::ops::custom::ExtensionOp;
-use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRow, TypeRowRV};
+use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRow};
 use crate::utils::collect_array;
 
 use crate::{
@@ -136,7 +136,7 @@ impl MakeOpDef for IntOpDef {
             }
             ineg | iabs | inot | iu_to_s | is_to_u => iunop_sig().into(),
             idivmod_checked_u | idivmod_checked_s => {
-                let intpair: TypeRowRV = vec![tv0; 2].into();
+                let intpair = vec![tv0; 2];
                 int_polytype(
                     1,
                     intpair.clone(),
@@ -145,7 +145,7 @@ impl MakeOpDef for IntOpDef {
             }
             .into(),
             idivmod_u | idivmod_s => {
-                let intpair: TypeRowRV = vec![tv0; 2].into();
+                let intpair = vec![tv0; 2];
                 int_polytype(1, intpair.clone(), intpair.clone())
             }
             .into(),

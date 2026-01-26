@@ -220,7 +220,7 @@ impl ListOp {
     ) -> PolyFuncTypeRV {
         PolyFuncTypeRV::new(
             vec![Self::TP],
-            FuncValueType::new(input.into().into_owned(), output.into().into_owned()),
+            FuncValueType::new(input.into(), output.into()),
         )
     }
 

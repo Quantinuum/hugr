@@ -22,8 +22,13 @@ pub struct TypeRow {
     types: Cow<'static, [Term]>,
 }
 
-/// ALAN TODO Should remove this.
-pub type TypeRowRV = TypeRow;
+/// Legacy alias. Used to indicate a [Term] that `check_term_type`s against
+/// [Term::ListType] of [Term::RuntmeType] (of a [TypeBound]), i.e. one of
+/// * A [Term::Variable] of type [Term::ListType] (of [Term::RuntimeType]...)
+/// * A [Term::List], each of whose elements is of type some [Term::RuntimeType]
+/// * A [Term::ListConcat], each of whose sublists is one of these three
+// ALAN TODO Should remove this.
+pub type TypeRowRV = Term;
 
 impl Substitutable for TypeRow {
     /// Applies a substitution to the row.
