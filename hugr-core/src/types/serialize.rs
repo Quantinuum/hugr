@@ -57,7 +57,6 @@ impl TryFrom<Type> for SerSimpleType {
             }
             Term::RuntimeSum(st) => Ok(SerSimpleType::Sum(st)),
             _ => {
-                todo!("Only Custom types, functions, sums and variables supported ATM");
                 return Err(SignatureError::InvalidTypeArgs);
             }
         }
