@@ -199,7 +199,7 @@ impl<V: AbstractValue, N: std::fmt::Debug> PartialSum<V, N> {
     ///
     /// # Errors
     ///
-    /// If this `PartialSum` had multiple possible tags; or if `typ` was not a [`TypeEnum::Sum`]
+    /// If this `PartialSum` had multiple possible tags; or if `typ` was not a [`Type::RuntimeSum`]
     /// supporting the single possible tag with the correct number of elements and no row variables;
     /// or if converting a child element failed via [`PartialValue::try_into_concrete`].
     #[allow(clippy::type_complexity)] // Since C is a parameter, can't declare type aliases

@@ -123,7 +123,9 @@ pub enum Term {
     Float(OrderedFloat<f64>),
     /// A list of static terms. Instance of [`Term::ListType`].
     /// Note, not a [TypeRow] because `impl Arbitrary for TypeRow` generates only types.
-    /// TODO ALAN....so should we serialize TypeRow as Vec<SerSimpleType> ?
+    /// TODO ALAN....so should we serialize *all* TypeRows as `Vec<SerSimpleType>` ?
+    ///
+    /// [TypeRow]: super::TypeRow
     #[display("[{}]", {
         use itertools::Itertools as _;
         // extra space matching old Display for Type(Row) - TODO, change Vec<Type> to TypeRow?
@@ -400,6 +402,7 @@ impl Term {
         }
     }
 
+    #[allow(rustdoc::private_intra_doc_links)]
     /// Returns the [TypeBound] if this `Term` is a runtime type.
     /// (Does not check sub-[Term]s inside [Self::RuntimeSum] or [Self::RuntimeFunction];
     /// call [Self::validate] for that.)

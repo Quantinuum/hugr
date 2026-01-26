@@ -14,6 +14,8 @@ use itertools::Itertools;
 
 /// List of types/terms. Like a `Vec<`[Term]`>` but allows sharing via `Cow`
 /// and static allocation via [type_row!].
+///
+/// [type_row!]: crate::type_row
 #[derive(Clone, PartialEq, Eq, Debug, Hash, serde::Serialize, serde::Deserialize)]
 #[non_exhaustive]
 #[serde(transparent)]

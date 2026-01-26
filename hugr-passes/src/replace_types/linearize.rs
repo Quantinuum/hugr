@@ -106,7 +106,7 @@ pub trait Linearizer {
 
 /// A configuration for implementing [Linearizer] by delegating to
 /// type-specific callbacks, and by  composing them in order to handle compound types
-/// such as [`TypeEnum::Sum`]s.
+/// such as [`Term::RuntimeSum`]s.
 #[derive(Clone)]
 pub struct DelegatingLinearizer {
     // Keyed by lowered type, as only needed when there is an op outputting such
@@ -165,8 +165,8 @@ pub enum LinearizeError {
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
     /// We cannot linearize (insert copy and discard functions) for
-    /// [Variable](TypeEnum::Variable)s, [Row variables](TypeEnum::RowVar),
-    /// or [Alias](TypeEnum::Alias)es.
+    /// [Variable](Term::Variable)s (including row variables).
+    // or Aliases, as there is no Term::Alias
     #[error("Cannot linearize type {_0}")]
     UnsupportedType(Box<Type>),
     /// Neither does linearization make sense for copyable types
@@ -191,7 +191,7 @@ impl DelegatingLinearizer {
 
     /// Configures this instance that the specified monomorphic type can be copied and/or
     /// discarded via the provided [`NodeTemplate`]s - directly or as part of a compound type
-    /// e.g. [`TypeEnum::Sum`].
+    /// e.g. [`Term::RuntimeSum`].
     /// `copy` should have exactly one inport, of type `src`, and two outports, of same type;
     /// `discard` should have exactly one inport, of type 'src', and no outports.
     ///
