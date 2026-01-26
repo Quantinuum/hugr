@@ -14,7 +14,11 @@ use crate::types::{
 use crate::{IncomingPort, type_row};
 
 #[cfg(test)]
-use {crate::types::proptest_utils::any_serde_type_arg_vec, proptest_derive::Arbitrary};
+use {
+    crate::proptest::RecursionDepth,
+    crate::types::{proptest_utils::any_serde_type_arg_vec, test::proptest::any_type},
+    proptest_derive::Arbitrary,
+};
 
 /// Trait implemented by all dataflow operations.
 pub trait DataflowOpTrait: Sized {
@@ -334,10 +338,13 @@ impl DataflowOpTrait for CallIndirect {
 }
 
 /// Load a static constant in to the local dataflow graph.
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct LoadConstant {
     /// Constant type
+    #[cfg_attr(test, proptest(strategy = "any_type(RecursionDepth::default())"))]
+    #[serde_as(as = "crate::types::serialize::SerType")]
     pub datatype: Type,
 }
 impl_op_name!(LoadConstant);

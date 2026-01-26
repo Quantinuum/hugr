@@ -668,7 +668,8 @@ mod proptest {
     use super::check_testing_roundtrip;
     use super::{NodeSer, SimpleOpDef};
     use crate::ops::{OpType, OpaqueOp, Value};
-    use crate::types::{PolyFuncTypeRV, Type};
+    use crate::proptest::RecursionDepth;
+    use crate::types::{PolyFuncTypeRV, test::proptest::any_type};
     use proptest::prelude::*;
 
     impl Arbitrary for NodeSer {
@@ -696,7 +697,7 @@ mod proptest {
 
     proptest! {
         #[test]
-        fn prop_roundtrip_type(t:  Type) {
+        fn prop_roundtrip_type(t in any_type(RecursionDepth::default())) {
             check_testing_roundtrip(t);
         }
 
