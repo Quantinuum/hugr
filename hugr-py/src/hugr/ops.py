@@ -509,7 +509,6 @@ class Custom(DataflowOp):
 
         # Could not resolve to an ExtOp - return self with unresolved extension
         result = ExtensionResolutionResult()
-        result.unresolved_extensions.add(self.extension)
 
         signature, sig_result = self.signature._resolve_used_extensions(registry)
         assert isinstance(signature, tys.FunctionType)
@@ -521,7 +520,12 @@ class Custom(DataflowOp):
             new_args.append(resolved_arg)
             result.extend(arg_result)
 
-        return (Custom(self.op_name, signature, self.extension, new_args), result)
+        new_op = Custom(self.op_name, signature, self.extension, new_args)
+
+        result.unresolved_extensions.add(self.extension)
+        result.unused_ops.add(new_op)
+
+        return (new_op, result)
 
     def name(self) -> str:
         return f"Custom({self.op_name})"

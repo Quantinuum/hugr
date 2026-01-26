@@ -1032,6 +1032,9 @@ class Opaque(Type):
     def __str__(self) -> str:
         return _type_str(self.id, self.args)
 
+    def __hash__(self) -> int:
+        return hash(self._to_serial())
+
     def to_model(self) -> model.Term:
         # This cast is only necessary because `Type` can both be an
         # actual type or a row variable.
@@ -1056,15 +1059,18 @@ class Opaque(Type):
         # Could not resolve to an ExtType - return self with unresolved extension
         result = ExtensionResolutionResult()
 
-        result.unresolved_extensions.add(self.extension)
-
         new_args = []
         for arg in self.args:
             resolved_arg, arg_result = arg._resolve_used_extensions(registry)
             new_args.append(resolved_arg)
             result.extend(arg_result)
 
-        return (Opaque(self.id, self.bound, new_args, self.extension), result)
+        new_type = Opaque(self.id, self.bound, new_args, self.extension)
+
+        result.unresolved_extensions.add(self.extension)
+        result.unused_types.add(new_type)
+
+        return (new_type, result)
 
 
 @dataclass

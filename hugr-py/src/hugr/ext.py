@@ -521,10 +521,16 @@ class ExtensionResolutionResult:
         used_extensions: The extensions used by the HUGR.
         unresolved_extensions: A set of extension IDs referenced in the HUGR but
             not found in the given registry.
+        unused_ops: A set of Custom operations that could not be resolved to an
+            ExtOp because the operation was not found in the registry.
+        unused_types: A set of Opaque types that could not be resolved to an
+            ExtType because the type was not found in the registry.
     """
 
     used_extensions: ExtensionRegistry = field(default_factory=ExtensionRegistry)
     unresolved_extensions: set[ExtensionId] = field(default_factory=set)
+    unused_ops: set[ops.Custom] = field(default_factory=set)
+    unused_types: set[tys.Opaque] = field(default_factory=set)
 
     def ids(self) -> set[ExtensionId]:
         """Get the set of used extension IDs.
@@ -542,3 +548,5 @@ class ExtensionResolutionResult:
         """
         self.used_extensions.extend(other.used_extensions)
         self.unresolved_extensions.update(other.unresolved_extensions)
+        self.unused_ops.update(other.unused_ops)
+        self.unused_types.update(other.unused_types)
