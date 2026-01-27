@@ -36,7 +36,7 @@ __all__ = [
 
 def _try_hugr_qir() -> bool:
     try:
-        import hugr_qir  # noqa: F401, PLC0415
+        import hugr_qir  # noqa: F401, PLC0415  # type: ignore
 
         return True  # noqa: TRY300
     except ImportError:
@@ -125,8 +125,8 @@ class Package:
         :rtype: str
         """
         if _try_hugr_qir():
-            from hugr_qir.hugr_to_qir import hugr_to_qir  # noqa: PLC0415
-            from hugr_qir.output import OutputFormat  # noqa: PLC0415
+            from hugr_qir.hugr_to_qir import hugr_to_qir  # noqa: PLC0415  # type: ignore
+            from hugr_qir.output import OutputFormat  # noqa: PLC0415  # type: ignore
 
             qir_str = hugr_to_qir(
                 self, output_format=OutputFormat.LLVM_IR, validate_qir=validate_qir
@@ -148,8 +148,8 @@ class Package:
         :rtype: bytes
         """
         if _try_hugr_qir():
-            from hugr_qir.hugr_to_qir import hugr_to_qir  # noqa: PLC0415
-            from hugr_qir.output import OutputFormat  # noqa: PLC0415
+            from hugr_qir.hugr_to_qir import hugr_to_qir  # noqa: PLC0415  # type: ignore
+            from hugr_qir.output import OutputFormat  # noqa: PLC0415  # type: ignore
 
             qir_bytes = hugr_to_qir(
                 self, output_format=OutputFormat.BITCODE, validate_qir=validate_qir
