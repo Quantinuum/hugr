@@ -1468,6 +1468,7 @@ version = "0.25.4"
 dependencies = [
  "ascent",
  "derive_more 2.1.1",
+ "fxhash",
  "hugr-core",
  "itertools 0.14.0",
  "pastey",
@@ -1476,6 +1477,7 @@ dependencies = [
  "proptest",
  "proptest-recurse",
  "rstest",
+ "serde_json",
  "strum",
  "thiserror 2.0.18",
 ]
@@ -2620,7 +2622,7 @@ dependencies = [
  "rustc-hash",
  "rustls",
  "socket2",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tokio",
  "tracing",
  "web-time",
@@ -2642,7 +2644,7 @@ dependencies = [
  "rustls",
  "rustls-pki-types",
  "slab",
- "thiserror 2.0.17",
+ "thiserror 2.0.18",
  "tinyvec",
  "tracing",
  "web-time",

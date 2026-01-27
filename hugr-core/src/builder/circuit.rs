@@ -18,8 +18,8 @@ pub struct CircuitBuilder<'a, T: ?Sized> {
     /// List of wires that are being tracked, identified by their index in the vector.
     ///
     /// Terminating wires may create holes in the vector, but the indices are stable.
-    wires: Vec<Option<Wire>>,
-    builder: &'a mut T,
+    pub wires: Vec<Option<Wire>>,
+    pub builder: &'a mut T,
 }
 
 #[derive(Debug, Clone, PartialEq, Error)]

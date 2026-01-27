@@ -844,6 +844,17 @@ impl FromIterator<ExtensionId> for ExtensionSet {
     }
 }
 
+impl Extension {
+    /// Create a new extension for testing, with a 0 version.
+    pub fn new_test_arc(
+        name: ExtensionId,
+        init: impl FnOnce(&mut Extension, &Weak<Extension>),
+    ) -> Arc<Self> {
+        Self::new_arc(name, Version::new(0, 0, 0), init)
+    }
+}
+
+
 /// Extension tests.
 #[cfg(test)]
 pub mod test {
@@ -853,13 +864,6 @@ pub mod test {
     use super::*;
 
     impl Extension {
-        /// Create a new extension for testing, with a 0 version.
-        pub(crate) fn new_test_arc(
-            name: ExtensionId,
-            init: impl FnOnce(&mut Extension, &Weak<Extension>),
-        ) -> Arc<Self> {
-            Self::new_arc(name, Version::new(0, 0, 0), init)
-        }
 
         /// Create a new extension for testing, with a 0 version.
         pub(crate) fn try_new_test_arc(
