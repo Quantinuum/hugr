@@ -558,25 +558,6 @@ impl<'a> Substitution<'a> {
     }
 }
 
-/// Trait for static-level constructs that can have type variables
-/// substituted according to a [`Substitution`].
-pub trait Substitutable {
-    /// Applies a substitution to this instance. Infallible (assuming the `subst` covers all
-    /// variables) and will not invalidate the instance (assuming all values substituted in,
-    /// are valid instances of the variables they replace).
-    ///
-    /// May change the structure of `self` significantly, e.g. if variables that stand for
-    /// rows of types are replaced by fixed-length lists of types.
-    ///
-    /// May change the [TypeBound] of the resulting type, e.g. if a variable whose bound
-    /// is [TypeBound::Linear] is replaced by a concrete type that is [TypeBound::Copyable].
-    ///
-    /// # Panics
-    ///
-    /// If the substitution does not cover all type variables in `self`.
-    fn substitute(&self, subst: &Substitution) -> Self;
-}
-
 /// A transformation that can be applied to a [Type] or [`TypeArg`].
 ///
 /// More general in some ways than a Substitution: can fail with a

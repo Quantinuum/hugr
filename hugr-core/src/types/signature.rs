@@ -14,7 +14,7 @@ use crate::extension::resolution::{
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::types::type_param::{TermTypeError, check_term_type};
-use crate::types::{Substitutable, Term, TypeBound};
+use crate::types::{Term, TypeBound};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 /// The concept of "signature" in the spec - a list of inputs and outputs being
@@ -78,15 +78,6 @@ impl Default for FuncValueType {
 
 macro_rules! func_type_general {
     ($ft: ty, $io: ty) => {
-        impl Substitutable for $ft {
-            fn substitute(&self, tr: &Substitution) -> Self {
-                Self {
-                    input: self.input.substitute(tr),
-                    output: self.output.substitute(tr),
-                }
-            }
-        }
-
         impl Transformable for $ft {
             fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
                 // TODO handle extension sets?
@@ -122,6 +113,13 @@ macro_rules! func_type_general {
             #[must_use]
             pub fn io(&self) -> (&$io, &$io) {
                 (&self.input, &self.output)
+            }
+
+            pub(crate) fn substitute(&self, tr: &Substitution) -> Self {
+                Self {
+                    input: self.input.substitute(tr),
+                    output: self.output.substitute(tr),
+                }
             }
         }
     };

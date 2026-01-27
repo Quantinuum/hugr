@@ -7,8 +7,8 @@ use itertools::Itertools;
 use crate::extension::SignatureError;
 use crate::types::{FuncValueType, Signature};
 
+use super::Substitution;
 use super::type_param::{TypeArg, TypeParam, check_term_types};
-use super::{Substitutable, Substitution};
 
 /// A polymorphic type scheme, for a function ([`FuncDecl`] or [`FuncDefn`]).
 /// Number of inputs and outputs fixed (no row variables) so that [`Input`]

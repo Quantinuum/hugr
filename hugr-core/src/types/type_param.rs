@@ -17,7 +17,7 @@ use tracing::warn;
 
 use super::{Substitution, Transformable, Type, TypeBound, TypeTransformer};
 use crate::extension::SignatureError;
-use crate::types::{CustomType, FuncValueType, GeneralSum, Substitutable, SumType};
+use crate::types::{CustomType, FuncValueType, GeneralSum, SumType};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -631,35 +631,21 @@ impl Term {
     pub(crate) fn into_tuple_parts(self) -> TuplePartIter {
         TuplePartIter::new(SeqPart::Splice(self))
     }
-}
 
-fn check_typevar_decl(
-    decls: &[TypeParam],
-    idx: usize,
-    cached_decl: &TypeParam,
-) -> Result<(), SignatureError> {
-    match decls.get(idx) {
-        None => Err(SignatureError::FreeTypeVar {
-            idx,
-            num_decls: decls.len(),
-        }),
-        Some(actual) => {
-            // The cache here just mirrors the declaration. The typevar can be used
-            // anywhere expecting a kind *containing* the decl - see `check_type_arg`.
-            if actual == cached_decl {
-                Ok(())
-            } else {
-                Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    cached: Box::new(cached_decl.clone()),
-                    actual: Box::new(actual.clone()),
-                })
-            }
-        }
-    }
-}
-
-impl Substitutable for Term {
-    fn substitute(&self, s: &Substitution) -> Self {
+    /// Applies a substitution to this instance. Infallible (assuming the `subst` covers all
+    /// variables) and will not invalidate the instance (assuming all values substituted in,
+    /// are valid instances of the variables they replace).
+    ///
+    /// May change the structure of `self` significantly, e.g. if variables that stand for
+    /// rows of types are replaced by fixed-length lists of types.
+    ///
+    /// May change the [TypeBound] of the resulting type, e.g. if a variable whose bound
+    /// is [TypeBound::Linear] is replaced by a concrete type that is [TypeBound::Copyable].
+    ///
+    /// # Panics
+    ///
+    /// If the substitution does not cover all type variables in `self`.
+    pub(crate) fn substitute(&self, s: &Substitution) -> Self {
         match self {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
             TypeArg::RuntimeSum(SumType::General(GeneralSum { rows, .. })) => {
@@ -703,6 +689,31 @@ impl Substitutable for Term {
             Term::TupleType(item_types) => Term::new_list_type(item_types.substitute(s)),
             Term::StaticType => self.clone(),
             Term::ConstType(ty) => Term::new_const(ty.substitute(s)),
+        }
+    }
+}
+
+fn check_typevar_decl(
+    decls: &[TypeParam],
+    idx: usize,
+    cached_decl: &TypeParam,
+) -> Result<(), SignatureError> {
+    match decls.get(idx) {
+        None => Err(SignatureError::FreeTypeVar {
+            idx,
+            num_decls: decls.len(),
+        }),
+        Some(actual) => {
+            // The cache here just mirrors the declaration. The typevar can be used
+            // anywhere expecting a kind *containing* the decl - see `check_type_arg`.
+            if actual == cached_decl {
+                Ok(())
+            } else {
+                Err(SignatureError::TypeVarDoesNotMatchDeclaration {
+                    cached: Box::new(cached_decl.clone()),
+                    actual: Box::new(actual.clone()),
+                })
+            }
         }
     }
 }
@@ -965,7 +976,7 @@ mod test {
     use super::{Substitution, TypeArg, TypeParam, check_term_type};
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::types::type_param::SeqPart;
-    use crate::types::{Substitutable, Term, TypeRow};
+    use crate::types::{Term, TypeRow};
     use crate::types::{TypeBound, TypeRV, type_param::TermTypeError};
 
     #[test]

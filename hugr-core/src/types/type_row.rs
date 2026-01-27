@@ -8,7 +8,7 @@ use std::{
 };
 
 use super::{Substitution, Term, Transformable, Type, TypeTransformer, type_param::TypeParam};
-use crate::{extension::SignatureError, types::Substitutable, utils::display_list};
+use crate::{extension::SignatureError, utils::display_list};
 use delegate::delegate;
 use itertools::Itertools;
 
@@ -33,16 +33,6 @@ pub struct TypeRow {
 /// * A [Term::ListConcat], each of whose sublists is one of these three
 // ALAN TODO Should remove this.
 pub type TypeRowRV = Term;
-
-impl Substitutable for TypeRow {
-    /// Applies a substitution to the row.
-    fn substitute(&self, s: &Substitution) -> Self {
-        self.iter()
-            .map(|ty| ty.substitute(s))
-            .collect::<Vec<_>>()
-            .into()
-    }
-}
 
 impl Display for TypeRow {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
@@ -70,6 +60,14 @@ impl TypeRow {
     #[must_use]
     pub fn as_slice(&self) -> &[Term] {
         &self.types
+    }
+
+    /// Applies a substitution to the row.
+    pub(crate) fn substitute(&self, s: &Substitution) -> Self {
+        self.iter()
+            .map(|ty| ty.substitute(s))
+            .collect::<Vec<_>>()
+            .into()
     }
 
     delegate! {
