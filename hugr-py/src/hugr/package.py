@@ -124,7 +124,7 @@ class Package:
         :return: QIR corresponding to the HUGR input as str
         :rtype: str
         """
-        if _try_hugr_qir():
+        try:
             from hugr_qir.hugr_to_qir import hugr_to_qir  # noqa: PLC0415  # type: ignore
             from hugr_qir.output import OutputFormat  # noqa: PLC0415  # type: ignore
 
