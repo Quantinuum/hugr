@@ -126,7 +126,7 @@ class Package:
             return qir_str  # noqa: TRY300
         except ImportError as err:
             raise ImportError(
-                "The `to_qir_bytes` method requires package hugr-qir to be installed."  # noqa: EM101
+                "The `to_qir_str` method requires package hugr-qir to be installed."  # noqa: EM101
                 "For example via `pip install hugr-qir`"
             ) from err
 
