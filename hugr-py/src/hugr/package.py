@@ -34,15 +34,6 @@ __all__ = [
 ]
 
 
-def _try_hugr_qir() -> bool:
-    try:
-        import hugr_qir  # noqa: F401, PLC0415  # type: ignore
-
-        return True  # noqa: TRY300
-    except ImportError:
-        return False
-
-
 @dataclass(frozen=True)
 class Package:
     """A package of HUGR modules and extensions.
@@ -114,10 +105,8 @@ class Package:
         config = config or EnvelopeConfig.TEXT
         return make_envelope_str(self, config)
 
-
     def to_qir_str(self, *, validate_qir: bool = True) -> str:
-        """
-        Converts hugr package to qir str
+        """Converts hugr package to qir str.
 
         :param validate_qir: Whether to validate the created QIR
         :type validate_qir: bool
@@ -125,40 +114,47 @@ class Package:
         :rtype: str
         """
         try:
-            from hugr_qir.hugr_to_qir import hugr_to_qir  # noqa: PLC0415  # type: ignore
-            from hugr_qir.output import OutputFormat  # noqa: PLC0415  # type: ignore
+            from hugr_qir.hugr_to_qir import (  # type: ignore [import-not-found]
+                hugr_to_qir,
+            )
+            from hugr_qir.output import OutputFormat  # type: ignore [import-not-found]
 
             qir_str = hugr_to_qir(
                 self, output_format=OutputFormat.LLVM_IR, validate_qir=validate_qir
             )
-            assert isinstance(qir_str, str)  # noqa: S101
-            return qir_str
-        raise ValueError(  # noqa: TRY003
-            "please install hugr-qir, for example via `pip install hugr-qir`"  # noqa: EM101
-        )
-
+            assert isinstance(qir_str, str)
+            return qir_str  # noqa: TRY300
+        except ImportError as err:
+            raise ValueError(
+                "The `to_qir_bytes` method requires package hugr-qir to be installed."  # noqa: EM101
+                "For example via `pip install hugr-qir`"
+            ) from err
 
     def to_qir_bytes(self, *, validate_qir: bool = True) -> bytes:
-        """
-        Converts hugr package to qir bytes
+        """Converts hugr package to qir bytes.
 
         :param validate_qir: Whether to validate the created QIR
         :type validate_qir: bool
         :return: QIR corresponding to the HUGR input as bytes
         :rtype: bytes
         """
-        if _try_hugr_qir():
-            from hugr_qir.hugr_to_qir import hugr_to_qir  # noqa: PLC0415  # type: ignore
-            from hugr_qir.output import OutputFormat  # noqa: PLC0415  # type: ignore
+        try:
+            from hugr_qir.hugr_to_qir import (  # type: ignore [import-not-found]
+                hugr_to_qir,
+            )
+            from hugr_qir.output import OutputFormat  # type: ignore [import-not-found]
 
             qir_bytes = hugr_to_qir(
                 self, output_format=OutputFormat.BITCODE, validate_qir=validate_qir
             )
-            assert isinstance(qir_bytes, bytes)  # noqa: S101
-            return qir_bytes
-        raise ValueError(  # noqa: TRY003
-            "please install hugr-qir, for example via `pip install hugr-qir`"  # noqa: EM101
-        )
+            assert isinstance(qir_bytes, bytes)
+            return qir_bytes  # noqa: TRY300
+
+        except ImportError as err:
+            raise ValueError(
+                "The `to_qir_bytes` method requires package hugr-qir to be installed."  # noqa: EM101
+                "For example via `pip install hugr-qir`"
+            ) from err
 
     @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
     def to_json(self) -> str:
