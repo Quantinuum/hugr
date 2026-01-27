@@ -108,6 +108,9 @@ class Package:
     def to_qir_str(self, *, validate_qir: bool = True) -> str:
         """Converts hugr package to qir str.
 
+        This functions requires hugr-qir to be installed.
+        It can be installed for example via `pip install hugr-qir`
+
         :param validate_qir: Whether to validate the created QIR
         :type validate_qir: bool
         :return: QIR corresponding to the HUGR input as str
@@ -132,6 +135,9 @@ class Package:
 
     def to_qir_bytes(self, *, validate_qir: bool = True) -> bytes:
         """Converts hugr package to qir bytes.
+
+        This functions requires hugr-qir to be installed.
+        It can be installed for example via `pip install hugr-qir`
 
         :param validate_qir: Whether to validate the created QIR
         :type validate_qir: bool
