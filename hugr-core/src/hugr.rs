@@ -324,6 +324,34 @@ impl Hugr {
         node.into()
     }
 
+    /// Move all Const nodes to the same region as their succeeding LoadConstant
+    /// nodes. If a Const node has no successors, remove it. This is a hack to
+    /// make round-trip equality checking work, necessary because the model has
+    /// no representation of Const nodes.
+    fn canonicalize_consts(&mut self) {
+        let const_nodes = self
+            .nodes()
+            .filter(|n| self.get_optype(*n).is_const())
+            .collect_vec();
+        for node in const_nodes {
+            let const_parent = self.get_parent(node).unwrap();
+            let outport = self.node_outputs(node).exactly_one().ok().unwrap();
+            let succ_nodeports = self.all_linked_inputs(node).collect_vec();
+            for (succ_node, succ_inport) in succ_nodeports {
+                let succ_parent = self.get_parent(succ_node).unwrap();
+                if succ_parent == const_parent {
+                    continue;
+                }
+                self.disconnect_edge(node, outport, succ_node, succ_inport);
+                let new_node = self.add_node_before(succ_node, self.get_optype(node).clone());
+                self.connect(new_node, 0, succ_node, succ_inport);
+            }
+            if self.output_neighbours(node).peekable().peek().is_none() {
+                self.remove_node(node);
+            }
+        }
+    }
+
     /// Whether the node's children form either a dataflow sibling graph or a
     /// control-flow sibling graph. (For these nodes the positions of the first
     /// two children have semantic significance.)
@@ -418,6 +446,8 @@ impl Hugr {
     /// After this operation, a serialization and deserialization of the Hugr is guaranteed to
     /// preserve the indices.
     pub fn canonicalize_nodes(&mut self, mut rekey: impl FnMut(Node, Node)) {
+        self.canonicalize_consts();
+
         // Generate the ordered list of nodes
         let ordered = {
             let mut v = Vec::with_capacity(self.num_nodes());
