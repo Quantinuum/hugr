@@ -55,7 +55,8 @@ class Value(Protocol):
             The resolution result containing used and unresolved extensions.
         """
         ...
-
+        from hugr.ext import ExtensionResolutionResult
+        return ExtensionResolutionResult()
 
 @dataclass
 class Sum(Value):
