@@ -56,7 +56,9 @@ class Value(Protocol):
         """
         ...
         from hugr.ext import ExtensionResolutionResult
+
         return ExtensionResolutionResult()
+
 
 @dataclass
 class Sum(Value):
