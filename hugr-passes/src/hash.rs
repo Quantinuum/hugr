@@ -48,9 +48,14 @@ impl CircuitHash for Hugr {
             last_node = node;
         }
 
+        if false {
+        for node in self.nodes() {
+            let _ = node_hashes.node_hash(node).ok_or(HashError::CyclicCircuit)?;
+        }}
+
         node_hashes
             .node_hash(last_node)
-            .ok_or(HashError::CyclicCircuit)
+            .ok_or(HashError::Unexpected)
 
         
         // If the output node has no hash, the topological sort failed due to a cycle.
@@ -158,15 +163,17 @@ pub enum HashError {
     /// The hashed hugr is not a DFG.
     #[display("Tried to hash a non-dfg hugr.")]
     NotADfg,
+    /// Should not happen.
+    #[display("An unexpected error occurred during hashing.")]
+    Unexpected,
 }
 
 #[cfg(test)]
 mod test {
     use crate::utils::test_quantum_extension::{cx_gate, h_gate};
     use crate::utils::build_simple_hugr;
-    use hugr_core::builder::Dataflow;
-    use hugr_core::builder::CircuitBuilder;
-    use hugr_core::builder::DataflowSubContainer;
+    use hugr_core::builder::{Dataflow, CircuitBuilder, DataflowSubContainer};
+    use std::{fs::File, io::BufReader};
 
     use super::*;
 
@@ -260,17 +267,64 @@ mod test {
     //     circ.circuit_hash(circ.parent()).unwrap();
     // }
 
-    // #[test]
-    // fn hash_constants_neq() {
-    //     let c_str1 = r#"{"bits": [], "commands": [{"args": [["q", [0]]], "op": {"params": ["0.5"], "type": "Rz"}}], "created_qubits": [], "discarded_qubits": [], "implicit_permutation": [[["q", [0]], ["q", [0]]]], "phase": "0.0", "qubits": [["q", [0]]]}"#;
-    //     let c_str2 = r#"{"bits": [], "commands": [{"args": [["q", [0]]], "op": {"params": ["1.0"], "type": "Rz"}}], "created_qubits": [], "discarded_qubits": [], "implicit_permutation": [[["q", [0]], ["q", [0]]]], "phase": "0.0", "qubits": [["q", [0]]]}"#;
 
-    //     let mut all_hashes = Vec::with_capacity(2);
-    //     for c_str in [c_str1, c_str2] {
-    //         let ser: circuit_json::SerialCircuit = serde_json::from_str(c_str).unwrap();
-    //         let circ: Circuit = ser.decode(DecodeOptions::new()).unwrap();
-    //         all_hashes.push(circ.circuit_hash(circ.parent()).unwrap());
-    //     }
-    //     assert_ne!(all_hashes[0], all_hashes[1]);
-    // }
+
+    #[test]
+    fn hash_constants_neq() {
+
+        let folder_path = concat!(env!("CARGO_MANIFEST_DIR"), "/hugr_hash_test/");
+
+        let files = [
+            "conditional_loop.hugr",
+            "const_op.hugr",
+            "empty_func.hugr",
+            "fn_calls.hugr",
+            "loop_conditional.hugr",
+            "one_rz.hugr",
+            "repeat_until_success.hugr",
+        ];
+
+        // let mut hugrs = Vec::new();
+        // for entry in std::fs::read_dir(folder_path).unwrap() {
+        //     let entry = entry.unwrap();
+        //     let path = entry.path();
+        //     print!("1. Loading file: {:?}\n", path);
+        //     if path.extension().and_then(|s| s.to_str()) == Some("hugr") {
+        //     let file = File::open(&path).unwrap();
+        //     let hugr = Hugr::load(BufReader::new(file), None).unwrap();
+        //     hugrs.push(hugr);
+        //     }
+        // }
+
+        let mut hugrs = Vec::new();
+        for entry in files {
+            let file_path = format!("{}{}", folder_path, entry);
+            print!("Loading file: {}\n", entry);
+            let file = File::open(&file_path).unwrap();
+            let hugr = Hugr::load(BufReader::new(file), None);
+            let hugr = hugr.unwrap();
+            hugrs.push(hugr);
+        }
+        
+        
+
+        
+        
+        let mut all_hashes = Vec::new();
+
+        for hugr in &hugrs {
+            all_hashes.push(hugr.circuit_hash(hugr.entrypoint()).unwrap());
+        }
+        
+        let set: std::collections::HashSet<u64> = all_hashes.iter().copied().collect();
+        // check that all hashes are different
+        assert_eq!(set.len(), all_hashes.len());
+        
+        // for c_str in [c_str1, c_str2] {
+        //     let ser: circuit_json::SerialCircuit = serde_json::from_str(c_str).unwrap();
+        //     let circ: Circuit = ser.decode(DecodeOptions::new()).unwrap();
+        //     all_hashes.push(circ.circuit_hash(circ.parent()).unwrap());
+        // }
+        // assert_ne!(all_hashes[0], all_hashes[1]);
+    }
 }
