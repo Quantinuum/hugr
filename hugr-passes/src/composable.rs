@@ -1,5 +1,9 @@
 //! Compiler passes and utilities for composing them
 
+mod scope;
+
+pub use scope::{InScope, PassScope};
+
 use std::{error::Error, marker::PhantomData};
 
 use hugr_core::core::HugrNode;
@@ -17,6 +21,26 @@ pub trait ComposablePass<H: HugrMut>: Sized {
     /// Run the pass on the given HUGR.
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error>;
 
+    /// Set the scope configuration used to run the pass.
+    ///
+    /// See [`PassScope`] for more details.
+    ///
+    /// In `hugr 0.25.*`, this configuration is only a guidance, and may be
+    /// ignored by the pass by using the default implementation.
+    ///
+    /// From `hugr >=0.26.0`, passes must respect the scope configuration.
+    //
+    // For hugr passes, this is tracked by <https://github.com/Quantinuum/hugr/issues/2771>
+    fn with_scope(self, scope: &PassScope) -> Self {
+        // Currently passes are not required to respect the scope configuration.
+        // <https://github.com/Quantinuum/hugr/issues/2771>
+        //
+        // deprecated: Remove default implementation in hugr 0.26.0,
+        // ensure all passes follow the scope configuration.
+        let _ = scope;
+        self
+    }
+
     /// Apply a function to the error type of this pass, returning a new
     /// [`ComposablePass`] that has the same result type.
     fn map_err<E2: Error>(
@@ -28,6 +52,10 @@ pub trait ComposablePass<H: HugrMut>: Sized {
 
     /// Returns a [`ComposablePass`] that does "`self` then `other`", so long as
     /// `other::Err` can be combined with ours.
+    ///
+    /// Composed passes may have different configured [`PassScope`]s. Use
+    /// [`ComposablePass::with_scope`] after the composition to override all the
+    /// scope configurations if needed.
     fn then<P: ComposablePass<H>, E: ErrorCombiner<Self::Error, P::Error>>(
         self,
         other: P,
@@ -47,6 +75,14 @@ pub trait ComposablePass<H: HugrMut>: Sized {
                 let res1 = self.0.run(hugr).map_err(E::from_first)?;
                 let res2 = self.1.run(hugr).map_err(E::from_second)?;
                 Ok((res1, res2))
+            }
+
+            fn with_scope(self, scope: &PassScope) -> Self {
+                Self(
+                    self.0.with_scope(scope),
+                    self.1.with_scope(scope),
+                    PhantomData,
+                )
             }
         }
 
@@ -109,6 +145,10 @@ impl<P: ComposablePass<H>, H: HugrMut, E: Error, F: Fn(P::Error) -> E> Composabl
 
     fn run(&self, hugr: &mut H) -> Result<P::Result, Self::Error> {
         self.0.run(hugr).map_err(&self.1)
+    }
+
+    fn with_scope(self, scope: &PassScope) -> Self {
+        Self(self.0.with_scope(scope), self.1, PhantomData)
     }
 }
 
@@ -188,6 +228,10 @@ where
         })?;
         Ok(res)
     }
+
+    fn with_scope(self, scope: &PassScope) -> Self {
+        Self(self.0.with_scope(scope), self.1)
+    }
 }
 
 // IfThen ------------------------------
@@ -224,6 +268,14 @@ impl<
         let res: bool = self.0.run(hugr).map_err(ErrorCombiner::from_first)?;
         res.then(|| self.1.run(hugr).map_err(ErrorCombiner::from_second))
             .transpose()
+    }
+
+    fn with_scope(self, scope: &PassScope) -> Self {
+        Self(
+            self.0.with_scope(scope),
+            self.1.with_scope(scope),
+            PhantomData,
+        )
     }
 }
 
