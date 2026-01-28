@@ -3,11 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from typing import TYPE_CHECKING
 
 import hugr.tys as tys
 from hugr import val
 from hugr.std import _load_extension
 from hugr.utils import comma_sep_str
+
+if TYPE_CHECKING:
+    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
 
 EXTENSION = _load_extension("collections.list")
 
@@ -33,6 +37,22 @@ class List(tys.ExtType):
     def type_bound(self) -> tys.TypeBound:
         return self.ty.type_bound()
 
+    def _resolve_used_extensions(
+        self, registry: ExtensionRegistry | None = None
+    ) -> tuple[List, ExtensionResolutionResult]:
+        ext_type, result = super()._resolve_used_extensions(registry)
+
+        assert isinstance(
+            ext_type, tys.ExtType
+        ), "HUGR internal error, expected resolved type to be extension type."
+        assert (
+            ext_type.type_def == EXTENSION.types["List"]
+        ), "HUGR internal error, expected resolved type to be list."
+
+        list = List(tys.Unit)
+        list.args = ext_type.args
+        return list, result
+
 
 @dataclass
 class ListVal(val.ExtensionValue):
@@ -56,3 +76,15 @@ class ListVal(val.ExtensionValue):
 
     def __str__(self) -> str:
         return f"[{comma_sep_str(self.v)}]"
+
+    def _resolve_used_extensions_inplace(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionResolutionResult:
+        resolved_ty, result = self.ty._resolve_used_extensions(registry)
+        assert isinstance(
+            resolved_ty, List
+        ), "HUGR internal error, expected resolved type to be list."
+        self.ty = resolved_ty
+        for value in self.v:
+            result.extend(value._resolve_used_extensions_inplace(registry))
+        return result

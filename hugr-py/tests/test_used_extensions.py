@@ -3,13 +3,14 @@
 import hugr
 import hugr.ops as ops
 import hugr.tys as tys
-from hugr import ext
+from hugr import ext, val
 
 from hugr.build import Dfg
 from hugr.std.collections.list import List
 from hugr.std.int import INT_T, INT_TYPES_EXTENSION
+import pytest
 
-from .conftest import H, QUANTUM_EXT
+from .conftest import H, QUANTUM_EXT, TEST_EXT, TEST_TYPE_OPAQUE, TEST_OP_OPAQUE
 
 
 def test_extension_ops() -> None:
@@ -114,3 +115,223 @@ def test_op_signature_contains_same_extension() -> None:
     # because the signature contains my_type (from my_ext) and we also add my_ext
     exts = op.used_extensions()
     assert my_ext.name in exts.ids()
+
+
+@pytest.mark.parametrize(
+    ("typ", "extensions"),
+    [
+        # Opaque type
+        (TEST_TYPE_OPAQUE, [TEST_EXT]),
+        (tys.Sum([[TEST_TYPE_OPAQUE], [tys.Bool]]), [TEST_EXT]),
+        (tys.Tuple(TEST_TYPE_OPAQUE, tys.Bool), [TEST_EXT]),
+        (tys.Option(TEST_TYPE_OPAQUE), [TEST_EXT]),
+        (tys.Either([TEST_TYPE_OPAQUE], [tys.Bool]), [TEST_EXT]),
+        (tys.UnitSum(3), []),
+        (tys.FunctionType([TEST_TYPE_OPAQUE], [tys.Bool]), [TEST_EXT]),
+        (
+            tys.PolyFuncType(
+                [tys.FloatParam()], tys.FunctionType([TEST_TYPE_OPAQUE], [tys.Bool])
+            ),
+            [TEST_EXT],
+        ),
+        (tys.Variable(0, tys.TypeBound.Copyable), []),
+        (tys.RowVariable(0, tys.TypeBound.Copyable), []),
+        (tys.Alias("MyAlias", tys.TypeBound.Copyable), []),
+    ],
+)
+def test_type_resolution(typ: tys.Type, extensions: list[ext.Extension]) -> None:
+    """Test that Opaque types are tracked and resolved correctly."""
+    _, result = typ._resolve_used_extensions()
+    for extension in extensions:
+        assert extension.name in result.unresolved_extensions
+    if extensions:
+        assert (TEST_EXT.name, "TestType") in result.unresolved_types
+    assert not result.unresolved_ops
+
+    test_registry = ext.ExtensionRegistry()
+    for extension in extensions:
+        test_registry.add_extension(extension)
+    _, result = typ._resolve_used_extensions(test_registry)
+    for extension in extensions:
+        assert extension.name in result.used_extensions.ids()
+    assert not result.unresolved_types
+    assert not result.unresolved_ops
+
+
+@pytest.mark.parametrize(
+    ("arg", "extensions"),
+    [
+        (tys.TypeTypeArg(TEST_TYPE_OPAQUE), [TEST_EXT]),
+        (tys.ListArg([tys.TypeTypeArg(TEST_TYPE_OPAQUE)]), [TEST_EXT]),
+        (
+            tys.TupleArg([tys.TypeTypeArg(TEST_TYPE_OPAQUE), tys.BoundedNatArg(5)]),
+            [TEST_EXT],
+        ),
+        (
+            tys.ListConcatArg([tys.ListArg([tys.TypeTypeArg(TEST_TYPE_OPAQUE)])]),
+            [TEST_EXT],
+        ),
+        (
+            tys.TupleConcatArg([tys.TupleArg([tys.TypeTypeArg(TEST_TYPE_OPAQUE)])]),
+            [TEST_EXT],
+        ),
+        (tys.VariableArg(0, tys.ConstParam(TEST_TYPE_OPAQUE)), [TEST_EXT]),
+        (tys.BoundedNatArg(42), []),
+        (tys.StringArg("hello"), []),
+        (tys.FloatArg(3.14), []),
+        (tys.BytesArg(b"bytes"), []),
+    ],
+)
+def test_type_arg_resolution(arg: tys.TypeArg, extensions: list[ext.Extension]) -> None:
+    """Test that type arguments are tracked and resolved correctly."""
+    _, result = arg._resolve_used_extensions()
+    for extension in extensions:
+        assert extension.name in result.unresolved_extensions
+    if extensions:
+        assert (TEST_EXT.name, "TestType") in result.unresolved_types
+    assert not result.unresolved_ops
+
+    test_registry = ext.ExtensionRegistry()
+    for extension in extensions:
+        test_registry.add_extension(extension)
+    _, result = arg._resolve_used_extensions(test_registry)
+    for extension in extensions:
+        assert extension.name in result.used_extensions.ids()
+    assert not result.unresolved_types
+    assert not result.unresolved_ops
+
+
+@pytest.mark.parametrize(
+    ("param", "extensions"),
+    [
+        (tys.ListParam(tys.ConstParam(TEST_TYPE_OPAQUE)), [TEST_EXT]),
+        (
+            tys.TupleParam([tys.ConstParam(TEST_TYPE_OPAQUE), tys.BoundedNatParam()]),
+            [TEST_EXT],
+        ),
+        (tys.ConstParam(TEST_TYPE_OPAQUE), [TEST_EXT]),
+        (tys.TypeTypeParam(tys.TypeBound.Copyable), []),
+        (tys.BoundedNatParam(100), []),
+        (tys.StringParam(), []),
+        (tys.FloatParam(), []),
+        (tys.BytesParam(), []),
+    ],
+)
+def test_type_param_resolution(
+    param: tys.TypeParam, extensions: list[ext.Extension]
+) -> None:
+    """Test that type parameters are tracked and resolved correctly."""
+    _, result = param._resolve_used_extensions()
+    for extension in extensions:
+        assert extension.name in result.unresolved_extensions
+    if extensions:
+        assert (TEST_EXT.name, "TestType") in result.unresolved_types
+    assert not result.unresolved_ops
+
+    test_registry = ext.ExtensionRegistry()
+    for extension in extensions:
+        test_registry.add_extension(extension)
+    _, result = param._resolve_used_extensions(test_registry)
+    for extension in extensions:
+        assert extension.name in result.used_extensions.ids()
+    assert not result.unresolved_types
+    assert not result.unresolved_ops
+
+
+@pytest.mark.parametrize(
+    ("op", "extensions"),
+    [
+        (TEST_OP_OPAQUE, [TEST_EXT]),
+        (ops.MakeTuple([TEST_TYPE_OPAQUE]), [TEST_EXT]),
+        (ops.UnpackTuple([TEST_TYPE_OPAQUE]), [TEST_EXT]),
+        (ops.Tag(0, tys.Sum([[TEST_TYPE_OPAQUE], []])), [TEST_EXT]),
+        (ops.LoadConst(TEST_TYPE_OPAQUE), [TEST_EXT]),
+        (ops.Conditional(tys.Sum([[TEST_TYPE_OPAQUE], []]), [tys.Bool]), [TEST_EXT]),
+        (ops.Case([TEST_TYPE_OPAQUE]), [TEST_EXT]),
+        (ops.TailLoop([TEST_TYPE_OPAQUE], [tys.Bool]), [TEST_EXT]),
+        (ops.DFG([TEST_TYPE_OPAQUE]), [TEST_EXT]),
+        (ops.CFG([TEST_TYPE_OPAQUE]), [TEST_EXT]),
+        (ops.DataflowBlock([TEST_TYPE_OPAQUE]), [TEST_EXT]),
+        (ops.ExitBlock([TEST_TYPE_OPAQUE]), [TEST_EXT]),
+        (ops.FuncDefn("test_fn", [TEST_TYPE_OPAQUE]), [TEST_EXT]),
+        (
+            ops.FuncDecl(
+                "test_fn",
+                tys.PolyFuncType([], tys.FunctionType([TEST_TYPE_OPAQUE], [])),
+            ),
+            [TEST_EXT],
+        ),
+        (ops.CallIndirect(tys.FunctionType([TEST_TYPE_OPAQUE], [])), [TEST_EXT]),
+        (ops.AliasDefn("MyAlias", TEST_TYPE_OPAQUE), [TEST_EXT]),
+    ],
+)
+def test_op_resolution(op: ops.Op, extensions: list[ext.Extension]) -> None:
+    """Test that ops are tracked and resolved correctly."""
+    _, result = op._resolve_used_extensions()
+    for extension in extensions:
+        assert extension.name in result.unresolved_extensions
+
+    if isinstance(op, ops.Custom):
+        assert (op.extension, op.op_name) in result.unresolved_ops
+        assert not result.unresolved_types
+    elif extensions:
+        assert not result.unresolved_ops
+        assert (TEST_EXT.name, "TestType") in result.unresolved_types
+    else:
+        assert not result.unresolved_ops
+        assert not result.unresolved_types
+
+    test_ext_registry = ext.ExtensionRegistry()
+    for extension in extensions:
+        test_ext_registry.add_extension(extension)
+    _, result = op._resolve_used_extensions(test_ext_registry)
+    for extension in extensions:
+        assert extension.name in result.used_extensions.ids()
+    assert not result.unresolved_ops
+    assert not result.unresolved_types
+
+
+@pytest.mark.parametrize(
+    ("value", "extensions"),
+    [
+        (val.Sum(0, tys.Sum([[TEST_TYPE_OPAQUE], []]), []), [TEST_EXT]),
+        (val.Tuple(val.TRUE), []),
+        (val.Some(val.TRUE), []),
+        (val.None_(TEST_TYPE_OPAQUE), [TEST_EXT]),
+        (val.Left([], [TEST_TYPE_OPAQUE]), [TEST_EXT]),
+        (val.Right([TEST_TYPE_OPAQUE], []), [TEST_EXT]),
+        (val.UnitSum(0, 3), []),
+        (val.Extension("test", TEST_TYPE_OPAQUE, {}), [TEST_EXT]),
+    ],
+)
+def test_value_resolution(value: val.Value, extensions: list[ext.Extension]) -> None:
+    """Test that values are tracked and resolved correctly."""
+    result = value._resolve_used_extensions_inplace()
+    for extension in extensions:
+        assert extension.name in result.unresolved_extensions
+
+    # Reset the value for the second test by creating a fresh copy
+    test_ext_registry = ext.ExtensionRegistry()
+    for extension in extensions:
+        test_ext_registry.add_extension(extension)
+    result = value._resolve_used_extensions_inplace(test_ext_registry)
+    for extension in extensions:
+        assert extension.name in result.used_extensions.ids()
+
+
+def test_hugr_with_opaque_type_resolve() -> None:
+    """Test that Hugr.used_extensions can resolve opaque types."""
+    # Create a DFG with the opaque type
+    h = Dfg(TEST_TYPE_OPAQUE)
+    (inp,) = h.inputs()
+    h.set_outputs(inp)
+
+    # Without resolve_from, unresolved extensions are tracked
+    result_no_resolve = h.hugr.used_extensions()
+    assert TEST_EXT.name in result_no_resolve.unresolved_extensions
+
+    # With resolve_from, should work
+    test_ext_registry = ext.ExtensionRegistry()
+    test_ext_registry.add_extension(TEST_EXT)
+    exts = h.hugr.used_extensions(resolve_from=test_ext_registry)
+    assert TEST_EXT.name in exts.used_extensions.ids()
