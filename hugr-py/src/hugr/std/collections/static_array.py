@@ -39,6 +39,22 @@ class StaticArray(tys.ExtType):
     def type_bound(self) -> tys.TypeBound:
         return self.ty.type_bound()
 
+    def _resolve_used_extensions(
+        self, registry: ExtensionRegistry | None = None
+    ) -> tuple[StaticArray, ExtensionResolutionResult]:
+        ext_type, result = super()._resolve_used_extensions(registry)
+
+        assert isinstance(
+            ext_type, tys.ExtType
+        ), "HUGR internal error, expected resolved type to be extension type."
+        assert (
+            ext_type.type_def == EXTENSION.types["static_array"]
+        ), "HUGR internal error, expected resolved type to be static array."
+
+        static_array = StaticArray(tys.Unit)
+        static_array.args = ext_type.args
+        return static_array, result
+
 
 @dataclass
 class StaticArrayVal(val.ExtensionValue):

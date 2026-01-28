@@ -37,6 +37,22 @@ class List(tys.ExtType):
     def type_bound(self) -> tys.TypeBound:
         return self.ty.type_bound()
 
+    def _resolve_used_extensions(
+        self, registry: ExtensionRegistry | None = None
+    ) -> tuple[List, ExtensionResolutionResult]:
+        ext_type, result = super()._resolve_used_extensions(registry)
+
+        assert isinstance(
+            ext_type, tys.ExtType
+        ), "HUGR internal error, expected resolved type to be extension type."
+        assert (
+            ext_type.type_def == EXTENSION.types["List"]
+        ), "HUGR internal error, expected resolved type to be list."
+
+        list = List(tys.Unit)
+        list.args = ext_type.args
+        return list, result
+
 
 @dataclass
 class ListVal(val.ExtensionValue):

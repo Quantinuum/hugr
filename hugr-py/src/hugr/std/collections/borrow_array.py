@@ -61,6 +61,22 @@ class BorrowArray(tys.ExtType):
     def type_bound(self) -> tys.TypeBound:
         return tys.TypeBound.Linear
 
+    def _resolve_used_extensions(
+        self, registry: ExtensionRegistry | None = None
+    ) -> tuple[BorrowArray, ExtensionResolutionResult]:
+        ext_type, result = super()._resolve_used_extensions(registry)
+
+        assert isinstance(
+            ext_type, tys.ExtType
+        ), "HUGR internal error, expected resolved type to be extension type."
+        assert (
+            ext_type.type_def == EXTENSION.types["borrow_array"]
+        ), "HUGR internal error, expected resolved type to be borrow array."
+
+        borrow_array = BorrowArray(tys.Unit, 0)
+        borrow_array.args = ext_type.args
+        return borrow_array, result
+
 
 # Note that only borrow array values with no elements borrowed should be emitted.
 @dataclass
