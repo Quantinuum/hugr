@@ -23,8 +23,8 @@ from hugr._serialization.ops import OpType as SerialOp
 from hugr._serialization.serial_hugr import SerialHugr
 from hugr.envelope import (
     EnvelopeConfig,
-    make_envelope,
-    make_envelope_str,
+    _make_envelope,
+    _make_envelope_str,
     read_envelope_hugr,
     read_envelope_hugr_str,
 )
@@ -1150,7 +1150,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 Standard extensions are ignored.
         """
         config = config or EnvelopeConfig.BINARY
-        return make_envelope(self.to_package(include_extensions), config)
+        return _make_envelope(self.to_package(include_extensions), config)
 
     def to_str(
         self,
@@ -1171,7 +1171,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 Standard extensions are ignored.
         """
         config = config or EnvelopeConfig.TEXT
-        return make_envelope_str(self.to_package(include_extensions), config)
+        return _make_envelope_str(self.to_package(include_extensions), config)
 
     @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
     def to_json(self) -> str:

@@ -38,6 +38,7 @@ from enum import Enum
 from typing import TYPE_CHECKING, ClassVar
 
 import pyzstd
+from typing_extensions import deprecated
 
 import hugr._hugr.model as rust
 
@@ -55,7 +56,17 @@ _DEFAULT_FLAGS = 0b0100_0000
 _ZSTD_FLAG = 0b0000_0001
 
 
-def make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
+@deprecated("Use Package/Hugr.to_bytes() instead.")
+def make_envelope(package: Package | Hugr, config: EnvelopeConfig) -> bytes:
+    """Encode a Package into an envelope, using the given configuration."""
+    from hugr.hugr.base import Hugr
+
+    if isinstance(package, Hugr):
+        package = package.to_package()
+    return _make_envelope(package, config)
+
+
+def _make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
     """Encode a Package into an envelope, using the given configuration."""
     envelope = bytearray(config._make_header().to_bytes())
 
@@ -85,7 +96,17 @@ def make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
     return bytes(envelope)
 
 
-def make_envelope_str(package: Package, config: EnvelopeConfig) -> str:
+@deprecated("Use Package/Hugr.to_str() instead.")
+def make_envelope_str(package: Package | Hugr, config: EnvelopeConfig) -> str:
+    """Encode a Package into an envelope, using the given configuration."""
+    from hugr.hugr.base import Hugr
+
+    if isinstance(package, Hugr):
+        package = package.to_package()
+    return _make_envelope_str(package, config)
+
+
+def _make_envelope_str(package: Package, config: EnvelopeConfig) -> str:
     """Encode a Package into an envelope, using the given configuration."""
     if not config.format.ascii_printable():
         msg = "Only ascii-printable envelope formats can be encoded into a string."
