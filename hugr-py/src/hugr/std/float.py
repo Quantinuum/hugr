@@ -6,7 +6,7 @@ from dataclasses import dataclass
 
 import hugr.model as model
 from hugr import ext, val
-from hugr.std import _load_extension
+from hugr.std._util import _load_extension
 
 FLOAT_TYPES_EXTENSION = _load_extension("arithmetic.float.types")
 

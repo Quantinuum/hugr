@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
 from hugr import tys, val
-from hugr.std import _load_extension
+from hugr.std._util import _load_extension
 from hugr.utils import comma_sep_str
 
 if TYPE_CHECKING:

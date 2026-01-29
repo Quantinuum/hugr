@@ -10,7 +10,7 @@ from typing_extensions import Self
 import hugr.model as model
 from hugr import ext, tys, val
 from hugr.ops import AsExtOp, DataflowOp, ExtOp, RegisteredOp
-from hugr.std import _load_extension
+from hugr.std._util import _load_extension
 
 if TYPE_CHECKING:
     from hugr.ops import Command, ComWire
