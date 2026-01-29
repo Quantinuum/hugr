@@ -24,7 +24,7 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Iterable, Sequence
 
     from hugr.hugr import Hugr
     from hugr.tys import ExtensionId
@@ -441,6 +441,11 @@ class ExtensionRegistry:
 
         extension_id: ExtensionId
 
+    @classmethod
+    def from_extensions(cls, extensions: Iterable[Extension]) -> ExtensionRegistry:
+        """Create an extension registry from a list of extensions."""
+        return cls(extensions={extension.name: extension for extension in extensions})
+
     def ids(self) -> set[ExtensionId]:
         """Get the set of extension IDs in the registry.
 
@@ -511,6 +516,9 @@ class ExtensionRegistry:
 
     def __str__(self) -> str:
         return "ExtensionRegistry(" + ", ".join(self.extensions.keys()) + ")"
+
+    def __contains__(self, name: ExtensionId) -> bool:
+        return name in self.extensions
 
 
 @dataclass
