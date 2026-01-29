@@ -14,6 +14,7 @@ from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
     from hugr.hugr import Hugr
 
 
@@ -38,6 +39,25 @@ class Value(Protocol):
         ...  # pragma: no cover
 
     def to_model(self) -> model.Term: ...
+
+    def _resolve_used_extensions_inplace(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionResolutionResult:
+        """Resolve the extensions required to define this value.
+
+        The value is modified in-place.
+
+        Args:
+            registry: A registry to resolve unresolved extensions from.
+                If None, opaque operations and types will not be resolved.
+
+        Returns:
+            The resolution result containing used and unresolved extensions.
+        """
+        ...
+        from hugr.ext import ExtensionResolutionResult
+
+        return ExtensionResolutionResult()
 
 
 @dataclass
@@ -151,6 +171,19 @@ class Sum(Value):
                 model.Tuple(values),
             ],
         )
+
+    def _resolve_used_extensions_inplace(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionResolutionResult:
+        resolved_typ, result = self.typ._resolve_used_extensions(registry)
+        assert isinstance(
+            resolved_typ, tys.Sum
+        ), "HUGR internal error, expected resolved type to be sum."
+        self.typ = resolved_typ
+
+        for val in self.vals:
+            result.extend(val._resolve_used_extensions_inplace(registry))
+        return result
 
 
 @dataclass(eq=False, repr=False)
@@ -326,6 +359,11 @@ class Function(Value):
         module = self.body.to_model()
         return model.Func(module.root)
 
+    def _resolve_used_extensions_inplace(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionResolutionResult:
+        return self.body.used_extensions(registry)
+
 
 @dataclass
 class Extension(Value):
@@ -351,6 +389,12 @@ class Extension(Value):
         type = cast(model.Term, self.typ.to_model())
         json = sops.CustomConst(c=self.name, v=self.val).model_dump_json()
         return model.Apply("compat.const_json", [type, model.Literal(json)])
+
+    def _resolve_used_extensions_inplace(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionResolutionResult:
+        self.typ, result = self.typ._resolve_used_extensions(registry)
+        return result
 
     def __str__(self) -> str:
         return f"{self.name}({self.val})"

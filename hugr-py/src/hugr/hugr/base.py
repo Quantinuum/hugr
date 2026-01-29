@@ -34,7 +34,6 @@ from hugr.ops import (
     Call,
     Conditional,
     Const,
-    Custom,
     DataflowBlock,
     DataflowOp,
     ExitBlock,
@@ -988,16 +987,6 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         else:
             return p.offset
 
-    def resolve_extensions(self, registry: ext.ExtensionRegistry) -> Hugr:
-        """Resolve extension types and operations in the HUGR by matching them to
-        extensions in the registry.
-        """
-        for node in self:
-            op = self[node].op
-            if isinstance(op, Custom):
-                self[node].op = op.resolve(registry)
-        return self
-
     def _connect_df_entrypoint_outputs(self) -> None:
         """If this Hugr was created by wrapping a dataflow operation entrypoint in a
         function, connect the entrypoint outputs to the function outputs.
@@ -1081,13 +1070,17 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return hugr
 
     @staticmethod
-    def from_bytes(envelope: bytes) -> Hugr:
+    def from_bytes(
+        envelope: bytes, extensions: ExtensionRegistry | None = None
+    ) -> Hugr:
         """Deserialize a byte string to a Hugr object.
 
         Some envelope formats can be read from a string. See :meth:`from_str`.
 
         Args:
             envelope: The byte string representing a Hugr envelope.
+            extensions: If not None, an extension registry to resolve the custom
+                operations and types.
 
         Returns:
             The deserialized Hugr object.
@@ -1095,17 +1088,23 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Raises:
             ValueError: If the envelope does not contain exactly one module.
         """
-        return read_envelope_hugr(envelope)
+        hugr = read_envelope_hugr(envelope)
+        if extensions is not None:
+            # TODO: This can be done during deserialization
+            hugr.resolve_extensions(extensions)
+        return hugr
 
     @staticmethod
-    def from_str(envelope: str) -> Hugr:
+    def from_str(envelope: str, extensions: ExtensionRegistry | None = None) -> Hugr:
         """Deserialize a string to a Hugr object.
 
-        Not all envelope formats can be read from a string.
-        See :meth:`from_bytes` for a more general method.
+        Not all envelope formats can be read from a string. See
+        :meth:`from_bytes` for a more general method.
 
         Args:
             envelope: The string representing a Hugr envelope.
+            extensions: If not None, an extension registry to resolve the custom
+                operations and types.
 
         Returns:
             The deserialized Hugr object.
@@ -1113,7 +1112,11 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Raises:
             ValueError: If the envelope does not contain exactly one module.
         """
-        return read_envelope_hugr_str(envelope)
+        hugr = read_envelope_hugr_str(envelope)
+        if extensions is not None:
+            # TODO: This can be done during deserialization
+            hugr.resolve_extensions(extensions)
+        return hugr
 
     @staticmethod
     def from_model(module: model.Module) -> Hugr:
@@ -1218,24 +1221,50 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
         DotRenderer(config).store(self, filename=filename, format=format, root=root)
 
-    def used_extensions(self) -> ExtensionRegistry:
-        """Get the set of extensions required to define this Hugr.
+    def used_extensions(
+        self, resolve_from: ext.ExtensionRegistry | None = None
+    ) -> ext.ExtensionResolutionResult:
+        """Get the extensions used by this HUGR, optionally resolving unresolved
+        types and operations.
 
-        Raises:
-            UnresolvedExtensionError: if the Hugr contains an :class:`Opaque` type
-                that has not been resolved. Call :meth:`resolve` first.
+        This method modifies the HUGR in-place when resolve_from is provided,
+        replacing Custom operations with ExtOp operations and opaque types with
+        ExtType when their extensions are found in the registry.
+
+        Args:
+            resolve_from: Optional extension registry to resolve against.
+                If None, opaque types and Custom ops will not be resolved.
+
+        Returns:
+            The result of resolving the extensions, containing the used
+            extensions and a list of referenced but unresolved extensions.
 
         Example:
             >>> from hugr.build import Dfg
             >>> Dfg(tys.Qubit).hugr.used_extensions().ids()
             {'prelude'}
         """
-        from hugr.ext import ExtensionRegistry
+        from hugr.ext import ExtensionResolutionResult
 
-        registry = ExtensionRegistry()
+        result = ExtensionResolutionResult()
 
         for node in self:
-            reg = self[node].op.used_extensions()
-            registry.extend(reg)
+            op = self[node].op
+            # _resolve_used_extensions returns the resolved op and the extensions
+            resolved_op, op_result = op._resolve_used_extensions(resolve_from)
+            self[node].op = resolved_op
+            result.extend(op_result)
 
-        return registry
+        return result
+
+    def resolve_extensions(self, registry: ext.ExtensionRegistry) -> Hugr:
+        """Resolve extension references in the types and operations of the HUGR.
+
+        This is an alias for :meth:`used_extensions` that discards the computed
+        extensions.
+
+        Args:
+            registry: The extension registry to resolve against.
+        """
+        self.used_extensions(resolve_from=registry)
+        return self

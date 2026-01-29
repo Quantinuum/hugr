@@ -24,7 +24,7 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Iterable, Sequence
 
     from hugr.hugr import Hugr
     from hugr.tys import ExtensionId
@@ -441,6 +441,11 @@ class ExtensionRegistry:
 
         extension_id: ExtensionId
 
+    @classmethod
+    def from_extensions(cls, extensions: Iterable[Extension]) -> ExtensionRegistry:
+        """Create an extension registry from a list of extensions."""
+        return cls(extensions={extension.name: extension for extension in extensions})
+
     def ids(self) -> set[ExtensionId]:
         """Get the set of extension IDs in the registry.
 
@@ -511,3 +516,51 @@ class ExtensionRegistry:
 
     def __str__(self) -> str:
         return "ExtensionRegistry(" + ", ".join(self.extensions.keys()) + ")"
+
+    def __contains__(self, name: ExtensionId) -> bool:
+        return name in self.extensions
+
+
+@dataclass
+class ExtensionResolutionResult:
+    """Result of resolving extensions in a HUGR.
+
+    Args:
+        used_extensions: The extensions used by the HUGR.
+        unresolved_extensions: A set of extension IDs referenced in the HUGR but
+            not found in the given registry.
+        unresolved_ops: The Custom operations that could not be resolved to an
+            ExtOp because the operation was not found in the registry.
+            Indexed by (extension ID, operation name).
+        unresolved_types: The Opaque types that could not be resolved to an
+            ExtType because the type was not found in the registry.
+            Indexed by (extension ID, type name).
+    """
+
+    used_extensions: ExtensionRegistry = field(default_factory=ExtensionRegistry)
+    unresolved_extensions: set[ExtensionId] = field(default_factory=set)
+    unresolved_ops: dict[tuple[tys.ExtensionId, str], ops.Custom] = field(
+        default_factory=dict
+    )
+    unresolved_types: dict[tuple[tys.ExtensionId, str], tys.Opaque] = field(
+        default_factory=dict
+    )
+
+    def ids(self) -> set[ExtensionId]:
+        """Get the set of used extension IDs.
+
+        This includes both resolved and unresolved extensions referenced in the
+        HUGR.
+        """
+        return self.used_extensions.ids() | self.unresolved_extensions
+
+    def extend(self, other: ExtensionResolutionResult) -> None:
+        """Add the extensions from another result to this result.
+
+        Args:
+            other: The result of resolving extensions to add.
+        """
+        self.used_extensions.extend(other.used_extensions)
+        self.unresolved_extensions.update(other.unresolved_extensions)
+        self.unresolved_ops.update(other.unresolved_ops)
+        self.unresolved_types.update(other.unresolved_types)
