@@ -99,20 +99,19 @@ fn optype_id(optype: &OpType) -> usize {
     }
 }
 
-impl PartialOrd for OpType {
-    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
-        let a = optype_id(self);
-        let b = optype_id(other);
-        if a < b {
-            Some(Ordering::Less)
-        } else if a > b {
-            Some(Ordering::Greater)
-        } else {
-            match format!("{:?}", self).cmp(&format!("{:?}", other)) {
-                Ordering::Less => Some(Ordering::Less),
-                Ordering::Greater => Some(Ordering::Greater),
-                Ordering::Equal => None,
-            }
+/// A partial order on [`OpType`]s.
+pub fn partial_cmp(x: &OpType, y: &OpType) -> Option<Ordering> {
+    let a = optype_id(x);
+    let b = optype_id(y);
+    if a < b {
+        Some(Ordering::Less)
+    } else if a > b {
+        Some(Ordering::Greater)
+    } else {
+        match format!("{:?}", x).cmp(&format!("{:?}", y)) {
+            Ordering::Less => Some(Ordering::Less),
+            Ordering::Greater => Some(Ordering::Greater),
+            Ordering::Equal => None,
         }
     }
 }

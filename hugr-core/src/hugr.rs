@@ -36,6 +36,7 @@ use crate::extension::resolution::{
 };
 use crate::extension::{EMPTY_REG, ExtensionRegistry, ExtensionSet};
 use crate::metadata::RawMetadataValue;
+use crate::ops::partial_cmp;
 use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
 pub use crate::ops::{DEFAULT_OPTYPE, OpType};
 use crate::package::Package;
@@ -396,8 +397,7 @@ impl Hugr {
                 } else if n_a_out > n_b_out {
                     Ordering::Greater
                 } else {
-                    self.get_optype(*a)
-                        .partial_cmp(self.get_optype(*b))
+                    partial_cmp(self.get_optype(*a), self.get_optype(*b))
                         .unwrap_or_else(|| a.cmp(b))
                 }
             };
