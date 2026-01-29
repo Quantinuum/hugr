@@ -11,8 +11,8 @@ import hugr._serialization.extension as ext_s
 import hugr.model as model
 from hugr.envelope import (
     EnvelopeConfig,
-    make_envelope,
-    make_envelope_str,
+    _make_envelope,
+    _make_envelope_str,
     read_envelope,
     read_envelope_str,
 )
@@ -110,7 +110,7 @@ class Package:
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
         """
         config = config or EnvelopeConfig.BINARY
-        return make_envelope(self, config)
+        return _make_envelope(self, config)
 
     def to_str(self, config: EnvelopeConfig | None = None) -> str:
         """Serialize the package to a HUGR envelope string.
@@ -119,7 +119,7 @@ class Package:
         See :meth:`to_bytes` for a more general method.
         """
         config = config or EnvelopeConfig.TEXT
-        return make_envelope_str(self, config)
+        return _make_envelope_str(self, config)
 
     @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
     def to_json(self) -> str:

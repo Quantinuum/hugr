@@ -23,8 +23,8 @@ from hugr._serialization.ops import OpType as SerialOp
 from hugr._serialization.serial_hugr import SerialHugr
 from hugr.envelope import (
     EnvelopeConfig,
-    make_envelope,
-    make_envelope_str,
+    _make_envelope,
+    _make_envelope_str,
     read_envelope_hugr,
     read_envelope_hugr_str,
 )
@@ -63,6 +63,7 @@ if TYPE_CHECKING:
 
     from hugr import ext
     from hugr.ext import ExtensionRegistry
+    from hugr.package import Package
     from hugr.val import Value
 
     from .render import RenderConfig
@@ -1131,22 +1132,46 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         loader.add_module_metadata()
         return loader.hugr
 
-    def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
+    def to_bytes(
+        self,
+        config: EnvelopeConfig | None = None,
+        *,
+        include_extensions: ExtensionRegistry | None = None,
+    ) -> bytes:
         """Serialize the HUGR into an envelope byte string.
 
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
+
+        Args:
+            config: The envelope configuration.
+            include_extensions:
+                If not None, the extensions to embed in the encoded envelope.
+                If None, uses the registry returned by :meth:`used_extensions`.
+                Standard extensions are ignored.
         """
         config = config or EnvelopeConfig.BINARY
-        return make_envelope(self, config)
+        return _make_envelope(self.to_package(include_extensions), config)
 
-    def to_str(self, config: EnvelopeConfig | None = None) -> str:
+    def to_str(
+        self,
+        config: EnvelopeConfig | None = None,
+        *,
+        include_extensions: ExtensionRegistry | None = None,
+    ) -> str:
         """Serialize the package to a HUGR envelope string.
 
         Not all envelope formats can be encoded into a string.
         See :meth:`to_bytes` for a more general method.
+
+        Args:
+            config: The envelope configuration.
+            include_extensions:
+                If not None, the extensions to embed in the encoded envelope.
+                If None, uses the registry returned by :meth:`used_extensions`.
+                Standard extensions are ignored.
         """
         config = config or EnvelopeConfig.TEXT
-        return make_envelope_str(self, config)
+        return _make_envelope_str(self.to_package(include_extensions), config)
 
     @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
     def to_json(self) -> str:
@@ -1164,6 +1189,28 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         export = ModelExport(self)
         region = export.export_region_module(self.module_root)
         return model.Module(region)
+
+    def to_package(
+        self, include_extensions: ExtensionRegistry | None = None
+    ) -> Package:
+        """Wrap this module into a Package.
+
+        Args:
+            include_extensions:
+                If not None, the extensions to include in the package.
+                If None, uses the registry returned by :meth:`used_extensions`.
+                Standard extensions are ignored.
+        """
+        from hugr.package import Package
+        from hugr.std import _std_extensions
+
+        if include_extensions is None:
+            include_extensions = self.used_extensions().used_extensions
+        std = _std_extensions()
+        extensions = [
+            ext for ext in include_extensions.extensions.values() if ext.name not in std
+        ]
+        return Package(modules=[self], extensions=extensions)
 
     @classmethod
     @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
