@@ -159,5 +159,5 @@ pub fn circuit(layers: usize) -> (Hugr, Vec<CircuitLayer>) {
     let outs = linear.finish();
     f_build.finish_with_outputs(outs).unwrap();
 
-    (module_builder.get_hugr(), layer_ids)
+    (module_builder.finish_hugr().unwrap(), layer_ids)
 }
