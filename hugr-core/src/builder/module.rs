@@ -41,6 +41,11 @@ impl ModuleBuilder<Hugr> {
     pub fn new() -> Self {
         Self::default()
     }
+
+    /// Get the underlying Hugr. No validation is performed.
+    pub fn get_hugr(self) -> Hugr {
+        self.0
+    }
 }
 
 impl HugrBuilder for ModuleBuilder<Hugr> {
