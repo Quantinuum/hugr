@@ -55,14 +55,9 @@ _DEFAULT_FLAGS = 0b0100_0000
 _ZSTD_FLAG = 0b0000_0001
 
 
-def make_envelope(package: Package | Hugr, config: EnvelopeConfig) -> bytes:
-    """Encode a HUGR or Package into an envelope, using the given configuration."""
-    from hugr.package import Package
-
+def make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
+    """Encode a Package into an envelope, using the given configuration."""
     envelope = bytearray(config._make_header().to_bytes())
-
-    if not isinstance(package, Package):
-        package = Package(modules=[package], extensions=[])
 
     payload: bytes
     match config.format:
@@ -90,8 +85,8 @@ def make_envelope(package: Package | Hugr, config: EnvelopeConfig) -> bytes:
     return bytes(envelope)
 
 
-def make_envelope_str(package: Package | Hugr, config: EnvelopeConfig) -> str:
-    """Encode a HUGR or Package into an envelope, using the given configuration."""
+def make_envelope_str(package: Package, config: EnvelopeConfig) -> str:
+    """Encode a Package into an envelope, using the given configuration."""
     if not config.format.ascii_printable():
         msg = "Only ascii-printable envelope formats can be encoded into a string."
         raise ValueError(msg)
