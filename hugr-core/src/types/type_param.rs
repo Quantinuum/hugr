@@ -239,23 +239,6 @@ impl Term {
         }
     }
 
-    /*pub fn try_into_list_elements(self) -> Result<TypeRow, SignatureError> {
-            Ok(self
-                .into_list_parts()
-                .map(|s| match s {
-                    SeqPart::Item(i) => Ok(i),
-                    SeqPart::Splice(term) => Err(SignatureError::TypeArgMismatch(
-                        TermTypeError::TypeMismatch {
-                            term: Box::new(term),
-                            type_: Box::new(TypeBound::Copyable.into()),
-                        },
-                    )),
-                })
-                .collect::<Result<Vec<_>, _>>()?
-                .into())
-        }
-    */
-
     /// Returns true if this term is an empty list (contains no elements)
     pub fn is_empty_list(&self) -> bool {
         match self {
@@ -528,7 +511,7 @@ impl Term {
     }
 
     /// Creates a new list from a sequence of [`SeqPart`]s.
-    pub(crate) fn new_list_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
+    pub fn new_list_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
         Self::new_seq_from_parts(
             parts.into_iter().flat_map(ListPartIter::new),
             TypeArg::List,
@@ -609,14 +592,14 @@ impl Term {
     /// );
     /// ```
     #[inline]
-    pub(crate) fn into_list_parts(self) -> ListPartIter {
+    pub fn into_list_parts(self) -> impl Iterator<Item = SeqPart<Self>> {
         ListPartIter::new(SeqPart::Splice(self))
     }
 
     /// Creates a new tuple from a sequence of [`SeqPart`]s.
     ///
     /// Analogous to [`TypeArg::new_list_from_parts`].
-    pub(crate) fn new_tuple_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
+    pub fn new_tuple_from_parts(parts: impl IntoIterator<Item = SeqPart<Self>>) -> Self {
         Self::new_seq_from_parts(
             parts.into_iter().flat_map(TuplePartIter::new),
             TypeArg::Tuple,
@@ -628,7 +611,7 @@ impl Term {
     ///
     /// Analogous to [`TypeArg::into_list_parts`].
     #[inline]
-    pub(crate) fn into_tuple_parts(self) -> TuplePartIter {
+    pub fn into_tuple_parts(self) -> impl Iterator<Item = SeqPart<Self>> {
         TuplePartIter::new(SeqPart::Splice(self))
     }
 
@@ -892,7 +875,7 @@ pub enum TermTypeError {
 
 /// Part of a sequence.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub(crate) enum SeqPart<T> {
+pub enum SeqPart<T> {
     /// An individual item in the sequence.
     Item(T),
     /// A subsequence that is spliced into the parent sequence.
