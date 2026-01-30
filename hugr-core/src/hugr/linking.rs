@@ -1,5 +1,6 @@
 //! Directives and errors relating to linking Hugrs.
 
+use std::collections::BTreeSet;
 use std::collections::{BTreeMap, HashMap, VecDeque, btree_map::Entry};
 use std::{fmt::Display, iter::once};
 
@@ -39,23 +40,25 @@ pub trait HugrLinking: HugrMut {
         children: NodeLinkingDirectives<HN, Self::Node>,
     ) -> Result<InsertedForest<HN, Self::Node>, NodeLinkingError<HN, Self::Node>> {
         let transfers = check_directives(other, parent, &children)?;
-        let nodes =
-            parent
-                .iter()
-                .flat_map(|_| other.entry_descendants())
-                .chain(children.iter().flat_map(|(&ch, dirv)| match dirv {
-                    NodeLinkingDirective::Add { .. } => Either::Left(other.descendants(ch)),
-                    NodeLinkingDirective::UseExisting(_) => Either::Right(std::iter::once(ch)),
-                }));
-        let mut roots = HashMap::new();
+        // Make a fresh map here, so determinism is not affected by iteration order of the HashMap in `children`.
+        // (This may be slow for large numbers of module-children, but not total size of Hugr)
+        let mut nodes = BTreeSet::new();
+        if parent.is_some() {
+            nodes.extend(other.entry_descendants());
+        }
+        nodes.extend(children.iter().flat_map(|(&ch, dirv)| match dirv {
+            NodeLinkingDirective::Add { .. } => Either::Left(other.descendants(ch)),
+            NodeLinkingDirective::UseExisting(_) => Either::Right(std::iter::once(ch)),
+        }));
+        let mut roots = BTreeMap::new();
         if let Some(parent) = parent {
             roots.insert(other.entrypoint(), parent);
         }
-        for ch in children.keys() {
-            roots.insert(*ch, self.module_root());
+        for ch in children.into_keys() {
+            roots.insert(ch, self.module_root());
         }
         let mut inserted = self
-            .insert_view_forest(other, nodes, roots)
+            .insert_view_forest(other, nodes.iter().cloned(), roots)
             .expect("NodeLinkingDirectives were checked for disjointness");
         link_by_node(self, transfers, &mut inserted.node_map);
         Ok(inserted)
@@ -83,7 +86,7 @@ pub trait HugrLinking: HugrMut {
         children: NodeLinkingDirectives<Node, Self::Node>,
     ) -> Result<InsertedForest<Node, Self::Node>, NodeLinkingError<Node, Self::Node>> {
         let transfers = check_directives(&other, parent, &children)?;
-        let mut roots = HashMap::new();
+        let mut roots = BTreeMap::new();
         if let Some(parent) = parent {
             roots.insert(other.entrypoint(), parent);
             other.set_parent(other.entrypoint(), other.module_root());
@@ -754,7 +757,7 @@ struct Transfers<SourceNode, TargetNode> {
 fn check_directives<SRC: HugrView, TN: HugrNode>(
     other: &SRC,
     parent: Option<TN>,
-    children: &HashMap<SRC::Node, NodeLinkingDirective<TN>>,
+    children: &NodeLinkingDirectives<SRC::Node, TN>,
 ) -> Result<Transfers<SRC::Node, TN>, NodeLinkingError<SRC::Node, TN>> {
     if parent.is_some() {
         if other.entrypoint() == other.module_root() {
@@ -1509,5 +1512,35 @@ mod test {
                 [&ConstUsize::new(5).into()]
             );
         }
+    }
+
+    #[test]
+    fn determinism() {
+        // Really this just checks that things from the source hugr are added in consistent
+        // order (taking next available indices in the target). Actually linking them with
+        // nodes already (at consistent positions) in the target only reduces variability.
+        let (insert, _, _) = dfg_calling_defn_decl();
+        let [mut host, mut host2, mut host3, mut host4] = [0, 1, 2, 3].map(|_| simple_dfg_hugr());
+        host.insert_link_from_view(host.entrypoint(), &insert, &NameLinkingPolicy::default())
+            .unwrap();
+        host2
+            .insert_link_from_view(host2.entrypoint(), &insert, &NameLinkingPolicy::default())
+            .unwrap();
+        assert_eq!(host, host2);
+
+        // Same between two tries of `insert_link_hugr`
+        host3
+            .insert_link_hugr(
+                host3.entrypoint(),
+                insert.clone(),
+                &NameLinkingPolicy::default(),
+            )
+            .unwrap();
+        host4
+            .insert_link_hugr(host4.entrypoint(), insert, &NameLinkingPolicy::default())
+            .unwrap();
+        assert_eq!(host3, host4);
+
+        // Do not necessarily expect host==host3.
     }
 }

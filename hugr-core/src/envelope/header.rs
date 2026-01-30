@@ -45,6 +45,7 @@ pub enum EnvelopeFormat {
     ///
     /// This is a temporary format required until the model adds support for
     /// extensions.
+    #[default]
     ModelWithExtensions = 2,
     /// Human-readable S-expression encoding using [`hugr_model::v0`].
     ///
@@ -68,7 +69,6 @@ pub enum EnvelopeFormat {
     ///
     /// Uses a printable ascii value as the discriminant so the envelope can be
     /// read as text.
-    #[default]
     PackageJson = 63, // '?' in ascii
 }
 

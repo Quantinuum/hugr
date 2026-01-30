@@ -23,8 +23,8 @@ from hugr._serialization.ops import OpType as SerialOp
 from hugr._serialization.serial_hugr import SerialHugr
 from hugr.envelope import (
     EnvelopeConfig,
-    make_envelope,
-    make_envelope_str,
+    _make_envelope,
+    _make_envelope_str,
     read_envelope_hugr,
     read_envelope_hugr_str,
 )
@@ -34,7 +34,6 @@ from hugr.ops import (
     Call,
     Conditional,
     Const,
-    Custom,
     DataflowBlock,
     DataflowOp,
     ExitBlock,
@@ -63,6 +62,8 @@ if TYPE_CHECKING:
     import graphviz as gv  # type: ignore[import-untyped]
 
     from hugr import ext
+    from hugr.ext import ExtensionRegistry
+    from hugr.package import Package
     from hugr.val import Value
 
     from .render import RenderConfig
@@ -987,16 +988,6 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         else:
             return p.offset
 
-    def resolve_extensions(self, registry: ext.ExtensionRegistry) -> Hugr:
-        """Resolve extension types and operations in the HUGR by matching them to
-        extensions in the registry.
-        """
-        for node in self:
-            op = self[node].op
-            if isinstance(op, Custom):
-                self[node].op = op.resolve(registry)
-        return self
-
     def _connect_df_entrypoint_outputs(self) -> None:
         """If this Hugr was created by wrapping a dataflow operation entrypoint in a
         function, connect the entrypoint outputs to the function outputs.
@@ -1080,13 +1071,17 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return hugr
 
     @staticmethod
-    def from_bytes(envelope: bytes) -> Hugr:
+    def from_bytes(
+        envelope: bytes, extensions: ExtensionRegistry | None = None
+    ) -> Hugr:
         """Deserialize a byte string to a Hugr object.
 
         Some envelope formats can be read from a string. See :meth:`from_str`.
 
         Args:
             envelope: The byte string representing a Hugr envelope.
+            extensions: If not None, an extension registry to resolve the custom
+                operations and types.
 
         Returns:
             The deserialized Hugr object.
@@ -1094,17 +1089,23 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Raises:
             ValueError: If the envelope does not contain exactly one module.
         """
-        return read_envelope_hugr(envelope)
+        hugr = read_envelope_hugr(envelope)
+        if extensions is not None:
+            # TODO: This can be done during deserialization
+            hugr.resolve_extensions(extensions)
+        return hugr
 
     @staticmethod
-    def from_str(envelope: str) -> Hugr:
+    def from_str(envelope: str, extensions: ExtensionRegistry | None = None) -> Hugr:
         """Deserialize a string to a Hugr object.
 
-        Not all envelope formats can be read from a string.
-        See :meth:`from_bytes` for a more general method.
+        Not all envelope formats can be read from a string. See
+        :meth:`from_bytes` for a more general method.
 
         Args:
             envelope: The string representing a Hugr envelope.
+            extensions: If not None, an extension registry to resolve the custom
+                operations and types.
 
         Returns:
             The deserialized Hugr object.
@@ -1112,7 +1113,11 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Raises:
             ValueError: If the envelope does not contain exactly one module.
         """
-        return read_envelope_hugr_str(envelope)
+        hugr = read_envelope_hugr_str(envelope)
+        if extensions is not None:
+            # TODO: This can be done during deserialization
+            hugr.resolve_extensions(extensions)
+        return hugr
 
     @staticmethod
     def from_model(module: model.Module) -> Hugr:
@@ -1127,22 +1132,46 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         loader.add_module_metadata()
         return loader.hugr
 
-    def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
+    def to_bytes(
+        self,
+        config: EnvelopeConfig | None = None,
+        *,
+        include_extensions: ExtensionRegistry | None = None,
+    ) -> bytes:
         """Serialize the HUGR into an envelope byte string.
 
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
+
+        Args:
+            config: The envelope configuration.
+            include_extensions:
+                If not None, the extensions to embed in the encoded envelope.
+                If None, uses the registry returned by :meth:`used_extensions`.
+                Standard extensions are ignored.
         """
         config = config or EnvelopeConfig.BINARY
-        return make_envelope(self, config)
+        return _make_envelope(self.to_package(include_extensions), config)
 
-    def to_str(self, config: EnvelopeConfig | None = None) -> str:
+    def to_str(
+        self,
+        config: EnvelopeConfig | None = None,
+        *,
+        include_extensions: ExtensionRegistry | None = None,
+    ) -> str:
         """Serialize the package to a HUGR envelope string.
 
         Not all envelope formats can be encoded into a string.
         See :meth:`to_bytes` for a more general method.
+
+        Args:
+            config: The envelope configuration.
+            include_extensions:
+                If not None, the extensions to embed in the encoded envelope.
+                If None, uses the registry returned by :meth:`used_extensions`.
+                Standard extensions are ignored.
         """
         config = config or EnvelopeConfig.TEXT
-        return make_envelope_str(self, config)
+        return _make_envelope_str(self.to_package(include_extensions), config)
 
     @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
     def to_json(self) -> str:
@@ -1160,6 +1189,28 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         export = ModelExport(self)
         region = export.export_region_module(self.module_root)
         return model.Module(region)
+
+    def to_package(
+        self, include_extensions: ExtensionRegistry | None = None
+    ) -> Package:
+        """Wrap this module into a Package.
+
+        Args:
+            include_extensions:
+                If not None, the extensions to include in the package.
+                If None, uses the registry returned by :meth:`used_extensions`.
+                Standard extensions are ignored.
+        """
+        from hugr.package import Package
+        from hugr.std import _std_extensions
+
+        if include_extensions is None:
+            include_extensions = self.used_extensions().used_extensions
+        std = _std_extensions()
+        extensions = [
+            ext for ext in include_extensions.extensions.values() if ext.name not in std
+        ]
+        return Package(modules=[self], extensions=extensions)
 
     @classmethod
     @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
@@ -1216,3 +1267,51 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         from .render import DotRenderer
 
         DotRenderer(config).store(self, filename=filename, format=format, root=root)
+
+    def used_extensions(
+        self, resolve_from: ext.ExtensionRegistry | None = None
+    ) -> ext.ExtensionResolutionResult:
+        """Get the extensions used by this HUGR, optionally resolving unresolved
+        types and operations.
+
+        This method modifies the HUGR in-place when resolve_from is provided,
+        replacing Custom operations with ExtOp operations and opaque types with
+        ExtType when their extensions are found in the registry.
+
+        Args:
+            resolve_from: Optional extension registry to resolve against.
+                If None, opaque types and Custom ops will not be resolved.
+
+        Returns:
+            The result of resolving the extensions, containing the used
+            extensions and a list of referenced but unresolved extensions.
+
+        Example:
+            >>> from hugr.build import Dfg
+            >>> Dfg(tys.Qubit).hugr.used_extensions().ids()
+            {'prelude'}
+        """
+        from hugr.ext import ExtensionResolutionResult
+
+        result = ExtensionResolutionResult()
+
+        for node in self:
+            op = self[node].op
+            # _resolve_used_extensions returns the resolved op and the extensions
+            resolved_op, op_result = op._resolve_used_extensions(resolve_from)
+            self[node].op = resolved_op
+            result.extend(op_result)
+
+        return result
+
+    def resolve_extensions(self, registry: ext.ExtensionRegistry) -> Hugr:
+        """Resolve extension references in the types and operations of the HUGR.
+
+        This is an alias for :meth:`used_extensions` that discards the computed
+        extensions.
+
+        Args:
+            registry: The extension registry to resolve against.
+        """
+        self.used_extensions(resolve_from=registry)
+        return self

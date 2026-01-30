@@ -7,8 +7,8 @@ from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import Self
 
-from hugr import cli, ext, tys
-from hugr.envelope import EnvelopeConfig
+from hugr import cli, ext, ops, tys
+from hugr.envelope import EnvelopeConfig, EnvelopeFormat
 from hugr.hugr import Hugr
 from hugr.ops import AsExtOp, Command, Const, Custom, DataflowOp, ExtOp, RegisteredOp
 from hugr.package import Package
@@ -37,6 +37,45 @@ QUANTUM_EXT.add_op_def(
         description="CNOT gate",
         signature=ext.OpDefSig(tys.FunctionType.endo([tys.Qubit] * 2)),
     )
+)
+
+# Shared test extension
+TEST_EXT = ext.Extension("pytest.test_ext", ext.Version(0, 1, 0))
+
+
+def test_ext_registry() -> ext.ExtensionRegistry:
+    """Registry containing TEST_EXT."""
+    registry = ext.ExtensionRegistry()
+    registry.add_extension(TEST_EXT)
+    return registry
+
+
+TEST_TYPE_DEF = TEST_EXT.add_type_def(
+    ext.TypeDef(
+        name="TestType",
+        description="A custom type for testing",
+        params=[],
+        bound=ext.ExplicitBound(tys.TypeBound.Copyable),
+    )
+)
+TEST_OP_DEF = TEST_EXT.add_op_def(
+    ext.OpDef(
+        name="TestOp",
+        description="A custom operation for testing",
+        signature=ext.OpDefSig(tys.FunctionType([tys.Bool], [tys.Bool])),
+    )
+)
+TEST_OP = ops.ExtOp(TEST_OP_DEF, args=[])
+TEST_TYPE = tys.ExtType(TEST_TYPE_DEF, args=[])
+
+# Unresolved opaque type and Custom op for testing resolution
+TEST_TYPE_OPAQUE = tys.Opaque(
+    id="TestType", bound=tys.TypeBound.Copyable, extension=TEST_EXT.name
+)
+TEST_OP_OPAQUE = ops.Custom(
+    op_name="TestOp",
+    signature=tys.FunctionType([tys.Bool], [tys.Bool]),
+    extension=TEST_EXT.name,
 )
 
 
@@ -166,16 +205,25 @@ def validate(
         if os.environ.get("HUGR_RENDER_DOT"):
             dot.pipe("svg")
 
-    # Encoding formats to test, indexed by the format name as used by
-    # `hugr convert --format`.
+    # Encoding formats to test. Note that these include other formats than
+    # those supported by `hugr convert`.
     FORMATS = {
         "json": EnvelopeConfig.TEXT,
+        "json-compressed": EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=0),
         "model-exts": EnvelopeConfig.BINARY,
+        "model-exts-no-compression": EnvelopeConfig(
+            format=EnvelopeFormat.MODEL_WITH_EXTS, zstd=None
+        ),
     }
     # Envelope formats used when exporting test hugrs.
-    WRITE_FORMATS = ["json", "model-exts"]
-    # Envelope formats used as target for `hugr convert` before loading back the
-    # test hugrs.
+    WRITE_FORMATS = [
+        "json",
+        "json-compressed",
+        "model-exts",
+        "model-exts-no-compression",
+    ]
+    # Envelope formats used as target before loading back the test hugrs.
+    # These should correspond to the formats supported by `hugr convert`.
     LOAD_FORMATS = ["json", "model-exts"]
 
     # validate text and binary formats

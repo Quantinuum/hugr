@@ -378,7 +378,7 @@ impl<SAC: StaticArrayCodegen + 'static> CodegenExtension for StaticArrayCodegenE
             )
             .custom_const::<StaticArrayValue>({
                 let sac = self.0.clone();
-                move |context, sav| sac.static_array_value(context, sav)
+                move |context, static_ar_val| sac.static_array_value(context, static_ar_val)
             })
             .simple_extension_op::<StaticArrayOpDef>({
                 let sac = self.0.clone();
