@@ -4,7 +4,7 @@ use hugr_core::{
     extension::simple_op::MakeExtensionOp as _,
     ops::ExtensionOp,
     std_extensions::collections::list::{self, ListOp, ListValue},
-    types::{SumType, Type, TypeArg},
+    types::{SumType, Type},
 };
 use inkwell::values::FunctionValue;
 use inkwell::{
@@ -394,7 +394,7 @@ mod test {
         use hugr_core::extension::simple_op::MakeExtensionOp as _;
 
         let ext_op = list::EXTENSION
-            .instantiate_extension_op(op.op_id().as_ref(), [qb_t().into()])
+            .instantiate_extension_op(op.op_id().as_ref(), [qb_t()])
             .unwrap();
         let es = ExtensionRegistry::new([list::EXTENSION.to_owned(), prelude::PRELUDE.to_owned()]);
         es.validate().unwrap();

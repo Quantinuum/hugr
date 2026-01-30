@@ -428,7 +428,7 @@ mod test {
         #[case] op: StaticArrayOpDef,
         #[case] ty: HugrType,
     ) {
-        let op = op.instantiate(&[ty.clone().into()]).unwrap();
+        let op = op.instantiate(std::slice::from_ref(&ty)).unwrap();
         let op = OpType::from(op.to_extension_op().unwrap());
         llvm_ctx.add_extensions(|ceb| {
             ceb.add_default_static_array_extensions()

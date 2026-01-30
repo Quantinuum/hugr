@@ -606,7 +606,7 @@ mod test {
     #[rstest]
     fn prelude_panic(prelude_llvm_ctx: TestContext) {
         let error_val = ConstError::new(42, "PANIC");
-        let type_arg_q: Term = qb_t().into();
+        let type_arg_q: Term = qb_t();
         let type_arg_2q = Term::new_list([type_arg_q.clone(), type_arg_q]);
         let panic_op = PRELUDE
             .instantiate_extension_op(&PANIC_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
@@ -632,7 +632,7 @@ mod test {
     #[rstest]
     fn prelude_exit(prelude_llvm_ctx: TestContext) {
         let error_val = ConstError::new(42, "EXIT");
-        let type_arg_q: Term = qb_t().into();
+        let type_arg_q: Term = qb_t();
         let type_arg_2q = Term::new_list([type_arg_q.clone(), type_arg_q]);
         let exit_op = PRELUDE
             .instantiate_extension_op(&EXIT_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])

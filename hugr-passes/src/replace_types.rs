@@ -1505,9 +1505,9 @@ mod test {
     fn op_to_call_monomorphic(#[values(false, true)] i64_to_usize: bool) {
         let e = ext();
         let pv = e.get_type(PACKED_VEC).unwrap();
-        let inner = pv.instantiate([usize_t().into()]).unwrap();
+        let inner = pv.instantiate([usize_t()]).unwrap();
         let outer = pv
-            .instantiate([Type::new_extension(inner.clone()).into()])
+            .instantiate([Type::new_extension(inner.clone())])
             .unwrap();
         let read_outer = read_op(&e, inner.clone().into());
         let mut dfb = DFGBuilder::new(inout_sig(

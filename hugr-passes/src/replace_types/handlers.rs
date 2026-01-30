@@ -128,7 +128,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
                     let mut mb = dfb.module_root_builder();
                     let mut fb = mb
                         .define_function_vis(
-                            mangle_name(DISCARD_TO_UNIT_PREFIX, &[ty.clone()]),
+                            mangle_name(DISCARD_TO_UNIT_PREFIX, std::slice::from_ref(ty)),
                             inout_sig([ty.clone()], [Type::UNIT]),
                             Visibility::Public,
                         )
@@ -172,7 +172,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             let mut mb = dfb.module_root_builder();
             let mut fb = mb
                 .define_function_vis(
-                    mangle_name(MAKE_NONE_PREFIX, &[ty.clone()]),
+                    mangle_name(MAKE_NONE_PREFIX, std::slice::from_ref(ty)),
                     inout_sig(vec![], [option_ty.clone()]),
                     Visibility::Public,
                 )
@@ -295,7 +295,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         let mut mb = dfb.module_root_builder();
         let mut fb = mb
             .define_function_vis(
-                mangle_name(UNWRAP_PREFIX, &[ty.clone()]),
+                mangle_name(UNWRAP_PREFIX, std::slice::from_ref(ty)),
                 inout_sig([option_ty.clone()], [ty.clone()]),
                 Visibility::Public,
             )
