@@ -10,7 +10,7 @@ from typing_extensions import Self
 import hugr.model as model
 from hugr import ext, tys, val
 from hugr.ops import AsExtOp, DataflowOp, ExtOp, RegisteredOp
-from hugr.std import _load_extension
+from hugr.std._util import _load_extension
 
 if TYPE_CHECKING:
     from hugr.ops import Command, ComWire
@@ -93,6 +93,13 @@ class IntVal(val.ExtensionValue):
 
     def __str__(self) -> str:
         return f"{self.v}"
+
+    def _resolve_used_extensions_inplace(
+        self, registry: ext.ExtensionRegistry | None = None
+    ) -> ext.ExtensionResolutionResult:
+        result = ext.ExtensionResolutionResult()
+        result.used_extensions.add_extension(INT_TYPES_EXTENSION)
+        return result
 
     def to_model(self) -> model.Term:
         unsigned = _to_unsigned(self.v, 1 << self.width)

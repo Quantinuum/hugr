@@ -3,12 +3,15 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import cast
+from typing import TYPE_CHECKING, cast
 
 import hugr.model as model
 from hugr import tys, val
-from hugr.std import _load_extension
+from hugr.std._util import _load_extension
 from hugr.utils import comma_sep_str
+
+if TYPE_CHECKING:
+    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
 
 EXTENSION = _load_extension("collections.borrow_arr")
 
@@ -58,6 +61,22 @@ class BorrowArray(tys.ExtType):
     def type_bound(self) -> tys.TypeBound:
         return tys.TypeBound.Linear
 
+    def _resolve_used_extensions(
+        self, registry: ExtensionRegistry | None = None
+    ) -> tuple[BorrowArray, ExtensionResolutionResult]:
+        ext_type, result = super()._resolve_used_extensions(registry)
+
+        assert isinstance(
+            ext_type, tys.ExtType
+        ), "HUGR internal error, expected resolved type to be extension type."
+        assert (
+            ext_type.type_def == EXTENSION.types["borrow_array"]
+        ), "HUGR internal error, expected resolved type to be borrow array."
+
+        borrow_array = BorrowArray(tys.Unit, 0)
+        borrow_array.args = ext_type.args
+        return borrow_array, result
+
 
 # Note that only borrow array values with no elements borrowed should be emitted.
 @dataclass
@@ -92,3 +111,15 @@ class BorrowArrayVal(val.ExtensionValue):
                 model.List([value.to_model() for value in self.v]),
             ],
         )
+
+    def _resolve_used_extensions_inplace(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionResolutionResult:
+        resolved_ty, result = self.ty._resolve_used_extensions(registry)
+        assert isinstance(
+            resolved_ty, BorrowArray
+        ), "HUGR internal error, expected resolved type to be borrow array."
+        self.ty = resolved_ty
+        for value in self.v:
+            result.extend(value._resolve_used_extensions_inplace(registry))
+        return result

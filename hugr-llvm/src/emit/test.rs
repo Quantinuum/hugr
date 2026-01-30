@@ -156,7 +156,10 @@ impl<'c> Emission<'c> {
             .module
             .get_function(PANIC_EXIT)
             .ok_or_else(|| anyhow!("exec_panicking requires using UnwindingPreludeCodegen"))?;
-        ee.add_global_mapping(&panic_exit_func, panic_runtime::panic_exit as usize);
+        ee.add_global_mapping(
+            &panic_exit_func,
+            panic_runtime::panic_exit as *const () as usize,
+        );
 
         // Invoke the entry function using the panic runtime trampoline
         let entry_ptr = unsafe { ee.get_function(entry.as_ref()).unwrap() };

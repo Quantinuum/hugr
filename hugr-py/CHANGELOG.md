@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.15.1](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.0...hugr-py-v0.15.1) (2026-01-28)
+
+
+### Features
+
+* Add used_extensions method to Hugr ([#2817](https://github.com/Quantinuum/hugr/issues/2817)) ([0d88a43](https://github.com/Quantinuum/hugr/commit/0d88a430bdb8a6af9c7ec7c45ef6c853a7c79041)), closes [#2614](https://github.com/Quantinuum/hugr/issues/2614)
+* Do resolution while computing used_extensions ([#2834](https://github.com/Quantinuum/hugr/issues/2834)) ([7aff29e](https://github.com/Quantinuum/hugr/commit/7aff29e2f53bbb0c7c63f962ae48fd27fa365644))
+* **py:** add qualified_name method to TypeDef ([#2804](https://github.com/Quantinuum/hugr/issues/2804)) ([b2231b3](https://github.com/Quantinuum/hugr/commit/b2231b377d2c655d14b7528640a66c9fe02a2c1e)), closes [#2426](https://github.com/Quantinuum/hugr/issues/2426)
+
+
+### Bug Fixes
+
+* add register_updated function for registry for self-referential ops ([#2830](https://github.com/Quantinuum/hugr/issues/2830)) ([afba54f](https://github.com/Quantinuum/hugr/commit/afba54fda2d348161baf792f1cba2128369be09d)), closes [#2829](https://github.com/Quantinuum/hugr/issues/2829)
+
 ## [0.15.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.14.2...hugr-py-v0.15.0) (2026-01-02)
 
 
