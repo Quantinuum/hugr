@@ -854,7 +854,6 @@ impl Extension {
     }
 }
 
-
 /// Extension tests.
 #[cfg(test)]
 pub mod test {
@@ -864,7 +863,6 @@ pub mod test {
     use super::*;
 
     impl Extension {
-
         /// Create a new extension for testing, with a 0 version.
         pub(crate) fn try_new_test_arc(
             name: ExtensionId,
