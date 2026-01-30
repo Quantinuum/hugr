@@ -71,7 +71,6 @@ fn generic_hugr_hash(hugr: &Hugr, node: Node) -> Result<u64, HashError> {
     
     for child in hugr.children(node) {
         let mut hasher = FxHasher64::default();
-        // hash_node(hugr, child, &mut node_hashes)?;
         hugr.hugr_hash(child)?.hash(&mut hasher);
         hashable_op(hugr.get_optype(child)).hash(&mut hasher);
         child_hashes.push(hasher.finish());
