@@ -8,7 +8,7 @@ use delegate::delegate;
 use crate::extension::{ExtensionId, SignatureError, TypeDef, TypeDefBound};
 use crate::ops::constant::{CustomConst, ValueName};
 use crate::type_row;
-use crate::types::type_param::{TypeArg, TypeParam};
+use crate::types::type_param::{TypeArg, TypeParam, check_term_type};
 use crate::types::{CustomCheckFailure, Term, Type, TypeBound, TypeName};
 use crate::{Extension, Wire};
 use crate::{
@@ -142,7 +142,7 @@ impl BArrayUnsafeOpDef {
         let size_var = TypeArg::new_var_use(0, TypeParam::max_nat_type());
         let elem_ty_var = Type::new_var_use(1, TypeBound::Linear);
         let array_ty: Type = def
-            .instantiate(vec![size_var, elem_ty_var.clone().into()])
+            .instantiate(vec![size_var, elem_ty_var.clone()])
             .unwrap()
             .into();
 
@@ -267,7 +267,7 @@ impl MakeExtensionOp for BArrayUnsafeOp {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![self.size.into(), self.elem_ty.clone().into()]
+        vec![self.size.into(), self.elem_ty.clone()]
     }
 }
 
@@ -279,10 +279,11 @@ impl HasConcrete for BArrayUnsafeOpDef {
     type Concrete = BArrayUnsafeOp;
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
-        match type_args {
-            [Term::BoundedNat(n), Term::Runtime(ty)] => Ok(self.to_concrete(ty.clone(), *n)),
-            _ => Err(SignatureError::InvalidTypeArgs.into()),
-        }
+        let [Term::BoundedNat(n), ty] = type_args else {
+            return Err(SignatureError::InvalidTypeArgs.into());
+        };
+        check_term_type(ty, &TypeBound::Linear.into()).map_err(SignatureError::from)?;
+        Ok(self.to_concrete(ty.clone(), *n))
     }
 }
 
@@ -557,8 +558,7 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
         index1: Wire,
         index2: Wire,
     ) -> Result<Wire, BuildError> {
-        let op =
-            GenericArrayOpDef::<BorrowArray>::swap.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = GenericArrayOpDef::<BorrowArray>::swap.instantiate(&[size.into(), elem_ty])?;
         let [out] = self
             .add_dataflow_op(op, vec![input, index1, index2])?
             .outputs_arr();
@@ -660,7 +660,7 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
         input: Wire,
         index: Wire,
     ) -> Result<(Wire, Wire), BuildError> {
-        let op = BArrayUnsafeOpDef::borrow.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = BArrayUnsafeOpDef::borrow.instantiate(&[size.into(), elem_ty])?;
         let [arr, out] = self
             .add_dataflow_op(op.to_extension_op().unwrap(), vec![input, index])?
             .outputs_arr();
@@ -688,7 +688,7 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
         index: Wire,
         value: Wire,
     ) -> Result<Wire, BuildError> {
-        let op = BArrayUnsafeOpDef::r#return.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = BArrayUnsafeOpDef::r#return.instantiate(&[size.into(), elem_ty])?;
         let [arr] = self
             .add_dataflow_op(op.to_extension_op().unwrap(), vec![input, index, value])?
             .outputs_arr();
@@ -712,8 +712,7 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
         size: u64,
         input: Wire,
     ) -> Result<(), BuildError> {
-        let op =
-            BArrayUnsafeOpDef::discard_all_borrowed.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = BArrayUnsafeOpDef::discard_all_borrowed.instantiate(&[size.into(), elem_ty])?;
         self.add_dataflow_op(op.to_extension_op().unwrap(), vec![input])?;
         Ok(())
     }
@@ -729,7 +728,7 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
     ///
     /// Returns an error if building the operation fails.
     fn add_new_all_borrowed(&mut self, elem_ty: Type, size: u64) -> Result<Wire, BuildError> {
-        let op = BArrayUnsafeOpDef::new_all_borrowed.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = BArrayUnsafeOpDef::new_all_borrowed.instantiate(&[size.into(), elem_ty])?;
         let [arr] = self
             .add_dataflow_op(op.to_extension_op().unwrap(), vec![])?
             .outputs_arr();
@@ -761,7 +760,7 @@ pub trait BArrayOpBuilder: GenericArrayOpBuilder {
         input: Wire,
         index: Wire,
     ) -> Result<(Wire, Wire), BuildError> {
-        let op = BArrayUnsafeOpDef::is_borrowed.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = BArrayUnsafeOpDef::is_borrowed.instantiate(&[size.into(), elem_ty])?;
         let [arr, is_borrowed] = self
             .add_dataflow_op(op.to_extension_op().unwrap(), vec![input, index])?
             .outputs_arr();

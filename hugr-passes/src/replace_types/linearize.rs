@@ -7,7 +7,7 @@ use hugr_core::builder::{
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::borrow_array::borrow_array_type_def;
-use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
+use hugr_core::types::{CustomType, Signature, Term, Type, TypeArg, TypeRow};
 use hugr_core::{HugrView, IncomingPort, Node, Wire, hugr::hugrmut::HugrMut, ops::Tag};
 use itertools::Itertools;
 
@@ -106,7 +106,7 @@ pub trait Linearizer {
 
 /// A configuration for implementing [Linearizer] by delegating to
 /// type-specific callbacks, and by  composing them in order to handle compound types
-/// such as [`TypeEnum::Sum`]s.
+/// such as [`Term::RuntimeSum`]s.
 #[derive(Clone)]
 pub struct DelegatingLinearizer {
     // Keyed by lowered type, as only needed when there is an op outputting such
@@ -165,8 +165,8 @@ pub enum LinearizeError {
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
     /// We cannot linearize (insert copy and discard functions) for
-    /// [Variable](TypeEnum::Variable)s, [Row variables](TypeEnum::RowVar),
-    /// or [Alias](TypeEnum::Alias)es.
+    /// [Variable](Term::Variable)s (including row variables).
+    // or Aliases, as there is no Term::Alias
     #[error("Cannot linearize type {_0}")]
     UnsupportedType(Box<Type>),
     /// Neither does linearization make sense for copyable types
@@ -191,7 +191,7 @@ impl DelegatingLinearizer {
 
     /// Configures this instance that the specified monomorphic type can be copied and/or
     /// discarded via the provided [`NodeTemplate`]s - directly or as part of a compound type
-    /// e.g. [`TypeEnum::Sum`].
+    /// e.g. [`Term::RuntimeSum`].
     /// `copy` should have exactly one inport, of type `src`, and two outports, of same type;
     /// `discard` should have exactly one inport, of type 'src', and no outports.
     ///
@@ -272,8 +272,8 @@ impl Linearizer for DelegatingLinearizer {
         }
         assert!(num_outports != 1);
 
-        match typ.as_type_enum() {
-            TypeEnum::Sum(sum_type) => {
+        match typ {
+            Term::RuntimeSum(sum_type) => {
                 let variants = sum_type
                     .variants()
                     .map(|trv| trv.clone().try_into())
@@ -319,7 +319,7 @@ impl Linearizer for DelegatingLinearizer {
                     cb.finish_hugr().unwrap(),
                 )))
             }
-            TypeEnum::Extension(cty) => {
+            Term::RuntimeExtension(cty) => {
                 if let Some((copy, discard)) = self.copy_discard.get(cty) {
                     Ok(if num_outports == 0 {
                         discard.clone()
@@ -352,7 +352,7 @@ impl Linearizer for DelegatingLinearizer {
                     Ok(tmpl)
                 }
             }
-            TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
+            Term::RuntimeFunction(_) => panic!("Ruled out above as copyable"),
             _ => Err(LinearizeError::UnsupportedType(Box::new(typ.clone()))),
         }
     }
@@ -389,7 +389,7 @@ mod test {
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections::array::array_type;
     use hugr_core::std_extensions::collections::borrow_array::{BArrayOpDef, borrow_array_type};
-    use hugr_core::types::type_param::TypeParam;
+    use hugr_core::types::type_param::{TypeParam, check_term_type};
     use hugr_core::types::{
         FuncValueType, PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRow,
     };
@@ -844,24 +844,23 @@ mod test {
         );
         let drop_op = drop_ext.get_op("drop").unwrap();
         lowerer.set_replace_parametrized_op(drop_op, |args, rt| {
-            let [TypeArg::Runtime(ty)] = args else {
+            let [ty] = args else {
                 panic!("Expected just one type")
             };
+            check_term_type(ty, &TypeBound::Linear.into()).unwrap();
             Ok(Some(rt.get_linearizer().copy_discard_op(ty, 0)?))
         });
 
         let build_hugr = |ty: Type| {
             let mut dfb = DFGBuilder::new(Signature::new([ty.clone()], [])).unwrap();
             let [inp] = dfb.input_wires_arr();
-            let drop_op = drop_ext
-                .instantiate_extension_op("drop", [ty.into()])
-                .unwrap();
+            let drop_op = drop_ext.instantiate_extension_op("drop", [ty]).unwrap();
             dfb.add_dataflow_op(drop_op, [inp]).unwrap();
             dfb.finish_hugr().unwrap()
         };
         // We can drop a tuple of 2* lin_t
         let lin_t = Type::from(e.get_type(LIN_T).unwrap().instantiate([]).unwrap());
-        let mut h = build_hugr(Type::new_tuple(vec![lin_t.clone(); 2]));
+        let mut h = build_hugr(Type::new_runtime_tuple(vec![lin_t.clone(); 2]));
         lowerer.run(&mut h).unwrap();
         h.validate().unwrap();
         let mut exts = h.nodes().filter_map(|n| h.get_optype(n).as_extension_op());

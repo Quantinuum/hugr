@@ -324,7 +324,7 @@ fn invalid_types() {
 
     let valid = Type::new_extension(CustomType::new(
         "MyContainer",
-        vec![usize_t().into()],
+        vec![usize_t()],
         EXT_ID,
         TypeBound::Linear,
         &Arc::downgrade(&ext),
@@ -336,7 +336,7 @@ fn invalid_types() {
     // valid is Any, so is not allowed as an element of an outer MyContainer.
     let element_outside_bound = CustomType::new(
         "MyContainer",
-        vec![valid.clone().into()],
+        vec![valid.clone()],
         EXT_ID,
         TypeBound::Linear,
         &Arc::downgrade(&ext),
@@ -345,13 +345,13 @@ fn invalid_types() {
         validate_to_sig_error(element_outside_bound),
         SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
             type_: Box::new(TypeBound::Copyable.into()),
-            term: Box::new(valid.into())
+            term: Box::new(valid)
         })
     );
 
     let bad_bound = CustomType::new(
         "MyContainer",
-        vec![usize_t().into()],
+        vec![usize_t()],
         EXT_ID,
         TypeBound::Copyable,
         &Arc::downgrade(&ext),
@@ -367,7 +367,7 @@ fn invalid_types() {
     // bad_bound claims to be Copyable, which is valid as an element for the outer MyContainer.
     let nested = CustomType::new(
         "MyContainer",
-        vec![Type::new_extension(bad_bound).into()],
+        vec![Type::new_extension(bad_bound)],
         EXT_ID,
         TypeBound::Linear,
         &Arc::downgrade(&ext),
@@ -382,7 +382,7 @@ fn invalid_types() {
 
     let too_many_type_args = CustomType::new(
         "MyContainer",
-        vec![usize_t().into(), 3u64.into()],
+        vec![usize_t(), 3u64.into()],
         EXT_ID,
         TypeBound::Linear,
         &Arc::downgrade(&ext),
@@ -497,11 +497,10 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
     Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
         let inputs = TypeRV::new_row_var_use(0, TypeBound::Linear);
         let outputs = TypeRV::new_row_var_use(1, TypeBound::Linear);
-        let evaled_fn =
-            TypeRV::new_function(FuncValueType::new([inputs.clone()], [outputs.clone()]));
+        let evaled_fn = TypeRV::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone()],
-            FuncValueType::new([evaled_fn, inputs], [outputs]),
+            FuncValueType::new(Term::concat_lists([[evaled_fn].into(), inputs]), outputs),
         );
         ext.add_op("eval".into(), String::new(), pf, extension_ref)
             .unwrap();
@@ -510,13 +509,13 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
             Signature::new(
-                vec![
-                    Type::new_function(FuncValueType::new([rv(0)], [rv(2)])),
-                    Type::new_function(FuncValueType::new([rv(1)], [rv(3)])),
+                [
+                    Type::new_function(FuncValueType::new(rv(0), rv(2))),
+                    Type::new_function(FuncValueType::new(rv(1), rv(3))),
                 ],
                 [Type::new_function(FuncValueType::new(
-                    [rv(0), rv(1)],
-                    [rv(2), rv(3)],
+                    Term::concat_lists([rv(0), rv(1)]),
+                    Term::concat_lists([rv(2), rv(3)]),
                 ))],
             ),
         );
@@ -528,7 +527,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
 #[test]
 fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     fn uint_seq(i: usize) -> Term {
-        vec![usize_t().into(); i].into()
+        vec![usize_t(); i].into()
     }
     let e = extension_with_eval_parallel();
     let mut dfb = DFGBuilder::new(inout_sig(
@@ -552,16 +551,15 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn list1ty(t: TypeRV) -> Term {
-    Term::new_list([t.into()])
-}
-
 #[test]
 fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
     let tv = TypeRV::new_row_var_use(0, TypeBound::Linear);
-    let inner_ft = Type::new_function(FuncValueType::new_endo([tv.clone()]));
-    let ft_usz = Type::new_function(FuncValueType::new_endo([tv.clone(), usize_t().into()]));
+    let inner_ft = Type::new_function(FuncValueType::new_endo(tv.clone()));
+    let ft_usz = Type::new_function(FuncValueType::new_endo(Term::concat_lists([
+        tv.clone(),
+        [usize_t()].into(),
+    ])));
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
@@ -580,7 +578,12 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     };
     let par = e.instantiate_extension_op(
         "parallel",
-        [tv.clone(), usize_t().into(), tv.clone(), usize_t().into()].map(list1ty),
+        [
+            tv.clone(),
+            [usize_t()].into(),
+            tv.clone(),
+            [usize_t()].into(),
+        ],
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
     fb.finish_hugr_with_outputs(par_func.outputs())?;
@@ -602,7 +605,7 @@ fn test_polymorphic_load() -> Result<(), Box<dyn std::error::Error>> {
         vec![Type::new_function(Signature::new_endo([usize_t()]))],
     );
     let mut f = m.define_function("main", sig)?;
-    let l = f.load_func(&id, &[usize_t().into()])?;
+    let l = f.load_func(&id, &[usize_t()])?;
     f.finish_with_outputs([l])?;
     let _ = m.finish_hugr()?;
     Ok(())

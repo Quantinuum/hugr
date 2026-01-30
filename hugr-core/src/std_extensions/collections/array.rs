@@ -357,7 +357,7 @@ pub trait ArrayOpBuilder: GenericArrayOpBuilder {
         index1: Wire,
         index2: Wire,
     ) -> Result<Wire, BuildError> {
-        let op = GenericArrayOpDef::<Array>::swap.instantiate(&[size.into(), elem_ty.into()])?;
+        let op = GenericArrayOpDef::<Array>::swap.instantiate(&[size.into(), elem_ty])?;
         let [out] = self
             .add_dataflow_op(op, vec![input, index1, index2])?
             .outputs_arr();

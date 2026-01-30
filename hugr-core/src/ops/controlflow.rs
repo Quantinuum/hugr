@@ -365,11 +365,11 @@ mod test {
             other_outputs: vec![tv0.clone()].into(),
             sum_rows: vec![[usize_t()].into(), [qb_t(), tv0.clone()].into()],
         };
-        let dfb2 = dfb.substitute(&Substitution::new(&[qb_t().into()]));
+        let dfb2 = dfb.substitute(&Substitution::new(&[qb_t()]));
         let st = Type::new_sum(vec![vec![usize_t()], vec![qb_t(); 2]]);
         assert_eq!(
-            dfb2.inner_signature(),
-            Signature::new(vec![usize_t(), qb_t()], vec![st, qb_t()])
+            dfb2.inner_signature().as_ref(),
+            &Signature::new(vec![usize_t(), qb_t()], vec![st, qb_t()])
         );
     }
 
@@ -378,22 +378,22 @@ mod test {
         let tv1 = Type::new_var_use(1, TypeBound::Linear);
         let cond = Conditional {
             sum_rows: vec![[usize_t()].into(), [tv1.clone()].into()],
-            other_inputs: vec![Type::new_tuple([TypeRV::new_row_var_use(
+            other_inputs: vec![Type::new_runtime_tuple(TypeRV::new_row_var_use(
                 0,
                 TypeBound::Linear,
-            )])]
+            ))]
             .into(),
             outputs: vec![usize_t(), tv1].into(),
         };
         let cond2 = cond.substitute(&Substitution::new(&[
-            TypeArg::new_list([usize_t().into(), usize_t().into(), usize_t().into()]),
-            qb_t().into(),
+            TypeArg::new_list([usize_t(), usize_t(), usize_t()]),
+            qb_t(),
         ]));
         let st = Type::new_sum([[usize_t()], [qb_t()]]);
         assert_eq!(
-            cond2.signature(),
-            Signature::new(
-                [st, Type::new_tuple(vec![usize_t(); 3])],
+            cond2.signature().as_ref(),
+            &Signature::new(
+                [st, Type::new_runtime_tuple(vec![usize_t(); 3])],
                 [usize_t(), qb_t()]
             )
         );
@@ -407,10 +407,10 @@ mod test {
             just_outputs: vec![tv0.clone(), qb_t()].into(),
             rest: vec![tv0.clone()].into(),
         };
-        let tail2 = tail_loop.substitute(&Substitution::new(&[usize_t().into()]));
+        let tail2 = tail_loop.substitute(&Substitution::new(&[usize_t()]));
         assert_eq!(
-            tail2.signature(),
-            Signature::new(
+            tail2.signature().as_ref(),
+            &Signature::new(
                 vec![qb_t(), usize_t(), usize_t()],
                 vec![usize_t(), qb_t(), usize_t()]
             )

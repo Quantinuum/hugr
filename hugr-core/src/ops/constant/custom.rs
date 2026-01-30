@@ -8,11 +8,12 @@ use std::any::Any;
 use std::hash::{Hash, Hasher};
 
 use downcast_rs::{Downcast, impl_downcast};
+use serde_with::serde_as;
 use thiserror::Error;
 
 use crate::IncomingPort;
 use crate::extension::resolution::{
-    ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_term_extensions,
 };
 use crate::macros::impl_box_clone;
 use crate::types::{CustomCheckFailure, Type};
@@ -171,9 +172,11 @@ fn deserialize_dyn_custom_const(
 impl_downcast!(CustomConst);
 impl_box_clone!(CustomConst, CustomConstBoxClone);
 
+#[serde_as]
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 /// A constant value stored as a serialized blob that can report its own type.
 pub struct CustomSerialized {
+    #[serde_as(as = "crate::types::serialize::SerType")]
     typ: Type,
     value: serde_json::Value,
 }
@@ -303,7 +306,7 @@ impl CustomConst for CustomSerialized {
         &mut self,
         extensions: &WeakExtensionRegistry,
     ) -> Result<(), ExtensionResolutionError> {
-        resolve_type_extensions(&mut self.typ, extensions)
+        resolve_term_extensions(&mut self.typ, extensions)
     }
     fn get_type(&self) -> Type {
         self.typ.clone()
@@ -525,14 +528,14 @@ mod proptest {
     use crate::{
         ops::constant::CustomSerialized,
         proptest::{any_serde_json_value, any_string},
-        types::Type,
+        types::CustomType,
     };
 
     impl Arbitrary for CustomSerialized {
         type Parameters = ();
         type Strategy = BoxedStrategy<Self>;
         fn arbitrary_with(_args: Self::Parameters) -> Self::Strategy {
-            let typ = any::<Type>();
+            let typ = any::<CustomType>().prop_map_into();
             // here we manually construct a serialized `dyn CustomConst`.
             // The "c" and "v" come from the `typetag::serde` annotation on
             // `trait CustomConst`.

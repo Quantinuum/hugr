@@ -4,13 +4,13 @@ use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
 use crate::extension::resolution::{
-    ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions,
+    ExtensionResolutionError, WeakExtensionRegistry, resolve_term_extensions,
     resolve_value_extensions,
 };
 use crate::ops::Value;
 use crate::ops::constant::{TryHash, ValueName, maybe_hash_values};
-use crate::types::type_param::TypeArg;
-use crate::types::{CustomCheckFailure, CustomType, Type};
+use crate::types::type_param::{TypeArg, check_term_type};
+use crate::types::{CustomCheckFailure, CustomType, Type, TypeBound};
 
 use super::array_kind::ArrayKind;
 
@@ -94,7 +94,10 @@ impl<AK: ArrayKind> GenericArrayValue<AK> {
 
         // constant can only hold classic type.
         let ty = match typ.args() {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] if *n as usize == self.values.len() => {
+            [TypeArg::BoundedNat(n), ty]
+                if *n as usize == self.values.len()
+                    && check_term_type(ty, &TypeBound::Linear.into()).is_ok() =>
+            {
                 ty
             }
             _ => {
@@ -125,7 +128,7 @@ impl<AK: ArrayKind> GenericArrayValue<AK> {
         for val in &mut self.values {
             resolve_value_extensions(val, extensions)?;
         }
-        resolve_type_extensions(&mut self.typ, extensions)
+        resolve_term_extensions(&mut self.typ, extensions)
     }
 }
 

@@ -10,7 +10,7 @@ use crate::extension::simple_op::{
 use crate::extension::{CustomValidator, OpDef, SignatureFunc, ValidateJustArgs};
 use crate::ops::OpName;
 use crate::ops::custom::ExtensionOp;
-use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRowRV};
+use crate::types::{FuncValueType, PolyFuncTypeRV, TypeRow};
 use crate::utils::collect_array;
 
 use crate::{
@@ -136,16 +136,16 @@ impl MakeOpDef for IntOpDef {
             }
             ineg | iabs | inot | iu_to_s | is_to_u => iunop_sig().into(),
             idivmod_checked_u | idivmod_checked_s => {
-                let intpair: TypeRowRV = vec![tv0; 2].into();
+                let intpair = vec![tv0; 2];
                 int_polytype(
                     1,
                     intpair.clone(),
-                    [sum_ty_with_err(Type::new_tuple(intpair))],
+                    [sum_ty_with_err(Type::new_runtime_tuple(intpair))],
                 )
             }
             .into(),
             idivmod_u | idivmod_s => {
-                let intpair: TypeRowRV = vec![tv0; 2].into();
+                let intpair = vec![tv0; 2];
                 int_polytype(1, intpair.clone(), intpair.clone())
             }
             .into(),
@@ -227,15 +227,15 @@ impl MakeOpDef for IntOpDef {
     }
 }
 
-/// Returns a polytype composed by a function type, and a number of integer width type parameters.
+/// Returns a polytype composed by a fixed-arity function type, and a number of integer width type parameters.
 pub(in crate::std_extensions::arithmetic) fn int_polytype(
     n_vars: usize,
-    input: impl Into<TypeRowRV>,
-    output: impl Into<TypeRowRV>,
+    input: impl Into<TypeRow>,
+    output: impl Into<TypeRow>,
 ) -> PolyFuncTypeRV {
     PolyFuncTypeRV::new(
         vec![LOG_WIDTH_TYPE_PARAM; n_vars],
-        FuncValueType::new(input, output),
+        FuncValueType::new(input.into().into_owned(), output.into().into_owned()),
     )
 }
 

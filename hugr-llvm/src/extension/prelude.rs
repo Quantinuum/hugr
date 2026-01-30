@@ -575,7 +575,7 @@ mod test {
     fn prelude_make_tuple(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![bool_t(), bool_t()])
-            .with_outs([Type::new_tuple(vec![bool_t(); 2])])
+            .with_outs([Type::new_runtime_tuple(vec![bool_t(); 2])])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let in_wires = builder.input_wires();
@@ -588,7 +588,7 @@ mod test {
     #[rstest]
     fn prelude_unpack_tuple(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_ins([Type::new_tuple(vec![bool_t(); 2])])
+            .with_ins([Type::new_runtime_tuple(vec![bool_t(); 2])])
             .with_outs(vec![bool_t(), bool_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
@@ -606,7 +606,7 @@ mod test {
     #[rstest]
     fn prelude_panic(prelude_llvm_ctx: TestContext) {
         let error_val = ConstError::new(42, "PANIC");
-        let type_arg_q: Term = qb_t().into();
+        let type_arg_q: Term = qb_t();
         let type_arg_2q = Term::new_list([type_arg_q.clone(), type_arg_q]);
         let panic_op = PRELUDE
             .instantiate_extension_op(&PANIC_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
@@ -632,7 +632,7 @@ mod test {
     #[rstest]
     fn prelude_exit(prelude_llvm_ctx: TestContext) {
         let error_val = ConstError::new(42, "EXIT");
-        let type_arg_q: Term = qb_t().into();
+        let type_arg_q: Term = qb_t();
         let type_arg_2q = Term::new_list([type_arg_q.clone(), type_arg_q]);
         let exit_op = PRELUDE
             .instantiate_extension_op(&EXIT_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])

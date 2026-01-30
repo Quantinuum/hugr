@@ -141,7 +141,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayDiscard<AK> {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![self.size.into(), self.elem_ty.clone().into()]
+        vec![self.size.into(), self.elem_ty.clone()]
     }
 }
 
@@ -164,7 +164,7 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayDiscardDef<AK> {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] if ty.copyable() => {
+            [TypeArg::BoundedNat(n), ty] if ty.copyable() => {
                 Ok(GenericArrayDiscard::new(ty.clone(), *n).unwrap())
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),

@@ -208,7 +208,7 @@ pub enum Value {
 /// use serde_json::json;
 ///
 /// let expected_json = json!({
-///     "typ": usize_t(),
+///     "typ": {"t": "I"}, // No public way to serialize a Term as a (SerSimple)Type...
 ///     "value": {'c': "ConstUsize", 'v': 1}
 /// });
 /// let ev = OpaqueValue::new(ConstUsize::new(1));
@@ -217,7 +217,7 @@ pub enum Value {
 ///
 /// let ev = OpaqueValue::new(CustomSerialized::new(usize_t().clone(), serde_json::Value::Null));
 /// let expected_json = json!({
-///     "typ": usize_t(),
+///     "typ": {"t": "I"}, // No public way to serialize a Term as a (SerSimple)Type
 ///     "value": null
 /// });
 ///
@@ -367,7 +367,9 @@ impl Value {
         let vs = items.into_iter().collect_vec();
         let tys = vs.iter().map(Self::get_type).collect_vec();
 
-        Self::sum(0, vs, SumType::new_tuple(tys)).expect("Tuple type is valid")
+        let sty = SumType::try_new([tys.clone()])
+            .unwrap_or_else(|_| panic!("Values {:?} tys {:?}", vs, tys));
+        Self::sum(0, vs, sty).expect("Tuple type is valid")
     }
 
     /// Returns a constant function defined by a Hugr.
@@ -757,7 +759,7 @@ pub(crate) mod test {
     #[case(Value::unit(), Type::UNIT, "const:seq:{}")]
     #[case(const_usize(), usize_t(), "const:custom:ConstUsize(")]
     #[case(serialized_float(17.4), float64_type(), "const:custom:json:Object")]
-    #[case(const_tuple(), Type::new_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
+    #[case(const_tuple(), Type::new_runtime_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
     #[case(const_array_bool(), array_type(2, bool_t()), "const:custom:array")]
     #[case(
         const_borrow_array_bool(),
@@ -830,7 +832,7 @@ pub(crate) mod test {
         );
         let json_const: Value = CustomSerialized::new(typ_int.clone(), 6.into()).into();
         let classic_t = Type::new_extension(typ_int.clone());
-        assert_matches!(classic_t.least_upper_bound(), TypeBound::Copyable);
+        assert_matches!(classic_t.least_upper_bound(), Some(TypeBound::Copyable));
         assert_eq!(json_const.get_type(), classic_t);
 
         let typ_qb = CustomType::new(
@@ -885,9 +887,9 @@ pub(crate) mod test {
         use super::super::{OpaqueValue, Sum};
         use crate::{
             ops::{Value, constant::CustomSerialized},
-            std_extensions::arithmetic::int_types::ConstInt,
-            std_extensions::collections::list::ListValue,
-            types::{SumType, Type},
+            proptest::RecursionDepth,
+            std_extensions::{arithmetic::int_types::ConstInt, collections::list::ListValue},
+            types::{SumType, proptest_utils::any_type},
         };
         use ::proptest::{collection::vec, prelude::*};
         impl Arbitrary for OpaqueValue {
@@ -905,12 +907,14 @@ pub(crate) mod test {
                     32, // Target around 32 total elements
                     3,  // Each collection is up to 3 elements long
                     |child_strat| {
-                        (any::<Type>(), vec(child_strat, 0..3)).prop_map(|(typ, children)| {
-                            Self::new(ListValue::new(
-                                typ,
-                                children.into_iter().map(|e| Value::Extension { e }),
-                            ))
-                        })
+                        (any_type(RecursionDepth::default()), vec(child_strat, 0..3)).prop_map(
+                            |(typ, children)| {
+                                Self::new(ListValue::new(
+                                    typ,
+                                    children.into_iter().map(|e| Value::Extension { e }),
+                                ))
+                            },
+                        )
                     },
                 )
                 .boxed()

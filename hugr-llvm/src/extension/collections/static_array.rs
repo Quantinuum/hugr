@@ -10,6 +10,8 @@ use hugr_core::{
     std_extensions::collections::static_array::{
         self, StaticArrayOp, StaticArrayOpDef, StaticArrayValue,
     },
+    types::TypeBound,
+    types::type_param::check_term_type,
 };
 use inkwell::{
     AddressSpace, IntPredicate,
@@ -369,10 +371,10 @@ impl<SAC: StaticArrayCodegen + 'static> CodegenExtension for StaticArrayCodegenE
                 {
                     let sac = self.0.clone();
                     move |ts, custom_type| {
-                        let element_type = custom_type.args()[0]
-                            .as_runtime()
+                        let element_type = &custom_type.args()[0];
+                        check_term_type(element_type, &TypeBound::Copyable.into())
                             .expect("Type argument for static array must be a type");
-                        sac.static_array_type(ts, &element_type)
+                        sac.static_array_type(ts, element_type)
                     }
                 },
             )
@@ -426,7 +428,7 @@ mod test {
         #[case] op: StaticArrayOpDef,
         #[case] ty: HugrType,
     ) {
-        let op = op.instantiate(&[ty.clone().into()]).unwrap();
+        let op = op.instantiate(std::slice::from_ref(&ty)).unwrap();
         let op = OpType::from(op.to_extension_op().unwrap());
         llvm_ctx.add_extensions(|ceb| {
             ceb.add_default_static_array_extensions()

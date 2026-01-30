@@ -337,8 +337,8 @@ fn resolve_call() {
         Signature::new(vec![], vec![bool_t()]),
     );
 
-    let generic_type_1 = float64_type().into();
-    let generic_type_2 = int_type(6).into();
+    let generic_type_1 = float64_type();
+    let generic_type_2 = int_type(6);
     let expected_exts = [
         float_types::EXTENSION_ID.clone(),
         int_types::EXTENSION_ID.clone(),

@@ -365,7 +365,7 @@ mod test {
             vec![
                 bool_t(),
                 bool_t(),
-                Type::new_tuple(vec![bool_t(), bool_t()]),
+                Type::new_runtime_tuple(vec![bool_t(), bool_t()]),
             ],
         ))
         .unwrap();

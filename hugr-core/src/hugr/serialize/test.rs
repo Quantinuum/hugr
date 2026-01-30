@@ -26,8 +26,8 @@ use crate::std_extensions::std_reg;
 use crate::test_file;
 use crate::types::type_param::TypeParam;
 use crate::types::{
-    FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
-    TypeRV,
+    FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Term, Type, TypeArg,
+    TypeBound, TypeRV,
 };
 use crate::{OutgoingPort, Visibility, type_row};
 use std::fs::File;
@@ -39,6 +39,7 @@ use itertools::Itertools;
 use jsonschema::{Draft, Validator};
 use portgraph::{Hierarchy, LinkMut, PortMut, UnmanagedDenseMap, multiportgraph::MultiPortGraph};
 use rstest::rstest;
+use serde_with::serde_as;
 
 /// A serde-serializable hugr. Used for testing.
 #[derive(Debug, serde::Serialize)]
@@ -50,8 +51,10 @@ pub(super) struct HugrSer<'h>(#[serde(serialize_with = "Hugr::serde_serialize")]
 pub(super) struct HugrDeser(#[serde(deserialize_with = "Hugr::serde_deserialize")] pub Hugr);
 
 /// Version 1 of the Testing HUGR serialization format, see `testing_hugr.py`.
+#[serde_as]
 #[derive(Serialize, Deserialize, PartialEq, Debug, Default)]
 struct SerTestingLatest {
+    #[serde_as(as = "Option<crate::types::serialize::SerType>")]
     typ: Option<crate::types::TypeRV>,
     sum_type: Option<crate::types::SumType>,
     poly_func_type: Option<crate::types::PolyFuncTypeRV>,
@@ -142,7 +145,7 @@ macro_rules! impl_sertesting_from {
     };
 }
 
-impl_sertesting_from!(crate::types::TypeRV, typ);
+impl_sertesting_from!(crate::types::Type, typ);
 impl_sertesting_from!(crate::types::SumType, sum_type);
 impl_sertesting_from!(crate::types::PolyFuncTypeRV, poly_func_type);
 impl_sertesting_from!(crate::ops::Value, value);
@@ -153,13 +156,6 @@ impl From<PolyFuncType> for SerTestingLatest {
     fn from(v: PolyFuncType) -> Self {
         let v: PolyFuncTypeRV = v.into();
         v.into()
-    }
-}
-
-impl From<Type> for SerTestingLatest {
-    fn from(v: Type) -> Self {
-        let t: TypeRV = v.into();
-        t.into()
     }
 }
 
@@ -522,7 +518,7 @@ fn serialize_types_roundtrip() {
     check_testing_roundtrip(g.clone());
 
     // A Simple tuple
-    let t = Type::new_tuple(vec![usize_t(), g]);
+    let t = Type::new_runtime_tuple(vec![usize_t(), g]);
     check_testing_roundtrip(t);
 
     // A Classic sum
@@ -537,9 +533,8 @@ fn serialize_types_roundtrip() {
 #[case(bool_t())]
 #[case(usize_t())]
 #[case(INT_TYPES[2].clone())]
-#[case(Type::new_alias(crate::ops::AliasDecl::new("t", TypeBound::Linear)))]
 #[case(Type::new_var_use(2, TypeBound::Copyable))]
-#[case(Type::new_tuple(vec![bool_t(),qb_t()]))]
+#[case(Type::new_runtime_tuple(vec![bool_t(),qb_t()]))]
 #[case(Type::new_sum([vec![bool_t(),qb_t()], vec![Type::new_unit_sum(4)]]))]
 #[case(Type::new_function(Signature::new_endo([qb_t(),bool_t(),usize_t()])))]
 fn roundtrip_type(#[case] typ: Type) {
@@ -575,11 +570,14 @@ fn polyfunctype2() -> PolyFuncTypeRV {
     let tv0 = TypeRV::new_row_var_use(0, TypeBound::Linear);
     let tv1 = TypeRV::new_row_var_use(1, TypeBound::Copyable);
     let params = [TypeBound::Linear, TypeBound::Copyable].map(TypeParam::new_list_type);
-    let inputs = vec![
-        TypeRV::new_function(FuncValueType::new([tv0.clone()], [tv1.clone()])),
+    let inputs = Term::concat_lists([
+        Term::new_list([TypeRV::new_function(FuncValueType::new(
+            tv0.clone(),
+            tv1.clone(),
+        ))]),
         tv0,
-    ];
-    let res = PolyFuncTypeRV::new(params, FuncValueType::new(inputs, [tv1]));
+    ]);
+    let res = PolyFuncTypeRV::new(params, FuncValueType::new(inputs, tv1));
     // Just check we've got the arguments the right way round
     // (not that it really matters for the serialization schema we have)
     res.validate().unwrap();
@@ -595,7 +593,7 @@ fn polyfunctype2() -> PolyFuncTypeRV {
 #[case(PolyFuncType::new([TypeParam::new_tuple_type([TypeBound::Linear.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], Signature::new_endo(type_row![])))]
 #[case(PolyFuncType::new(
     [TypeParam::new_list_type(TypeBound::Linear)],
-    Signature::new_endo([Type::new_tuple([TypeRV::new_row_var_use(0, TypeBound::Linear)])])))]
+    Signature::new_endo([Type::new_runtime_tuple(TypeRV::new_row_var_use(0, TypeBound::Linear))])))]
 fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
     check_testing_roundtrip(poly_func_type);
 }
@@ -608,7 +606,7 @@ fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
 #[case(PolyFuncTypeRV::new([TypeParam::new_tuple_type([TypeBound::Linear.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], FuncValueType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new(
     [TypeParam::new_list_type(TypeBound::Linear)],
-    FuncValueType::new_endo([TypeRV::new_row_var_use(0, TypeBound::Linear)])))]
+    FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Linear))))]
 #[case(polyfunctype2())]
 fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
     check_testing_roundtrip(poly_func_type);
@@ -670,7 +668,8 @@ mod proptest {
     use super::check_testing_roundtrip;
     use super::{NodeSer, SimpleOpDef};
     use crate::ops::{OpType, OpaqueOp, Value};
-    use crate::types::{PolyFuncTypeRV, Type};
+    use crate::proptest::RecursionDepth;
+    use crate::types::{PolyFuncTypeRV, proptest_utils::any_type};
     use proptest::prelude::*;
 
     impl Arbitrary for NodeSer {
@@ -698,7 +697,7 @@ mod proptest {
 
     proptest! {
         #[test]
-        fn prop_roundtrip_type(t:  Type) {
+        fn prop_roundtrip_type(t in any_type(RecursionDepth::default())) {
             check_testing_roundtrip(t);
         }
 
