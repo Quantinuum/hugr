@@ -311,11 +311,11 @@ mod test {
     fn builder_from_existing() -> Result<(), BuildError> {
         let hugr = Hugr::new();
 
-        let fn_builder = FunctionBuilder::with_hugr(hugr, "main", Signature::new_endo(vec![]))?;
+        let fn_builder = FunctionBuilder::with_hugr(hugr, "main", Signature::new_endo([]))?;
         let mut hugr = fn_builder.finish_hugr()?;
 
         let mut module_builder = ModuleBuilder::with_hugr(&mut hugr);
-        module_builder.declare("other", Signature::new_endo(vec![]).into())?;
+        module_builder.declare("other", Signature::new_endo([]).into())?;
 
         hugr.validate()?;
 

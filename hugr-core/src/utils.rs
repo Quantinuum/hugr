@@ -139,11 +139,11 @@ pub(crate) mod test_quantum_extension {
     };
 
     fn one_qb_func() -> PolyFuncTypeRV {
-        FuncValueType::new_endo(qb_t()).into()
+        FuncValueType::new_endo([qb_t()]).into()
     }
 
     fn two_qb_func() -> PolyFuncTypeRV {
-        FuncValueType::new_endo(vec![qb_t(), qb_t()]).into()
+        FuncValueType::new_endo([qb_t(), qb_t()]).into()
     }
     /// The extension identifier.
     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("test.quantum");

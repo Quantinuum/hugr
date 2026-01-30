@@ -522,7 +522,7 @@ mod test {
     #[rstest]
     fn prelude_const_usize(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let k = builder.add_load_value(ConstUsize::new(17));
@@ -557,8 +557,8 @@ mod test {
     #[rstest]
     fn prelude_noop(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_ins(usize_t())
-            .with_outs(usize_t())
+            .with_ins([usize_t()])
+            .with_outs([usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let in_wires = builder.input_wires();
@@ -575,7 +575,7 @@ mod test {
     fn prelude_make_tuple(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![bool_t(), bool_t()])
-            .with_outs(Type::new_tuple(vec![bool_t(), bool_t()]))
+            .with_outs([Type::new_tuple(vec![bool_t(); 2])])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let in_wires = builder.input_wires();
@@ -588,7 +588,7 @@ mod test {
     #[rstest]
     fn prelude_unpack_tuple(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_ins(Type::new_tuple(vec![bool_t(), bool_t()]))
+            .with_ins([Type::new_tuple(vec![bool_t(); 2])])
             .with_outs(vec![bool_t(), bool_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
@@ -682,7 +682,7 @@ mod test {
 
         let hugr = SimpleHugrConfig::new()
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
-            .with_outs(error_type())
+            .with_outs([error_type()])
             .finish(|mut builder| {
                 let sig_out = builder.add_load_value(sig);
                 let msg_out = builder.add_load_value(msg);
@@ -728,7 +728,7 @@ mod test {
     #[rstest]
     fn prelude_load_nat(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let v = builder
