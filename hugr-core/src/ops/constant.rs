@@ -208,7 +208,7 @@ pub enum Value {
 /// use serde_json::json;
 ///
 /// let expected_json = json!({
-///     "typ": usize_t(),
+///     "typ": {"t": "I"}, // No public way to serialize a Term as a (SerSimple)Type...
 ///     "value": {'c': "ConstUsize", 'v': 1}
 /// });
 /// let ev = OpaqueValue::new(ConstUsize::new(1));
@@ -217,7 +217,7 @@ pub enum Value {
 ///
 /// let ev = OpaqueValue::new(CustomSerialized::new(usize_t().clone(), serde_json::Value::Null));
 /// let expected_json = json!({
-///     "typ": usize_t(),
+///     "typ": {"t": "I"}, // No public way to serialize a Term as a (SerSimple)Type
 ///     "value": null
 /// });
 ///
