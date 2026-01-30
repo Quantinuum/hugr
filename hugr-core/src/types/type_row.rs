@@ -27,11 +27,13 @@ pub struct TypeRow {
 }
 
 /// Legacy alias. Used to indicate a [Term] that `check_term_type`s against
-/// [Term::ListType] of [Term::RuntmeType] (of a [TypeBound]), i.e. one of
+/// [Term::ListType] of [Term::RuntimeType] (of a [TypeBound]), i.e. one of
 /// * A [Term::Variable] of type [Term::ListType] (of [Term::RuntimeType]...)
 /// * A [Term::List], each of whose elements is of type some [Term::RuntimeType]
 /// * A [Term::ListConcat], each of whose sublists is one of these three
-// ALAN TODO Should remove this.
+///
+/// [TypeBound]: crate::types::TypeBound
+// ALAN TODO remove this? or make a wrapper struct?
 pub type TypeRowRV = Term;
 
 impl Display for TypeRow {
