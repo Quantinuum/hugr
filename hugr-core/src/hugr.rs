@@ -406,9 +406,7 @@ impl Hugr {
             } else {
                 children.sort_by(sort_fn);
             }
-            for child in children {
-                queue.push_back(child);
-            }
+            queue.extend(children);
             Some(node)
         })
     }
