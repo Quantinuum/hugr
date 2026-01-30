@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.15.2](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.1...hugr-py-v0.15.2) (2026-01-30)
+
+
+### Features
+
+* Add ptr extension and cleanup `hugr.std` module ([#2842](https://github.com/Quantinuum/hugr/issues/2842)) ([0871b82](https://github.com/Quantinuum/hugr/commit/0871b8268e391886df48a9a5a0b3152ef8156aa0))
+* Auto-embed extensions in stored hugrs ([#2843](https://github.com/Quantinuum/hugr/issues/2843)) ([36408d4](https://github.com/Quantinuum/hugr/commit/36408d4bb83a752e8a4ac986e2b0857c8b1df5c1))
+
 ## [0.15.1](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.0...hugr-py-v0.15.1) (2026-01-28)
 
 
