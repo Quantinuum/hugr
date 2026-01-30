@@ -179,7 +179,7 @@ class Block(Op):
 
 @dataclass(frozen=True)
 class DefineFunc(Op):
-    """Function definiton."""
+    """Function definition."""
 
     symbol: Symbol
 

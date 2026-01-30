@@ -1,5 +1,36 @@
 # Changelog
 
+## [0.25.4](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.3...hugr-v0.25.4) - 2026-01-14
+
+### Bug Fixes
+
+- UnpackTuple error on disconnected outputs ([#2813](https://github.com/Quantinuum/hugr/pull/2813))
+
+## [0.25.3](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.2...hugr-v0.25.3) - 2026-01-09
+
+### Bug Fixes
+
+- *(hugr-passes)* Recursive replacement on NodeTemplate::LinkedHugr ([#2800](https://github.com/Quantinuum/hugr/pull/2800))
+- more nondeterminism in linking ([#2792](https://github.com/Quantinuum/hugr/pull/2792))
+
+### Documentation
+
+- Add collection extension ops to the spec ([#2767](https://github.com/Quantinuum/hugr/pull/2767))
+
+### Refactor
+
+- *(ReplaceTypes)* [tiny] correct computation of containing_func ([#2807](https://github.com/Quantinuum/hugr/pull/2807))
+
+## [0.25.2](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.1...hugr-v0.25.2) - 2025-12-30
+
+### Bug Fixes
+
+- *(determinism)* use BTreeMap in ModuleGraph ([#2783](https://github.com/Quantinuum/hugr/pull/2783))
+
+### New Features
+
+- Re-export hugr_core::hugr::linking from hugr:: ([#2781](https://github.com/Quantinuum/hugr/pull/2781))
+
 ## [0.25.1](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.0...hugr-v0.25.1) - 2025-12-29
 
 ### Bug Fixes

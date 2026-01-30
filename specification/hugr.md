@@ -157,8 +157,10 @@ EdgeKind ::= Value(Locality, AnyType)
              | Hierarchy | Order | ControlFlow
 ```
 
-Note that a port is associated with a node and zero or more Dataflow edges.
-Incoming ports are associated with exactly one edge, or many `ControlFlow` edges.
+Note that a port is associated with a node and zero or more Dataflow or `ControlFlow` edges.
+Incoming ports are associated with exactly one Dataflow edge, or any number of
+`ControlFlow` edges. Outgoing ports are associated with any number of Dataflow
+edges, or exactly one `ControlFlow` edge.
 All Dataflow edges associated with a port have the same type; thus a port has a
 well defined type, matching that of its adjoining edges. The incoming and
 outgoing ports of a node are each ordered independently, meaning that the first
@@ -170,7 +172,8 @@ The sequences of incoming and outgoing port types (carried on `Value` edges) of 
 Note that the locality is not fixed or even specified by the signature.
 
 A source port with a `CopyableType` may have any number of edges associated with
-it (including zero, which means "discard"). Any other port
+it (including zero, which means "discard"). A target port for a `ControlFlow`
+edge may also have any number of `ControlFlow` edges associated with it. Any other port
 must have exactly one edge associated with it. This captures the property of
 linear types that the value is used exactly once.
 
@@ -190,8 +193,7 @@ The root node has no non-hierarchy edges (and this supersedes any other requirem
 edges of specific node types).
 
 A *sibling graph* is a subgraph of the HUGR containing all nodes with
-a particular parent, plus any `Order`, `Value` `Static`, and `ControlFlow` edges between
-them.
+a particular parent, plus any edges between them.
 
 #### `Value` edges
 
@@ -341,9 +343,9 @@ express control flow, i.e. conditional or repeated evaluation.
 
 These are parents to multiple `Case` nodes; the children have no edges.
 The first input to the Conditional-node is of Sum type (see below), whose
-arity matches the number of children of the Conditional-node. At runtime
-the constructor (tag) selects which child to execute; the elements of the tagged row
-of the Sum, with all remaining inputs to Conditional
+arity matches the number of children of the Conditional node. At runtime
+the sum's tag is inspected to select which child to execute; the elements of
+the tagged row of the Sum, with all remaining inputs to Conditional
 appended, are sent to this child, and all outputs of the child are the
 outputs of the Conditional; that child is evaluated, but the others are
 not. That is, Conditional-nodes act as "if-then-else" followed by a
@@ -355,17 +357,17 @@ flowchart
     subgraph Conditional
         direction LR
         subgraph Case0["Case 0"]
-            C0I["case 0 inputs + other inputs"] --> op0["operations"]
-            op0 --> C0O["outputs"]
+            C0I["Input"] --#Input0:#Other--> op0["operations"]
+            op0 --#Output--> C0O["Output"]
         end
         subgraph Case1["Case 1"]
-            C1I["case 1 inputs + other inputs"] --> op1["operations"]
-            op1 --> C1O["outputs"]
+            C1I["Input"] --#Input1:#Other--> op1["operations"]
+            op1 --#Output--> C1O["Output"]
         end
         Case0 ~~~ Case1
     end
-    Sum["case 0 inputs | case 1 inputs"] --> Conditional
-    OI["other inputs"] --> Conditional
+    Sum["case 0 inputs | case 1 inputs"] --Sum(#Input0,#Input1)--> Conditional
+    OI["other inputs"] --#Other--> Conditional
     Conditional --> outputs
 ```
 
@@ -373,19 +375,70 @@ flowchart
 
 These provide tail-controlled loops. The dataflow sibling graph within the
 TailLoop-node defines the loop body: this computes a row of outputs, whose
-first element has type `Sum(#I, #O)` and the remainder is a row `#X`
+first element has type `Sum(#Input, #Output)` and the remainder is a row `#Extra`
 (perhaps empty). Inputs to the contained graph and to the TailLoop node itself
-are the row `#I:#X`, where `:` indicates row concatenation (with the row
+are the row `#Input:#Extra`, where `:` indicates row concatenation (with the row
 inside the `Sum`).
 
 Evaluation of the node begins by feeding the node inputs into the child graph
-and evaluating it.  The `Sum` produced controls iteration of the loop:
+and evaluating it.  The `Sum` produced by the child graph controls iteration of
+the loop:
 
-- The first variant (`#I`) means that these values, along with the other
- sibling-graph outputs `#X`, are fed back into the top of the loop,
+- The first variant (`#Input`) means that these values, along with the other
+ sibling-graph outputs `#Extra`, are fed back into the top of the loop,
  and the body is evaluated again (thus perhaps many times)
-- The second variant (`#O`) means that evaluation of the `TailLoop` node
- terminates, returning all the values produced as a row of outputs `#O:#X`.
+- The second variant (`#Output`) means that evaluation of the `TailLoop` node
+ terminates, returning all the values produced as a row of outputs
+ `#Output:#Extra`.
+
+```mermaid
+flowchart TB
+ subgraph Case0["Case0"]
+        TI0["Input"]
+        TIT["Tag"]
+        TO0["Output"]
+  end
+ subgraph Case1["Case1"]
+        TI1["Input"]
+        TIT1["Tag"]
+        TO1["Output"]
+  end
+ subgraph Conditional["Conditional"]
+    direction LR
+        Case0
+        Case1
+  end
+ subgraph DFG["DFG"]
+        Process["Process"]
+        Conditional
+        CI["Input"]
+        CO["Output"]
+  end
+ subgraph TailLoop["TailLoop"]
+    direction LR
+        DFG
+  end
+
+ 0["Loop inputs"]
+ 1["Other inputs"]
+ 2["Output"]
+ 0 -- #Input --> TailLoop
+ 1 -- #Extra --> TailLoop
+ TailLoop -- #Output --> 2
+ TI0 -- #Return --> TIT
+ TIT -- #Input --> TO0
+ TI1 -- #Continue --> TIT1
+ TIT1 -- #Output --> TO1
+ Case0 ~~~ Case1
+ Process L_Process_CO_0@-- #Extra --> CO
+ CI L_CI_Process_0@-- #Input:#Extra --> Process
+ Process L_Process_Conditional_0@-- Sum(#Return,#Continue) --> Conditional
+ Conditional -- Sum(#Input,#Output) --> CO
+
+ L_Process_CO_0@{ curve: natural }
+ L_CI_Process_0@{ curve: natural }
+ L_Process_Conditional_0@{ curve: natural }
+```
 
 ##### Control Flow Graphs
 
@@ -406,7 +459,7 @@ with inputs the same as the CFG-node; the second child is an
 The remaining children are either `DFB`s or [scoped definitions](#scoped-definitions).
 
 The first output of the graph contained in a `DFB` has type
-`Sum(\#t(0),...,#t(n-1))`, where the node has `n` successors, and the
+`Sum(#t(0),...,#t(n-1))`, where the node has `n` successors, and the
 remaining outputs are a row `#x`. `#t(i)` with `#x` appended matches the
 inputs of successor `i`.
 
@@ -418,14 +471,19 @@ Some normalizations are possible:
 - If the entry node has only one successor and that successor is the
   exit node, the CFG node itself can be removed.
 
-The CFG in the example below has three inputs: one (call it `v`) of type "P"
-(not specified, but with a conversion to boolean represented by the nodes labelled "P?1" and "P?2"), one of
-type "qubit" and one (call it `t`) of type "angle".
+The CFG in the example below takes three inputs:
 
-The CFG has the effect of performing an `Rz` rotation on the qubit with angle
-`x`. where `x` is the constant `C` if `v` and `H(v)` are both true and `G(F(t))`
-otherwise. (`H` is a function from type "P" to type "P" and `F` and `G` are
-functions from type "angle" to type "angle".)
+- A value `v` of type "P" (its exact structure isn’t specified, but it can be converted to a boolean—this conversion is represented by the nodes labeled "P?1" and "P?2").
+- A value of type "qubit".
+- A value `t` of type "angle".
+
+The CFG applies an `Rz` rotation to the qubit. The rotation angle `x` is determined as follows:
+
+- If both `v` and `H(v)` evaluate to true, then `x` is the constant `C`.
+- Otherwise, `x` is `G(F(t))`.
+
+Here, `H` maps values of type "P" to "P", and both `F` and `G` map values of type "angle" to "angle".
+
 
 The `DFB` nodes are labelled `Entry` and `BB1` to `BB4`. Note that the first
 output of each of these is a sum type, whose arity is the number of outgoing
@@ -630,7 +688,8 @@ analysis required to move computations out of a CFG-node into
 Conditional- and TailLoop-nodes). Note that such conversion could be
 done for only a subpart of the HUGR at a time.
 
-The following CFG is equivalent to the previous example. In this diagram:
+The following CFG is equivalent to the example given in the
+[Control Flow Graphs](#control-flow-graphs) section. In this diagram:
 
 - the thick arrow from "angle source" to "F" is an `Ext` edge (from an
   ancestral DFG into the CFG's entry block);
@@ -714,88 +773,31 @@ flowchart
 Each node in the HUGR may have arbitrary metadata attached to it. This
 is preserved during graph modifications, and,
 [when possible](#metadata-updates-on-replacement), copied when rewriting.
-Additionally the metadata may record references to other nodes; these
-references are updated along with node indices.
-
-The metadata could either be built into the hugr itself (metadata as
-node weights) or separated from it (keep a separate map from node ID to
-metadata). The advantages of the first approach are:
-
-- just one object to have around, not two;
-- reassignment of node IDs doesn't mess with metadata.
-
-The advantages of the second approach are:
-
-- Metadata should make no difference to the semantics of the hugr (by
-  definition, otherwise it isn't metadata but data), so it makes sense
-  to be separated from the core structure.
-- We can be more agile with the details, such as formatting and
-  versioning.
-
-The problem of reassignment can be solved by having an API function that
-operates on both together atomically. We will therefore tentatively
-adopt the second approach, keeping metadata and hugr in separate
-structures.
 
 For each node, the metadata is a dictionary keyed by strings. Keys are
 used to identify applications or users so these do not (accidentally)
-interfere with each other's metadata; for example a reverse-DNS system
-(`com.quantinuum.username....` or `com.quantinuum.tket....`). The values
-are tuples of (1) any serializable struct, and (2) a list of node
-indices. References from the serialized struct to other nodes should
-indirect through the list of node indices stored with the struct.
-
-**TODO**: Specify format, constraints, and serialization. Is YAML syntax
-appropriate?
+interfere with each other's metadata; we use a reverse-DNS system
+(`com.quantinuum.tket....`). The values
+are required to be serializable.
 
 There is an API to add metadata, or extend existing metadata, or read
 existing metadata, given the node ID.
-
-**TODO** Examples illustrating this API.
-
+<!---
 **TODO** Do we want to reserve any top-level metadata keys, e.g. `Name`,
 `Ports` (for port metadata) or `History` (for use by the rewrite
 engine)?
-
+-->
 Reserved metadata keys used by the HUGR tooling are prefixed with `core.`.
 Use of this prefix by external tooling may cause issues.
+Keys used by the reference implementation are described in the separate [metadata documentation](metadata.md).
 
-#### Generator Metadata
-Tooling generating HUGR can specify some reserved metadata keys to be used for debugging
-purposes.
-
-The key `core.generator` when used on the module root node is
-used to specify the tooling used to generate the module.
-The associated value must be an object/dictionary containing the fields `name`
-and `version`, each with string values. Extra fields may be used to include
-additional data about generating tooling that may be useful for debugging. Example:
-
-```json
-{
-  "core.generator": { "name": "my_compiler", "version": "1.0.0" }
-}
-```
-
-The key `core.used_extensions` when used on the module root node is
-used to specify the names and versions of all the extensions used in the module.
-Some of these may correspond to extensions packaged with the module, but they
-may also be extensions the consuming tooling has pre-loaded. They can be used by the
-tooling to check for extension version mismatches. The value associated with the key
-must be an array of objects/dictionaries containing the keys `name` and `version`, each
-with string values. Example:
-```json
-{
-  "core.used_extensions": [{ "name": "my_ext", "version": "2.2.3" }]
-}
-```
-
-
+<!---
 
 **TODO** Do we allow per-port metadata (using the same mechanism?)
 
 **TODO** What about references to ports? Should we add a list of port
 indices after the list of node indices?
-
+-->
 ## Type System
 
 There are two classes of type: `AnyType` $\supset$ `CopyableType`. Types in these
@@ -907,8 +909,6 @@ For example, a polymorphic FuncDefn might declare a row variable X of kind
 `Sum([#(X, usize)])`. A call that instantiates said type-parameter with
 `TypeArg::List([usize, unit])` would then have output `Sum([#(usize, unit, usize)])`.
 
-See [Declarative Format](#declarative-format) for more examples.
-
 Note that since a row variable does not have kind Type, it cannot be used as the type of an edge.
 
 ## Extension System
@@ -962,8 +962,8 @@ compiling, and linking C++ code.
 
 We can do something similar in Rust, and we wouldn't even need to parse
 another format, sufficiently nice rust macros/proc\_macros should
-provide a human-friendly-enough definition experience.  However, we also
-provide a declarative YAML format, below.
+provide a human-friendly-enough definition experience.  These extensions can be
+serialized as JSON for use in other tools.
 
 Ultimately though, we cannot avoid the "stringly" type problem if we
 want *runtime* extensibility - extensions that can be specified and used
@@ -971,8 +971,7 @@ at runtime. In many cases this is desirable.
 
 ### Extension Implementation
 
-To strike a balance then, every extension provides declarative structs containing
-named **TypeDef**s and **OpDef**s---see [Declarative Format](#declarative-format).
+Extensions may provide a number of named **TypeDef**s and **OpDef**s.
 These are (potentially polymorphic) definitions of types and operations, respectively---polymorphism arises because both may
 declare any number of TypeParams, as per [Polymorphism](#polymorphism). To use a TypeDef as a type,
 it must be instantiated with TypeArgs appropriate for its TypeParams, and similarly
@@ -997,14 +996,14 @@ introduces the possibility of failure (see full details in [appendix](#appendix-
 When serializing the node, we also serialize the type arguments; we can also serialize
 the resulting (computed) type with the operation, and this will be useful when the type
 is computed by binary code, to allow the operation to be treated opaquely by tools that
-do not have the binary code available. (That is: the YAML definition, including all types
+do not have the binary code available. (That is: the serialized JSON, including all types
 but only OpDefs that do not have binary `compute_signature`, can be sent with the HUGR).
 
 This mechanism allows new operations to be passed through tools that do not understand
 what the operations *do*---that is, new operations may be be defined independently of
 any tool, but without providing any way for the tooling to treat them as anything other
 than a black box. Similarly, tools may understand that operations may consume/produce
-values of new types---whose *existence* is carried in the YAML---but the *semantics*
+values of new types---whose *existence* is carried in the JSON---but the *semantics*
 of each operation and/or type are necessarily specific to both operation *and* tool
 (e.g. compiler or runtime).
 
@@ -1026,123 +1025,6 @@ Whether a particular OpDef provides binary code for `try_lower` is independent
 of whether it provides a binary `compute_signature`, but it will not generally
 be possible to provide a HUGR for an operation whose type cannot be expressed
 using a polymorphic type scheme.
-
-### Declarative format
-
-The declarative format needs to specify some required data that is
-needed by the compiler to correctly treat the operation (the minimum
-case is opaque operations that should be left untouched). However, we
-wish to also leave it expressive enough to specify arbitrary extra data
-that may be used by compiler extensions. This suggests a flexible
-standard format such as YAML would be suitable. (The internal Rust structs
-may also be used directly.) Here we provide an
-illustrative example:
-
-See [Type System](#type-system) for more on Extensions.
-
-```yaml
-# may need some top level data, e.g. namespace?
-
-# Import other header files to use their custom types
-  # TODO: allow qualified, and maybe locally-scoped
-imports: [Quantum, Array]
-
-extensions:
-- name: MyGates
-  # Declare custom types
-  types:
-  - name: QubitVector
-    description: "A vector of qubits"
-    # Opaque types can take type arguments, with specified names
-    params: [["size", USize]]
-  operations:
-  - name: measure
-    description: "measure a qubit"
-    signature:
-      # The first element of each pair is an optional parameter name.
-      inputs: [[null, Q]]  # Q is defined in Quantum extension
-      outputs: [[null, Q], ["measured", B]]
-  - name: ZZPhase
-    description: "Apply a parametric ZZPhase gate"
-    signature:
-      inputs: [[null, Q], [null, Q], ["angle", Angle]]
-      outputs: [[null, Q], [null, Q]]
-    misc:
-      # extra data that may be used by some compiler passes
-      # and is passed to try_lower and compute_signature
-      equivalent: [0, 1]
-      basis: [Z, Z]
-  - name: SU2
-    description: "One qubit unitary matrix"
-    params: # per-node values passed to the type-scheme interpreter, but not used in signature
-      matrix: Opaque(complex_matrix,2,2)
-    signature:
-      inputs: [[null, Q]]
-      outputs: [[null, Q]]
-  - name: MatMul
-    description: "Multiply matrices of statically-known size"
-    params:  # per-node values passed to type-scheme-interpreter and used in signature
-      i: USize
-      j: USize
-      k: USize
-    signature:
-      inputs: [["a", Array<i>(Array<j>(F64))], ["b", Array<j>(Array<k>(F64))]]
-      outputs: [[null, Array<i>(Array<k>(F64))]]
-      #alternative inputs: [["a", Opaque(complex_matrix,i,j)], ["b", Opaque(complex_matrix,j,k)]]
-      #alternative outputs: [[null, Opaque(complex_matrix,i,k)]]
-  - name: max_float
-    description: "Variable number of inputs"
-    params:
-      n: USize
-    signature:
-      # Where an element of a signature has three subelements, the third is the number of repeats
-      inputs: [[null, F64, n]] # (defaulting to 1 if omitted)
-      outputs: [[null, F64, 1]]
-  - name: ArrayConcat
-    description: "Concatenate two arrays. Extension provides a compute_signature implementation."
-    params:
-      t: Type  # Classic or Quantum
-      i: USize
-      j: USize
-    # inputs could be: Array<i>(t), Array<j>(t)
-    # outputs would be, in principle: Array<i+j>(t)
-    # - but default type scheme interpreter does not support such addition
-    # Hence, no signature block => will look up a compute_signature in registry.
-  - name: TupleConcat
-    description: "Concatenate two tuples"
-    params:
-      a: List[Type]
-      b: List[Type]
-    signature:
-      inputs: [[null, Sum(a)], [null, Sum(b)]] # Sums with single variant are tuples
-      outputs: [[null, Sum([a,b])]] # Tuple of elements of a concatenated with elements of b
-  - name: GraphOp
-    description: "Involves running an argument Graph. E.g. run it some variable number of times."
-    params:
-      - r: ExtensionSet
-    signature:
-      inputs: [[null, Function[r](USize -> USize)], ["arg", USize]]
-      outputs: [[null, USize]]
-      extensions: [r] # Indicates that running this operation also invokes extensions r
-    lowering:
-      file: "graph_op_hugr.bin"
-      extensions: ["arithmetic.int", r] # r is the ExtensionSet in "params"
-```
-
-**Implementation note** Reading this format into Rust is made easy by `serde` and
-[serde\_yaml](https://github.com/dtolnay/serde-yaml) (see the
-Serialization section). It is also trivial to serialize these
-definitions in to the overall HUGR serialization format.
-
-Note the only required fields are `name` and `description`. `signature` is optional, but if present
-must have children `inputs` and `outputs`, each lists, and may have `extensions`.
-
-The optional `misc` field is used for arbitrary YAML, which is read in as-is and passed to compiler
- passes and (if no `signature` is present) the`compute_signature` function; e.g. a pass can use the `basis` information to perform commutation.
-
-The optional `params` field can be used to specify the types of static+const arguments to each operation
----for example the matrix needed to define an SU2 operation. If `params` are not specified
-then it is assumed empty.
 
 ## Replacement and Pattern Matching
 
@@ -1590,7 +1472,7 @@ so must be supported by all third-party tooling.
 
 `error`: an error type which operations use as a variant of sum to indicate when an error may occur. See [Arithmetic Extensions](#arithmetic-extensions) for some examples.
 
-### Operations
+#### Operations
 
 | Name              | Inputs       | Outputs       | Meaning                                                                                                                                                                                                            |
 |-------------------|--------------|---------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -1774,6 +1656,84 @@ Conversions between integers and floats:
 | `convert_s<N>` | `int<N>`  | `float64`                  | signed int to float   |
 | `bytecast_int64_to_float64` | `int<6>`  | `float64`     | reinterpret an int64 as a float64 based on its bytes, with the same endianness. |
 | `bytecast_float64_to_int64` | `float64` | `int64`       | reinterpret an float64 as an int based on its bytes, with the same endianness. |
+
+### Collections Extensions
+
+There are multiple extensions defining types, values and operations to work with collections of data:
+
+- `collections.array`: The standard linear and fixed-length array type, parametrized by length and element type.
+- `collections.borrow_arr`: A linear and fixed-length array type that provides additional unsafe operations for borrowing elements from the array, parametrized by length and element type.
+- `collections.static_array`: An array type for modeling globally available constant arrays of copyable values, parametrized only by element type.
+- `collections.list`: A variable-length list type, parametrized by element type.
+
+
+#### `collections.array`
+
+This extension provides the `array` type and value with the following operations:
+
+
+| Operation       | Inputs          | Outputs         | Meaning         |
+|-----------------|-----------------|-----------------|-----------------|
+| `new_array`     | `elem_ty^SIZE` | `array<SIZE, elemty>` | Make a new array, given distinct inputs equal to its length. `SIZE` must be statically known (not a variable). |
+| `get`           | `array<size, elemty>`, `usize` | `option<elemty>`, `array` | Copy an element out of the array (**copyable** elements only). Return none if the index is out of bounds. |
+| `set`           | `array<size, elemty>`, `usize`, `elemty` | `either<elemty, array>` | Exchange an element of the array with an external value. Tagged for failure/success if index is out of bounds respectively. |
+| `swap`          | `array<size, elemty>`, `usize`, `usize` | `either<array, array>` | Exchange the elements at two indices within the array. Tagged for failure/success if index is out of bounds respectively. |
+| `pop_left`      | `array<SIZE, elemty>` | `option<elemty, array<SIZE-1, elemty>>` | Pop an element from the left of the array. `SIZE` must be statically known (not a variable). Return none if the input array is size 0. |
+| `pop_right`     | `array<SIZE, elemty>` | `option<elemty, array<SIZE-1, elemty>>` | Pop an element from the right of the array. `SIZE` must be statically known (not a variable). Return none if the input array is size 0. |
+| `discard_empty` | `array<0, elemty>` | `()`  | Discard an empty array. |
+| `discard`       | `array<SIZE, elemty>` | `()`  | Discard an array with **copyable** elements. |
+| `clone`         | `array<SIZE, elemty>` | `array<SIZE, elemty>`, `array<SIZE, elemty>` | Clone an array with **copyable** elements. |
+| `unpack`        | `array<SIZE, elemty>` | `elemty^SIZE` | Unpack an array into its individual elements. `SIZE` must be statically known (not a variable). |
+| `repeat`        | `(() -> elemty)` | `array<SIZE, elemty>` | Create a new array whose elements are initialised by calling the given function `SIZE` times. |
+| `scan`          | `array<SIZE, elemty_src>`,  `(elemty_src, list<acc_ty> -> elemty_dest, list<acc_ty>)`, `list<acc_ty>` | `array<SIZE, elemty_dest>`, `list<acc_ty>`  | A combination of map and foldl. Apply a function to each element of the array with an accumulator that is passed through from start to finish. Return the resulting array and the final state of the accumulator. |
+
+
+#### `collections.borrow_arr`
+
+This extension contains the `borrow_array` type and value. It has all the operations that the array extension does (see previous section), with additional unsafe operations to deal with borrowing elements. Borrowing means taking elements out of an array while relying on the underlying implementation to keep track of which elements have already been taken out.
+
+| Operation             | Inputs                | Outputs               | Meaning               |
+|-----------------------|-----------------------|-----------------------|-----------------------|
+| `borrow`              | `borrow_array<size, elemty>`, `usize`| `borrow_array<size, elemty>`, `elemty` | Borrow an element from the array at the given index. The element already being borrowed should result in a panic. |
+| `return`              | `borrow_array<size, elemty>`, `usize`, `elemty` | `borrow_array<size, elemty>`| Return an element to the array at the given index. There already being an element at this index should result in a panic. |
+| `discard_all_borrowed`| `borrow_array<size, elemty>`| `()`| Discard an array where all elements have been borrowed. Should panic if there are still elements in the array. |
+| `new_all_borrowed`   | `()` | `borrow_array<size, elemty>`| Create a new borrow array where all elements are borrowed. |
+| `is_borrowed`         | `borrow_array<size, elemty>`, `usize` | `bool`, `borrow_array<size, elemty>` | Check if the element at the given index is borrowed. |
+
+There are also conversion operations to convert borrow arrays to and from standard arrays:
+
+| Operation    | Inputs       | Outputs      | Meaning      |
+|--------------|--------------|--------------|--------------|
+| `from_array` | `array<size, elemty>` | `borrow_array<size, elemty>` | Turn an array into a borrow array. |
+| `to_array`   | `borrow_array<size, elemty>` | `array<size, elemty>` | Turn a borrow array into an array. |
+
+#### `collections.static_array`
+
+
+This extension contains the `static_array` type and value for modelling constant statically sized arrays. The only way of obtaining a value of type `static_array` is by creating a `StaticArrayValue`. There are only two operations provided:
+
+
+| Operation    | Inputs       | Outputs      | Meaning      |
+|--------------|--------------|--------------|--------------|
+| `get`        | `static_array<elemty>`, `usize` | `option<elemty>`| Get the element at the given index. Return none if the index is out of bounds. |
+| `len`        | `static_array<elemty>` | `usize` | Gets the length of the array. |
+
+
+
+#### `collections.list`
+
+This extension contains the `list` type and value. Lists are dynamically sized, with all elements having the same type.
+
+| Operation | Inputs | Outputs | Meaning |
+|-----------|--------|---------|---------|
+| `pop`     | `list<elemty>` | `list<elemty>`, `option<elemty>` | Pop from the end of a list. Return the new list and the popped value (or none if the list was empty). |
+| `push`    | `list<elemty>`, `elemty` | `list<elemty>` | Push to the end of a list. Return the new list. |
+| `get`     | `list<elemty>`, `usize` | `option<elemty>` | Look up an element in a list by index. |
+| `set`     | `list<elemty>`, `usize`, `elemty` | `list<elemty>`, `either<elemty, elemty>`,  | Replace the element at the given index, and return the old value. If the index is out of bounds, return the input value as an error. |
+| `insert`  | `list<elemty>`, `usize`, `elemty` | `list<elemty>`, `either<elem_ty, ()>` | Insert an element at the given index. Elements at higher indices are shifted one position to the right. Return an error with the element if the index is out of bounds. |
+| `length`  | `list<elemty>` | `list<elemty>`, `usize` | Get the length of a list. |
+
+
 
 ## Glossary
 

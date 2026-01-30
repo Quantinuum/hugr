@@ -36,7 +36,7 @@ pub trait MakeOpDef {
     /// The [`OpDef::name`] which will be used when `Self`  is added to an [Extension]
     /// or when `Self` is loaded from an [`OpDef`].
     ///
-    /// This identifer must be unique within the extension with which the
+    /// This identifier must be unique within the extension with which the
     /// [`OpDef`] is registered. An [`ExtensionOp`] instantiating this [`OpDef`] will
     /// report `self.opdef_id()` as its [`ExtensionOp::unqualified_id`].
     ///
@@ -151,7 +151,7 @@ pub trait HasDef: MakeExtensionOp {
 pub trait MakeExtensionOp {
     /// The [`OpDef::name`] of [`ExtensionOp`]s from which `Self` can be loaded.
     ///
-    /// This identifer must be unique within the extension with which the
+    /// This identifier must be unique within the extension with which the
     /// [`OpDef`] is registered. An [`ExtensionOp`] instantiating this [`OpDef`] will
     /// report `self.opdef_id()` as its [`ExtensionOp::unqualified_id`].
     fn op_id(&self) -> OpName;

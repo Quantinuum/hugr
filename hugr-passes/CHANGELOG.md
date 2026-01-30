@@ -1,6 +1,22 @@
 # Changelog
 
 
+## [0.25.4](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.3...hugr-passes-v0.25.4) - 2026-01-14
+
+### Bug Fixes
+
+- UnpackTuple error on disconnected outputs ([#2813](https://github.com/Quantinuum/hugr/pull/2813))
+
+## [0.25.3](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.2...hugr-passes-v0.25.3) - 2026-01-09
+
+### Bug Fixes
+
+- *(hugr-passes)* Recursive replacement on NodeTemplate::LinkedHugr ([#2800](https://github.com/Quantinuum/hugr/pull/2800))
+
+### Refactor
+
+- *(ReplaceTypes)* [tiny] correct computation of containing_func ([#2807](https://github.com/Quantinuum/hugr/pull/2807))
+
 ## [0.25.1](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.0...hugr-passes-v0.25.1) - 2025-12-29
 
 ### Bug Fixes

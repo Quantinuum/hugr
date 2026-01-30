@@ -199,7 +199,7 @@ impl<'a> Walker<'a> {
     ///
     /// If the wire is not complete yet, return an iterator over all possible
     /// [`Walker`]s that can be created by pinning exactly one additional
-    /// node (or one additonal commit with an empty wire) connected to
+    /// node (or one additional commit with an empty wire) connected to
     /// `wire`. Each returned [`Walker`] represents a different alternative
     /// Hugr in the exploration space.
     ///
