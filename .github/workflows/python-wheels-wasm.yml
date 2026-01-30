@@ -1,0 +1,66 @@
+name: Python wheels (WASM)
+
+on:
+  # TODO: Test trigger, remove before merge.
+  pull_request:
+    branches:
+      - "**"
+
+permissions:
+  contents: read
+
+env:
+  MODULE_DIR: hugr-py
+  # Pinned version for the uv package manager
+  UV_VERSION: "0.9.5"
+  UV_FROZEN: 1
+  PYTHON_VERSION: "3.14"
+
+jobs:
+  wasm:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      - name: Install nightly Rust toolchain
+        uses: dtolnay/rust-toolchain@master
+        with:
+          # Nightly must be installed for `cargo-minimal-versions` to work
+          toolchain: "nightly"
+          components: rust-src
+          targets: wasm32-unknown-emscripten
+      - name: Setup emsdk
+        uses: mymindstorm/setup-emsdk@v14
+        with:
+          # Compatible with `pyodide_2024_0` ABI
+          # See <https://github.com/pyodide/pyodide/blob/main/docs/development/abi.md>
+          version: 3.1.58
+      - name: Set up uv
+        uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+
+      - name: Rebuild Rust std with emscripten version
+        run: cargo +nightly -Zbuild-std build
+
+      - name: Build wasm wheels
+        # Emscripten's ABI is unstable, so we pass `-Zbuild-std` to rebuild Rust
+        # std with the specific emscripten version we are using, as indicated in
+        # <https://doc.rust-lang.org/beta/rustc/platform-support/wasm32-unknown-emscripten.html#emscripten-abi-compatibility>
+        run: |
+          cd ${{ env.MODULE_DIR }}
+          uv run maturin build
+            -Zbuild-std \
+            --release \
+            -i python${{ env.PYTHON_VERSION }} \
+            --target wasm32-unknown-unknown \
+            -o ./dist
+
+      - name: Upload wheels
+        uses: actions/upload-artifact@v6
+        with:
+          name: wheels-wasm-${{ matrix.platform.target }}
+          path: dist
