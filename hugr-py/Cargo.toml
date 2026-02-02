@@ -25,3 +25,4 @@ hugr-cli = { version = "0.25.4", path = "../hugr-cli", default-features = false 
 hugr-model = { version = "0.25.4", path = "../hugr-model", features = ["pyo3"] }
 pastey.workspace = true
 pyo3 = { workspace = true, features = ["extension-module", "abi3-py310"] }
+zstd = { workspace = true }

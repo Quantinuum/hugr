@@ -37,10 +37,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, ClassVar
 
-import pyzstd
 from typing_extensions import deprecated
 
 import hugr._hugr.model as rust
+import hugr._hugr.zstd as zstd
 
 if TYPE_CHECKING:
     from hugr.hugr.base import Hugr
@@ -90,7 +90,7 @@ def _make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
             payload = package_bytes + extension_bytes
 
     if config.zstd is not None:
-        payload = pyzstd.compress(payload, config.zstd)
+        payload = zstd.compress(payload, config.zstd)
 
     envelope += payload
     return bytes(envelope)
@@ -111,7 +111,7 @@ def _make_envelope_str(package: Package, config: EnvelopeConfig) -> str:
     if not config.format.ascii_printable():
         msg = "Only ascii-printable envelope formats can be encoded into a string."
         raise ValueError(msg)
-    envelope = make_envelope(package, config)
+    envelope = _make_envelope(package, config)
     return envelope.decode("utf-8")
 
 
@@ -124,7 +124,7 @@ def read_envelope(envelope: bytes) -> Package:
     payload = envelope[10:]
 
     if header.zstd:
-        payload = pyzstd.decompress(payload)
+        payload = zstd.decompress(payload)
 
     match header.format:
         case EnvelopeFormat.JSON:
