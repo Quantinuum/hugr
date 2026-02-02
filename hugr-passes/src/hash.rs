@@ -37,10 +37,10 @@ where
         let node_op = self.get_optype(node);
         if OpTag::DataflowParent.is_superset(node_op.tag()) {
             // In this case, we have a dataflow container
-            dfg_hash(&self, node)
+            dfg_hash(self, node)
         } else {
             // otherwise, use generic hash
-            generic_hugr_hash(&self, node)
+            generic_hugr_hash(self, node)
         }
     }
 }
@@ -68,7 +68,7 @@ fn dfg_hash(dfg_hugr: &impl HugrView<Node = Node>, node: Node) -> Result<u64, Ha
         .ok_or(HashError::CyclicDFG)
 }
 
-fn generic_hugr_hash(hugr: impl HugrView<Node = Node>, node: Node) -> Result<u64, HashError> {
+fn generic_hugr_hash(hugr: &impl HugrView<Node = Node>, node: Node) -> Result<u64, HashError> {
     println!("Generic hash called");    
     let mut child_hashes = Vec::new();
     
