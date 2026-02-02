@@ -16,10 +16,6 @@ on:
     types:
       - published
   workflow_dispatch:
-  # TODO: Test trigger, remove before merge.
-  pull_request:
-    branches:
-      - "**"
 
 permissions:
   contents: read
@@ -54,9 +50,7 @@ jobs:
 
   linux:
     needs: check-tag
-    # TODO: Remove before merge.
-    if: false
-    #if: ${{ needs.check-tag.outputs.run == 'true' }}
+    if: ${{ needs.check-tag.outputs.run == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -102,9 +96,7 @@ jobs:
 
   musllinux:
     needs: check-tag
-    # TODO: Remove before merge.
-    if: false
-    #if: ${{ needs.check-tag.outputs.run == 'true' }}
+    if: ${{ needs.check-tag.outputs.run == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -146,9 +138,7 @@ jobs:
 
   windows:
     needs: check-tag
-    # TODO: Remove before merge.
-    if: false
-    #if: ${{ needs.check-tag.outputs.run == 'true' }}
+    if: ${{ needs.check-tag.outputs.run == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -178,9 +168,7 @@ jobs:
 
   macos:
     needs: check-tag
-    # TODO: Remove before merge.
-    if: false
-    #if: ${{ needs.check-tag.outputs.run == 'true' }}
+    if: ${{ needs.check-tag.outputs.run == 'true' }}
     runs-on: ${{ matrix.platform.runner }}
     strategy:
       matrix:
@@ -216,9 +204,7 @@ jobs:
 
   sdist:
     needs: check-tag
-    # TODO: Remove before merge.
-    if: false
-    #if: ${{ needs.check-tag.outputs.run == 'true' }}
+    if: ${{ needs.check-tag.outputs.run == 'true' }}
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
