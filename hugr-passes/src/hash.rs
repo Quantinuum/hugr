@@ -1,24 +1,26 @@
-//! Hugr hashing.
-use derive_more::{Display, Error};
-use hugr_core::ops::OpTag;
-use hugr_core::ops::OpTrait;
-use fxhash::{FxHashMap, FxHasher64};
-use hugr_core::hugr::internal::HugrInternals;
-use hugr_core::hugr::internal::PortgraphNodeMap;
-use hugr_core::ops::OpType;
-use hugr_core::{Hugr, HugrView, Node};
-use petgraph::visit::{self as pg, Walker};
+//! Circuit hashing.
+
 use std::hash::{Hash, Hasher};
 
+use derive_more::{Display, Error};
+use fxhash::{FxHashMap, FxHasher64};
+use hugr_core::ops::OpType;
+use hugr_core::{HugrView, Node, Hugr};
+use hugr_core::hugr::internal::PortgraphNodeMap;
+use hugr_core::hugr::internal::HugrInternals;
+use petgraph::visit::{self as pg, Walker};
+
+
+
+
 /// Hugr hashing utilities.
-pub trait HugrHash: HugrView {
+pub trait HugrHash {
     /// TODO: FIX THE DOCS
     /// Compute the hash of an hugr object.
     ///
-    /// If the hugr is a dfg, we compute a hash for each node from its operation
-    /// and the hash of the predecessors. The hash of the circuit corresponds to
-    /// the hash of its output node.
-    /// Otherwise, we compute a generic hash combining the hashes of its children.
+    /// We compute a hash for each node from its operation and the hash of
+    /// the predecessors. The hash of the circuit corresponds to the hash of its
+    /// output node.
     ///
     /// This hash is independent from the operation traversal order.
     ///
@@ -27,30 +29,32 @@ pub trait HugrHash: HugrView {
     fn hugr_hash(&self, node: Node) -> Result<u64, HashError>;
 }
 
-impl<H> HugrHash for H where H: HugrView<Node = Node> {
+impl HugrHash for Hugr {
     fn hugr_hash(&self, node: Node) -> Result<u64, HashError> {
-       let node_op = self.get_optype(node);
-        if OpTag::DataflowParent.is_superset(node_op.tag()) {
-            // In this case, we have a dataflow container
-            dfg_hash(&self, node)
-        } else {
-            // otherwise, use generic hash
-            generic_hugr_hash(&self, node)
+
+        match self.get_io(node) {
+            Some([_, output_node]) => {
+                // In this case, we have a dataflow container
+                dfg_hash(self, node, output_node)
+                
+            }
+            Option::None => {
+                // otherwise, use generic hash
+                generic_hugr_hash(self, node)
+            }
         }
     }
 }
 
-fn dfg_hash(dfg_hugr: impl HugrView<Node = Node>, node: Node) -> Result<u64, HashError> {
-    let mut node_hashes = HashState::default();
 
-    let Some([_, output_node]) = dfg_hugr.get_io(node) else {
-        return Err(HashError::Unexpected);
-    };
+fn dfg_hash(dfg_hugr:&Hugr, node: Node, output_node: Node) -> Result<u64, HashError> {
+    println!("Hashing DFG");
+    let mut node_hashes = HashState::default();
 
     let (region, node_map) = dfg_hugr.region_portgraph(node);
     for pg_node in pg::Topo::new(&region).iter(&region) {
         let node = node_map.from_portgraph(pg_node);
-        let hash = hash_node(&dfg_hugr, node, &mut node_hashes)?;
+        let hash = hash_node(dfg_hugr, node, &mut node_hashes)?;
         if node_hashes.set_hash(node, hash).is_some() {
             panic!("Hash already set for node {node}");
         }
@@ -58,24 +62,27 @@ fn dfg_hash(dfg_hugr: impl HugrView<Node = Node>, node: Node) -> Result<u64, Has
 
     node_hashes
         .get_hash(output_node)
-        .ok_or(HashError::CyclicDFG)
+        .ok_or(HashError::CyclicCircuit)
 }
 
-fn generic_hugr_hash(hugr: impl HugrView<Node = Node>, node: Node) -> Result<u64, HashError> {
+fn generic_hugr_hash(hugr: &Hugr, node: Node) -> Result<u64, HashError> {
+    println!("Generic hash called");    
     let mut child_hashes = Vec::new();
-
+    
     for child in hugr.children(node) {
         let mut hasher = FxHasher64::default();
         hugr.hugr_hash(child)?.hash(&mut hasher);
         hashable_op(hugr.get_optype(child)).hash(&mut hasher);
         child_hashes.push(hasher.finish());
     }
-    // Combine child hashes using XOR to be order-independent,
+    // Combine child hashes using XOR to be order-independent, 
     // looking for a better solution
     Ok(child_hashes.iter().fold(0, |acc, &h| acc ^ h))
 }
 
-/// Auxiliary data for hugr hashing.
+
+
+/// Auxiliary data for circuit hashing.
 ///
 /// Contains previously computed hashes.
 // OK!
@@ -123,14 +130,18 @@ fn hashable_op(op: &OpType) -> impl Hash + use<> {
     }
 }
 
-/// Compute the hash of a hugr command.
+/// Compute the hash of a circuit command.
 ///
 /// Uses the hash of the operation and the node hash of its predecessors.
 ///
 /// # Panics
 /// - If the command is a container node, or if it is a parametric CustomOp.
 /// - If the hash of any of its predecessors has not been set.
-fn hash_node(hugr: &impl HugrView<Node = Node>, node: Node, state: &mut HashState) -> Result<u64, HashError> {
+fn hash_node(
+    hugr: &Hugr,
+    node: Node,
+    state: &mut HashState,
+) -> Result<u64, HashError> {
     let op: &OpType = hugr.get_optype(node);
     let mut hasher = FxHasher64::default();
 
@@ -162,9 +173,12 @@ fn hash_node(hugr: &impl HugrView<Node = Node>, node: Node, state: &mut HashStat
 #[derive(Debug, Display, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum HashError {
-    /// The hugr contains a cycle.
-    #[display("The hugr contains a cycle.")]
-    CyclicDFG,
+    /// The circuit contains a cycle.
+    #[display("The circuit contains a cycle.")]
+    CyclicCircuit,
+    /// The hashed hugr is not a DFG.
+    #[display("Tried to hash a non-dfg hugr.")]
+    NotADfg,
     /// Should not happen.
     #[display("An unexpected error occurred during hashing.")]
     Unexpected,
