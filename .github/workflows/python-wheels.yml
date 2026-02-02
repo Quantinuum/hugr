@@ -27,9 +27,6 @@ env:
   UV_FROZEN: 1
   PYTHON_VERSION: "3.14"
   # Nightly version of rust used to build the wasm wheels
-  #
-  # Pinned to an older 1.86 version due to rustc - emscripten compatibility issues.
-  # See <https://github.com/PyO3/maturin/issues/2549#issuecomment-2797285836>
   RUST_NIGHTLY_VERSION: "nightly-2026-01-29"
 
 jobs:
@@ -246,7 +243,8 @@ jobs:
         # Ideally this should match both the version used by rustc and the pyodide ABI.
         # See <https://doc.rust-lang.org/beta/rustc/platform-support/wasm32-unknown-emscripten.html>
         # and <https://github.com/pyodide/pyodide/blob/main/docs/development/abi.md>
-        # Pyodide 2024.0 ABI uses 3.1.58. We fix a rustc version compatible with it.
+        # Pyodide `0.28` and `0.29` use 4.0.9
+        # We fix a rustc version compatible with it.
         run: |
           git clone --depth 1 https://github.com/emscripten-core/emsdk.git
           cd emsdk
