@@ -1,7 +1,7 @@
 //! Hugr hashing.
 
 use std::hash::{Hash, Hasher};
-
+use hugr_core::ops::{OpTag, OpTrait};
 use derive_more::{Display, Error};
 use fxhash::{FxHashMap, FxHasher64};
 use hugr_core::ops::OpType;
@@ -29,27 +29,30 @@ pub trait HugrHash {
     fn hugr_hash(&self, node: Node) -> Result<u64, HashError>;
 }
 
-impl HugrHash for Hugr {
+impl<T> HugrHash for T
+where
+    T: HugrView<Node = Node>, 
+{
     fn hugr_hash(&self, node: Node) -> Result<u64, HashError> {
-
-        match self.get_io(node) {
-            Some([_, output_node]) => {
-                // In this case, we have a dataflow container
-                dfg_hash(self, node, output_node)
-                
-            }
-            Option::None => {
-                // otherwise, use generic hash
-                generic_hugr_hash(self, node)
-            }
+        let node_op = self.get_optype(node);
+        if OpTag::DataflowParent.is_superset(node_op.tag()) {
+            // In this case, we have a dataflow container
+            dfg_hash(&self, node)
+        } else {
+            // otherwise, use generic hash
+            generic_hugr_hash(&self, node)
         }
     }
 }
 
 
-fn dfg_hash(dfg_hugr:&Hugr, node: Node, output_node: Node) -> Result<u64, HashError> {
+fn dfg_hash(dfg_hugr: &impl HugrView<Node = Node>, node: Node) -> Result<u64, HashError> {
     println!("Hashing DFG");
     let mut node_hashes = HashState::default();
+
+    let Some([_, output_node]) = dfg_hugr.get_io(node) else {
+        return Err(HashError::Unexpected);
+    };
 
     let (region, node_map) = dfg_hugr.region_portgraph(node);
     for pg_node in pg::Topo::new(&region).iter(&region) {
@@ -65,7 +68,7 @@ fn dfg_hash(dfg_hugr:&Hugr, node: Node, output_node: Node) -> Result<u64, HashEr
         .ok_or(HashError::CyclicDFG)
 }
 
-fn generic_hugr_hash(hugr: &Hugr, node: Node) -> Result<u64, HashError> {
+fn generic_hugr_hash(hugr: impl HugrView<Node = Node>, node: Node) -> Result<u64, HashError> {
     println!("Generic hash called");    
     let mut child_hashes = Vec::new();
     
@@ -138,7 +141,7 @@ fn hashable_op(op: &OpType) -> impl Hash + use<> {
 /// - If the command is a container node, or if it is a parametric CustomOp.
 /// - If the hash of any of its predecessors has not been set.
 fn hash_node(
-    hugr: &Hugr,
+    hugr: &impl HugrView<Node = Node>,
     node: Node,
     state: &mut HashState,
 ) -> Result<u64, HashError> {
@@ -182,7 +185,7 @@ pub enum HashError {
 }
 
 #[cfg(test)]
-mod test {
+mod  test {
     use crate::utils::test_quantum_extension::{cx_gate, h_gate};
     use crate::utils::{build_simple_hugr};
     use hugr_core::builder::{Dataflow, DataflowSubContainer};
