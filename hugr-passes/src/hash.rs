@@ -1,4 +1,4 @@
-//! Circuit hashing.
+//! Hugr hashing.
 
 use std::hash::{Hash, Hasher};
 
@@ -62,7 +62,7 @@ fn dfg_hash(dfg_hugr:&Hugr, node: Node, output_node: Node) -> Result<u64, HashEr
 
     node_hashes
         .get_hash(output_node)
-        .ok_or(HashError::CyclicCircuit)
+        .ok_or(HashError::CyclicDFG)
 }
 
 fn generic_hugr_hash(hugr: &Hugr, node: Node) -> Result<u64, HashError> {
@@ -173,12 +173,9 @@ fn hash_node(
 #[derive(Debug, Display, Clone, PartialEq, Eq, Error)]
 #[non_exhaustive]
 pub enum HashError {
-    /// The circuit contains a cycle.
-    #[display("The circuit contains a cycle.")]
-    CyclicCircuit,
-    /// The hashed hugr is not a DFG.
-    #[display("Tried to hash a non-dfg hugr.")]
-    NotADfg,
+    /// The hugr dfg contains a cycle.
+    #[display("The hugr dfg contains a cycle.")]
+    CyclicDFG,
     /// Should not happen.
     #[display("An unexpected error occurred during hashing.")]
     Unexpected,
