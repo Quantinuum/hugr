@@ -46,7 +46,7 @@ runs:
           echo "out=true" >> $GITHUB_OUTPUT
         fi
       env:
-        OVERRIDE_LABEL: ${{ github.event_name == 'pull_request' && contains( github.event.pull_request.labels.*.name, 'run-ci-checks') }}
+        OVERRIDE_LABEL: ${{ github.event_name == 'pull_request' && contains( github.event.pull_request.labels.*.name, 'X-run-thorough-ci-tests') }}
         DEFAULT_BRANCH: ${{ github.ref_name == github.event.repository.default_branch }}
     - if: steps.override.outputs.out != 'true'
       uses: dorny/paths-filter@v3
