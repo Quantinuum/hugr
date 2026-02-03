@@ -31,14 +31,14 @@ body:
   - type: textarea
     id: expected
     attributes:
-      label: Expected Behavior
+      label: Expected Behaviour
       description: What did you expect to happen?
       placeholder: What should have happened?
 
   - type: textarea
     id: actual
     attributes:
-      label: Actual Behavior
+      label: Actual Behaviour
       description: What actually happened?
       placeholder: Include error messages, stack traces, etc.
 
