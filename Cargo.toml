@@ -41,7 +41,7 @@ too_long_first_doc_paragraph = "warn"
 
 [workspace.dependencies]
 anyhow = "1.0.100"
-insta = { version = "1.46.1" }
+insta = { version = "1.46.3" }
 bitvec = "1.0.1"
 capnp = "0.25.0"
 cgmath = "0.18.0"
@@ -52,7 +52,7 @@ downcast-rs = "2.0.2"
 enum_dispatch = "0.3.11"
 html-escape = "0.2.13"
 itertools = "0.14.0"
-jsonschema = "0.40.0"
+jsonschema = "0.40.2"
 num-rational = "0.4.1"
 pastey = "0.2.1"
 proptest = "1.9.0"
@@ -72,7 +72,7 @@ strum = "0.27.2"
 tempfile = "3.24"
 thiserror = "2.0.18"
 typetag = "0.2.21"
-clap = { version = "4.5.54" }
+clap = { version = "4.5.56" }
 clio = "0.3.5"
 clap-verbosity-flag = "3.0.4"
 assert_cmd = "2.1"
@@ -91,7 +91,7 @@ pretty_assertions = "1.4.1"
 zstd = "0.13.2"
 relrc = "0.5.0"
 wyhash = "0.6.0"
-schemars = "1.2.0"
+schemars = "1.2.1"
 
 # These public dependencies usually require breaking changes downstream, so we
 # try to be as permissive as possible.
