@@ -85,7 +85,7 @@ mod test {
     ///       /
     ///       \-> a -> x
     fn make_test_hugr() -> Hugr {
-        let sig = || Signature::new_endo(qb_t());
+        let sig = || Signature::new_endo([qb_t()]);
         let mut mb = ModuleBuilder::new();
         let x = mb.declare("x", sig().into()).unwrap();
         let a = {

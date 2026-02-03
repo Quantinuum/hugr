@@ -167,8 +167,20 @@ impl From<Vec<Type>> for TypeRowRV {
 impl From<TypeRow> for TypeRowRV {
     fn from(value: TypeRow) -> Self {
         Self {
-            types: value.iter().cloned().map(Type::into_).collect(),
+            types: value.into_owned().into_iter().map(Type::into_).collect(),
         }
+    }
+}
+
+impl<RV: MaybeRV, const N: usize> From<[TypeBase<RV>; N]> for TypeRowBase<RV> {
+    fn from(types: [TypeBase<RV>; N]) -> Self {
+        Self::from(Vec::from(types))
+    }
+}
+
+impl<const N: usize> From<[Type; N]> for TypeRowRV {
+    fn from(types: [Type; N]) -> Self {
+        Self::from(Vec::from(types))
     }
 }
 
@@ -176,22 +188,6 @@ impl<RV: MaybeRV> From<&'static [TypeBase<RV>]> for TypeRowBase<RV> {
     fn from(types: &'static [TypeBase<RV>]) -> Self {
         Self {
             types: types.into(),
-        }
-    }
-}
-
-impl<RV1: MaybeRV> From<TypeBase<RV1>> for TypeRowRV {
-    fn from(t: TypeBase<RV1>) -> Self {
-        Self {
-            types: vec![t.into_()].into(),
-        }
-    }
-}
-
-impl From<Type> for TypeRow {
-    fn from(t: Type) -> Self {
-        Self {
-            types: vec![t].into(),
         }
     }
 }
@@ -226,10 +222,9 @@ impl TryFrom<Term> for TypeRow {
         match value {
             TypeArg::List(elems) => elems
                 .into_iter()
-                .map(|ta| ta.as_runtime())
-                .collect::<Option<Vec<_>>>()
-                .map(|x| x.into())
-                .ok_or(SignatureError::InvalidTypeArgs),
+                .map(|ta| ta.as_runtime().ok_or(SignatureError::InvalidTypeArgs))
+                .collect::<Result<Vec<_>, _>>()
+                .map(TypeRow::from),
             _ => Err(SignatureError::InvalidTypeArgs),
         }
     }

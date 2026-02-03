@@ -408,7 +408,7 @@ impl DataflowOpTrait for LoadFunction {
     fn signature(&self) -> Cow<'_, Signature> {
         Cow::Owned(Signature::new(
             type_row![],
-            Type::new_function(self.instantiation.clone()),
+            [Type::new_function(self.instantiation.clone())],
         ))
     }
 

@@ -119,14 +119,14 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         let in_type = AK::ty(*n, ty.clone());
         return Ok(NodeTemplate::LinkedHugr(
             Box::new({
-                let mut dfb = DFGBuilder::new(inout_sig(in_type, type_row![])).unwrap();
+                let mut dfb = DFGBuilder::new(inout_sig([in_type], [])).unwrap();
                 // first map each element to unit (via type-specific discard):
                 let map_fn = {
                     let mut mb = dfb.module_root_builder();
                     let mut fb = mb
                         .define_function_vis(
                             mangle_name(DISCARD_TO_UNIT_PREFIX, &[ty.clone().into()]),
-                            inout_sig(ty.clone(), Type::UNIT),
+                            inout_sig([ty.clone()], [Type::UNIT]),
                             Visibility::Public,
                         )
                         .unwrap();
@@ -156,13 +156,13 @@ pub fn linearize_generic_array<AK: ArrayKind>(
     let num_new = num_outports - 1;
     let array_ty = AK::ty(*n, ty.clone());
     let mut dfb = DFGBuilder::new(inout_sig(
-        array_ty.clone(),
+        [array_ty.clone()],
         vec![array_ty.clone(); num_outports],
     ))
     .unwrap();
 
     // 1. make num_new array<SZ, Option<T>>, initialized to None...
-    let option_sty = option_type(ty.clone());
+    let option_sty = option_type([ty.clone()]);
     let option_ty = Type::from(option_sty.clone());
     let arrays_of_none = {
         let fn_none = {
@@ -170,12 +170,12 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             let mut fb = mb
                 .define_function_vis(
                     mangle_name(MAKE_NONE_PREFIX, &[ty.clone().into()]),
-                    inout_sig(vec![], option_ty.clone()),
+                    inout_sig(vec![], [option_ty.clone()]),
                     Visibility::Public,
                 )
                 .unwrap();
             let none = fb
-                .add_dataflow_op(Tag::new(0, vec![type_row![], ty.clone().into()]), [])
+                .add_dataflow_op(Tag::new(0, vec![type_row![], [ty.clone()].into()]), [])
                 .unwrap();
             fb.finish_with_outputs(none.outputs()).unwrap()
         };
@@ -234,7 +234,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             .zip_eq(copies)
             .map(|(opt_array, copy1)| {
                 let [tag] = fb
-                    .add_dataflow_op(Tag::new(1, vec![type_row![], ty.clone().into()]), [copy1])
+                    .add_dataflow_op(Tag::new(1, vec![type_row![], [ty.clone()].into()]), [copy1])
                     .unwrap()
                     .outputs_arr();
                 let [set_result] = fb
@@ -247,7 +247,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
                     .unwrap();
                 //the removed element is an option, which should always be none (and thus discardable)
                 let [] = fb
-                    .build_unwrap_sum(0, SumType::new_option(ty.clone()), none)
+                    .build_unwrap_sum(0, SumType::new_option([ty.clone()]), none)
                     .unwrap();
                 opt_array
             })
@@ -293,7 +293,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
         let mut fb = mb
             .define_function_vis(
                 mangle_name(UNWRAP_PREFIX, &[ty.clone().into()]),
-                inout_sig(option_ty.clone(), ty.clone()),
+                inout_sig([option_ty.clone()], [ty.clone()]),
                 Visibility::Public,
             )
             .unwrap();
@@ -349,7 +349,7 @@ pub fn copy_discard_array(
             let array_ty = array_type(*n, ty.clone());
             Ok(NodeTemplate::CompoundOp(Box::new({
                 let mut dfb =
-                    DFGBuilder::new(inout_sig(array_ty.clone(), vec![array_ty; *n as usize]))
+                    DFGBuilder::new(inout_sig([array_ty.clone()], vec![array_ty; *n as usize]))
                         .unwrap();
                 let [mut arr] = dfb.input_wires_arr();
                 let mut outs = vec![];
@@ -396,7 +396,7 @@ pub fn copy_discard_borrow_array(
             let array_ty = borrow_array_type(*n, ty.clone());
             Ok(NodeTemplate::CompoundOp(Box::new({
                 let mut dfb =
-                    DFGBuilder::new(inout_sig(array_ty.clone(), vec![array_ty; *n as usize]))
+                    DFGBuilder::new(inout_sig([array_ty.clone()], vec![array_ty; *n as usize]))
                         .unwrap();
                 let [mut arr] = dfb.input_wires_arr();
                 let mut outs = vec![];
@@ -414,7 +414,7 @@ pub fn copy_discard_borrow_array(
         let elem_discard = lin.copy_discard_op(ty, 0)?;
         let array_ty = || borrow_array_type(*n, ty.clone());
         let i64_t = || INT_TYPES[6].clone();
-        let mut dfb = DFGBuilder::new(inout_sig(array_ty(), type_row![])).unwrap();
+        let mut dfb = DFGBuilder::new(inout_sig([array_ty()], [])).unwrap();
         let [in_array] = dfb.input_wires_arr();
         let zero = dfb.add_load_value(ConstInt::new_u(6, 0).unwrap());
         let one = dfb.add_load_value(ConstInt::new_u(6, 1).unwrap());
@@ -429,12 +429,12 @@ pub fn copy_discard_borrow_array(
             .add_dataflow_op(IntOpDef::ilt_u.with_log_width(6), [idx, len])
             .unwrap()
             .outputs_arr();
-        let loop_variants = vec![vec![i64_t(), array_ty()].into(), type_row![]];
+        let loop_variants = vec![[i64_t(), array_ty()].into(), type_row![]];
         let mut cond = tl
             .conditional_builder(
                 (vec![type_row![]; 2], in_range),
                 [(array_ty(), arr)],
-                Type::new_sum(loop_variants.clone()).into(),
+                [Type::new_sum(loop_variants.clone())].into(),
             )
             .unwrap();
         {
@@ -464,7 +464,7 @@ pub fn copy_discard_borrow_array(
                 .conditional_builder(
                     (vec![type_row![]; 2], is_borrowed),
                     [(array_ty(), arr)],
-                    array_ty().into(),
+                    [array_ty()].into(),
                 )
                 .unwrap();
             {
@@ -508,7 +508,7 @@ mod test {
     use hugr_core::builder::{DFGBuilder, Dataflow, DataflowHugr};
     use hugr_core::{
         extension::prelude::usize_t, std_extensions::collections::borrow_array::borrow_array_type,
-        type_row, types::Signature,
+        types::Signature,
     };
 
     use crate::replace_types::{DelegatingLinearizer, Linearizer};
@@ -517,7 +517,7 @@ mod test {
     fn test_borrow_array_discard() {
         let arr_ty = borrow_array_type(5, borrow_array_type(7, usize_t()));
         let dl = DelegatingLinearizer::default();
-        let mut dfb = DFGBuilder::new(Signature::new(arr_ty.clone(), type_row![])).unwrap();
+        let mut dfb = DFGBuilder::new(Signature::new([arr_ty.clone()], [])).unwrap();
         let nt = dl.copy_discard_op(&arr_ty, 0).unwrap();
         let ins = dfb.input_wires();
         nt.add(&mut dfb, ins).unwrap();

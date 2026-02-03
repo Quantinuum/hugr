@@ -471,8 +471,8 @@ fn opaque_ops() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn function_type() -> Result<(), Box<dyn std::error::Error>> {
-    let fn_ty = Type::new_function(Signature::new_endo(vec![bool_t()]));
-    let mut bldr = DFGBuilder::new(Signature::new_endo(vec![fn_ty.clone()]))?;
+    let fn_ty = Type::new_function(Signature::new_endo([bool_t()]));
+    let mut bldr = DFGBuilder::new(Signature::new_endo([fn_ty.clone()]))?;
     let op = bldr.add_dataflow_op(Noop(fn_ty), bldr.input_wires())?;
     let h = bldr.finish_hugr_with_outputs(op.outputs())?;
 
@@ -501,7 +501,7 @@ fn hierarchy_order() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
-    let mut builder = DFGBuilder::new(inout_sig(vec![], INT_TYPES[4].clone())).unwrap();
+    let mut builder = DFGBuilder::new(inout_sig([], [INT_TYPES[4].clone()])).unwrap();
     let w = builder.add_load_value(ConstInt::new_s(4, -2).unwrap());
     let hugr = builder.finish_hugr_with_outputs([w])?;
 
@@ -518,7 +518,7 @@ fn constants_roundtrip() -> Result<(), Box<dyn std::error::Error>> {
 
 #[test]
 fn serialize_types_roundtrip() {
-    let g: Type = Type::new_function(Signature::new_endo(vec![]));
+    let g: Type = Type::new_function(Signature::new_endo([]));
     check_testing_roundtrip(g.clone());
 
     // A Simple tuple
@@ -541,7 +541,7 @@ fn serialize_types_roundtrip() {
 #[case(Type::new_var_use(2, TypeBound::Copyable))]
 #[case(Type::new_tuple(vec![bool_t(),qb_t()]))]
 #[case(Type::new_sum([vec![bool_t(),qb_t()], vec![Type::new_unit_sum(4)]]))]
-#[case(Type::new_function(Signature::new_endo(vec![qb_t(),bool_t(),usize_t()])))]
+#[case(Type::new_function(Signature::new_endo([qb_t(),bool_t(),usize_t()])))]
 fn roundtrip_type(#[case] typ: Type) {
     check_testing_roundtrip(typ);
 }
@@ -576,10 +576,10 @@ fn polyfunctype2() -> PolyFuncTypeRV {
     let tv1 = TypeRV::new_row_var_use(1, TypeBound::Copyable);
     let params = [TypeBound::Linear, TypeBound::Copyable].map(TypeParam::new_list_type);
     let inputs = vec![
-        TypeRV::new_function(FuncValueType::new(tv0.clone(), tv1.clone())),
+        TypeRV::new_function(FuncValueType::new([tv0.clone()], [tv1.clone()])),
         tv0,
     ];
-    let res = PolyFuncTypeRV::new(params, FuncValueType::new(inputs, tv1));
+    let res = PolyFuncTypeRV::new(params, FuncValueType::new(inputs, [tv1]));
     // Just check we've got the arguments the right way round
     // (not that it really matters for the serialization schema we have)
     res.validate().unwrap();
@@ -589,26 +589,26 @@ fn polyfunctype2() -> PolyFuncTypeRV {
 #[rstest]
 #[case(Signature::new_endo(type_row![]).into())]
 #[case(polyfunctype1())]
-#[case(PolyFuncType::new([TypeParam::StringType], Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncType::new([TypeBound::Copyable.into()], Signature::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncType::new([TypeParam::StringType], Signature::new_endo([Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncType::new([TypeBound::Copyable.into()], Signature::new_endo([Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncType::new([TypeParam::new_list_type(TypeBound::Linear)], Signature::new_endo(type_row![])))]
 #[case(PolyFuncType::new([TypeParam::new_tuple_type([TypeBound::Linear.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], Signature::new_endo(type_row![])))]
 #[case(PolyFuncType::new(
     [TypeParam::new_list_type(TypeBound::Linear)],
-    Signature::new_endo(Type::new_tuple(TypeRV::new_row_var_use(0, TypeBound::Linear)))))]
+    Signature::new_endo([Type::new_tuple([TypeRV::new_row_var_use(0, TypeBound::Linear)])])))]
 fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
     check_testing_roundtrip(poly_func_type);
 }
 
 #[rstest]
 #[case(FuncValueType::new_endo(type_row![]).into())]
-#[case(PolyFuncTypeRV::new([TypeParam::StringType], FuncValueType::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncTypeRV::new([TypeBound::Copyable.into()], FuncValueType::new_endo(vec![Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncTypeRV::new([TypeParam::StringType], FuncValueType::new_endo([Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncTypeRV::new([TypeBound::Copyable.into()], FuncValueType::new_endo([Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncTypeRV::new([TypeParam::new_list_type(TypeBound::Linear)], FuncValueType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new([TypeParam::new_tuple_type([TypeBound::Linear.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], FuncValueType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new(
     [TypeParam::new_list_type(TypeBound::Linear)],
-    FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Linear))))]
+    FuncValueType::new_endo([TypeRV::new_row_var_use(0, TypeBound::Linear)])))]
 #[case(polyfunctype2())]
 fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
     check_testing_roundtrip(poly_func_type);
@@ -626,7 +626,7 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 #[case(ops::Input::new(vec![Type::new_var_use(3,TypeBound::Copyable)]))]
 #[case(ops::Output::new(vec![Type::new_function(FuncValueType::new_endo(type_row![]))]))]
 #[case(ops::Call::try_new(polyfunctype1(), [TypeArg::BoundedNat(1)]).unwrap())]
-#[case(ops::CallIndirect { signature : Signature::new_endo(vec![bool_t()]) })]
+#[case(ops::CallIndirect { signature : Signature::new_endo([bool_t()]) })]
 fn roundtrip_optype(#[case] optype: impl Into<OpType> + std::fmt::Debug) {
     check_testing_roundtrip(NodeSer {
         parent: portgraph::NodeIndex::new(0).into(),
