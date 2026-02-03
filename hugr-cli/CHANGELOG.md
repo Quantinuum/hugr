@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.25.5](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.25.4...hugr-cli-v0.25.5) - 2026-02-03
+
+### Refactor
+
+- make EnvelopeFormat::ModelWithExtensions the default ([#2816](https://github.com/Quantinuum/hugr/pull/2816))
+
 ## [0.25.0](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.24.3...hugr-cli-v0.25.0) - 2025-12-22
 
 ### New Features

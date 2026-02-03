@@ -37,9 +37,10 @@ from dataclasses import dataclass
 from enum import Enum
 from typing import TYPE_CHECKING, ClassVar
 
-import pyzstd
+from typing_extensions import deprecated
 
 import hugr._hugr.model as rust
+import hugr._hugr.zstd as zstd
 
 if TYPE_CHECKING:
     from hugr.hugr.base import Hugr
@@ -55,14 +56,19 @@ _DEFAULT_FLAGS = 0b0100_0000
 _ZSTD_FLAG = 0b0000_0001
 
 
+@deprecated("Use Package/Hugr.to_bytes() instead.")
 def make_envelope(package: Package | Hugr, config: EnvelopeConfig) -> bytes:
-    """Encode a HUGR or Package into an envelope, using the given configuration."""
-    from hugr.package import Package
+    """Encode a Package into an envelope, using the given configuration."""
+    from hugr.hugr.base import Hugr
 
+    if isinstance(package, Hugr):
+        package = package.to_package()
+    return _make_envelope(package, config)
+
+
+def _make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
+    """Encode a Package into an envelope, using the given configuration."""
     envelope = bytearray(config._make_header().to_bytes())
-
-    if not isinstance(package, Package):
-        package = Package(modules=[package], extensions=[])
 
     payload: bytes
     match config.format:
@@ -84,18 +90,28 @@ def make_envelope(package: Package | Hugr, config: EnvelopeConfig) -> bytes:
             payload = package_bytes + extension_bytes
 
     if config.zstd is not None:
-        payload = pyzstd.compress(payload, config.zstd)
+        payload = zstd.compress(payload, config.zstd)
 
     envelope += payload
     return bytes(envelope)
 
 
+@deprecated("Use Package/Hugr.to_str() instead.")
 def make_envelope_str(package: Package | Hugr, config: EnvelopeConfig) -> str:
-    """Encode a HUGR or Package into an envelope, using the given configuration."""
+    """Encode a Package into an envelope, using the given configuration."""
+    from hugr.hugr.base import Hugr
+
+    if isinstance(package, Hugr):
+        package = package.to_package()
+    return _make_envelope_str(package, config)
+
+
+def _make_envelope_str(package: Package, config: EnvelopeConfig) -> str:
+    """Encode a Package into an envelope, using the given configuration."""
     if not config.format.ascii_printable():
         msg = "Only ascii-printable envelope formats can be encoded into a string."
         raise ValueError(msg)
-    envelope = make_envelope(package, config)
+    envelope = _make_envelope(package, config)
     return envelope.decode("utf-8")
 
 
@@ -108,7 +124,7 @@ def read_envelope(envelope: bytes) -> Package:
     payload = envelope[10:]
 
     if header.zstd:
-        payload = pyzstd.decompress(payload)
+        payload = zstd.decompress(payload)
 
     match header.format:
         case EnvelopeFormat.JSON:

@@ -1,6 +1,6 @@
 [project]
 name = "hugr"
-version = "0.15.0"
+version = "0.15.1"
 requires-python = ">=3.10"
 description = "Quantinuum's common representation for quantum programs"
 license = { file = "LICENCE" }
@@ -33,7 +33,6 @@ dependencies = [
     "pydantic-extra-types~=2.9",
     "semver~=3.0",
     "typing-extensions~=4.12",
-    "pyzstd>=0.18,<0.20",
 ]
 
 
