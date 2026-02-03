@@ -3,15 +3,9 @@ use hugr_core::builder::{
     BuildError, BuildHandle, HugrBuilder, ModuleBuilder, dataflow::FunctionBuilder,
 };
 use hugr_core::ops::handle::FuncID;
-use hugr_core::types::PolyFuncType;
-use hugr_core::{Extension, extension::ExtensionId};
-use std::sync::{Arc, Weak};
 
+#[expect(unused)]
 pub(crate) mod test_quantum_extension {
-
-    pub(crate) fn dummy() -> i32 {
-        21
-    }
     use std::sync::{Arc, LazyLock};
 
     use hugr_core::ops::{OpName, OpNameRef};

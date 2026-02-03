@@ -19,6 +19,7 @@ mod monomorphize;
 pub mod normalize_cfgs;
 pub mod redundant_order_edges;
 pub mod untuple;
+#[cfg(test)]
 mod utils;
 
 pub use monomorphize::{MonomorphizePass, mangle_name, monomorphize};
