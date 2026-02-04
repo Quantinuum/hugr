@@ -11,20 +11,26 @@ use std::hash::{Hash, Hasher};
 
 /// Hugr hashing utilities.
 pub trait HugrHash: HugrView {
-    /// TODO: FIX THE DOCS
-    /// Compute the hash of an hugr object.
+    /// Compute a hash for the entire HUGR structure.
     ///
+    /// This corresponds to the hash of the root node.
+    fn hugr_hash(&self) -> Result<u64, HashError> {
+        self.region_hash(self.module_root())
+    }
+
+    /// Compute a hash for a hugr region.
+    ///     
     /// If the hugr is a dfg, we compute a hash for each node from its operation
     /// and the hash of the predecessors. The hash of the hugr corresponds to
     /// the hash of its output node.
     /// Otherwise, we compute a generic hash combining the hashes of its children.
     ///
     /// This hash is independent from the children node order.
-    fn hugr_hash(&self, node: Self::Node) -> Result<u64, HashError>;
+    fn region_hash(&self, node: Self::Node) -> Result<u64, HashError>;
 }
 
 impl<H: HugrView> HugrHash for H {
-    fn hugr_hash(&self, node: Self::Node) -> Result<u64, HashError> {
+    fn region_hash(&self, node: Self::Node) -> Result<u64, HashError> {
         let node_op = self.get_optype(node);
         let mut hasher = FxHasher64::default();
 
@@ -48,9 +54,7 @@ fn dfg_hash<H: HugrView>(dfg_hugr: &H, node: H::Node) -> Result<u64, HashError> 
         hashes: FxHashMap::default(),
     };
 
-    let [_, output_node] = dfg_hugr
-        .get_io(node)
-        .expect("DFG region missing I/O nodes");
+    let [_, output_node] = dfg_hugr.get_io(node).expect("DFG region missing I/O nodes");
 
     let (region, node_map) = dfg_hugr.region_portgraph(node);
     for pg_node in pg::Topo::new(&region).iter(&region) {
@@ -70,7 +74,7 @@ fn generic_hugr_hash<H: HugrView>(hugr: &H, node: H::Node) -> Result<u64, HashEr
     let mut child_hashes = Vec::new();
 
     for child in hugr.children(node) {
-        child_hashes.push(hugr.hugr_hash(child)?);
+        child_hashes.push(hugr.region_hash(child)?);
     }
     // Combine child hashes in an order-independent way
     child_hashes.sort_unstable();
@@ -80,13 +84,11 @@ fn generic_hugr_hash<H: HugrView>(hugr: &H, node: H::Node) -> Result<u64, HashEr
 /// Auxiliary data for circuit hashing.
 ///
 /// Contains previously computed hashes.
-// OK!
 #[derive(Clone, Default, Debug)]
 struct HashState<H: HugrView> {
     /// Computed node hashes.
     pub hashes: FxHashMap<H::Node, u64>,
 }
-// OK!
 impl<H: HugrView> HashState<H> {
     /// Return the hash for a node.
     #[inline]
@@ -141,7 +143,7 @@ fn dfg_hash_node<H: HugrView>(
 ) -> Result<u64, HashError> {
     let mut hasher = FxHasher64::default();
 
-    hugr.hugr_hash(node)?.hash(&mut hasher);
+    hugr.region_hash(node)?.hash(&mut hasher);
 
     // Add each each input neighbour hash, including the connected ports.
     // TODO: Ignore state edges?
@@ -194,7 +196,7 @@ mod test {
         })
         .unwrap();
 
-        let hash1 = hugr1.hugr_hash(hugr1.entrypoint()).unwrap();
+        let hash1 = hugr1.hugr_hash().unwrap();
 
         // A circuit built in a different order should have the same hash
         let hugr2 = build_simple_hugr(2, |mut f_build| {
@@ -210,7 +212,7 @@ mod test {
         })
         .unwrap();
 
-        let hash2 = hugr2.hugr_hash(hugr2.entrypoint()).unwrap();
+        let hash2 = hugr2.hugr_hash().unwrap();
 
         assert_eq!(hash1, hash2);
 
@@ -227,7 +229,7 @@ mod test {
             f_build.finish_with_outputs(outs)
         })
         .unwrap();
-        let hash3 = hugr3.hugr_hash(hugr3.entrypoint()).unwrap();
+        let hash3 = hugr3.hugr_hash().unwrap();
 
         assert_ne!(hash1, hash3);
     }
@@ -254,7 +256,7 @@ mod test {
             let file = File::open(&file_path).unwrap();
             let hugr = Hugr::load(BufReader::new(file), None);
             let hugr = hugr.unwrap();
-            let hash = hugr.hugr_hash(hugr.entrypoint()).unwrap();
+            let hash = hugr.hugr_hash().unwrap();
             all_hashes.push(hash);
         }
 
@@ -269,12 +271,12 @@ mod test {
             // First hash computation
             let file1 = File::open(&file_path).unwrap();
             let hugr1 = Hugr::load(BufReader::new(file1), None).unwrap();
-            let hash1 = hugr1.hugr_hash(hugr1.entrypoint()).unwrap();
+            let hash1 = hugr1.hugr_hash().unwrap();
 
             // Second hash computation
             let file2 = File::open(&file_path).unwrap();
             let hugr2 = Hugr::load(BufReader::new(file2), None).unwrap();
-            let hash2 = hugr2.hugr_hash(hugr2.entrypoint()).unwrap();
+            let hash2 = hugr2.hugr_hash().unwrap();
             assert_eq!(
                 hash1,
                 hash2,
