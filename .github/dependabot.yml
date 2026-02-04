@@ -26,7 +26,6 @@ updates:
         versions: [">=0.3.4"] # Requires rustc 1.89
     labels:
       - "X-dependabot"
-      - "C-dependencies"
       - "A-rust"
 
   - package-ecosystem: "uv"
