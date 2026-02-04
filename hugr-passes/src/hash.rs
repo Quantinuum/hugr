@@ -19,10 +19,7 @@ pub trait HugrHash: HugrView {
     /// the hash of its output node.
     /// Otherwise, we compute a generic hash combining the hashes of its children.
     ///
-    /// This hash is independent from the operation traversal order.
-    ///
-    /// Adapted from Quartz (Apache 2.0)
-    /// <https://github.com/quantum-compiler/quartz/blob/2e13eb7ffb3c5c5fe96cf5b4246f4fd7512e111e/src/quartz/tasograph/tasograph.cpp#L410>
+    /// This hash is independent from the children node order.
     fn hugr_hash(&self, node: Self::Node) -> Result<u64, HashError>;
 }
 
@@ -47,14 +44,13 @@ impl<H: HugrView> HugrHash for H {
 }
 
 fn dfg_hash<H: HugrView>(dfg_hugr: &H, node: H::Node) -> Result<u64, HashError> {
-    println!("Hashing DFG");
     let mut node_hashes = HashState {
         hashes: FxHashMap::default(),
     };
 
-    let Some([_, output_node]) = dfg_hugr.get_io(node) else {
-        return Err(HashError::Unexpected);
-    };
+    let [_, output_node] = dfg_hugr
+        .get_io(node)
+        .expect("DFG region missing I/O nodes");
 
     let (region, node_map) = dfg_hugr.region_portgraph(node);
     for pg_node in pg::Topo::new(&region).iter(&region) {
@@ -71,14 +67,12 @@ fn dfg_hash<H: HugrView>(dfg_hugr: &H, node: H::Node) -> Result<u64, HashError> 
 }
 
 fn generic_hugr_hash<H: HugrView>(hugr: &H, node: H::Node) -> Result<u64, HashError> {
-    println!("Generic hash called");
     let mut child_hashes = Vec::new();
 
     for child in hugr.children(node) {
         child_hashes.push(hugr.hugr_hash(child)?);
     }
-    // Combine child hashes using XOR to be order-independent,
-    // looking for a better solution
+    // Combine child hashes in an order-independent way
     child_hashes.sort_unstable();
     Ok(fxhash::hash64(&child_hashes))
 }
@@ -110,6 +104,8 @@ impl<H: HugrView> HashState<H> {
 }
 
 /// Returns a hashable representation of an operation.
+///
+/// TODO(perf): String formatting here is a big bottleneck
 fn hashable_op(op: &OpType) -> impl Hash + use<> {
     match op {
         OpType::ExtensionOp(op) if !op.args().is_empty() => {
@@ -170,9 +166,6 @@ pub enum HashError {
     /// The hugr dfg contains a cycle.
     #[display("The hugr dfg contains a cycle.")]
     CyclicDFG,
-    /// Should not happen.
-    #[display("An unexpected error occurred during hashing.")]
-    Unexpected,
 }
 
 #[cfg(test)]
