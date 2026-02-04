@@ -6,6 +6,7 @@ use hugr_core::ops::handle::FuncID;
 
 #[expect(unused)]
 pub(crate) mod test_quantum_extension {
+    use hugr_core::extension::Version;
     use std::sync::{Arc, LazyLock};
 
     use hugr_core::ops::{OpName, OpNameRef};
@@ -34,60 +35,64 @@ pub(crate) mod test_quantum_extension {
     /// The extension identifier.
     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("test.quantum");
     fn extension() -> Arc<Extension> {
-        Extension::new_test_arc(EXTENSION_ID, |extension, extension_ref| {
-            extension
-                .add_op(
-                    OpName::new_inline("H"),
-                    "Hadamard".into(),
-                    one_qb_func(),
-                    extension_ref,
-                )
-                .unwrap();
-            extension
-                .add_op(
-                    OpName::new_inline("RzF64"),
-                    "Rotation specified by float".into(),
-                    Signature::new(vec![qb_t(), float_types::float64_type()], vec![qb_t()]),
-                    extension_ref,
-                )
-                .unwrap();
+        Extension::new_arc(
+            EXTENSION_ID,
+            Version::new(0, 0, 0),
+            |extension, extension_ref| {
+                extension
+                    .add_op(
+                        OpName::new_inline("H"),
+                        "Hadamard".into(),
+                        one_qb_func(),
+                        extension_ref,
+                    )
+                    .unwrap();
+                extension
+                    .add_op(
+                        OpName::new_inline("RzF64"),
+                        "Rotation specified by float".into(),
+                        Signature::new(vec![qb_t(), float_types::float64_type()], vec![qb_t()]),
+                        extension_ref,
+                    )
+                    .unwrap();
 
-            extension
-                .add_op(
-                    OpName::new_inline("CX"),
-                    "CX".into(),
-                    two_qb_func(),
-                    extension_ref,
-                )
-                .unwrap();
+                extension
+                    .add_op(
+                        OpName::new_inline("CX"),
+                        "CX".into(),
+                        two_qb_func(),
+                        extension_ref,
+                    )
+                    .unwrap();
 
-            extension
-                .add_op(
-                    OpName::new_inline("Measure"),
-                    "Measure a qubit, returning the qubit and the measurement result.".into(),
-                    Signature::new(vec![qb_t()], vec![qb_t(), bool_t()]),
-                    extension_ref,
-                )
-                .unwrap();
+                extension
+                    .add_op(
+                        OpName::new_inline("Measure"),
+                        "Measure a qubit, returning the qubit and the measurement result.".into(),
+                        Signature::new(vec![qb_t()], vec![qb_t(), bool_t()]),
+                        extension_ref,
+                    )
+                    .unwrap();
 
-            extension
-                .add_op(
-                    OpName::new_inline("QAlloc"),
-                    "Allocate a new qubit.".into(),
-                    Signature::new(type_row![], vec![qb_t()]),
-                    extension_ref,
-                )
-                .unwrap();
+                extension
+                    .add_op(
+                        OpName::new_inline("QAlloc"),
+                        "Allocate a new qubit.".into(),
+                        Signature::new(type_row![], vec![qb_t()]),
+                        extension_ref,
+                    )
+                    .unwrap();
 
-            extension
-                .add_op(
-                    OpName::new_inline("QDiscard"),
-                    "Discard a qubit.".into(),
-                    Signature::new(vec![qb_t()], type_row![]),
-                    extension_ref,
-                )
-                .unwrap();
-        })
+                extension
+                    .add_op(
+                        OpName::new_inline("QDiscard"),
+                        "Discard a qubit.".into(),
+                        Signature::new(vec![qb_t()], type_row![]),
+                        extension_ref,
+                    )
+                    .unwrap();
+            },
+        )
     }
 
     /// Quantum extension definition.

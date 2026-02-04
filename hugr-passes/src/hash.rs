@@ -19,7 +19,7 @@ pub trait HugrHash: HugrView {
     }
 
     /// Compute a hash for a hugr region.
-    ///     
+    ///
     /// If the hugr is a dfg, we compute a hash for each node from its operation
     /// and the hash of the predecessors. The hash of the hugr corresponds to
     /// the hash of its output node.
