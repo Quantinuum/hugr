@@ -198,7 +198,7 @@ fn instantiate(
 /// whenever the names of their parents are unique, but this is not guaranteed.
 #[derive(Debug, Default, Clone)]
 pub struct MonomorphizePass {
-    scope: Option<PassScope>,
+    scope: PassScope,
 }
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for MonomorphizePass {
@@ -206,28 +206,19 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for MonomorphizePass {
     type Result = ();
 
     fn run(&self, h: &mut H) -> Result<(), Self::Error> {
-        let root = match self.scope {
-            Some(PassScope::EntrypointFlat | PassScope::EntrypointRecursive) => {
+        Ok(match self.scope {
+            PassScope::EntrypointFlat | PassScope::EntrypointRecursive => {
                 // for module-entrypoint, PassScope says to do nothing. (Monomorphization could.)
                 // for non-module-entrypoint, PassScope says not to touch Hugr outside entrypoint,
                 //     so monomorphization cannot add any new functions --> do nothing.
-                return Ok(());
                 // NOTE we could look to see if there are any existing instantations that
                 //   we could use (!), but not atm.
+                ()
             }
-            Some(
-                PassScope::PreserveAll | PassScope::PreserveEntrypoint | PassScope::PreservePublic,
-            ) => h.module_root(),
-            None => {
-                let ep = h.entrypoint();
-                if is_polymorphic_funcdefn(h.get_optype(ep)) {
-                    return Ok(());
-                }
-                ep
+            PassScope::PreserveAll | PassScope::PreserveEntrypoint | PassScope::PreservePublic => {
+                mono_scan(h, h.module_root(), None, &mut HashMap::new())
             }
-        };
-        mono_scan(h, root, None, &mut HashMap::new());
-        Ok(())
+        })
     }
 
     fn with_scope(mut self, scope: &PassScope) -> Self {
