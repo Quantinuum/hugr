@@ -1404,6 +1404,7 @@ version = "0.25.5"
 dependencies = [
  "ascent",
  "derive_more 2.1.1",
+ "fxhash",
  "hugr-core",
  "itertools 0.14.0",
  "pastey",
@@ -1412,6 +1413,7 @@ dependencies = [
  "proptest",
  "proptest-recurse",
  "rstest",
+ "serde_json",
  "strum",
  "thiserror 2.0.18",
 ]
