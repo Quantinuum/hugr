@@ -13,8 +13,8 @@ use hugr_core::{
 use hugr_core::hugr::{HugrView, OpType, hugrmut::HugrMut};
 use itertools::Itertools as _;
 
-use crate::ComposablePass;
 use crate::composable::{ValidatePassError, validate_if_test};
+use crate::{ComposablePass, PassScope};
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
@@ -35,7 +35,7 @@ use crate::composable::{ValidatePassError, validate_if_test};
 pub fn monomorphize(
     hugr: &mut impl HugrMut<Node = Node>,
 ) -> Result<(), ValidatePassError<Node, Infallible>> {
-    validate_if_test(MonomorphizePass, hugr)
+    validate_if_test(MonomorphizePass::default(), hugr)
 }
 
 fn is_polymorphic(fd: &FuncDefn) -> bool {
@@ -196,20 +196,29 @@ fn instantiate(
 /// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
-#[derive(Debug, Clone)]
-pub struct MonomorphizePass;
+#[derive(Debug, Default, Clone)]
+pub struct MonomorphizePass {
+    scope: PassScope,
+}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for MonomorphizePass {
     type Error = Infallible;
     type Result = ();
 
     fn run(&self, h: &mut H) -> Result<(), Self::Error> {
-        let root = h.entrypoint();
-        // If the root is a polymorphic function, then there are no external calls, so nothing to do
-        if !is_polymorphic_funcdefn(h.get_optype(root)) {
-            mono_scan(h, root, None, &mut HashMap::new());
-        }
-        Ok(())
+        Ok(match self.scope {
+            PassScope::EntrypointFlat | PassScope::EntrypointRecursive => {
+                // for module-entrypoint, PassScope says to do nothing. (Monomorphization could.)
+                // for non-module-entrypoint, PassScope says not to touch Hugr outside entrypoint,
+                //     so monomorphization cannot add any new functions --> do nothing.
+                // NOTE we could look to see if there are any existing instantations that
+                //   we could use (!), but not atm.
+                ()
+            }
+            PassScope::PreserveAll | PassScope::PreserveEntrypoint | PassScope::PreservePublic => {
+                mono_scan(h, h.module_root(), None, &mut HashMap::new())
+            }
+        })
     }
 }
 
@@ -281,13 +290,14 @@ mod test {
         HugrBuilder, ModuleBuilder,
     };
     use hugr_core::extension::prelude::{ConstUsize, UnpackTuple, UnwrapBuilder, usize_t};
-    use hugr_core::ops::handle::{FuncID, NodeHandle};
+    use hugr_core::ops::handle::FuncID;
     use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
     use hugr_core::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound, TypeEnum};
-    use hugr_core::{Hugr, HugrView, Node};
+    use hugr_core::{Hugr, HugrView, Node, Visibility};
     use rstest::rstest;
 
-    use crate::{monomorphize, remove_dead_funcs};
+    use crate::dead_funcs::remove_dead_funcs_scoped;
+    use crate::{PassScope, monomorphize};
 
     use super::{is_polymorphic, mangle_name};
 
@@ -349,9 +359,13 @@ mod test {
             let trip = fb.add_dataflow_op(tag, [elem1, elem2, elem])?;
             fb.finish_with_outputs(trip.outputs())?
         };
-        let mn = {
+        {
             let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
-            let mut fb = mb.define_function("main", Signature::new(usize_t(), outs))?;
+            let mut fb = mb.define_function_vis(
+                "main",
+                Signature::new(usize_t(), outs),
+                Visibility::Public,
+            )?;
             let [elem] = fb.input_wires_arr();
             let [res1] = fb
                 .call(tr.handle(), &[usize_t().into()], [elem])?
@@ -359,7 +373,7 @@ mod test {
             let pair = fb.call(db.handle(), &[usize_t().into()], [elem])?;
             let pty = pair_type(usize_t()).into();
             let [res2] = fb.call(tr.handle(), &[pty], pair.outputs())?.outputs_arr();
-            fb.finish_with_outputs([res1, res2])?
+            fb.finish_with_outputs([res1, res2])?;
         };
         let mut hugr = mb.finish_hugr()?;
         assert_eq!(
@@ -394,7 +408,7 @@ mod test {
         assert_eq!(mono2, mono); // Idempotent
 
         let mut nopoly = mono;
-        remove_dead_funcs(&mut nopoly, [mn.node()])?;
+        remove_dead_funcs_scoped(&mut nopoly, &PassScope::PreservePublic)?;
         let mut funcs = list_funcs(&nopoly);
 
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
@@ -621,7 +635,7 @@ mod test {
         };
 
         monomorphize(&mut hugr).unwrap();
-        remove_dead_funcs(&mut hugr, []).unwrap();
+        remove_dead_funcs_scoped(&mut hugr, &PassScope::PreservePublic).unwrap();
 
         let funcs = list_funcs(&hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
