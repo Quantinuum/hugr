@@ -230,15 +230,15 @@ class EnvelopeFormat(Enum):
     S_EXPRESSION = 40
     """A textual representation of a hugr.
 
-    Note: This format is experimental and not fully tested.
-    Please report any issues you find.
+    Note: This format is **experimental** and not fully tested.
+    It is not recommended for production use.
     """
     S_EXPRESSION_WITH_EXTS = 41
     """A textual representation of a hugr, preceded by a json-encoded
     extension registry.
 
-    Note: This format is experimental and not fully tested.
-    Please report any issues you find.
+    Note: This format is **experimental** and not fully tested.
+    It is not recommended for production use.
     """
     JSON = 63  # '?' in ASCII
     """A json-encoded hugr-package. This format is ASCII-printable."""
