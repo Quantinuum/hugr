@@ -74,9 +74,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
 
             let (mut hugr, node_map) = self.hugr.extract_hugr(self.hugr.module_root());
             hugr.set_entrypoint(node_map.extracted_node(self.hugr.entrypoint()));
-            // TODO: Currently fails when using `hugr-model`
-            //crate::envelope::test::check_hugr_roundtrip(&hugr, EnvelopeConfig::binary());
-            crate::envelope::test::check_hugr_roundtrip(&hugr, EnvelopeConfig::text());
+            crate::envelope::test::check_hugr_roundtrip(&hugr, EnvelopeConfig::binary());
         }
 
         Ok(())
