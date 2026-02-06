@@ -231,5 +231,4 @@ mod test {
 
         assert_ne!(hash1, hash3);
     }
-
 }
