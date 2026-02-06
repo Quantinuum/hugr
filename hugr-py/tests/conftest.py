@@ -214,6 +214,10 @@ def validate(
         "model-exts-no-compression": EnvelopeConfig(
             format=EnvelopeFormat.MODEL_WITH_EXTS, zstd=None
         ),
+        "s-expression": EnvelopeConfig(format=EnvelopeFormat._S_EXPRESSION, zstd=None),
+        "s-expression-exts": EnvelopeConfig(
+            format=EnvelopeFormat._S_EXPRESSION_WITH_EXTS, zstd=None
+        ),
     }
     # Envelope formats used when exporting test hugrs.
     WRITE_FORMATS = [
@@ -221,10 +225,19 @@ def validate(
         "json-compressed",
         "model-exts",
         "model-exts-no-compression",
+        # Requires extension-encoding for the cli validation to load the envelope
+        # "s-expression",
+        # TODO: Raises multiple errors when loading values
+        # "s-expression-exts",
     ]
     # Envelope formats used as target before loading back the test hugrs.
     # These should correspond to the formats supported by `hugr convert`.
-    LOAD_FORMATS = ["json", "model-exts"]
+    LOAD_FORMATS = [
+        "json",
+        "model-exts",
+        # TODO: Raises multiple errors when loading values
+        # "s-expression-exts"
+    ]
 
     # validate text and binary formats
     for write_fmt in WRITE_FORMATS:

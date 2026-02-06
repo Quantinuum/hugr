@@ -81,13 +81,27 @@ def _make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
         case EnvelopeFormat.MODEL:
             payload = bytes(package.to_model())
 
+        case EnvelopeFormat._S_EXPRESSION:
+            payload = str(package.to_model()).encode("utf-8")
+
         case EnvelopeFormat.MODEL_WITH_EXTS:
+            # Encoded model first, followed by json-encoded extensions.
             package_bytes = bytes(package.to_model())
             extension_str = json.dumps(
                 [ext._to_serial().model_dump(mode="json") for ext in package.extensions]
             )
             extension_bytes = extension_str.encode("utf8")
             payload = package_bytes + extension_bytes
+
+        case EnvelopeFormat._S_EXPRESSION_WITH_EXTS:
+            # Json-encoded extensions first, followed by s-expression.
+            # (Due to restrictions in S-expression parsing)
+            extension_str = json.dumps(
+                [ext._to_serial().model_dump(mode="json") for ext in package.extensions]
+            )
+            package_str = str(package.to_model())
+            payload_str = extension_str + package_str
+            payload = payload_str.encode("utf-8")
 
     if config.zstd is not None:
         payload = zstd.compress(payload, config.zstd)
@@ -129,13 +143,14 @@ def read_envelope(envelope: bytes) -> Package:
     match header.format:
         case EnvelopeFormat.JSON:
             return ext_s.Package.model_validate_json(payload).deserialize()
-        case EnvelopeFormat.MODEL:
+        case EnvelopeFormat.MODEL | EnvelopeFormat._S_EXPRESSION:
             model_package, suffix = rust.bytes_to_package(payload)
             if suffix:
                 msg = f"Excess bytes in envelope with format {EnvelopeFormat.MODEL}."
                 raise ValueError(msg)
             return Package.from_model(model_package)
         case EnvelopeFormat.MODEL_WITH_EXTS:
+            # Encoded model first, followed by json-encoded extensions.
             from hugr.ext import Extension
 
             model_package, suffix = rust.bytes_to_package(payload)
@@ -145,6 +160,25 @@ def read_envelope(envelope: bytes) -> Package:
                     Extension.from_json(json.dumps(extension))
                     for extension in json.loads(suffix)
                 ],
+            )
+        case EnvelopeFormat._S_EXPRESSION_WITH_EXTS:
+            # Json-encoded extensions first, followed by s-expression.
+            # (Due to restrictions in S-expression parsing)
+            from hugr.ext import Extension
+
+            decoder = json.JSONDecoder()
+            payload_str = payload.decode("utf-8")
+            extensions, parse_index = decoder.raw_decode(payload_str)
+
+            extensions = [
+                Extension.from_json(json.dumps(extension)) for extension in extensions
+            ]
+
+            model_package = rust.string_to_package(payload_str[parse_index:])
+
+            return Package(
+                modules=Package.from_model(model_package).modules,
+                extensions=extensions,
             )
 
 
@@ -193,6 +227,19 @@ class EnvelopeFormat(Enum):
     MODEL_WITH_EXTS = 2
     """A capnp-encoded hugr-model, immediately followed by a json-encoded
     extension registry."""
+    _S_EXPRESSION = 40
+    """A textual representation of a hugr.
+
+    Note: This format is **experimental** and not fully tested.
+    It is not recommended for production use.
+    """
+    _S_EXPRESSION_WITH_EXTS = 41
+    """A textual representation of a hugr, preceded by a json-encoded
+    extension registry.
+
+    Note: This format is **experimental** and not fully tested.
+    It is not recommended for production use.
+    """
     JSON = 63  # '?' in ASCII
     """A json-encoded hugr-package. This format is ASCII-printable."""
 
