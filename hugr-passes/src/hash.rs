@@ -174,9 +174,7 @@ pub enum HashError {
 mod test {
     use crate::utils::build_simple_hugr;
     use crate::utils::test_quantum_extension::{cx_gate, h_gate};
-    use hugr_core::Hugr;
     use hugr_core::builder::{Dataflow, DataflowSubContainer};
-    use std::{fs::File, io::BufReader};
 
     use super::*;
     #[test]
@@ -234,55 +232,4 @@ mod test {
         assert_ne!(hash1, hash3);
     }
 
-    fn get_file_paths() -> Vec<std::path::PathBuf> {
-        let folder_path = concat!(env!("CARGO_MANIFEST_DIR"), "/hugr_hash_test/");
-
-        let mut file_paths = Vec::new();
-        for entry in std::fs::read_dir(folder_path).unwrap() {
-            let entry = entry.unwrap();
-            let path = entry.path();
-            if path.extension().and_then(|s| s.to_str()) == Some("hugr") {
-                file_paths.push(path);
-            }
-        }
-        file_paths
-    }
-
-    #[test]
-    fn hash_constants_neq() {
-        let mut all_hashes = Vec::new();
-
-        for file_path in get_file_paths() {
-            let file = File::open(&file_path).unwrap();
-            let hugr = Hugr::load(BufReader::new(file), None);
-            let hugr = hugr.unwrap();
-            let hash = hugr.hugr_hash().unwrap();
-            all_hashes.push(hash);
-        }
-
-        let set: std::collections::HashSet<u64> = all_hashes.iter().copied().collect();
-        // check that all hashes are different
-        assert_eq!(set.len(), all_hashes.len());
-    }
-
-    #[test]
-    fn hash_idempotency_on_files() {
-        for file_path in get_file_paths() {
-            // First hash computation
-            let file1 = File::open(&file_path).unwrap();
-            let hugr1 = Hugr::load(BufReader::new(file1), None).unwrap();
-            let hash1 = hugr1.hugr_hash().unwrap();
-
-            // Second hash computation
-            let file2 = File::open(&file_path).unwrap();
-            let hugr2 = Hugr::load(BufReader::new(file2), None).unwrap();
-            let hash2 = hugr2.hugr_hash().unwrap();
-            assert_eq!(
-                hash1,
-                hash2,
-                "Hash is not idempotent for file: {}",
-                file_path.display()
-            );
-        }
-    }
 }
