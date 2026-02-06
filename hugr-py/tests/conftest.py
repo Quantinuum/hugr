@@ -214,9 +214,9 @@ def validate(
         "model-exts-no-compression": EnvelopeConfig(
             format=EnvelopeFormat.MODEL_WITH_EXTS, zstd=None
         ),
-        "s-expression": EnvelopeConfig(format=EnvelopeFormat.S_EXPRESSION, zstd=None),
+        "s-expression": EnvelopeConfig(format=EnvelopeFormat._S_EXPRESSION, zstd=None),
         "s-expression-exts": EnvelopeConfig(
-            format=EnvelopeFormat.S_EXPRESSION_WITH_EXTS, zstd=None
+            format=EnvelopeFormat._S_EXPRESSION_WITH_EXTS, zstd=None
         ),
     }
     # Envelope formats used when exporting test hugrs.

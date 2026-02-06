@@ -81,7 +81,7 @@ def _make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
         case EnvelopeFormat.MODEL:
             payload = bytes(package.to_model())
 
-        case EnvelopeFormat.S_EXPRESSION:
+        case EnvelopeFormat._S_EXPRESSION:
             payload = str(package.to_model()).encode("utf-8")
 
         case EnvelopeFormat.MODEL_WITH_EXTS:
@@ -93,7 +93,7 @@ def _make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
             extension_bytes = extension_str.encode("utf8")
             payload = package_bytes + extension_bytes
 
-        case EnvelopeFormat.S_EXPRESSION_WITH_EXTS:
+        case EnvelopeFormat._S_EXPRESSION_WITH_EXTS:
             # Json-encoded extensions first, followed by s-expression.
             # (Due to restrictions in S-expression parsing)
             extension_str = json.dumps(
@@ -143,7 +143,7 @@ def read_envelope(envelope: bytes) -> Package:
     match header.format:
         case EnvelopeFormat.JSON:
             return ext_s.Package.model_validate_json(payload).deserialize()
-        case EnvelopeFormat.MODEL | EnvelopeFormat.S_EXPRESSION:
+        case EnvelopeFormat.MODEL | EnvelopeFormat._S_EXPRESSION:
             model_package, suffix = rust.bytes_to_package(payload)
             if suffix:
                 msg = f"Excess bytes in envelope with format {EnvelopeFormat.MODEL}."
@@ -161,7 +161,7 @@ def read_envelope(envelope: bytes) -> Package:
                     for extension in json.loads(suffix)
                 ],
             )
-        case EnvelopeFormat.S_EXPRESSION_WITH_EXTS:
+        case EnvelopeFormat._S_EXPRESSION_WITH_EXTS:
             # Json-encoded extensions first, followed by s-expression.
             # (Due to restrictions in S-expression parsing)
             from hugr.ext import Extension
@@ -227,13 +227,13 @@ class EnvelopeFormat(Enum):
     MODEL_WITH_EXTS = 2
     """A capnp-encoded hugr-model, immediately followed by a json-encoded
     extension registry."""
-    S_EXPRESSION = 40
+    _S_EXPRESSION = 40
     """A textual representation of a hugr.
 
     Note: This format is **experimental** and not fully tested.
     It is not recommended for production use.
     """
-    S_EXPRESSION_WITH_EXTS = 41
+    _S_EXPRESSION_WITH_EXTS = 41
     """A textual representation of a hugr, preceded by a json-encoded
     extension registry.
 
