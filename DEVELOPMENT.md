@@ -92,7 +92,7 @@ Run `just` to see all available commands.
 
 Any breaking change in the public Rust APIs will cause the next release to be a
 major version bump. You can check the next release version [draft release
-PR](https://github.com/quantinuum/hugr/pulls?q=is%3Aopen+is%3Apr+label%3Arelease) on
+PR](https://github.com/quantinuum/hugr/pulls?q=is%3Aopen+is%3Apr+label%3AX-release) on
 github.
 
 Use `cargo semver-checks` to alert you of any problematic changes.

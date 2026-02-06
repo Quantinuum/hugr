@@ -56,6 +56,7 @@ pub enum EnvelopeFormat {
     /// be avoided.
     //
     // TODO: Update comment once extension encoding is supported.
+    // TODO(deprecated): Change name to SExpression to avoid confusion with Model.
     ModelText = 40, // '(' in ascii
     /// Human-readable S-expression encoding using [`hugr_model::v0`].
     ///
@@ -64,6 +65,8 @@ pub enum EnvelopeFormat {
     ///
     /// This is a temporary format required until the model adds support for
     /// extensions.
+    //
+    // TODO(deprecated): Change name to SExpressionWithExtensions to avoid confusion with Model.
     ModelTextWithExtensions = 41, // ')' in ascii
     /// Json-encoded [`crate::package::Package`]
     ///
