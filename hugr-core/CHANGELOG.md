@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.25.6](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.5...hugr-core-v0.25.6) - 2026-02-06
+
+### New Features
+
+- Add s expression format to envelope formats ([#2864](https://github.com/Quantinuum/hugr/pull/2864))
+- added hash.rs, updated imports ([#2840](https://github.com/Quantinuum/hugr/pull/2840))
+
 ## [0.25.5](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.4...hugr-core-v0.25.5) - 2026-02-03
 
 ### Refactor

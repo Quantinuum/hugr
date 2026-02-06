@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.25.6](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.5...hugr-passes-v0.25.6) - 2026-02-06
+
+### New Features
+
+- added hash.rs, updated imports ([#2840](https://github.com/Quantinuum/hugr/pull/2840))
+
 ## [0.25.4](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.3...hugr-passes-v0.25.4) - 2026-01-14
 
 ### Bug Fixes
