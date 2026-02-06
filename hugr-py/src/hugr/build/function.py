@@ -11,7 +11,7 @@ from hugr.hugr import Hugr
 
 if TYPE_CHECKING:
     from hugr.hugr.node_port import Node
-    from hugr.tys import PolyFuncType, Type, TypeBound, TypeParam, TypeRow
+    from hugr.tys import PolyFuncType, Type, TypeBound, TypeParam, TypeRow, Visibility
 
 __all__ = ["Function", "Module"]
 
@@ -41,6 +41,7 @@ class Module(DefinitionBuilder[ops.Module]):
         input_types: TypeRow,
         output_types: TypeRow | None = None,
         type_params: list[TypeParam] | None = None,
+        visibility: Visibility = "Private",
     ) -> Function:
         """Start building a function definition in the graph.
 
@@ -51,22 +52,28 @@ class Module(DefinitionBuilder[ops.Module]):
                 If not provided, it will be inferred after the function is built.
             type_params: The type parameters for the function, if polymorphic.
             parent: The parent node of the constant. Defaults to the entrypoint node.
+            visibility: The visibility of the function.
 
         Returns:
             The new function builder.
         """
-        parent_op = ops.FuncDefn(name, input_types, type_params or [])
+        parent_op = ops.FuncDefn(
+            name, input_types, type_params or [], visibility=visibility
+        )
         func = Function.new_nested(parent_op, self.hugr, self.hugr.module_root)
         if output_types is not None:
             func.declare_outputs(output_types)
         return func
 
-    def declare_function(self, name: str, signature: PolyFuncType) -> Node:
+    def declare_function(
+        self, name: str, signature: PolyFuncType, visibility: Visibility = "Public"
+    ) -> Node:
         """Add a function declaration to the module.
 
         Args:
             name: The name of the function.
             signature: The (polymorphic) signature of the function.
+            visibility: The visibility of the function.
 
         Returns:
             The node representing the function declaration.
@@ -79,7 +86,9 @@ class Module(DefinitionBuilder[ops.Module]):
             Node(1)
         """
         return self.hugr.add_node(
-            ops.FuncDecl(name, signature), self.hugr.entrypoint, num_outs=1
+            ops.FuncDecl(name, signature, visibility=visibility),
+            self.hugr.entrypoint,
+            num_outs=1,
         )
 
     def add_alias_defn(self, name: str, ty: Type) -> Node:
