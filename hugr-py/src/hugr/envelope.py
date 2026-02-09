@@ -244,7 +244,11 @@ class EnvelopeFormat(Enum):
     """A json-encoded hugr-package. This format is ASCII-printable."""
 
     def ascii_printable(self) -> bool:
-        return self in {EnvelopeFormat.JSON}
+        return self in {
+            EnvelopeFormat.JSON,
+            EnvelopeFormat._S_EXPRESSION,
+            EnvelopeFormat._S_EXPRESSION_WITH_EXTS,
+        }
 
 
 @dataclass
