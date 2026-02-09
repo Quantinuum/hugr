@@ -10,6 +10,7 @@ mod dead_funcs;
 pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass, remove_dead_funcs};
 pub mod force_order;
 mod half_node;
+pub mod hash;
 pub mod inline_dfgs;
 pub mod inline_funcs;
 pub use inline_funcs::inline_acyclic;
@@ -18,6 +19,8 @@ mod monomorphize;
 pub mod normalize_cfgs;
 pub mod redundant_order_edges;
 pub mod untuple;
+#[cfg(test)]
+mod utils;
 
 pub use monomorphize::{MonomorphizePass, mangle_name, monomorphize};
 pub mod replace_types;

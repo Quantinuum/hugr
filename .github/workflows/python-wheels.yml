@@ -295,6 +295,7 @@ jobs:
       # Used to generate artifact attestation
       attestations: write
     steps:
+      - uses: actions/checkout@v4
       - uses: actions/download-artifact@v7
       - name: Generate artifact attestation
         uses: actions/attest-build-provenance@v3
@@ -309,5 +310,7 @@ jobs:
           # Pypi doesn't support wasm wheels, so we skip them here.
           args: --non-interactive --skip-existing wheels-linux-*/* wheels-musllinux-*/* wheels-windows-*/* wheels-macos-*/* wheels-sdist/*
       - name: Upload wheels to the release assets
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          gh release upload ${{ github.ref }} wheels-*/*
+          gh release upload ${{ github.ref_name }} wheels-*/*
