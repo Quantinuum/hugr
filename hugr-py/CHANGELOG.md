@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.3](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.2...hugr-py-v0.15.3) (2026-02-09)
+
+
+### Bug Fixes
+
+* Mark SExp formats as ascii printable ([#2866](https://github.com/Quantinuum/hugr/issues/2866)) ([a4bc253](https://github.com/Quantinuum/hugr/commit/a4bc25313ef5d123f014299315f5ca36f0807983))
+
 ## [0.15.2](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.1...hugr-py-v0.15.2) (2026-02-06)
 
 
