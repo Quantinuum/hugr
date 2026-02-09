@@ -1303,7 +1303,7 @@ mod test {
     #[fixture]
     fn test_simple_circuit() -> Hugr {
         crate::builder::test::build_main(
-            Signature::new_endo(vec![qb_t(), qb_t()]).into(),
+            Signature::new_endo([qb_t(), qb_t()]).into(),
             |mut f_build| {
                 let wires: Vec<_> = f_build.input_wires().collect();
                 let mut linear = f_build.as_circuit(wires);

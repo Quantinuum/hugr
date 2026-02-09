@@ -775,7 +775,7 @@ mod tests {
         assert!(walker.is_complete(&wire, None));
 
         let empty_hugr = {
-            let dfg_builder = DFGBuilder::new(endo_sig(bool_t())).unwrap();
+            let dfg_builder = DFGBuilder::new(endo_sig([bool_t()])).unwrap();
             let inputs = dfg_builder.input_wires();
             dfg_builder.finish_hugr_with_outputs(inputs).unwrap()
         };

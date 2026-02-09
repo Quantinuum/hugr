@@ -53,18 +53,18 @@ pub fn simple_cfg_hugr() -> Hugr {
 }
 
 pub fn dfg_calling_defn_decl() -> (Hugr, FuncID<true>, FuncID<false>) {
-    let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
+    let mut dfb = DFGBuilder::new(Signature::new([], [bool_t()])).unwrap();
     let new_defn = {
         let mut mb = dfb.module_root_builder();
         let fb = mb
-            .define_function("helper_id", Signature::new_endo(bool_t()))
+            .define_function("helper_id", Signature::new_endo([bool_t()]))
             .unwrap();
         let [f_inp] = fb.input_wires_arr();
         fb.finish_with_outputs([f_inp]).unwrap()
     };
     let new_decl = dfb
         .module_root_builder()
-        .declare("helper2", Signature::new_endo(bool_t()).into())
+        .declare("helper2", Signature::new_endo([bool_t()]).into())
         .unwrap();
     let cst = dfb.add_load_value(Value::true_val());
     let [c1] = dfb
@@ -87,7 +87,7 @@ pub static QUANTUM_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             ext.add_op(
                 OpName::new_inline("H"),
                 String::new(),
-                Signature::new_endo(qb_t()),
+                Signature::new_endo([qb_t()]),
                 extension_ref,
             )
             .unwrap();
@@ -102,7 +102,7 @@ pub static QUANTUM_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             ext.add_op(
                 OpName::new_inline("CX"),
                 String::new(),
-                Signature::new_endo(vec![qb_t(), qb_t()]),
+                Signature::new_endo([qb_t(), qb_t()]),
                 extension_ref,
             )
             .unwrap();
@@ -128,7 +128,7 @@ pub fn circuit(layers: usize) -> (Hugr, Vec<CircuitLayer>) {
     let h_gate = QUANTUM_EXT.instantiate_extension_op("H", []).unwrap();
     let cx_gate = QUANTUM_EXT.instantiate_extension_op("CX", []).unwrap();
     let rz = QUANTUM_EXT.instantiate_extension_op("Rz", []).unwrap();
-    let signature = Signature::new_endo(vec![qb_t(), qb_t()]);
+    let signature = Signature::new_endo([qb_t(), qb_t()]);
     let mut module_builder = ModuleBuilder::new();
     let mut f_build = module_builder.define_function("main", signature).unwrap();
 

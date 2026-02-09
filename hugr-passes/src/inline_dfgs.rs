@@ -60,7 +60,7 @@ mod test {
 
     #[test]
     fn inline_dfgs() -> Result<(), Box<dyn std::error::Error>> {
-        let mut outer = DFGBuilder::new(Signature::new_endo(vec![qb_t(), qb_t()]))?;
+        let mut outer = DFGBuilder::new(Signature::new_endo([qb_t(), qb_t()]))?;
         let [a, b] = outer.input_wires_arr();
 
         let inner1 = outer.dfg_builder_endo([(qb_t(), a)])?;

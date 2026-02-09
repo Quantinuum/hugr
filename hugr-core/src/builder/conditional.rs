@@ -207,7 +207,7 @@ mod test {
 
     #[test]
     fn basic_conditional_case() -> Result<(), BuildError> {
-        let case_b = CaseBuilder::new(Signature::new_endo(vec![usize_t(), usize_t()]))?;
+        let case_b = CaseBuilder::new(Signature::new_endo([usize_t(), usize_t()]))?;
         let [in0, in1] = case_b.input_wires_arr();
         case_b.finish_with_outputs([in0, in1])?;
         Ok(())
