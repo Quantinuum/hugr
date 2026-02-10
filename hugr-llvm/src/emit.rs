@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{Context as _, Result, anyhow};
 use delegate::delegate;
 use hugr_core::{
     HugrView, Node, Visibility,
@@ -301,7 +301,12 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
                     node.hugr().get_optype(next_node)
                 )
             };
-            let (new_self, new_tasks) = self.emit_func_impl(func)?;
+            let (new_self, new_tasks) = self.emit_func_impl(func).with_context(|| {
+                format!(
+                    "Failed to emit LLVM for function {} at node {next_node}",
+                    func.func_name()
+                )
+            })?;
             self = new_self;
             worklist.extend(new_tasks.into_iter());
         }
