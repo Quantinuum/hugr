@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use hugr_core::Node;
 use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::ops::{
@@ -385,6 +385,12 @@ fn emit_optype<'c, H: HugrView<Node = Node>>(
         OpType::TailLoop(x) => emit_tail_loop(context, args.into_ot(x)),
         _ => Err(anyhow!("Invalid child for Dataflow Parent: {node}")),
     }
+    .with_context(|| {
+        format!(
+            "Failed to emit LLVM for node {node} with optype {}",
+            node.as_ref()
+        )
+    })
 }
 
 /// Emit a custom operation with a single input.
