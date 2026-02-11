@@ -206,19 +206,19 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for MonomorphizePass {
     type Result = ();
 
     fn run(&self, h: &mut H) -> Result<(), Self::Error> {
-        Ok(match self.scope {
+        match self.scope {
             PassScope::EntrypointFlat | PassScope::EntrypointRecursive => {
                 // for module-entrypoint, PassScope says to do nothing. (Monomorphization could.)
                 // for non-module-entrypoint, PassScope says not to touch Hugr outside entrypoint,
                 //     so monomorphization cannot add any new functions --> do nothing.
                 // NOTE we could look to see if there are any existing instantations that
                 //   we could use (!), but not atm.
-                ()
             }
             PassScope::PreserveAll | PassScope::PreserveEntrypoint | PassScope::PreservePublic => {
                 mono_scan(h, h.module_root(), None, &mut HashMap::new())
             }
-        })
+        };
+        Ok(())
     }
 
     fn with_scope(mut self, scope: &PassScope) -> Self {

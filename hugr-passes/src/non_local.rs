@@ -11,12 +11,11 @@ use crate::{ComposablePass, PassScope};
 mod localize;
 use localize::ExtraSourceReqs;
 
-/// Converts non-local edges in a Hugr (within a region defined by the [PassScope]) into
-/// local ones, by inserting extra inputs to container nodes and extra outports to Input
-///  nodes (and conversely to outputs of [DataflowBlock]s).
+/// Converts non-local edges in a Hugr into local ones, by inserting extra inputs to container
+/// nodes and extra outports to Input nodes (and conversely to outputs of [DataflowBlock]s).
 ///
 /// Ignores [PassScope::recursive], as acts only on nonlocal edges *both* of whose endpoints
-/// are within the affected subtree.
+/// are within the subtree specified by [PassScope::root].
 ///
 /// [DataflowBlock]: hugr_core::ops::DataflowBlock
 #[derive(Clone, Debug, Default, Hash)]
@@ -134,8 +133,8 @@ impl LocalizeEdges {
         }
     }
 
-    fn nonlocal_edges<'a, 'b, H: HugrView>(
-        &'a self,
+    fn nonlocal_edges<'b, H: HugrView>(
+        &self,
         hugr: &'b H,
     ) -> impl Iterator<Item = (H::Node, IncomingPort)> + use<'b, H> {
         self.scope.root(hugr).into_iter().flat_map(move |root| {
