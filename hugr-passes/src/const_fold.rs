@@ -29,7 +29,7 @@ use crate::{
 /// A configuration for the Constant Folding pass.
 pub struct ConstantFoldPass {
     allow_increase_termination: bool,
-    scope: PassScope,
+    scope: Option<PassScope>,
     /// Each outer key Node must be either:
     ///   - a `FuncDefn` child of the root, if the root is a module; or
     ///   - the entrypoint, if the entrypoint is not a Module
@@ -104,8 +104,12 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
     /// [`ConstFoldError::InvalidEntryPoint`] if an entry-point added by [`Self::with_inputs`]
     /// was of an invalid [`OpType`]
     fn run(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
-        let Some(root) = self.scope.root(hugr) else {
-            return Ok(());
+        let root = match &self.scope {
+            None => hugr.entrypoint(),
+            Some(scope) => match scope.root(hugr) {
+                None => return Ok(()),
+                Some(root) => root,
+            },
         };
         let fresh_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().max().map_or(0, |n| n.index() + 1),
@@ -129,12 +133,12 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             .map_err(|op| ConstFoldError::InvalidEntryPoint { node: n, op })?;
         }
         let scope_nodes = match &self.scope {
-            PassScope::EntrypointFlat | PassScope::EntrypointRecursive => Vec::new(),
-            PassScope::PreserveAll => hugr
+            None | Some(PassScope::EntrypointFlat | PassScope::EntrypointRecursive) => Vec::new(),
+            Some(PassScope::PreserveAll) => hugr
                 .children(hugr.module_root())
                 .filter(|n| hugr.get_optype(*n).is_func_defn())
                 .collect(),
-            PassScope::PreservePublic => hugr
+            Some(PassScope::PreservePublic) => hugr
                 .children(hugr.module_root())
                 .filter(|n| {
                     hugr.get_optype(*n)
@@ -142,7 +146,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
                         .is_some_and(|fd| fd.visibility() == &Visibility::Public)
                 })
                 .collect(),
-            PassScope::PreserveEntrypoint => vec![hugr.entrypoint()],
+            Some(PassScope::PreserveEntrypoint) => vec![hugr.entrypoint()],
         };
         for node in scope_nodes {
             const NO_INPUTS: [(IncomingPort, PartialValue<ValueHandle>); 0] = [];
@@ -192,9 +196,13 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             hugr.connect(lcst, OutgoingPort::from(0), n, inport);
         }
         // Eliminate dead code not required for the same entry points.
-        DeadCodeElimPass::<H>::default()
-            .with_scope(&self.scope)
-            .with_entry_points(self.inputs.keys().copied())
+        let dce = self
+            .scope
+            .as_ref()
+            .map_or(DeadCodeElimPass::<H>::default(), |scope| {
+                DeadCodeElimPass::<H>::default().with_scope(scope)
+            });
+        dce.with_entry_points(self.inputs.keys().copied())
             .set_preserve_callback(if self.allow_increase_termination {
                 Arc::new(|_, _| PreserveNode::CanRemoveIgnoringChildren)
             } else {
@@ -216,7 +224,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
     }
 
     fn with_scope(mut self, scope: &PassScope) -> Self {
-        self.scope = scope.clone();
+        self.scope = Some(scope.clone());
         self
     }
 }

@@ -14,7 +14,8 @@ pub struct DeadCodeElimPass<H: HugrView> {
     /// Nodes that are definitely needed - e.g. `FuncDefns`, but could be anything.
     /// Hugr Root is assumed to be an entry point even if not mentioned here.
     entry_points: Vec<H::Node>,
-    scope: PassScope,
+    /// If None, use entrypoint-subtree (even if module root)
+    scope: Option<PassScope>,
     /// Callback identifying nodes that must be preserved even if their
     /// results are not used. Defaults to [`PreserveNode::default_for`].
     preserve_callback: Arc<PreserveCallback<H>>,
@@ -25,7 +26,7 @@ impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
         Self {
             entry_points: Default::default(),
             // Preserve pre-PassScope behaviour of affecting entrypoint subtree only:
-            scope: PassScope::EntrypointRecursive,
+            scope: None,
             preserve_callback: Arc::new(PreserveNode::default_for),
         }
     }
@@ -39,7 +40,7 @@ impl<H: HugrView> Debug for DeadCodeElimPass<H> {
         #[derive(Debug)]
         struct DCEDebug<'a, N> {
             entry_points: &'a Vec<N>,
-            scope: &'a PassScope,
+            scope: &'a Option<PassScope>,
         }
 
         Debug::fmt(
@@ -117,7 +118,10 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().copied());
 
-        q.extend(self.scope.preserve_interface(h));
+        match &self.scope {
+            None => q.push_back(h.entrypoint()),
+            Some(scope) => q.extend(scope.preserve_interface(h).chain(scope.root(h))),
+        };
         while let Some(n) = q.pop_front() {
             if !h.contains_node(n) {
                 return Err(DeadCodeElimError::NodeNotFound(n));
@@ -181,8 +185,12 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<(), Self::Error> {
-        let Some(root) = self.scope.root(hugr) else {
-            return Ok(());
+        let root = match &self.scope {
+            None => hugr.entrypoint(),
+            Some(scope) => match scope.root(hugr) {
+                Some(root) => root,
+                None => return Ok(()),
+            },
         };
         let needed = self.find_needed_nodes(&*hugr)?;
         let mut descs = hugr.descendants(root);
@@ -195,7 +203,7 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
     }
 
     fn with_scope(mut self, scope: &PassScope) -> Self {
-        self.scope = scope.clone();
+        self.scope = Some(scope.clone());
         self
     }
 }
