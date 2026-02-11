@@ -120,7 +120,7 @@ impl<N> NormalizeCFGPass<N> {
     #[deprecated(note = "Use with_scope")]
     pub fn cfgs(&mut self) -> &mut Vec<N> {
         match &mut self.scope {
-            Either::Left(cfgs) => return cfgs,
+            Either::Left(cfgs) => cfgs,
             r => {
                 *r = Either::Left(Vec::new());
                 r.as_mut().unwrap_left()
