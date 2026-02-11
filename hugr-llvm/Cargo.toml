@@ -1,6 +1,6 @@
 [package]
 name = "hugr-llvm"
-version = "0.24.3"
+version = "0.25.5"
 description = "A general and extensible crate for lowering HUGRs into LLVM IR"
 
 edition.workspace = true
@@ -25,8 +25,8 @@ llvm14-0 = ["inkwell/llvm14-0"]
 workspace = true
 
 [dependencies]
-inkwell = { version = "0.7", default-features = false }
-hugr-core = { path = "../hugr-core", version = "0.24.3" }
+inkwell = { version = ">=0.7.1, <0.9", default-features = false }
+hugr-core = { path = "../hugr-core", version = "0.25.5" }
 anyhow.workspace = true
 itertools.workspace = true
 delegate.workspace = true
@@ -43,4 +43,4 @@ hugr-llvm = { "path" = ".", features = ["test-utils"] }
 hugr-passes = { path = "../hugr-passes" }
 
 [build-dependencies]
-cc = "1.2.46"
+cc = "1.2.55"

@@ -58,10 +58,19 @@ To compile and test the code, run:
 
 ```bash
 just test
-# or, to test only the rust code or the python code
-just test rust
-just test python
 ```
+or, to test only the rust code or the python code:
+```bash
+just test-rust
+just test-python
+```
+or, to try a specific test:
+```bash
+just test-rust test_name
+just test-python -k test_name
+```
+
+
 
 Run the rust benchmarks with:
 
@@ -83,7 +92,7 @@ Run `just` to see all available commands.
 
 Any breaking change in the public Rust APIs will cause the next release to be a
 major version bump. You can check the next release version [draft release
-PR](https://github.com/quantinuum/hugr/pulls?q=is%3Aopen+is%3Apr+label%3Arelease) on
+PR](https://github.com/quantinuum/hugr/pulls?q=is%3Aopen+is%3Apr+label%3AX-release) on
 github.
 
 Use `cargo semver-checks` to alert you of any problematic changes.

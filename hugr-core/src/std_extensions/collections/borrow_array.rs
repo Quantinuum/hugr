@@ -114,7 +114,7 @@ pub type BArrayValue = GenericArrayValue<BorrowArray>;
 #[allow(non_camel_case_types, missing_docs)]
 #[non_exhaustive]
 pub enum BArrayUnsafeOpDef {
-    /// `borrow<size, elem_ty>: borrow_array<size, elem_ty>, index -> elem_ty, borrow_array<size, elem_ty>`
+    /// `borrow<size, elem_ty>: borrow_array<size, elem_ty>, index -> borrow_array<size, elem_ty>, elem_ty`
     borrow,
     /// `return<size, elem_ty>: borrow_array<size, elem_ty>, index, elem_ty -> borrow_array<size, elem_ty>`
     #[strum(serialize = "return")]

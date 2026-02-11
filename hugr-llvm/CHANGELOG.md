@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.25.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.24.3...hugr-llvm-v0.25.0) - 2025-12-22
+
+### New Features
+
+- *(llvm)* [**breaking**] upgrade to inkwell 0.7 ([#2695](https://github.com/Quantinuum/hugr/pull/2695))
+
+### Refactor
+
+- Deprecate Value::Function and inline_constant_functions ([#2770](https://github.com/Quantinuum/hugr/pull/2770))
+
 ## [0.24.3](https://github.com/CQCL/hugr/compare/hugr-llvm-v0.24.2...hugr-llvm-v0.24.3) - 2025-11-06
 
 ### Bug Fixes

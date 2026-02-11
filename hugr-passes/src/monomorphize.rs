@@ -272,7 +272,7 @@ mod test {
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
     use hugr_core::std_extensions::collections;
     use hugr_core::std_extensions::collections::array::ArrayKind;
-    use hugr_core::std_extensions::collections::value_array::{VArrayOpDef, ValueArray};
+    use hugr_core::std_extensions::collections::borrow_array::{BArrayOpDef, BorrowArray};
     use hugr_core::types::type_param::TypeParam;
     use itertools::Itertools;
 
@@ -283,7 +283,7 @@ mod test {
     use hugr_core::extension::prelude::{ConstUsize, UnpackTuple, UnwrapBuilder, usize_t};
     use hugr_core::ops::handle::{FuncID, NodeHandle};
     use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
-    use hugr_core::types::{PolyFuncType, Signature, SumType, Type, TypeArg, TypeBound, TypeEnum};
+    use hugr_core::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound, TypeEnum};
     use hugr_core::{Hugr, HugrView, Node};
     use rstest::rstest;
 
@@ -409,27 +409,28 @@ mod test {
     fn test_multiargs_nats() {
         //pf1 contains pf2 contains mono_func -> pf1<a> and pf1<b> share pf2's and they share mono_func
 
-        let tv = |i| Type::new_var_use(i, TypeBound::Copyable);
+        let tv = |i| Type::new_var_use(i, TypeBound::Linear);
         let sv = |i| TypeArg::new_var_use(i, TypeParam::max_nat_type());
         let sa = |n| TypeArg::BoundedNat(n);
         let n: u64 = 5;
+
+        let arr2u = || BorrowArray::ty_parametric(sa(2), usize_t()).unwrap();
+        // outer takes two arrays of size n of arrays of size 2 of usizes, and returns two usizes
         let mut outer = FunctionBuilder::new(
             "mainish",
             Signature::new(
-                ValueArray::ty_parametric(
-                    sa(n),
-                    ValueArray::ty_parametric(sa(2), usize_t()).unwrap(),
-                )
-                .unwrap(),
+                vec![
+                    BorrowArray::ty_parametric(sa(n), arr2u()).unwrap(),
+                    BorrowArray::ty_parametric(sa(n), arr2u()).unwrap(),
+                ],
                 vec![usize_t(); 2],
             ),
         )
         .unwrap();
 
-        let arr2u = || ValueArray::ty_parametric(sa(2), usize_t()).unwrap();
-
         let mut mb = outer.module_root_builder();
 
+        // mono_func returns constant 1 usize
         let mono_func = {
             let mut fb = mb
                 .define_function("get_usz", Signature::new(vec![], usize_t()))
@@ -438,62 +439,101 @@ mod test {
             fb.finish_with_outputs([cst0]).unwrap()
         };
 
+        // pf2[n, t] takes an array of size n of type t and return an element of type as well as the array to deal with it being linear
         let pf2 = {
             let pf2t = PolyFuncType::new(
-                [TypeParam::max_nat_type(), TypeBound::Copyable.into()],
-                Signature::new(ValueArray::ty_parametric(sv(0), tv(1)).unwrap(), tv(1)),
+                [TypeParam::max_nat_type(), TypeBound::Linear.into()],
+                Signature::new(
+                    BorrowArray::ty_parametric(sv(0), tv(1)).unwrap(),
+                    vec![tv(1), BorrowArray::ty_parametric(sv(0), tv(1)).unwrap()],
+                ),
             );
             let mut pf2 = mb.define_function("pf2", pf2t).unwrap();
             let [inw] = pf2.input_wires_arr();
+            // get the usize constant to use as an index
             let [idx] = pf2.call(mono_func.handle(), &[], []).unwrap().outputs_arr();
-            let op_def = collections::value_array::EXTENSION.get_op("get").unwrap();
+            let op_def = collections::borrow_array::EXTENSION
+                .get_op("borrow")
+                .unwrap();
             let op = hugr_core::ops::ExtensionOp::new(op_def.clone(), vec![sv(0), tv(1).into()])
                 .unwrap();
-            let [get, _] = pf2.add_dataflow_op(op, [inw, idx]).unwrap().outputs_arr();
-            let [got] = pf2
-                .build_unwrap_sum(1, SumType::new([vec![], vec![tv(1)]]), get)
-                .unwrap();
-            pf2.finish_with_outputs([got]).unwrap()
+            // borrow the element at that index and return it along with the array
+            let [arr, get] = pf2.add_dataflow_op(op, [inw, idx]).unwrap().outputs_arr();
+            pf2.finish_with_outputs([get, arr]).unwrap()
         };
 
+        // pf1[n] takes the same input as the outer and returns one usize
         let pf1t = PolyFuncType::new(
             [TypeParam::max_nat_type()],
             Signature::new(
-                ValueArray::ty_parametric(sv(0), arr2u()).unwrap(),
+                BorrowArray::ty_parametric(sv(0), arr2u()).unwrap(),
                 usize_t(),
             ),
         );
         let mut pf1 = mb.define_function("pf1", pf1t).unwrap();
 
-        // pf1: Two calls to pf2, one depending on pf1's TypeArg, the other not
+        // pf1: two calls to pf2, one depending on pf1's TypeArg, the other not
+        // first call stays generic in size but specifies the type as an array of 2 usizes
         let inner = pf1
             .call(pf2.handle(), &[sv(0), arr2u().into()], pf1.input_wires())
             .unwrap();
+        let [inner_arr, outer_arr] = inner.outputs_arr();
+        // discard the outer array output even though it is not all borrowed to get around linearity (would panic if you actually ran this)
+        let discard_op_def = collections::borrow_array::EXTENSION
+            .get_op("discard_all_borrowed")
+            .unwrap();
+        let discard_op =
+            hugr_core::ops::ExtensionOp::new(discard_op_def.clone(), vec![sv(0), arr2u().into()])
+                .unwrap();
+        let [] = pf1
+            .add_dataflow_op(discard_op, [outer_arr])
+            .unwrap()
+            .outputs_arr();
+        // second call specifies size as 2 and type as usize, taking the inner's array output
         let elem = pf1
             .call(
                 pf2.handle(),
                 &[TypeArg::BoundedNat(2), usize_t().into()],
-                inner.outputs(),
+                [inner_arr],
             )
             .unwrap();
-        let pf1 = pf1.finish_with_outputs(elem.outputs()).unwrap();
-
-        // Outer: two calls to pf1 with different TypeArgs
-        let [e1] = outer
-            .call(pf1.handle(), &[sa(n)], outer.input_wires())
+        // we also discard the outer array output here
+        let [result, inner_arr] = elem.outputs_arr();
+        let discard_op = hugr_core::ops::ExtensionOp::new(
+            discard_op_def.clone(),
+            vec![TypeArg::BoundedNat(2), usize_t().into()],
+        )
+        .unwrap();
+        let [] = pf1
+            .add_dataflow_op(discard_op.clone(), [inner_arr])
             .unwrap()
             .outputs_arr();
-        let popleft = VArrayOpDef::pop_left.to_concrete(arr2u(), n);
-        let ar2 = outer
-            .add_dataflow_op(popleft.clone(), outer.input_wires())
-            .unwrap();
+        let pf1 = pf1.finish_with_outputs([result]).unwrap();
+
+        // outer: two calls to pf1 with different TypeArgs
+        let [arr1, arr2] = outer.input_wires_arr();
+        let [e1] = outer
+            .call(pf1.handle(), &[sa(n)], [arr1])
+            .unwrap()
+            .outputs_arr();
+        // need to call popleft on on the second input array because we can't copy the linear array
+        // we remove the first element which the first call will use, and then pass the rest to pf1 again
+        let popleft = BArrayOpDef::pop_left.to_concrete(arr2u(), n);
+        let ar2 = outer.add_dataflow_op(popleft.clone(), [arr2]).unwrap();
         let sig = popleft.to_extension_op().unwrap().signature().into_owned();
         let TypeEnum::Sum(st) = sig.output().get(0).unwrap().as_type_enum() else {
             panic!()
         };
-        let [_, ar2_unwrapped] = outer
+        let [left_arr, ar2_unwrapped] = outer
             .build_unwrap_sum(1, st.clone(), ar2.out_wire(0))
             .unwrap();
+        let discard_op =
+            hugr_core::ops::ExtensionOp::new(discard_op_def.clone(), vec![sa(2), usize_t().into()])
+                .unwrap();
+        let [] = outer
+            .add_dataflow_op(discard_op, [left_arr])
+            .unwrap()
+            .outputs_arr();
         let [e2] = outer
             .call(pf1.handle(), &[sa(n - 1)], [ar2_unwrapped])
             .unwrap()

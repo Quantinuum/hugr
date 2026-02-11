@@ -184,7 +184,6 @@ mod tests {
 
     use crate::std_extensions::collections::array::Array;
     use crate::std_extensions::collections::borrow_array::BorrowArray;
-    use crate::std_extensions::collections::value_array::ValueArray;
     use crate::{
         extension::prelude::qb_t,
         ops::{OpTrait, OpType},
@@ -195,7 +194,6 @@ mod tests {
 
     #[rstest]
     #[case(Array)]
-    #[case(ValueArray)]
     #[case(BorrowArray)]
     fn test_repeat_def<AK: ArrayKind>(#[case] _kind: AK) {
         let op = GenericArrayRepeat::<AK>::new(qb_t(), 2);
@@ -206,7 +204,6 @@ mod tests {
 
     #[rstest]
     #[case(Array)]
-    #[case(ValueArray)]
     #[case(BorrowArray)]
     fn test_repeat<AK: ArrayKind>(#[case] _kind: AK) {
         let size = 2;

@@ -1,7 +1,5 @@
 //! Compilation passes acting on the HUGR program representation.
 
-#[deprecated(note = "Use hugr-core::module_graph::ModuleGraph", since = "0.24.1")]
-pub mod call_graph;
 pub mod composable;
 pub use composable::ComposablePass;
 pub mod const_fold;
@@ -12,37 +10,17 @@ mod dead_funcs;
 pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass, remove_dead_funcs};
 pub mod force_order;
 mod half_node;
+pub mod hash;
 pub mod inline_dfgs;
 pub mod inline_funcs;
 pub use inline_funcs::inline_acyclic;
-pub mod linearize_array;
-pub use linearize_array::LinearizeArrayPass;
 pub mod lower;
 mod monomorphize;
 pub mod normalize_cfgs;
 pub mod redundant_order_edges;
 pub mod untuple;
-
-/// Merge basic blocks. Subset of [normalize_cfgs], use the latter.
-#[deprecated(note = "Use normalize_cfgs", since = "0.23.0")]
-pub mod merge_bbs {
-    use hugr_core::hugr::{hugrmut::HugrMut, views::RootChecked};
-    use hugr_core::ops::handle::CfgID;
-
-    /// Merge any basic blocks that are direct children of the specified CFG
-    /// i.e. where a basic block B has a single successor B' whose only predecessor
-    /// is B, B and B' can be combined.
-    ///
-    /// # Panics
-    ///
-    /// If the `entrypoint` of `cfg` is not an [OpType::CFG]
-    ///
-    /// [OpType::CFG]: hugr_core::ops::OpType::CFG
-    #[deprecated(note = "Use version in normalize_cfgs", since = "0.23.0")]
-    pub fn merge_basic_blocks<'h, H: 'h + HugrMut>(cfg: RootChecked<&'h mut H, CfgID<H::Node>>) {
-        super::normalize_cfgs::merge_basic_blocks(cfg.into_hugr()).unwrap();
-    }
-}
+#[cfg(test)]
+mod utils;
 
 pub use monomorphize::{MonomorphizePass, mangle_name, monomorphize};
 pub mod replace_types;

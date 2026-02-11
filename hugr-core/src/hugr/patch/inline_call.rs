@@ -21,7 +21,7 @@ pub enum InlineCallError<N = Node> {
     NotCallNode(N, OpType),
     /// The node was a Call, but the target was not a [`FuncDefn`](OpType::FuncDefn)
     /// - presumably a [`FuncDecl`](OpType::FuncDecl), if the Hugr is valid.
-    #[display("Call targetted node {_0} which must be a FuncDefn but was {_1}")]
+    #[display("Call targeted node {_0} which must be a FuncDefn but was {_1}")]
     CallTargetNotFuncDefn(N, OpType),
 }
 

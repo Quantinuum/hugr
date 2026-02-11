@@ -63,12 +63,8 @@ def test_stringly_typed():
 
     assert isinstance(new_h[n].op, Custom)
 
+    # Resolve with the extension in the registry
     registry = ext.ExtensionRegistry()
-    new_h.resolve_extensions(registry)
-
-    # doesn't resolve without extension
-    assert isinstance(new_h[n].op, Custom)
-
     registry.add_extension(STRINGLY_EXT)
     new_h.resolve_extensions(registry)
 
@@ -154,12 +150,32 @@ _BOOL_LIST_T = _LIST_T.instantiate([tys.Bool.type_arg()])
 def test_custom_type(ext_t: tys.ExtType, registry: ext.ExtensionRegistry):
     opaque = ext_t._to_serial().deserialize()
     assert isinstance(opaque, tys.Opaque)
-    assert opaque.resolve(registry) == ext_t
+    resolved, _ = opaque._resolve_used_extensions(registry)
+    assert resolved == ext_t
 
-    assert opaque.resolve(ext.ExtensionRegistry()) == opaque
+    resolved, _ = opaque._resolve_used_extensions(ext.ExtensionRegistry())
+    assert resolved == opaque
 
     f_t = tys.FunctionType.endo([ext_t])
     f_t_opaque = f_t._to_serial().deserialize()
     assert isinstance(f_t_opaque.input[0], tys.Opaque)
 
-    assert f_t_opaque.resolve(registry) == f_t
+    resolved, _ = f_t_opaque._resolve_used_extensions(registry)
+    assert resolved == f_t
+
+
+def test_qualified_name():
+    # Test TypeDef with extension
+    assert _LIST_T.qualified_name() == "my_extension.List"
+
+    # Test TypeDef without extension
+    standalone_type = ext.TypeDef(
+        "Standalone",
+        description="A standalone type.",
+        params=[],
+        bound=ext.ExplicitBound(tys.TypeBound.Copyable),
+    )
+    assert standalone_type.qualified_name() == "Standalone"
+
+    # Test OpDef with extension
+    assert _STRINGLY_DEF.qualified_name() == "my_extension.StringlyOp"

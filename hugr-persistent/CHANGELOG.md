@@ -1,6 +1,18 @@
 # Changelog
 
 
+## [0.4.0](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.3.4...hugr-persistent-v0.4.0) - 2025-12-22
+
+### New Features
+
+- [**breaking**] Remove `RootCheckable` ([#2704](https://github.com/Quantinuum/hugr/pull/2704))
+- [**breaking**] Bump MSRV to Rust 1.89 ([#2747](https://github.com/Quantinuum/hugr/pull/2747))
+- [**breaking**] Type-safe access for node metadata ([#2755](https://github.com/Quantinuum/hugr/pull/2755))
+
+### Refactor
+
+- [**breaking**] Remove multiple deprecated definitions ([#2751](https://github.com/Quantinuum/hugr/pull/2751))
+
 ## [0.3.2](https://github.com/CQCL/hugr/compare/hugr-persistent-v0.3.1...hugr-persistent-v0.3.2) - 2025-11-03
 
 ### New Features
