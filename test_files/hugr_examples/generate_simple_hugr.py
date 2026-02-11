@@ -1,80 +1,38 @@
-
 """A list of functions generating simple Hugr programs for testing"""
 
 from __future__ import annotations
-from curses import OK
-from pathlib import Path
 
+from pathlib import Path
+from typing import TYPE_CHECKING
 
 import hugr.ops as ops
 import hugr.tys as tys
 import hugr.val as val
-from hugr.build.dfg import Dfg, Function
+from hugr.build.dfg import Dfg
 from hugr.build.function import Module
-from hugr.hugr import Hugr
-from hugr.std.int import INT_T, DivMod, IntVal
+from hugr.std.int import INT_T, DivMod
 from hugr.std.logic import Not
 
-FILE_PREFIX = "NCL_"
+if TYPE_CHECKING:
+    from hugr.hugr import Hugr
 
 direct_call = [True, False]
 
-#########################
-# included in simple_hugr
-########################
-def test_metadata() -> Hugr:
-    h = Dfg(tys.Bool)
-    h.metadata["name"] = "simple_id"
-
-    (b,) = h.inputs()
-    b = h.add_op(Not, b, metadata={"name": "not"})
-
-    h.set_outputs(b)
-    return h.hugr
-
-
-def test_multi_out() -> Hugr:
-    h = Dfg(INT_T, INT_T)
-    a, b = h.inputs()
-    a, b = h.add(DivMod(a, b))
-    h.set_outputs(a, b)
-    return h.hugr
-
-def test_add_op() -> Hugr:
-    h = Dfg(tys.Bool)
-    (a,) = h.inputs()
-    nt = h.add_op(Not, a)
-    h.set_outputs(nt)
-
-    return h.hugr
-
-def build_hugr_vals(val: val.Value) -> Hugr:
-    d = Dfg()
-    d.set_outputs(d.load(val))
-
-    return d.hugr
-
-def test_multiport() -> Hugr:
-    h = Dfg(tys.Bool)
-    (a,) = h.inputs()
-    h.set_outputs(a, a)
-    return h.hugr
-###################################################
 
 def simple_hugr() -> Hugr:
     d = Dfg(tys.Qubit, tys.Bool, INT_T, INT_T)
     d.metadata["name"] = "simple_hugr"
     q, b, i1, i2 = d.inputs()
-    
+
     b = d.add_op(Not, b, metadata={"name": "not"})
     c = d.add_op(Not, d.load(val.TRUE), metadata={"name": "not_true"})
     i1, i2 = d.add(DivMod(i1, i2))
     d.set_outputs(q, b, b, c, i1, i2)
-    
+
     return d.hugr
 
-print("Saving simple_hugr...")
-Path(f"{FILE_PREFIX}simple_hugr").with_suffix(".hugr").write_bytes(simple_hugr().to_bytes())
+
+Path("simple_hugr").with_suffix(".hugr").write_bytes(simple_hugr().to_bytes())
 
 
 def hugr_nested() -> Hugr:
@@ -90,8 +48,8 @@ def hugr_nested() -> Hugr:
 
     return h.hugr
 
-print("Saving hugr_nested...")
-Path(f"{FILE_PREFIX}hugr_nested").with_suffix(".hugr").write_bytes(hugr_nested().to_bytes())
+
+Path("hugr_nested").with_suffix(".hugr").write_bytes(hugr_nested().to_bytes())
 
 
 def hugr_nested_w_external_edge() -> Hugr:
@@ -105,8 +63,10 @@ def hugr_nested_w_external_edge() -> Hugr:
 
     return h.hugr
 
-print("Saving hugr_nested_w_external_edge...")
-Path(f"{FILE_PREFIX}hugr_nested_w_external_edge").with_suffix(".hugr").write_bytes(hugr_nested_w_external_edge().to_bytes())
+
+Path("hugr_nested_w_external_edge").with_suffix(".hugr").write_bytes(
+    hugr_nested_w_external_edge().to_bytes()
+)
 
 
 def hugr_w_function_call(direct_call: bool) -> Hugr:
@@ -129,12 +89,12 @@ def hugr_w_function_call(direct_call: bool) -> Hugr:
     q = f_main.inputs()[0]
     # for now concrete instantiations have to be provided.
     instantiation = tys.FunctionType.endo([tys.Qubit])
-    type_args=[
-            tys.StringArg("string"),
-            tys.BoundedNatArg(42),
-            tys.BytesArg(b"HUGR"),
-            tys.FloatArg(0.9),
-        ]
+    type_args = [
+        tys.StringArg("string"),
+        tys.BoundedNatArg(42),
+        tys.BytesArg(b"HUGR"),
+        tys.FloatArg(0.9),
+    ]
     if direct_call:
         call = f_main.call(f_id, q, instantiation=instantiation, type_args=type_args)
     else:
@@ -147,9 +107,11 @@ def hugr_w_function_call(direct_call: bool) -> Hugr:
 
     return mod.hugr
 
+
 for dc in direct_call:
-    print(f"Saving hugr_w_function_call_{dc}...")
-    Path(f"{FILE_PREFIX}hugr_w_function_{"direct" if dc else "indirect"}_call").with_suffix(".hugr").write_bytes(hugr_w_function_call(dc).to_bytes())
+    Path(f"hugr_w_function_{"direct" if dc else "indirect"}_call").with_suffix(
+        ".hugr"
+    ).write_bytes(hugr_w_function_call(dc).to_bytes())
 
 
 def hugr_w_recursive_function() -> Hugr:
@@ -162,10 +124,10 @@ def hugr_w_recursive_function() -> Hugr:
 
     return mod.hugr
 
-print("Saving hugr_w_recursive_function...")
-Path(f"{FILE_PREFIX}hugr_w_recursive_function").with_suffix(".hugr").write_bytes(hugr_w_recursive_function().to_bytes())
 
-
+Path("hugr_w_recursive_function").with_suffix(".hugr").write_bytes(
+    hugr_w_recursive_function().to_bytes()
+)
 
 
 def hugr_conditional() -> Hugr:
@@ -180,7 +142,5 @@ def hugr_conditional() -> Hugr:
 
     return dfg.hugr
 
-print("Saving hugr_conditional...")
-Path(f"{FILE_PREFIX}hugr_conditional").with_suffix(".hugr").write_bytes(hugr_conditional().to_bytes())
 
-
+Path("hugr_conditional").with_suffix(".hugr").write_bytes(hugr_conditional().to_bytes())

@@ -11,7 +11,7 @@ from sys import argv
 
 from guppylang import guppy
 from guppylang.std.builtins import result
-from guppylang.std.quantum import qubit, cx, discard, h, measure, t, tdg, z
+from guppylang.std.quantum import cx, discard, h, measure, qubit, t, tdg, z
 
 
 @guppy

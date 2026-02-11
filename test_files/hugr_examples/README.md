@@ -1,6 +1,6 @@
 # Guppy-generated test programs
 
-This directory contains simple guppy program definitions used for testing. 
+This directory contains simple guppy program definitions used for testing.
 
 Each example is defined as a `.py` [uv script](https://docs.astral.sh/uv/guides/scripts/)
 that defines the guppy program for a pinned version of guppylang.
