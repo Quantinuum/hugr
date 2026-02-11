@@ -6,7 +6,7 @@ use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 use hugr_core::{
-    HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
+    HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Visibility, Wire,
     hugr::hugrmut::HugrMut,
     ops::{
         Const, DataflowOpTrait, ExtensionOp, LoadConstant, OpType, Value, constant::OpaqueValue,
@@ -15,20 +15,24 @@ use hugr_core::{
 };
 use value_handle::ValueHandle;
 
-use crate::dataflow::{
-    ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
-    partial_from_const,
-};
 use crate::dead_code::{DeadCodeElimError, DeadCodeElimPass, PreserveNode};
 use crate::{ComposablePass, composable::validate_if_test};
+use crate::{
+    PassScope,
+    dataflow::{
+        ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
+        partial_from_const,
+    },
+};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
 pub struct ConstantFoldPass {
     allow_increase_termination: bool,
+    scope: PassScope,
     /// Each outer key Node must be either:
     ///   - a `FuncDefn` child of the root, if the root is a module; or
-    ///   - the root, if the root is not a Module
+    ///   - the entrypoint, if the entrypoint is not a Module
     inputs: HashMap<Node, HashMap<IncomingPort, Value>>,
 }
 
@@ -67,8 +71,8 @@ impl ConstantFoldPass {
     }
 
     /// Specifies a number of external inputs to an entry point of the Hugr.
-    /// In normal use, for Module-rooted Hugrs, `node` is a `FuncDefn` child of the root;
-    /// or for non-Module-rooted Hugrs, `node` is the root of the Hugr. (This is not
+    /// In normal use, for Module-entrypoint Hugrs, `node` is a `FuncDefn` child of the module;
+    /// or for non-Module-entrypoint Hugrs, `node` is the entrypoint of the Hugr. (This is not
     /// enforced, but it must be a container and not a module itself.)
     ///
     /// Multiple calls for the same entry-point combine their values, with later
@@ -100,6 +104,9 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
     /// [`ConstFoldError::InvalidEntryPoint`] if an entry-point added by [`Self::with_inputs`]
     /// was of an invalid [`OpType`]
     fn run(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
+        let Some(root) = self.scope.root(hugr) else {
+            return Ok(());
+        };
         let fresh_node = Node::from(portgraph::NodeIndex::new(
             hugr.nodes().max().map_or(0, |n| n.index() + 1),
         ));
@@ -121,16 +128,36 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             )
             .map_err(|op| ConstFoldError::InvalidEntryPoint { node: n, op })?;
         }
+        let scope_nodes = match &self.scope {
+            PassScope::EntrypointFlat | PassScope::EntrypointRecursive => Vec::new(),
+            PassScope::PreserveAll => hugr
+                .children(hugr.module_root())
+                .filter(|n| hugr.get_optype(*n).is_func_defn())
+                .collect(),
+            PassScope::PreservePublic => hugr
+                .children(hugr.module_root())
+                .filter(|n| {
+                    hugr.get_optype(*n)
+                        .as_func_defn()
+                        .is_some_and(|fd| fd.visibility() == &Visibility::Public)
+                })
+                .collect(),
+            PassScope::PreserveEntrypoint => vec![hugr.entrypoint()],
+        };
+        for node in scope_nodes {
+            const NO_INPUTS: [(IncomingPort, PartialValue<ValueHandle>); 0] = [];
+            m.prepopulate_inputs(node, NO_INPUTS)
+                .map_err(|op| ConstFoldError::InvalidEntryPoint { node, op })?;
+        }
 
         let results = m.run(ConstFoldContext, []);
         let mb_root_inp = hugr.get_io(hugr.entrypoint()).map(|[i, _]| i);
 
         let wires_to_break = hugr
-            .entry_descendants()
+            .descendants(root)
             .flat_map(|n| hugr.node_inputs(n).map(move |ip| (n, ip)))
             .filter(|(n, ip)| {
-                *n != hugr.entrypoint()
-                    && matches!(hugr.get_optype(*n).port_kind(*ip), Some(EdgeKind::Value(_)))
+                *n != root && matches!(hugr.get_optype(*n).port_kind(*ip), Some(EdgeKind::Value(_)))
             })
             .filter_map(|(n, ip)| {
                 let (src, outp) = hugr.single_linked_output(n, ip).unwrap();
@@ -166,6 +193,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
         }
         // Eliminate dead code not required for the same entry points.
         DeadCodeElimPass::<H>::default()
+            .with_scope(&self.scope)
             .with_entry_points(self.inputs.keys().copied())
             .set_preserve_callback(if self.allow_increase_termination {
                 Arc::new(|_, _| PreserveNode::CanRemoveIgnoringChildren)
@@ -186,6 +214,11 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             })?;
         Ok(())
     }
+
+    fn with_scope(mut self, scope: &PassScope) -> Self {
+        self.scope = scope.clone();
+        self
+    }
 }
 
 /// Exhaustively apply constant folding to a HUGR.
@@ -195,15 +228,10 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
 /// [`Module`]: hugr_core::ops::OpType::Module
 pub fn constant_fold_pass<H: HugrMut<Node = Node> + 'static>(mut h: impl AsMut<H>) {
     let h = h.as_mut();
-    let c = ConstantFoldPass::default();
-    let c = if h.get_optype(h.entrypoint()).is_module() {
-        let no_inputs: [(IncomingPort, _); 0] = [];
-        h.children(h.entrypoint())
-            .filter(|n| h.get_optype(*n).is_func_defn())
-            .fold(c, |c, n| c.with_inputs(n, no_inputs.iter().cloned()))
-    } else {
-        c
-    };
+    let c = ComposablePass::<H>::with_scope(
+        ConstantFoldPass::default(),
+        &PassScope::from_entrypoint(h),
+    );
     validate_if_test(c, h).unwrap();
 }
 
