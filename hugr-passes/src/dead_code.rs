@@ -185,10 +185,9 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
             return Ok(());
         };
         let needed = self.find_needed_nodes(&*hugr)?;
-        let remove = hugr
-            .descendants(root)
-            .filter(|n| !needed.contains(n))
-            .collect::<Vec<_>>();
+        let mut descs = hugr.descendants(root);
+        assert_eq!(descs.next(), Some(root)); // Module Root not strictly "needed"
+        let remove = descs.filter(|n| !needed.contains(n)).collect::<Vec<_>>();
         for n in remove {
             hugr.remove_node(n);
         }
