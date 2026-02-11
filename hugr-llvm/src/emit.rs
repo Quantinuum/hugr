@@ -137,7 +137,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         let name = self.name_func(name, node);
         match visibility {
             Visibility::Public => self.get_func_impl(name, llvm_func_ty, Some(Linkage::External)),
-            Visibility::Private => self.get_func_impl(name, llvm_func_ty, Some(Linkage::Private)),
+            Visibility::Private => self.get_func_impl(name, llvm_func_ty, Some(Linkage::Internal)),
             _ => self.get_func_impl(name, llvm_func_ty, None),
         }
     }
