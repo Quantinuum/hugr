@@ -162,11 +162,11 @@ class HugrGenerator(Metadata[GeneratorDesc]):
 
     @classmethod
     def to_json(cls, value: GeneratorDesc) -> dict[str, str]:
-        return value._to_json()
+        return value.to_json()
 
     @classmethod
     def from_json(cls, value: JsonType) -> GeneratorDesc:
-        return GeneratorDesc._from_json(value)
+        return GeneratorDesc.from_json(value)
 
 
 class HugrUsedExtensions(Metadata[list[ExtensionDesc]]):
@@ -182,7 +182,7 @@ class HugrUsedExtensions(Metadata[list[ExtensionDesc]]):
 
     @classmethod
     def to_json(cls, value: list[ExtensionDesc]) -> JsonType:
-        return [e._to_json() for e in value]
+        return [e.to_json() for e in value]
 
     @classmethod
     def from_json(cls, value: JsonType) -> list[ExtensionDesc]:
@@ -192,4 +192,4 @@ class HugrUsedExtensions(Metadata[list[ExtensionDesc]]):
                 + f" but got {type(value)}"
             )
             raise TypeError(msg)
-        return [ExtensionDesc._from_json(e) for e in value]
+        return [ExtensionDesc.from_json(e) for e in value]

@@ -344,7 +344,7 @@ class GeneratorDesc:
     name: str
     version: Version | None
 
-    def _to_json(self) -> dict[str, str]:
+    def to_json(self) -> dict[str, str]:
         """Encodes the generator as a dictionary of native types that can be
         serialized by `json.dump`.
         """
@@ -359,7 +359,7 @@ class GeneratorDesc:
             }
 
     @classmethod
-    def _from_json(cls, value: Any) -> GeneratorDesc:
+    def from_json(cls, value: Any) -> GeneratorDesc:
         """Decodes the generator from a native types obtained from `json.load`."""
         if isinstance(value, str):
             return GeneratorDesc(name=value, version=None)
@@ -395,7 +395,7 @@ class ExtensionDesc:
     name: str
     version: Version
 
-    def _to_json(self) -> dict[str, str]:
+    def to_json(self) -> dict[str, str]:
         """Encodes the extension as a dictionary of native types that can be
         serialized by `json.dump`.
         """
@@ -405,7 +405,7 @@ class ExtensionDesc:
         }
 
     @classmethod
-    def _from_json(cls, value: Any) -> ExtensionDesc:
+    def from_json(cls, value: Any) -> ExtensionDesc:
         """Decodes the extension from a native types obtained from `json.load`."""
         if not isinstance(value, dict):
             msg = f"Expected extension metadata to be a dict, but got {type(value)}"
