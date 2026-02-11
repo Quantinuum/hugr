@@ -1,21 +1,28 @@
 //! This module provides functions for finding non-local edges
 //! in a Hugr and converting them to local edges.
-use itertools::Itertools as _;
-
 use hugr_core::{
     HugrView, IncomingPort, Wire,
     hugr::hugrmut::HugrMut,
     types::{EdgeKind, Type},
 };
 
-use crate::ComposablePass;
+use crate::{ComposablePass, PassScope};
 
 mod localize;
 use localize::ExtraSourceReqs;
 
-/// [ComposablePass] wrapper for [remove_nonlocal_edges]
-#[derive(Clone, Debug, Hash)]
-pub struct LocalizeEdges;
+/// Converts non-local edges in a Hugr (within a region defined by the [PassScope]) into
+/// local ones, by inserting extra inputs to container nodes and extra outports to Input
+///  nodes (and conversely to outputs of [DataflowBlock]s).
+///
+/// Ignores [PassScope::recursive], as acts only on nonlocal edges *both* of whose endpoints
+/// are within the affected subtree.
+///
+/// [DataflowBlock]: hugr_core::ops::DataflowBlock
+#[derive(Clone, Debug, Default, Hash)]
+pub struct LocalizeEdges {
+    scope: PassScope,
+}
 
 /// Error from [LocalizeEdges] or [remove_nonlocal_edges]
 #[derive(derive_more::Error, derive_more::Display, derive_more::From, Debug, PartialEq)]
@@ -28,7 +35,54 @@ impl<H: HugrMut> ComposablePass<H> for LocalizeEdges {
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
-        remove_nonlocal_edges(hugr)
+        // Group all the non-local edges in the graph by target node,
+        // storing for each the source and type (well-defined as these are Value edges).
+        let edges = match self.check_no_nonlocal_edges(hugr) {
+            Ok(()) => return Ok(()),
+            Err(FindNonLocalEdgesError::Edges(edges)) => edges,
+        };
+
+        let nonlocal_edges: Vec<_> = edges
+            .into_iter()
+            .map(|(node, inport)| {
+                // unwrap because nonlocal_edges(hugr) already skips in-ports with !=1 linked outputs.
+                let (src_n, outp) = hugr.single_linked_output(node, inport).unwrap();
+                debug_assert!(hugr.get_parent(src_n).unwrap() != hugr.get_parent(node).unwrap());
+                let Some(EdgeKind::Value(ty)) = hugr.get_optype(src_n).port_kind(outp) else {
+                    panic!("impossible")
+                };
+                (node, (Wire::new(src_n, outp), ty))
+            })
+            .collect();
+
+        // We now compute the sources needed by each parent node.
+        let needs_sources_map = {
+            let mut bnsm = ExtraSourceReqs::default();
+            for (target_node, (source, ty)) in nonlocal_edges.iter() {
+                let parent = hugr.get_parent(*target_node).unwrap();
+                debug_assert!(hugr.get_parent(parent).is_some());
+                bnsm.add_edge(&*hugr, parent, *source, ty.clone());
+            }
+            bnsm
+        };
+
+        debug_assert!(nonlocal_edges.iter().all(|(n, (source, _))| {
+            let source_parent = hugr.get_parent(source.node()).unwrap();
+            let source_gp = hugr.get_parent(source_parent);
+            ancestors(*n, hugr)
+                .skip(1)
+                .take_while(|&a| a != source_parent && source_gp.is_none_or(|gp| a != gp))
+                .all(|parent| needs_sources_map.parent_needs(parent, *source))
+        }));
+
+        needs_sources_map.thread_hugr(hugr);
+
+        Ok(())
+    }
+
+    fn with_scope(mut self, scope: &PassScope) -> Self {
+        self.scope = scope.clone();
+        self
     }
 }
 
@@ -36,15 +90,10 @@ impl<H: HugrMut> ComposablePass<H> for LocalizeEdges {
 ///
 /// All `(node, in_port)` pairs are returned where `in_port` is a value port connected to a
 /// node whose parent is both beneath the entrypoint and different from the parent of `node`.
-pub fn nonlocal_edges<H: HugrView>(hugr: &H) -> impl Iterator<Item = (H::Node, IncomingPort)> + '_ {
-    hugr.entry_descendants().flat_map(move |node| {
-        hugr.in_value_types(node).filter_map(move |(in_p, _)| {
-            let (src, _) = hugr.single_linked_output(node, in_p)?;
-            (hugr.get_parent(node) != hugr.get_parent(src)
-                && ancestors(src, hugr).any(|a| a == hugr.entrypoint()))
-            .then_some((node, in_p))
-        })
-    })
+pub fn nonlocal_edges<'a, H: HugrView>(
+    hugr: &'a H,
+) -> impl Iterator<Item = (H::Node, IncomingPort)> + 'a {
+    LocalizeEdges::new(PassScope::from_entrypoint(hugr)).nonlocal_edges(hugr)
 }
 
 /// An error from [ensure_no_nonlocal_edges]
@@ -57,15 +106,48 @@ pub enum FindNonLocalEdgesError<N> {
     Edges(Vec<(N, IncomingPort)>),
 }
 
-/// Verifies that there are no non local value edges in the Hugr.
+/// Verifies that there are no non local value edges in the Hugr beneath the entrypoint.
+#[deprecated(note = "Use LocalizeEdges::check_no_nonlocal_edges")]
 pub fn ensure_no_nonlocal_edges<H: HugrView>(
     hugr: &H,
 ) -> Result<(), FindNonLocalEdgesError<H::Node>> {
-    let non_local_edges: Vec<_> = nonlocal_edges(hugr).collect_vec();
-    if non_local_edges.is_empty() {
-        Ok(())
-    } else {
-        Err(FindNonLocalEdgesError::Edges(non_local_edges))?
+    LocalizeEdges::new(PassScope::from_entrypoint(hugr)).check_no_nonlocal_edges(hugr)
+}
+
+impl LocalizeEdges {
+    /// Create a new instance using the given scope.
+    pub fn new(scope: PassScope) -> Self {
+        Self { scope }
+    }
+
+    /// Verifies that there are no non local value edges in the Hugr beneath the
+    /// [PassScope::root] (ignoring [PassScope::recursive]).
+    pub fn check_no_nonlocal_edges<H: HugrView>(
+        &self,
+        hugr: &H,
+    ) -> Result<(), FindNonLocalEdgesError<H::Node>> {
+        let non_local_edges: Vec<_> = self.nonlocal_edges(hugr).collect();
+        if non_local_edges.is_empty() {
+            Ok(())
+        } else {
+            Err(FindNonLocalEdgesError::Edges(non_local_edges))?
+        }
+    }
+
+    fn nonlocal_edges<'a, 'b, H: HugrView>(
+        &'a self,
+        hugr: &'b H,
+    ) -> impl Iterator<Item = (H::Node, IncomingPort)> + use<'b, H> {
+        self.scope.root(hugr).into_iter().flat_map(move |root| {
+            hugr.descendants(root).flat_map(move |node| {
+                hugr.in_value_types(node).filter_map(move |(in_p, _)| {
+                    let (src, _) = hugr.single_linked_output(node, in_p)?;
+                    (hugr.get_parent(node) != hugr.get_parent(src)
+                        && ancestors(src, hugr).any(|a| a == root))
+                    .then_some((node, in_p))
+                })
+            })
+        })
     }
 }
 
@@ -73,53 +155,9 @@ fn just_types<'a, X: 'a>(v: impl IntoIterator<Item = &'a (X, Type)>) -> impl Ite
     v.into_iter().map(|(_, t)| t.clone())
 }
 
-/// Converts all non-local edges in a Hugr into local ones, by inserting extra inputs
-/// to container nodes and extra outports to Input nodes (and conversely to outputs of
-/// [DataflowBlock]s).
-///
-/// [DataflowBlock]: hugr_core::ops::DataflowBlock
+/// Runs a [LocalizeEdges] pass on the entrypoint subtree of a hugr.
 pub fn remove_nonlocal_edges<H: HugrMut>(hugr: &mut H) -> Result<(), LocalizeEdgesError> {
-    // Group all the non-local edges in the graph by target node,
-    // storing for each the source and type (well-defined as these are Value edges).
-    let nonlocal_edges: Vec<_> = nonlocal_edges(hugr)
-        .map(|(node, inport)| {
-            // unwrap because nonlocal_edges(hugr) already skips in-ports with !=1 linked outputs.
-            let (src_n, outp) = hugr.single_linked_output(node, inport).unwrap();
-            debug_assert!(hugr.get_parent(src_n).unwrap() != hugr.get_parent(node).unwrap());
-            let Some(EdgeKind::Value(ty)) = hugr.get_optype(src_n).port_kind(outp) else {
-                panic!("impossible")
-            };
-            (node, (Wire::new(src_n, outp), ty))
-        })
-        .collect();
-
-    if nonlocal_edges.is_empty() {
-        return Ok(());
-    }
-
-    // We now compute the sources needed by each parent node.
-    let needs_sources_map = {
-        let mut bnsm = ExtraSourceReqs::default();
-        for (target_node, (source, ty)) in nonlocal_edges.iter() {
-            let parent = hugr.get_parent(*target_node).unwrap();
-            debug_assert!(hugr.get_parent(parent).is_some());
-            bnsm.add_edge(&*hugr, parent, *source, ty.clone());
-        }
-        bnsm
-    };
-
-    debug_assert!(nonlocal_edges.iter().all(|(n, (source, _))| {
-        let source_parent = hugr.get_parent(source.node()).unwrap();
-        let source_gp = hugr.get_parent(source_parent);
-        ancestors(*n, hugr)
-            .skip(1)
-            .take_while(|&a| a != source_parent && source_gp.is_none_or(|gp| a != gp))
-            .all(|parent| needs_sources_map.parent_needs(parent, *source))
-    }));
-
-    needs_sources_map.thread_hugr(hugr);
-
-    Ok(())
+    LocalizeEdges::new(PassScope::from_entrypoint(hugr)).run(hugr)
 }
 
 fn ancestors<H: HugrView>(n: H::Node, h: &H) -> impl Iterator<Item = H::Node> {
@@ -128,6 +166,9 @@ fn ancestors<H: HugrView>(n: H::Node, h: &H) -> impl Iterator<Item = H::Node> {
 
 #[cfg(test)]
 mod test {
+    use itertools::Itertools as _;
+    use rstest::rstest;
+
     use hugr_core::{
         builder::{DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer},
         extension::prelude::{Noop, bool_t, either_type},
@@ -136,7 +177,6 @@ mod test {
         type_row,
         types::Signature,
     };
-    use rstest::rstest;
 
     use super::*;
 
@@ -151,7 +191,9 @@ mod test {
                 .outputs_arr();
             builder.finish_hugr_with_outputs([out_w]).unwrap()
         };
-        ensure_no_nonlocal_edges(&hugr).unwrap();
+        LocalizeEdges::default()
+            .check_no_nonlocal_edges(&hugr)
+            .unwrap();
     }
 
     #[test]
@@ -178,7 +220,9 @@ mod test {
             (builder.finish_hugr_with_outputs([out_w]).unwrap(), edge)
         };
         assert_eq!(
-            ensure_no_nonlocal_edges(&hugr).unwrap_err(),
+            LocalizeEdges::new(PassScope::EntrypointRecursive)
+                .check_no_nonlocal_edges(&hugr)
+                .unwrap_err(),
             FindNonLocalEdgesError::Edges(vec![edge])
         );
     }
@@ -203,10 +247,11 @@ mod test {
             };
             outer.finish_hugr_with_outputs(inner_outs).unwrap()
         };
-        assert!(ensure_no_nonlocal_edges(&hugr).is_err());
+        let pass = LocalizeEdges::new(PassScope::EntrypointFlat);
+        assert!(pass.check_no_nonlocal_edges(&hugr).is_err());
         remove_nonlocal_edges(&mut hugr).unwrap();
         hugr.validate().unwrap();
-        assert!(ensure_no_nonlocal_edges(&hugr).is_ok());
+        assert!(pass.check_no_nonlocal_edges(&hugr).is_ok());
     }
 
     #[test]
@@ -246,10 +291,11 @@ mod test {
             };
             outer.finish_hugr_with_outputs([s1, s2, s3]).unwrap()
         };
-        assert!(ensure_no_nonlocal_edges(&hugr).is_err());
+        let pass = LocalizeEdges::default();
+        assert!(pass.check_no_nonlocal_edges(&hugr).is_err());
         remove_nonlocal_edges(&mut hugr).unwrap();
         hugr.validate().unwrap_or_else(|e| panic!("{e}"));
-        assert!(ensure_no_nonlocal_edges(&hugr).is_ok());
+        assert!(pass.check_no_nonlocal_edges(&hugr).is_ok());
     }
 
     #[test]
@@ -298,10 +344,11 @@ mod test {
             };
             outer.finish_hugr_with_outputs([out]).unwrap()
         };
-        assert!(ensure_no_nonlocal_edges(&hugr).is_err());
+        let pass = LocalizeEdges::default();
+        assert!(pass.check_no_nonlocal_edges(&hugr).is_err());
         remove_nonlocal_edges(&mut hugr).unwrap();
         hugr.validate().unwrap_or_else(|e| panic!("{e}"));
-        assert!(ensure_no_nonlocal_edges(&hugr).is_ok());
+        assert!(pass.check_no_nonlocal_edges(&hugr).is_ok());
     }
 
     #[test]
@@ -411,7 +458,8 @@ mod test {
         let [unit, out] = cfg.finish_sub_container().unwrap().outputs_arr();
 
         let mut hugr = outer.finish_hugr_with_outputs([unit, out]).unwrap();
-        let Err(FindNonLocalEdgesError::Edges(es)) = ensure_no_nonlocal_edges(&hugr) else {
+        let pass = LocalizeEdges::default();
+        let Err(FindNonLocalEdgesError::Edges(es)) = pass.check_no_nonlocal_edges(&hugr) else {
             panic!()
         };
         assert_eq!(
@@ -423,7 +471,7 @@ mod test {
         );
         remove_nonlocal_edges(&mut hugr).unwrap();
         hugr.validate().unwrap();
-        assert!(ensure_no_nonlocal_edges(&hugr).is_ok());
+        assert!(pass.check_no_nonlocal_edges(&hugr).is_ok());
         let dfb = |bb: BasicBlockID| hugr.get_optype(bb.node()).as_dataflow_block().unwrap();
         // Entry node gets ext_edge_type added, only
         assert_eq!(
