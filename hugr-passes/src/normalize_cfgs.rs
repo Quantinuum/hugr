@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use hugr_core::extension::prelude::UnpackTuple;
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::types::{EdgeKind, Signature, TypeRow};
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 use hugr_core::hugr::patch::inline_dfg::InlineDFG;
 use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
@@ -18,7 +18,7 @@ use hugr_core::ops::{
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 
-use crate::ComposablePass;
+use crate::{ComposablePass, PassScope};
 
 /// Merge any basic blocks that are direct children of the specified [`CFG`]-entrypoint
 /// Hugr.
@@ -98,22 +98,34 @@ pub enum NormalizeCFGResult<N = Node> {
 /// A [ComposablePass] that normalizes CFGs (i.e. [normalize_cfg]) in a Hugr.
 #[derive(Clone, Debug)]
 pub struct NormalizeCFGPass<N> {
-    cfgs: Vec<N>,
+    scope: Either<Vec<N>, PassScope>,
 }
 
 impl<N> Default for NormalizeCFGPass<N> {
     fn default() -> Self {
-        Self { cfgs: vec![] }
+        Self {
+            scope: Either::Left(vec![]),
+        }
     }
 }
 
 impl<N> NormalizeCFGPass<N> {
     /// Allows mutating the set of CFG nodes that will be normalized.
     ///
+    /// Note that calling this method (even if the returned mut-ref is not written to) will
+    /// override any previous call to [Self::with_scope].
+    ///
     /// If empty (the default), all (non-strict) descendants of the [HugrView::entrypoint]
     /// will be normalized.
+    #[deprecated(note = "Use with_scope")]
     pub fn cfgs(&mut self) -> &mut Vec<N> {
-        &mut self.cfgs
+        match &mut self.scope {
+            Either::Left(cfgs) => cfgs,
+            r => {
+                *r = Either::Left(Vec::new());
+                r.as_mut().unwrap_left()
+            }
+        }
     }
 }
 
@@ -124,17 +136,30 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
     type Result = HashMap<H::Node, NormalizeCFGResult<H::Node>>;
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
-        let cfgs = if self.cfgs.is_empty() {
-            let mut v = hugr
-                .entry_descendants()
-                .filter(|n| hugr.get_optype(*n).is_cfg())
-                .collect::<Vec<_>>();
-            // Process inner CFGs first, in case they are removed (if they are in a completely
-            // disconnected block when the Entry node has only the Exit as successor).
-            v.reverse();
-            v
-        } else {
-            self.cfgs.clone()
+        let cfgs = match &self.scope {
+            Either::Left(cfgs) if !cfgs.is_empty() => cfgs.clone(),
+            _ => {
+                let ctrs = match &self.scope {
+                    Either::Left(v) => {
+                        assert!(v.is_empty());
+                        Either::Right(hugr.descendants(hugr.entrypoint()))
+                    }
+                    Either::Right(scope) => {
+                        let r = scope.root(hugr);
+                        if let Some(r) = r.filter(|_| scope.recursive()) {
+                            Either::Right(hugr.descendants(r))
+                        } else {
+                            Either::Left(r.into_iter())
+                        }
+                    }
+                };
+                let mut cfgs: Vec<H::Node> =
+                    ctrs.filter(|n| hugr.get_optype(*n).is_cfg()).collect();
+                // Process inner CFGs first, in case they are removed (if they are in a completely
+                // disconnected block when the Entry node has only the Exit as successor).
+                cfgs.reverse();
+                cfgs
+            }
         };
         let mut results = HashMap::new();
         for cfg in cfgs {
@@ -142,6 +167,12 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
             results.insert(cfg, res);
         }
         Ok(results)
+    }
+
+    /// Overrides any previous call to [Self::cfgs]
+    fn with_scope(mut self, scope: &PassScope) -> Self {
+        self.scope = Either::Right(scope.clone());
+        self
     }
 }
 
