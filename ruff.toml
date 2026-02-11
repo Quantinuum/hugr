@@ -3,7 +3,7 @@ target-version = "py310"
 
 line-length = 88
 
-exclude = ["tests/error"]
+exclude = ["tests/error", "test_files/"]
 
 [lint]
 
