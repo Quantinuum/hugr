@@ -10,7 +10,7 @@ use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort};
 use itertools::Itertools;
 use petgraph::visit::Walker;
 
-use crate::ComposablePass;
+use crate::{ComposablePass, PassScope};
 
 /// A pass for removing order edges in a Hugr region that are already implied by
 /// other order or dataflow dependencies.
@@ -21,10 +21,10 @@ use crate::ComposablePass;
 /// Each evaluation on a region runs in `O(e + n log(n) * #order_edges)` time,
 /// where `e` and `n` are the number of edges and nodes in the region,
 /// respectively.
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Default, Debug, Clone)]
 pub struct RedundantOrderEdgesPass {
-    /// Whether to traverse the HUGR recursively.
-    recursive: bool,
+    /// On what part of the Hugr to run
+    scope: PassScope,
 }
 
 /// Result type for the redundant order edges pass.
@@ -37,12 +37,21 @@ pub struct RedundantOrderEdgesResult {
 impl RedundantOrderEdgesPass {
     /// Create a new redundant order edges pass with the given configuration.
     pub fn new() -> Self {
-        Self { recursive: true }
+        Self {
+            scope: PassScope::EntrypointRecursive,
+        }
     }
 
     /// Sets whether the pass should traverse the HUGR recursively.
+    ///
+    /// Deprecated: use [Self::with_scope] instead
+    #[deprecated(note = "Use with_scope")]
     pub fn recursive(mut self, recursive: bool) -> Self {
-        self.recursive = recursive;
+        self.scope = if recursive {
+            PassScope::EntrypointRecursive
+        } else {
+            PassScope::EntrypointFlat
+        };
         self
     }
 
@@ -84,7 +93,7 @@ impl RedundantOrderEdgesPass {
             let op = hugr.get_optype(node);
 
             // If the node has children and we are running recursively, add the children to the region candidates.
-            if self.recursive && hugr.first_child(node).is_some() {
+            if self.scope.recursive() && hugr.first_child(node).is_some() {
                 region_candidates.extend(hugr.children(node));
             }
 
@@ -167,9 +176,14 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RedundantOrderEdgesPass {
     type Error = HugrError;
     type Result = RedundantOrderEdgesResult;
 
+    fn with_scope(mut self, scope: &PassScope) -> Self {
+        self.scope = scope.clone();
+        self
+    }
+
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
         // Nodes to explore in the hugr.
-        let mut region_candidates = VecDeque::from_iter([hugr.entrypoint()]);
+        let mut region_candidates = VecDeque::from_iter(self.scope.root(hugr));
         let mut result = RedundantOrderEdgesResult::default();
 
         while let Some(region) = region_candidates.pop_front() {

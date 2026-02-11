@@ -32,6 +32,9 @@ pub use force_order::{force_order, force_order_by_key};
 pub use inline_funcs::inline_acyclic;
 pub use lower::{lower_ops, replace_many_ops};
 pub use monomorphize::{MonomorphizePass, mangle_name, monomorphize};
-pub use non_local::{ensure_no_nonlocal_edges, nonlocal_edges};
+#[deprecated(note = "Use LocalizeEdgesPass::check_no_nonlocal_edges")]
+#[expect(deprecated)] // Remove at same time
+pub use non_local::ensure_no_nonlocal_edges;
+pub use non_local::nonlocal_edges;
 pub use replace_types::ReplaceTypes;
 pub use untuple::UntuplePass;
