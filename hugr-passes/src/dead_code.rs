@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
-use crate::ComposablePass;
+use crate::{ComposablePass, PassScope};
 
 /// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
@@ -14,6 +14,7 @@ pub struct DeadCodeElimPass<H: HugrView> {
     /// Nodes that are definitely needed - e.g. `FuncDefns`, but could be anything.
     /// Hugr Root is assumed to be an entry point even if not mentioned here.
     entry_points: Vec<H::Node>,
+    scope: PassScope,
     /// Callback identifying nodes that must be preserved even if their
     /// results are not used. Defaults to [`PreserveNode::default_for`].
     preserve_callback: Arc<PreserveCallback<H>>,
@@ -23,6 +24,8 @@ impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
     fn default() -> Self {
         Self {
             entry_points: Default::default(),
+            // Preserve pre-PassScope behaviour of affecting entrypoint subtree only:
+            scope: PassScope::EntrypointRecursive,
             preserve_callback: Arc::new(PreserveNode::default_for),
         }
     }
@@ -36,11 +39,13 @@ impl<H: HugrView> Debug for DeadCodeElimPass<H> {
         #[derive(Debug)]
         struct DCEDebug<'a, N> {
             entry_points: &'a Vec<N>,
+            scope: &'a PassScope,
         }
 
         Debug::fmt(
             &DCEDebug {
                 entry_points: &self.entry_points,
+                scope: &self.scope,
             },
             f,
         )
@@ -97,11 +102,11 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         self
     }
 
-    /// Mark some nodes as entry points to the Hugr, i.e. so we cannot eliminate any code
-    /// used to evaluate these nodes.
-    /// [`HugrView::entrypoint`] is assumed to be an entry point;
-    /// for Module roots the client will want to mark some of the `FuncDefn` children
-    /// as entry points too.
+    /// Mark some nodes as starting points for analysis, i.e. so we cannot eliminate any code
+    /// used to evaluate these nodes. (E.g. nodes at which we may start executing the Hugr.)
+    ///
+    /// Other starting points are added according to the [PassScope].
+    // TODO should we deprecate this? i.e. require use of PreserveCallback / Hugr edges?
     pub fn with_entry_points(mut self, entry_points: impl IntoIterator<Item = H::Node>) -> Self {
         self.entry_points.extend(entry_points);
         self
@@ -111,7 +116,8 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         let mut must_preserve = HashMap::new();
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().copied());
-        q.push_front(h.entrypoint());
+
+        q.extend(self.scope.preserve_interface(h));
         while let Some(n) = q.pop_front() {
             if !h.contains_node(n) {
                 return Err(DeadCodeElimError::NodeNotFound(n));
@@ -175,15 +181,23 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<(), Self::Error> {
+        let Some(root) = self.scope.root(hugr) else {
+            return Ok(());
+        };
         let needed = self.find_needed_nodes(&*hugr)?;
         let remove = hugr
-            .entry_descendants()
+            .descendants(root)
             .filter(|n| !needed.contains(n))
             .collect::<Vec<_>>();
         for n in remove {
             hugr.remove_node(n);
         }
         Ok(())
+    }
+
+    fn with_scope(mut self, scope: &PassScope) -> Self {
+        self.scope = scope.clone();
+        self
     }
 }
 #[cfg(test)]
