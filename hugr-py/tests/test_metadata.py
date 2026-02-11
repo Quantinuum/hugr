@@ -9,6 +9,25 @@ from hugr.hugr import Hugr
 from hugr.metadata import HugrGenerator, HugrUsedExtensions, JsonType
 
 
+def test_metadata_properties() -> None:
+    hugr = Hugr[Any]()
+    node = hugr[hugr.module_root]
+
+    gen = GeneratorDesc(name="hugr-py-test", version=Version.parse("1.2.3"))
+    node.metadata[HugrGenerator] = gen
+
+    assert HugrGenerator in node.metadata
+    assert HugrGenerator.KEY in node.metadata
+    assert HugrUsedExtensions not in node.metadata
+    assert HugrUsedExtensions.KEY not in node.metadata
+
+    assert list(node.metadata) == [HugrGenerator.KEY]
+    assert (
+        str(node.metadata)
+        == f"NodeMetadata({{'{HugrGenerator.KEY}': {gen.to_json()}}})"
+    )
+
+
 def test_metadata_roundtrip() -> None:
     hugr = Hugr[Any]()
 
