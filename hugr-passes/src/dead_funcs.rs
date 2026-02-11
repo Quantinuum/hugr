@@ -163,8 +163,8 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
     }
 }
 
-/// Deletes from the Hugr any functions that are not used by either [`Call`] or
-/// [`LoadFunction`] nodes in reachable parts.
+/// Deletes from the Hugr any functions that are not used by either `Call` or
+/// `LoadFunction` nodes in reachable parts.
 ///
 /// `entry_points` may provide a list of entry points, which must be [`FuncDefn`]s (children of the root).
 /// The [HugrView::entrypoint] will also be used unless it is the [HugrView::module_root].
@@ -174,11 +174,9 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 /// # Errors
 /// * If any node in `entry_points` is not a [`FuncDefn`]
 ///
-/// [`Call`]: hugr_core::ops::OpType::Call
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
-/// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
 /// [`Module`]: hugr_core::ops::OpType::Module
-#[deprecated]
+#[deprecated(note = "Use remove_dead_funcs_scoped")]
 #[expect(deprecated)]
 pub fn remove_dead_funcs(
     h: &mut impl HugrMut<Node = Node>,
@@ -192,6 +190,9 @@ pub fn remove_dead_funcs(
 
 /// Deletes from the Hugr any functions that are not used by either [`Call`] or
 /// [`LoadFunction`] nodes in reachable parts, according to the specified [PassScope].
+///
+/// [`Call`]: hugr_core::ops::OpType::Call
+/// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
 // TODO: after removing the deprecated `remove_dead_funcs`, rename this over it
 pub fn remove_dead_funcs_scoped<H: HugrMut<Node = Node>>(
     h: &mut H,
