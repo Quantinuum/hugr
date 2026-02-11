@@ -6,7 +6,11 @@ from semver import Version
 
 from hugr.envelope import EnvelopeConfig, ExtensionDesc, GeneratorDesc
 from hugr.hugr import Hugr
-from hugr.metadata import HugrGenerator, HugrUsedExtensions, JsonType
+from hugr.metadata import HugrGenerator, HugrUsedExtensions, JsonType, Metadata
+
+
+class CustomMetadata(Metadata[list[JsonType]]):
+    KEY = "custom.metadata"
 
 
 def test_metadata_properties() -> None:
@@ -41,8 +45,10 @@ def test_metadata_roundtrip() -> None:
     node = hugr[hugr.module_root]
     node.metadata[HugrGenerator] = gen
     node.metadata[HugrUsedExtensions] = exts
+
     custom_payload: list[JsonType] = [1, "payload", True, None, {"key": "value"}]
-    node.metadata["custom.metadata"] = custom_payload
+    node.metadata[CustomMetadata.KEY] = custom_payload
+    node.metadata[CustomMetadata] = custom_payload
 
     # Roundtrip serialization
     data = hugr.to_bytes(EnvelopeConfig.TEXT)
@@ -54,9 +60,10 @@ def test_metadata_roundtrip() -> None:
     assert node.metadata.get(HugrGenerator) == gen
     assert node.metadata[HugrUsedExtensions] == exts
     assert node.metadata.get(HugrUsedExtensions) == exts
-    assert node.metadata["custom.metadata"] == custom_payload
-    assert node.metadata.get("custom.metadata") == custom_payload
-    assert node.metadata.get("custom.metadata", "default") == custom_payload
+    assert node.metadata[CustomMetadata] == custom_payload
+    assert node.metadata[CustomMetadata.KEY] == custom_payload
+    assert node.metadata.get(CustomMetadata.KEY) == custom_payload
+    assert node.metadata.get(CustomMetadata.KEY, "default") == custom_payload
 
     # Check the raw JSON encoding
     raw = node.metadata.as_dict()
