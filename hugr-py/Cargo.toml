@@ -20,8 +20,6 @@ test = false
 bench = false
 
 [dependencies]
-
-
 bumpalo = { workspace = true, features = ["collections"] }
 hugr-core = { version = "0.25.5", path = "../hugr-core", default-features = false }
 hugr-cli = { version = "0.25.5", path = "../hugr-cli", default-features = false }
