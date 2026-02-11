@@ -3,8 +3,16 @@
 from __future__ import annotations
 
 import copy
+from collections.abc import Mapping
 from dataclasses import dataclass
-from typing import TYPE_CHECKING, Any, ClassVar, Protocol, TypeVar, overload
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    ClassVar,
+    Protocol,
+    TypeVar,
+    overload,
+)
 
 import hugr._hugr.metadata as rust_metadata
 from hugr.envelope import ExtensionDesc, GeneratorDesc
@@ -13,6 +21,10 @@ if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
 Meta = TypeVar("Meta")
+
+# Type alias for json values.
+# See <https://github.com/python/typing/issues/182#issuecomment-1320974824>
+JsonType = str | int | float | bool | None | Mapping[str, "JsonType"] | list["JsonType"]
 
 
 class Metadata(Protocol[Meta]):
@@ -32,37 +44,45 @@ class Metadata(Protocol[Meta]):
     KEY: ClassVar[str]
 
     @classmethod
-    def to_json(cls, value: Meta) -> Any:
+    def to_json(cls, value: Meta) -> JsonType:
         """Serialize the metadata value to a json value."""
+        # Recursive types cannot be checked by isinstance, so we can only use a
+        # surface level check.
+        assert isinstance(
+            value, str | int | float | bool | None | Mapping | list
+        ), f"Cannot serialize {cls.KEY} metadata value {value} to json."
         return value
 
     @classmethod
-    def from_json(cls, value: Any) -> Meta:
+    def from_json(cls, value: JsonType) -> Meta:
         """Deserialize the metadata value from the stored json value."""
-        return value
+        # Default implementation for primitive types.
+        #
+        # `Meta` not runtime checkable, so we need to use type: ignore.
+        return value  # type: ignore  # noqa: PGH003
 
 
 @dataclass
 class NodeMetadata:
     """Key-value record of metadata for a HUGR node."""
 
-    _dict: dict[str, Any]
+    _dict: dict[str, JsonType]
 
-    def __init__(self, metadata: dict[str, Any] | None = None) -> None:
+    def __init__(self, metadata: dict[str, JsonType] | None = None) -> None:
         if metadata is None:
             metadata = {}
         # Only a shallow copy, values may still be shared with the original dictionary.
         self._dict = copy.copy(metadata)
 
     @overload
-    def get(self, key: str, default: Any | None = None) -> Any | None: ...
-    @overload
     def get(self, key: type[Metadata[Meta]], default: Meta) -> Meta: ...
     @overload
     def get(self, key: type[Metadata[Meta]], default: None = None) -> Meta | None: ...
+    @overload
+    def get(self, key: str, default: JsonType | None = None) -> JsonType | None: ...
     def get(
         self, key: str | type[Metadata[Meta]], default: Any | None = None
-    ) -> Any | None:
+    ) -> Meta | JsonType | None:
         if isinstance(key, str):
             return self._dict.get(key, default)
         elif key.KEY in self._dict:
@@ -71,17 +91,17 @@ class NodeMetadata:
         else:
             return default
 
-    def items(self) -> Iterable[tuple[str, Any]]:
+    def items(self) -> Iterable[tuple[str, JsonType]]:
         return self._dict.items()
 
-    def as_dict(self) -> dict[str, Any]:
+    def as_dict(self) -> dict[str, JsonType]:
         return self._dict
 
     @overload
-    def __getitem__(self, key: str) -> Any: ...
+    def __getitem__(self, key: str) -> JsonType: ...
     @overload
     def __getitem__(self, key: type[Metadata[Meta]]) -> Meta: ...
-    def __getitem__(self, key: str | type[Metadata[Meta]]) -> Any:
+    def __getitem__(self, key: str | type[Metadata[Meta]]) -> JsonType | Meta:
         if isinstance(key, str):
             return self._dict[key]
         else:
@@ -89,14 +109,23 @@ class NodeMetadata:
             return key.from_json(val)
 
     @overload
-    def __setitem__(self, key: str, value: Any) -> None: ...
+    def __setitem__(self, key: str, value: JsonType) -> None: ...
     @overload
     def __setitem__(self, key: type[Metadata[Meta]], value: Meta) -> None: ...
-    def __setitem__(self, key: str | type[Metadata[Meta]], value: Any) -> None:
+    def __setitem__(
+        self, key: str | type[Metadata[Meta]], value: JsonType | Meta
+    ) -> None:
         if isinstance(key, str):
+            # Recursive types cannot be checked by isinstance, so we can only use a
+            # surface level check.
+            assert isinstance(
+                value, str | int | float | bool | None | Mapping | list
+            ), f"Cannot set {key} metadata key with non-json value {value}."
             self._dict[key] = value
         else:
-            json_value = key.to_json(value)
+            # `value` must be a `Meta` type. Since `Meta` is not runtime checkable,
+            # we need to use type: ignore.
+            json_value = key.to_json(value)  # type: ignore  # noqa: PGH003
             self._dict[key.KEY] = json_value
 
     def __iter__(self) -> Iterator[str]:
@@ -116,7 +145,7 @@ class NodeMetadata:
     def __copy__(self) -> NodeMetadata:
         return NodeMetadata(copy.copy(self._dict))
 
-    def __deepcopy__(self, memo: dict[int, Any]) -> NodeMetadata:
+    def __deepcopy__(self, memo: dict[int, JsonType]) -> NodeMetadata:
         return NodeMetadata(copy.deepcopy(self._dict, memo))
 
 
@@ -136,7 +165,7 @@ class HugrGenerator(Metadata[GeneratorDesc]):
         return value._to_json()
 
     @classmethod
-    def from_json(cls, value: Any) -> GeneratorDesc:
+    def from_json(cls, value: JsonType) -> GeneratorDesc:
         return GeneratorDesc._from_json(value)
 
 
@@ -152,11 +181,11 @@ class HugrUsedExtensions(Metadata[list[ExtensionDesc]]):
     KEY = rust_metadata.HUGR_USED_EXTENSIONS
 
     @classmethod
-    def to_json(cls, value: list[ExtensionDesc]) -> list[dict[str, str]]:
+    def to_json(cls, value: list[ExtensionDesc]) -> JsonType:
         return [e._to_json() for e in value]
 
     @classmethod
-    def from_json(cls, value: Any) -> list[ExtensionDesc]:
+    def from_json(cls, value: JsonType) -> list[ExtensionDesc]:
         if not isinstance(value, list):
             msg = (
                 "Expected UsedExtensions metadata to be a list,"
