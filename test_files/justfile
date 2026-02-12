@@ -15,8 +15,9 @@ recompile-hugrs:
 
 # Remove all .hugr files recursively
 clean-hugrs:
+    #!/usr/bin/env sh
     find . -type f -name "*.hugr" -delete
-    @echo "All .hugr files removed!"
+    echo "All .hugr files removed!"
 
 # Remove all .hugr files with confirmation
 clean-hugrs-interactive:
