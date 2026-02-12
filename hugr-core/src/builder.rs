@@ -160,7 +160,6 @@ pub enum BuildError {
     BasicBlockTooComplex,
     /// Node was expected to have a certain type but was found to not.
     #[error("Node with index {node} does not have type {op_desc} as expected.")]
-    #[allow(missing_docs)]
     UnexpectedType {
         /// Index of node where error occurred.
         node: Node,
