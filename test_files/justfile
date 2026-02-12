@@ -8,9 +8,13 @@ recompile: recompile-hugrs
 # Re-generate all hugr files.
 recompile-hugrs:
     #!/usr/bin/env sh
-    for example in $(find . -type f -name "*.py"); do
+    for example in $(find ./guppy_examples -type f -name "*.py"); do
         echo "Re-generating $example"
         uv run --no-project "$example"
+    done
+    for example in $(find ./hugr_examples -type f -name "*.py"); do
+        echo "Re-generating $example"
+        uv run "$example"
     done
 
 # Remove all .hugr files recursively
