@@ -1,0 +1,34 @@
+# List the available commands
+help:
+    @just --list --justfile {{justfile()}}
+
+# Re-generate all hugr files and their mermaid diagrams.
+recompile: recompile-hugrs
+
+# Re-generate all hugr files.
+recompile-hugrs:
+    #!/usr/bin/env sh
+    for example in $(find . -type f -name "*.py"); do
+        echo "Re-generating $example"
+        uv run --no-project "$example"
+    done
+
+# Remove all .hugr files recursively
+clean-hugrs:
+    find . -type f -name "*.hugr" -delete
+    @echo "All .hugr files removed!"
+
+# Remove all .hugr files with confirmation
+clean-hugrs-interactive:
+    #!/usr/bin/env sh
+    echo "Files to be deleted:"
+    find . -type f -name "*.hugr"
+    echo ""
+    read -p "Do you want to delete these files? (y/n) " -n 1 -r
+    echo ""
+    if [ "$REPLY" = "y" ] || [ "$REPLY" = "Y" ]; then
+        find . -type f -name "*.hugr" -delete
+        echo "Files deleted!"
+    else
+        echo "Cancelled."
+    fi
