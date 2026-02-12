@@ -15,6 +15,8 @@ from typing import (
 
 from typing_extensions import Self
 
+from hugr.metadata import NodeMetadata
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -142,7 +144,7 @@ class ToNode(Wire, Protocol):
             return self.out(offset)
 
     @property
-    def metadata(self) -> dict[str, object]:
+    def metadata(self) -> NodeMetadata:
         """Metadata associated with this node."""
         return self.to_node()._metadata
 
@@ -154,8 +156,8 @@ class Node(ToNode):
     """
 
     idx: NodeIdx
-    _metadata: dict[str, object] = field(
-        repr=False, compare=False, default_factory=dict
+    _metadata: NodeMetadata = field(
+        repr=False, compare=False, default_factory=NodeMetadata
     )
     _num_out_ports: int | None = field(default=None, compare=False, repr=False)
 
