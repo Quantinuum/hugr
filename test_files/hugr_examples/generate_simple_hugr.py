@@ -12,6 +12,8 @@ from hugr.build.dfg import Dfg
 from hugr.build.function import Module
 from hugr.std.int import INT_T, DivMod
 from hugr.std.logic import Not
+from sys import argv
+
 
 if TYPE_CHECKING:
     from hugr.hugr import Hugr
@@ -32,7 +34,7 @@ def simple_hugr() -> Hugr:
     return d.hugr
 
 
-Path("simple_hugr").with_suffix(".hugr").write_bytes(simple_hugr().to_bytes())
+(Path(argv[0]).parent / "simple_hugr.hugr").write_bytes(simple_hugr().to_bytes())
 
 
 def hugr_nested() -> Hugr:
@@ -49,7 +51,7 @@ def hugr_nested() -> Hugr:
     return h.hugr
 
 
-Path("hugr_nested").with_suffix(".hugr").write_bytes(hugr_nested().to_bytes())
+(Path(argv[0]).parent / "hugr_nested.hugr").write_bytes(hugr_nested().to_bytes())
 
 
 def hugr_nested_w_external_edge() -> Hugr:
@@ -64,7 +66,7 @@ def hugr_nested_w_external_edge() -> Hugr:
     return h.hugr
 
 
-Path("hugr_nested_w_external_edge").with_suffix(".hugr").write_bytes(
+(Path(argv[0]).parent / "hugr_nested_w_external_edge.hugr").write_bytes(
     hugr_nested_w_external_edge().to_bytes()
 )
 
@@ -109,9 +111,9 @@ def hugr_w_function_call(direct_call: bool) -> Hugr:
 
 
 for dc in direct_call:
-    Path(f"hugr_w_function_{"direct" if dc else "indirect"}_call").with_suffix(
-        ".hugr"
-    ).write_bytes(hugr_w_function_call(dc).to_bytes())
+    (Path(argv[0]).parent / f"hugr_w_function_{"direct" if dc else "indirect"}_call.hugr").write_bytes(
+        hugr_w_function_call(dc).to_bytes()
+    )
 
 
 def hugr_w_recursive_function() -> Hugr:
@@ -125,7 +127,7 @@ def hugr_w_recursive_function() -> Hugr:
     return mod.hugr
 
 
-Path("hugr_w_recursive_function").with_suffix(".hugr").write_bytes(
+(Path(argv[0]).parent / "hugr_w_recursive_function.hugr").write_bytes(
     hugr_w_recursive_function().to_bytes()
 )
 
@@ -143,4 +145,4 @@ def hugr_conditional() -> Hugr:
     return dfg.hugr
 
 
-Path("hugr_conditional").with_suffix(".hugr").write_bytes(hugr_conditional().to_bytes())
+(Path(argv[0]).parent / "hugr_conditional.hugr").write_bytes(hugr_conditional().to_bytes())
