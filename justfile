@@ -112,4 +112,4 @@ _run_lang language rust_cmd python_cmd:
 # Regenerates all hugr definitions inside `test_files/`
 recompile-test-hugrs:
     @echo "---- Recompiling example guppy programs ----"
-    just test_files/hugr_examples/recompile
+    just test_files/recompile

@@ -1,5 +1,5 @@
 
-# Guppy-generated test programs
+# Test HUGR programs
 
 This directory contains test HUGR files with their source scripts.
 
