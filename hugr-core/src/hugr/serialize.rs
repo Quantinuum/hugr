@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::core::NodeIndex;
-use crate::hugr::Hugr;
+use crate::hugr::{CanonicalOrderStrat, Hugr};
 use crate::ops::OpType;
 use crate::types::EdgeKind;
 use crate::{Node, PortIndex};
@@ -175,7 +175,10 @@ impl TryFrom<&Hugr> for SerHugrLatest {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
         let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.num_nodes());
-        for (order, node) in hugr.canonical_order(hugr.module_root(), false).enumerate() {
+        for (order, node) in hugr
+            .canonical_order(hugr.module_root(), CanonicalOrderStrat::Quick)
+            .enumerate()
+        {
             node_rekey.insert(node, portgraph::NodeIndex::new(order).into());
         }
 
