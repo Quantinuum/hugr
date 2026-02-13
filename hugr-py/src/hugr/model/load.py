@@ -3,13 +3,14 @@
 import json
 from collections.abc import Generator, Iterable
 from dataclasses import dataclass, field
-from typing import Any, cast
+from typing import cast
 
 import hugr.model as model
 from hugr import val
 from hugr.hugr import InPort, OutPort
 from hugr.hugr.base import Hugr
 from hugr.hugr.node_port import Node
+from hugr.metadata import NodeMetadata
 from hugr.ops import (
     CFG,
     DFG,
@@ -95,7 +96,7 @@ class ModelImportError(Exception):
         super().__init__(f"{message}\n{location_error}")
 
 
-def _collect_meta_json(node: model.Node) -> dict[str, Any]:
+def _collect_meta_json(node: model.Node) -> NodeMetadata:
     """Collects the `core.meta_json` metadata on the given node."""
     metadata = {}
 
@@ -117,7 +118,7 @@ def _collect_meta_json(node: model.Node) -> dict[str, Any]:
 
         metadata[key] = decoded
 
-    return metadata
+    return NodeMetadata(metadata)
 
 
 def _find_meta_title(node: model.Node) -> str | None:

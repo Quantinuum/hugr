@@ -6,16 +6,18 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use handlers::list_const;
-use hugr_core::hugr::linking::{HugrLinking, NameLinkingPolicy};
+use hugr_core::hugr::linking::{HugrLinking, NameLinkingPolicy, OnMultiDefn};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::list::list_type_def;
 use thiserror::Error;
 
-use hugr_core::builder::{BuildError, BuildHandle, Dataflow};
+use hugr_core::builder::{
+    BuildError, BuildHandle, Container, Dataflow, DataflowHugr, FunctionBuilder, HugrBuilder,
+};
 use hugr_core::extension::{ExtensionId, OpDef, SignatureError, TypeDef};
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::ops::constant::{OpaqueValue, Sum};
-use hugr_core::ops::handle::{DataflowOpID, FuncID};
+use hugr_core::ops::handle::{DataflowOpID, FuncID, NodeHandle};
 use hugr_core::ops::{
     AliasDefn, CFG, Call, CallIndirect, Case, Conditional, Const, DFG, DataflowBlock, ExitBlock,
     ExtensionOp, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop, Value,
@@ -24,7 +26,7 @@ use hugr_core::types::{
     ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeRow,
     TypeTransformer,
 };
-use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Wire};
+use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Visibility, Wire};
 
 use crate::ComposablePass;
 
@@ -71,6 +73,48 @@ impl NodeTemplate {
     /// Creates a [Self::LinkedHugr] from the given Hugr with the default linking policy.
     pub fn linked_hugr(h: impl Into<Hugr>) -> Self {
         NodeTemplate::LinkedHugr(Box::new(h.into()), NameLinkingPolicy::default())
+    }
+
+    /// Creates a [`NodeTemplate::LinkedHugr`] creating a call node to the given
+    /// function definition or declaration.
+    ///
+    /// Returns a [`BuildError::UnexpectedType`] if the given Hugr does not have
+    /// a function definition or declaration as entrypoint.
+    pub fn call_to_function(
+        func_def: Hugr,
+        type_args: &[TypeArg],
+    ) -> Result<NodeTemplate, BuildError> {
+        // Create a replacement hugr for the op nodes: Add a `call` node in the `func_def` hugr and set it as entrypoint.
+        let func_op = func_def.entrypoint_optype();
+        let func_signature = match func_op {
+            OpType::FuncDecl(decl) => decl.signature().clone(),
+            OpType::FuncDefn(defn) => defn.signature().clone(),
+            _ => {
+                return Err(BuildError::UnexpectedType {
+                    node: func_def.entrypoint(),
+                    op_desc: "function definition or declaration",
+                });
+            }
+        }
+        .instantiate(type_args)?;
+
+        // Build a new hugr and insert the function definition into it
+        let mut b = FunctionBuilder::new_vis("", func_signature, Visibility::Private).unwrap();
+        let func_id = FuncID::<true>::from(
+            b.module_root_builder()
+                .add_hugr(func_def)
+                .inserted_entrypoint,
+        );
+
+        // Build a call to the function in the new separate function.
+        let call = b.call(&func_id, type_args, b.input_wires()).unwrap();
+        let mut call_hugr = b.finish_hugr_with_outputs(call.outputs()).unwrap();
+        call_hugr.set_entrypoint(call.node());
+
+        Ok(NodeTemplate::LinkedHugr(
+            Box::new(call_hugr),
+            NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget),
+        ))
     }
 
     /// Adds this instance to the specified [`HugrMut`] as a new node or subtree under a
@@ -939,10 +983,8 @@ mod test {
     };
     use hugr_core::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
     use hugr_core::extension::{TypeDefBound, Version, simple_op::MakeExtensionOp};
-    use hugr_core::hugr::linking::{NameLinkingPolicy, OnMultiDefn};
     use hugr_core::hugr::{IdentList, ValidationError, hugrmut::HugrMut};
     use hugr_core::ops::constant::{CustomConst, OpaqueValue};
-    use hugr_core::ops::handle::FuncID;
     use hugr_core::ops::{self, ExtensionOp, OpTrait, OpType, Tag, Value, handle::NodeHandle};
     use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
     use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
@@ -1465,16 +1507,12 @@ mod test {
         let mut lw = lowerer(&e);
         lw.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, _| {
             Ok(Some(if use_linking {
-                let mut fb = FunctionBuilder::new("not inserted", endo_sig(vec![])).unwrap();
-                let target = fb
-                    .module_root_builder()
-                    .declare("lowered_read", read_poly.clone())
-                    .unwrap();
-                let call = fb.call(&target, args, []).unwrap();
-                // We have not connected inputs or outputs to the call so the Hugr is invalid
-                let mut h = std::mem::take(fb.hugr_mut());
-                h.set_entrypoint(call.node());
-                NodeTemplate::linked_hugr(h)
+                let mut decl_b = ModuleBuilder::new();
+                let decl_node = decl_b.declare("lowered_read", read_poly.clone()).unwrap();
+                let mut decl_hugr = decl_b.finish_hugr().unwrap();
+                decl_hugr.set_entrypoint(decl_node.node());
+
+                NodeTemplate::call_to_function(decl_hugr, args).unwrap()
             } else {
                 #[expect(deprecated)] // remove use_linking==false case
                 NodeTemplate::Call(read_func, args.to_owned())
@@ -1528,31 +1566,18 @@ mod test {
                 let [Term::Runtime(ty)] = args else {
                     return Err(SignatureError::InvalidTypeArgs.into());
                 };
-                let mut fb = FunctionBuilder::new("not inserted", endo_sig(vec![])).unwrap();
-                let read_func = fb
-                    .module_root_builder()
-                    .add_hugr(
-                        lowered_read(ty.clone(), |sig| {
-                            FunctionBuilder::new_vis(
-                                mangle_name("lowered_read", args),
-                                sig,
-                                Visibility::Public,
-                            )
-                        })
-                        .finish_hugr()
-                        .unwrap(),
+
+                let defn_hugr = lowered_read(ty.clone(), |sig| {
+                    FunctionBuilder::new_vis(
+                        mangle_name("lowered_read", args),
+                        sig,
+                        Visibility::Public,
                     )
-                    .inserted_entrypoint;
-                let target = FuncID::<true>::from(read_func);
-                let call = fb.call(&target, &[], []).unwrap();
-                // We have not connected inputs or outputs to the call so the Hugr is invalid
-                let mut h = std::mem::take(fb.hugr_mut());
-                h.set_entrypoint(call.node());
-                // UseSource/UseTarget are equivalent here as both are identical copies
-                NodeTemplate::LinkedHugr(
-                    Box::new(h),
-                    NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseSource),
-                )
+                })
+                .finish_hugr()
+                .unwrap();
+
+                NodeTemplate::call_to_function(defn_hugr, &[]).unwrap()
             }))
         });
         if i64_to_usize {

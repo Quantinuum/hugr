@@ -18,13 +18,18 @@ dev-dependencies = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--doctest-modules"
+addopts = "--doctest-modules  --ignore=test_files"
 filterwarnings = "ignore::DeprecationWarning:lark.*"
+
+
 
 
 [tool.mypy]
 # TODO: Fix lints and enable this
 #strict = true
+exclude = '''(?x)(
+    ^test_files/  # Test files
+)'''
 
 [tool.coverage.report]
 exclude_also = [
