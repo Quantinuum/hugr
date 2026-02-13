@@ -1,5 +1,14 @@
 # Changelog
 
+## [0.25.6](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.5...hugr-v0.25.6) - 2026-02-13
+
+### New Features
+
+- Add s expression format to envelope formats ([#2864](https://github.com/Quantinuum/hugr/pull/2864))
+- *(hugr-py)* Define typed Metadata protocol ([#2765](https://github.com/Quantinuum/hugr/pull/2765))
+- Add a `NodeTemplate::call_to_function` helper ([#2878](https://github.com/Quantinuum/hugr/pull/2878))
+- added hash.rs, updated imports ([#2840](https://github.com/Quantinuum/hugr/pull/2840))
+
 ## [0.25.5](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.4...hugr-v0.25.5) - 2026-02-03
 
 ### Refactor
