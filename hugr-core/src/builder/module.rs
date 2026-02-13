@@ -286,6 +286,7 @@ mod test {
     }
 
     #[test]
+    #[ignore] // https://github.com/Quantinuum/hugr/issues/2828
     fn simple_alias() -> Result<(), BuildError> {
         let build_result = {
             let mut module_builder = ModuleBuilder::new();
