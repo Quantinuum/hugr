@@ -356,15 +356,8 @@ impl Hugr {
     /// control-flow sibling graph. (For these nodes the positions of the first
     /// two children have semantic significance.)
     fn contains_dsg_or_csg(&self, node: Node) -> bool {
-        matches!(
-            self.get_optype(node),
-            OpType::FuncDefn(_)
-                | OpType::DFG(_)
-                | OpType::DataflowBlock(_)
-                | OpType::TailLoop(_)
-                | OpType::CFG(_)
-                | OpType::Case(_)
-        )
+        let tag = self.get_optype(node).tag();
+        tag <= OpTag::DataflowParent || tag <= OpTag::Cfg
     }
 
     /// Produce an almost (but not perfectly) canonical ordering of the
