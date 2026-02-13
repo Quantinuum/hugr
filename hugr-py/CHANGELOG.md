@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.15.4](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.3...hugr-py-v0.15.4) (2026-02-13)
+
+
+### Features
+
+* **hugr-py:** Define typed Metadata protocol ([#2765](https://github.com/Quantinuum/hugr/issues/2765)) ([4390230](https://github.com/Quantinuum/hugr/commit/4390230f0b17b5a5ab12656853c40be195514ef5))
+
 ## [0.15.3](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.2...hugr-py-v0.15.3) (2026-02-09)
 
 
