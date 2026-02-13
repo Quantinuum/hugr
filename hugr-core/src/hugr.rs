@@ -371,40 +371,42 @@ impl Hugr {
     /// descendant nodes of a root, following the graph hierarchy.
     ///
     /// This starts with the root, and then proceeds in BFS order through the
-    /// contained regions, ordering sibling nodes according to a partial order
-    /// that is somewhat arbitrary but fine-grained enough to be practically
-    /// useful for testing.
+    /// contained regions. If `try_hard` is `true`, sibling nodes are ordered
+    /// according to a partial order that is somewhat arbitrary but fine-grained
+    /// enough to be practically useful for testing.
     ///
     /// Used by [`HugrMut::canonicalize_nodes`] and the serialization code.
-    fn canonical_order(&self, root: Node) -> impl Iterator<Item = Node> + '_ {
+    fn canonical_order(&self, root: Node, try_hard: bool) -> impl Iterator<Item = Node> + '_ {
         // Generate a BFS-ordered list of nodes based on the hierarchy
         let mut queue = VecDeque::from([root]);
         iter::from_fn(move || {
             let node = queue.pop_front()?;
             let mut children = self.children(node).collect_vec();
-            let sort_fn = |a: &Node, b: &Node| {
-                let n_a_inp = self.input_neighbours(*a).count();
-                let n_b_inp = self.input_neighbours(*b).count();
-                let n_a_out = self.output_neighbours(*a).count();
-                let n_b_out = self.output_neighbours(*b).count();
-                if n_a_inp < n_b_inp {
-                    Ordering::Less
-                } else if n_a_inp > n_b_inp {
-                    Ordering::Greater
-                } else if n_a_out < n_b_out {
-                    Ordering::Less
-                } else if n_a_out > n_b_out {
-                    Ordering::Greater
+            if try_hard {
+                let sort_fn = |a: &Node, b: &Node| {
+                    let n_a_inp = self.input_neighbours(*a).count();
+                    let n_b_inp = self.input_neighbours(*b).count();
+                    let n_a_out = self.output_neighbours(*a).count();
+                    let n_b_out = self.output_neighbours(*b).count();
+                    if n_a_inp < n_b_inp {
+                        Ordering::Less
+                    } else if n_a_inp > n_b_inp {
+                        Ordering::Greater
+                    } else if n_a_out < n_b_out {
+                        Ordering::Less
+                    } else if n_a_out > n_b_out {
+                        Ordering::Greater
+                    } else {
+                        self.get_optype(*a)
+                            .partial_cmp(self.get_optype(*b))
+                            .unwrap_or_else(|| a.cmp(b))
+                    }
+                };
+                if self.contains_dsg_or_csg(node) {
+                    children[2..].sort_by(sort_fn);
                 } else {
-                    self.get_optype(*a)
-                        .partial_cmp(self.get_optype(*b))
-                        .unwrap_or_else(|| a.cmp(b))
+                    children.sort_by(sort_fn);
                 }
-            };
-            if self.contains_dsg_or_csg(node) {
-                children[2..].sort_by(sort_fn);
-            } else {
-                children.sort_by(sort_fn);
             }
             queue.extend(children);
             Some(node)
@@ -449,7 +451,7 @@ impl Hugr {
         // Generate the ordered list of nodes
         let ordered = {
             let mut v = Vec::with_capacity(self.num_nodes());
-            v.extend(self.canonical_order(self.module_root()));
+            v.extend(self.canonical_order(self.module_root(), true));
             v
         };
         let mut new_entrypoint = None;

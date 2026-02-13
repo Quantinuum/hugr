@@ -175,7 +175,7 @@ impl TryFrom<&Hugr> for SerHugrLatest {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
         let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.num_nodes());
-        for (order, node) in hugr.canonical_order(hugr.module_root()).enumerate() {
+        for (order, node) in hugr.canonical_order(hugr.module_root(), false).enumerate() {
             node_rekey.insert(node, portgraph::NodeIndex::new(order).into());
         }
 
