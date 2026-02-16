@@ -37,16 +37,17 @@ use inkwell::builder::Builder;
 use inkwell::intrinsics::Intrinsic;
 use inkwell::types::{BasicType, BasicTypeEnum, IntType, StructType};
 use inkwell::values::{
-    BasicValue as _, BasicValueEnum, CallableValue, IntValue, PointerValue, StructValue,
+    BasicValue as _, BasicValueEnum, IntValue, PointerValue, StructValue,
 };
 use inkwell::{AddressSpace, IntPredicate};
 use itertools::Itertools;
 
-use crate::emit::emit_value;
+use crate::emit::{emit_value, val_as_ptr};
 use crate::emit::func::get_or_make_function;
 use crate::emit::libc::{emit_libc_free, emit_libc_malloc};
 use crate::extension::PreludeCodegen;
-use crate::extension::collections::array::{build_array_fat_pointer, decompose_array_fat_pointer};
+use crate::extension::collections::array::{build_array_fat_pointer,
+decompose_array_fat_pointer, get_accumulator_sig};
 use crate::{CodegenExtension, CodegenExtsBuilder};
 use crate::{
     emit::{EmitFuncContext, RowPromise, deaggregate_call_result},
@@ -1461,14 +1462,16 @@ pub fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     func: BasicValueEnum<'c>,
 ) -> Result<BasicValueEnum<'c>> {
     let elem_ty = ctx.llvm_type(&op.elem_ty)?;
+    let func_ty = elem_ty.fn_type(&[], false);
     let (ptr, array_v) = build_barray_alloc(ctx, ccg, elem_ty, op.size, false)?;
     let array_len = usize_ty(&ctx.typing_session()).const_int(op.size, false);
+    let func_ptr = val_as_ptr(func)
+        .map_err(|()| anyhow!("BArrayOpDef::repeat expects a function pointer"))?;
+
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
-        let func_ptr = CallableValue::try_from(func.into_pointer_value())
-            .map_err(|()| anyhow!("BArrayOpDef::repeat expects a function pointer"))?;
         let v = builder
-            .build_call(func_ptr, &[], "")?
+            .build_call(func_ty, func_ptr, &[], "")?
             .try_as_basic_value()
             .basic()
             .ok_or(anyhow!("BArrayOpDef::repeat function must return a value"))?;
@@ -1496,6 +1499,7 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
         offset: src_offset,
     } = decompose_barray_fat_pointer(ctx.builder(), src_array_v.into())?;
     build_none_borrowed_check(ccg, ctx, src_mask_ptr, src_offset, op.size)?;
+    let src_elem_ty = ctx.llvm_type(&op.src_ty)?;
     let tgt_elem_ty = ctx.llvm_type(&op.tgt_ty)?;
     // TODO: If `sizeof(op.src_ty) >= sizeof(op.tgt_ty)`, we could reuse the memory
     // from `src` instead of allocating a fresh array
@@ -1515,10 +1519,13 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
         builder.build_store(*ptr, *initial_val)?;
     }
 
+    let func_ptr = val_as_ptr(func)
+        .map_err(|()| anyhow!("BArrayOpDef::scan expects a function pointer"))?;
+    let func_ty = get_accumulator_sig(
+        ctx.typing_session(), src_elem_ty, tgt_elem_ty, acc_tys);
+
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
-        let func_ptr = CallableValue::try_from(func.into_pointer_value())
-            .map_err(|()| anyhow!("BArrayOpDef::scan expects a function pointer"))?;
         let src_idx = builder.build_int_add(idx, src_offset, "")?;
         let src_elem_addr = unsafe { builder.build_in_bounds_gep(src_ptr, &[src_idx], "")? };
         let src_elem = builder.build_load(src_elem_addr, "")?;
@@ -1526,7 +1533,7 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
         for ptr in &acc_ptrs {
             args.push(builder.build_load(*ptr, "")?.into());
         }
-        let call = builder.build_call(func_ptr, args.as_slice(), "")?;
+        let call = builder.build_indirect_call(func_ty, func_ptr, args.as_slice(), "")?;
         let call_results = deaggregate_call_result(builder, call, 1 + acc_tys.len())?;
         let tgt_elem_addr = unsafe { builder.build_in_bounds_gep(tgt_ptr, &[idx], "")? };
         builder.build_store(tgt_elem_addr, call_results[0])?;

@@ -18,8 +18,8 @@ categories = ["compilers"]
 [features]
 test-utils = ["insta", "rstest", "portgraph"]
 
-default = ["llvm14-0"]
-llvm14-0 = ["inkwell/llvm14-0"]
+default = ["llvm21-1"]
+llvm21-1 = ["inkwell/llvm21-1"]
 
 [lints]
 workspace = true

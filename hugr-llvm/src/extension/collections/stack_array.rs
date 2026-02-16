@@ -20,12 +20,13 @@ use inkwell::IntPredicate;
 use inkwell::builder::{Builder, BuilderError};
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{
-    ArrayValue, BasicValue as _, BasicValueEnum, CallableValue, IntValue, PointerValue,
+    ArrayValue, BasicValue as _, BasicValueEnum, IntValue, PointerValue,
 };
 use itertools::Itertools;
 
-use crate::emit::emit_value;
+use crate::emit::{emit_value, val_as_ptr};
 use crate::{CodegenExtension, CodegenExtsBuilder};
+use crate::extension::collections::array::get_accumulator_sig;
 use crate::{
     emit::{EmitFuncContext, RowPromise, deaggregate_call_result},
     types::{HugrType, TypingSession},
@@ -657,14 +658,18 @@ fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
 ) -> Result<BasicValueEnum<'c>> {
     let builder = ctx.builder();
     let array_len = ctx.iw_context().i32_type().const_int(op.size, false);
-    let array_ty = ctx.llvm_type(&op.elem_ty)?.array_type(op.size as u32);
+    let elem_ty = ctx.llvm_type(&op.elem_ty)?;
+    let array_ty = elem_ty.array_type(op.size as u32);
+    // The generator func takes no args and returns a single array element.
+    let func_ty = elem_ty.fn_type([], false); 
+    let func_ptr = val_as_ptr(func)
+        .map_err(|()| anyhow!("ArrayOpDef::repeat expects a function pointer"))?;
     let (ptr, array_ptr) = build_array_alloca(builder, array_ty.get_undef())?;
+
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
-        let func_ptr = CallableValue::try_from(func.into_pointer_value())
-            .map_err(|_| anyhow!("ArrayOpDef::repeat expects a function pointer"))?;
         let v = builder
-            .build_call(func_ptr, &[], "")?
+            .build_indirect_call(func_ty, func_ptr, &[], "")?
             .try_as_basic_value()
             .basic()
             .ok_or(anyhow!("ArrayOpDef::repeat function must return a value"))?;
@@ -691,8 +696,11 @@ fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     let builder = ctx.builder();
     let ts = ctx.typing_session();
     let array_len = ctx.iw_context().i32_type().const_int(op.size, false);
-    let tgt_array_ty = ts.llvm_type(&op.tgt_ty)?.array_type(op.size as u32);
-    let (src_ptr, _) = build_array_alloca(builder, src_array.into_array_value())?;
+    let src_array_val = src_array.into_array_value();
+    let src_ty = src_array_val.get_type().get_element_type();
+    let tgt_ty = ts.llvm_type(&op.tgt_ty)?;
+    let tgt_array_ty = tgt_ty.array_type(op.size as u32);
+    let (src_ptr, _) = build_array_alloca(builder, src_array_val)?;
     let (tgt_ptr, tgt_array_ptr) = build_array_alloca(builder, tgt_array_ty.get_undef())?;
 
     let acc_tys: Vec<_> = op.acc_tys.iter().map(|ty| ts.llvm_type(ty)).try_collect()?;
@@ -703,18 +711,19 @@ fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     for (ptr, initial_val) in acc_ptrs.iter().zip(initial_accs) {
         builder.build_store(*ptr, *initial_val)?;
     }
-
+    let func_ty = get_accumulator_sig(&ts, &src_ty, &tgt_ty, &acc_tys); 
+    let func_ptr = val_as_ptr(func)
+        .map_err(|()| anyhow!("ArrayOpDef::scan expects a function pointer"))?;
+    
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
-        let func_ptr = CallableValue::try_from(func.into_pointer_value())
-            .map_err(|_| anyhow!("ArrayOpDef::scan expects a function pointer"))?;
         let src_elem_addr = unsafe { builder.build_in_bounds_gep(src_ptr, &[idx], "")? };
         let src_elem = builder.build_load(src_elem_addr, "")?;
         let mut args = vec![src_elem.into()];
         for ptr in acc_ptrs.iter() {
             args.push(builder.build_load(*ptr, "")?.into());
         }
-        let call = builder.build_call(func_ptr, args.as_slice(), "")?;
+        let call = builder.build_indirect_call(func_ty, func_ptr, args.as_slice(), "")?;
         let call_results = deaggregate_call_result(builder, call, 1 + acc_tys.len())?;
         let tgt_elem_addr = unsafe { builder.build_in_bounds_gep(tgt_ptr, &[idx], "")? };
         builder.build_store(tgt_elem_addr, call_results[0])?;
