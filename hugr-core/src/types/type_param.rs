@@ -17,7 +17,7 @@ use tracing::warn;
 
 use super::{Substitution, Transformable, Type, TypeBound, TypeTransformer};
 use crate::extension::SignatureError;
-use crate::types::{CustomType, FuncValueType, GeneralSum, SumType};
+use crate::types::{CustomType, FuncValueType, SumType};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -262,16 +262,6 @@ impl From<UpperBound> for Term {
     }
 }
 
-/*ALAN delete(?)
-impl<RV: MaybeRV> From<TypeBase<RV>> for Term {
-    fn from(value: TypeBase<RV>) -> Self {
-        match value.try_into_type() {
-            Ok(ty) => Term::Runtime(ty),
-            Err(RowVariable(idx, bound)) => Term::new_var_use(idx, TypeParam::new_list_type(bound)),
-        }
-    }
-}*/
-
 impl From<u64> for Term {
     fn from(n: u64) -> Self {
         Self::BoundedNat(n)
@@ -361,7 +351,7 @@ impl Term {
         }
     }
 
-    const fn least_upper_bound(&self) -> Option<TypeBound> {
+    pub(super) const fn least_upper_bound(&self) -> Option<TypeBound> {
         match self {
             Self::RuntimeExtension(ct) => Some(ct.bound()),
             Self::RuntimeSum(st) => Some(st.bound()),
@@ -404,18 +394,8 @@ impl Term {
     /// [TypeDef]: crate::extension::TypeDef
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            Term::RuntimeSum(SumType::General(GeneralSum { rows, bound })) => {
+            Term::RuntimeSum(SumType::General { rows }) => {
                 rows.iter().try_for_each(|row| row.validate(var_decls))?;
-                // check_term_type does not look beyond the cached bound, so do that here.
-                rows.iter()
-                    .try_for_each(|row| check_term_type(row, &Term::new_list_type(*bound)))?;
-                debug_assert!(
-                    *bound == TypeBound::Copyable
-                        || !rows.iter().all(|r| {
-                            check_term_type(r, &Term::new_list_type(TypeBound::Copyable)).is_ok()
-                        }),
-                    "Incorrect bound, should have been Copyable"
-                );
                 Ok(())
             }
             Term::RuntimeSum(SumType::Unit { .. }) => Ok(()), // No leaves there
@@ -467,7 +447,7 @@ impl Term {
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
-            TypeArg::RuntimeSum(SumType::General(GeneralSum { rows, .. })) => {
+            TypeArg::RuntimeSum(SumType::General(rows)) => {
                 // A substitution of a row variable for an empty list, could make this from
                 // a GeneralSum into a unary SumType. Even new_unchecked recomputes the bound.
                 SumType::new_unchecked(rows.substitute(t).into_owned()).into()
@@ -678,7 +658,7 @@ impl Transformable for Term {
         match self {
             Term::RuntimeExtension(custom_type) => {
                 if let Some(nt) = tr.apply_custom(custom_type)? {
-                    *self = nt;
+                    *self = nt.0;
                     Ok(true)
                 } else {
                     let args_changed = custom_type.args_mut().transform(tr)?;
