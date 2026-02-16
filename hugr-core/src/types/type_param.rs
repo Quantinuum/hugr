@@ -262,16 +262,6 @@ impl From<UpperBound> for Term {
     }
 }
 
-/*ALAN delete(?)
-impl<RV: MaybeRV> From<TypeBase<RV>> for Term {
-    fn from(value: TypeBase<RV>) -> Self {
-        match value.try_into_type() {
-            Ok(ty) => Term::Runtime(ty),
-            Err(RowVariable(idx, bound)) => Term::new_var_use(idx, TypeParam::new_list_type(bound)),
-        }
-    }
-}*/
-
 impl From<u64> for Term {
     fn from(n: u64) -> Self {
         Self::BoundedNat(n)
