@@ -11,7 +11,7 @@ use crate::extension::SignatureError;
 use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
 use crate::types::GeneralSum;
-use crate::types::type_param::{TermTypeError, TermVar, UpperBound};
+use crate::types::type_param::{SeqPart, TermTypeError, TermVar, UpperBound};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]

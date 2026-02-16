@@ -1052,10 +1052,12 @@ mod test {
             &usize_and_ty,
         )
         .unwrap_err(); // Wrong way around
-        let two_types = TypeParam::new_tuple_type(Term::new_list([
+
+        let two_types = Term::new_list([
             TypeBound::Linear.into(),
             TypeBound::Linear.into(),
-        ]));
+        ]);
+        let two_types = TypeParam::new_tuple_type(two_types);
         check(TypeArg::new_var_use(0, two_types.clone()), &two_types).unwrap();
         // not a Row Var which could have any number of elems
         check(TypeArg::new_var_use(0, seq_param), &two_types).unwrap_err();
@@ -1100,7 +1102,8 @@ mod test {
         let Term::List(mut elems) = good_arg.clone() else {
             panic!()
         };
-        elems.push(usize_t().into());
+        let t: Term = usize_t().into();
+        elems.push(t);
         assert_eq!(
             check_term_type(&Term::new_list(elems), &outer_param),
             Err(TermTypeError::TypeMismatch {
@@ -1129,7 +1132,7 @@ mod test {
     fn test_try_into_list_elements() {
         // Test successful conversion with List
         let types = vec![Type::new_unit_sum(1), bool_t()];
-        let term = TypeArg::List(types.clone());
+        let term = TypeArg::List(types.iter().cloned().map_into());
         let result = term.try_into();
         assert_eq!(result, Ok(TypeRow::from(types)));
 
