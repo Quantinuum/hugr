@@ -1367,7 +1367,7 @@ pub fn emit_clone_op<'c, H: HugrView<Node = Node>>(
             ctx.get_current_module(),
             &[
                 ptr_ty.into(), ptr_ty.into(),
-                size_value.get_type().into(), is_volatile.get_type().into()
+                size_value.get_type().into(),
             ],
         )
         .unwrap();

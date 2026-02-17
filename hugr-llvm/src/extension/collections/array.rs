@@ -291,7 +291,7 @@ pub fn get_accumulator_sig<'c>(session: &TypingSession<'c, '_>,
     src_ty: &BasicTypeEnum<'c>, tgt_ty: &BasicTypeEnum<'c>,
     acc_tys: &[BasicTypeEnum<'c>]
 ) -> FunctionType<'c> {
-    
+
     let iw_ctx = session.iw_context();
     // `fn_type` takes `BasicMetadataTypeEnum` rather than `BasicTypeEnum`
     let mut in_tys : Vec<BasicMetadataTypeEnum> = vec![(*src_ty).into()];
@@ -761,7 +761,7 @@ pub fn emit_clone_op<'c, H: HugrView<Node = Node>>(
             ctx.get_current_module(),
             &[
                 ptr_ty.into(), ptr_ty.into(),
-                size_value.get_type().into(), is_volatile.get_type().into()
+                size_value.get_type().into(),
             ],
         )
         .unwrap();
