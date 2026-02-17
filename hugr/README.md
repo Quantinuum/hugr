@@ -24,7 +24,9 @@ Add the dependency to your project:
 cargo add hugr
 ```
 
-Please read the [API documentation here][].
+Please read the [Rust API documentation here][].
+
+Documentation for the HUGR python builder can be found [here](https://quantinuum.github.io/hugr/).
 
 ## Experimental Features
 
