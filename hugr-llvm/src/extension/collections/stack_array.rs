@@ -605,7 +605,7 @@ fn emit_pop_op<'c>(
 ) -> Result<BasicValueEnum<'c>> {
     let ret_ty = ts.llvm_sum_type(option_type(vec![
         hugr_elem_ty.clone(),
-        array_type(size.saturating_add_signed(-1), hugr_elem_ty),
+        array_type(size.saturating_add_signed(-1), hugr_elem_ty.clone()),
     ]))?;
     if size == 0 {
         return Ok(ret_ty.build_tag(builder, 0, vec![])?.into());

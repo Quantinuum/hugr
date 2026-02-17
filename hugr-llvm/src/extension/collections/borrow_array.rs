@@ -1412,7 +1412,7 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
     let fp = decompose_barray_fat_pointer(builder, array_v.into())?;
     let ret_ty = ts.llvm_sum_type(option_type(vec![
         hugr_elem_ty.clone(),
-        borrow_array_type(size.saturating_add_signed(-1), hugr_elem_ty),
+        borrow_array_type(size.saturating_add_signed(-1), hugr_elem_ty.clone()),
     ]))?;
     if size == 0 {
         return Ok(ret_ty.build_tag(builder, 0, vec![])?.into());

@@ -15,7 +15,7 @@ use inkwell::{
     AddressSpace, IntPredicate,
     builder::Builder,
     context::Context,
-    types::{BasicType, BasicTypeEnum, StructType},
+    types::{BasicType, BasicTypeEnum, IntType, StructType},
     values::{ArrayValue, BasicValue, BasicValueEnum, IntValue, PointerValue},
 };
 use itertools::Itertools as _;
@@ -140,17 +140,13 @@ fn build_read_len<'c>(
     context: &'c Context,
     builder: &Builder<'c>,
     struct_ty: StructType<'c>,
+    len_ty: IntType<'c>,
     mut ptr: PointerValue<'c>,
 ) -> Result<IntValue<'c>> {
-    // TODO: need to enforce this check without typed pointers
-    let canonical_ptr_ty = struct_ty.ptr_type(AddressSpace::default());
-    if ptr.get_type() != canonical_ptr_ty {
-        ptr = builder.build_pointer_cast(ptr, canonical_ptr_ty, "")?;
-    }
     let i32_ty = context.i32_type();
     let indices = [i32_ty.const_zero(), i32_ty.const_zero()];
-    let len_ptr = unsafe { builder.build_in_bounds_gep(ptr, &indices, "") }?;
-    Ok(builder.build_load(len_ptr, "")?.into_int_value())
+    let len_ptr = unsafe { builder.build_in_bounds_gep(len_ty, ptr, &indices, "") }?;
+    Ok(builder.build_load(len_ty, len_ptr, "")?.into_int_value())
 }
 
 /// A helper trait for customising the lowering of [`hugr_core::std_extensions::collections::static_array`]
@@ -262,6 +258,8 @@ pub trait StaticArrayCodegen: Clone {
         op: StaticArrayOp,
     ) -> Result<()> {
         let elem_ty = context.llvm_type(&op.elem_ty)?;
+        // TODO: need to enforce the use of usize_t for input pointers
+        let len_ty = context.llvm_type(&usize_t())?.into_int_type();
         match op.def {
             StaticArrayOpDef::get => {
                 let ptr = args.inputs[0].into_pointer_value();
@@ -270,7 +268,8 @@ pub trait StaticArrayCodegen: Clone {
                 let struct_ty =
                     static_array_struct_type(context.iw_context(), index_ty, elem_ty, 0);
 
-                let len = build_read_len(context.iw_context(), context.builder(), struct_ty, ptr)?;
+                let len = build_read_len(
+                    context.iw_context(), context.builder(), struct_ty, len_ty, ptr)?;
 
                 let result_sum_ty = option_type(op.elem_ty);
                 let rmb = context.new_row_mail_box([&result_sum_ty.clone().into()], "")?;
@@ -337,7 +336,8 @@ pub trait StaticArrayCodegen: Clone {
                 let index_ty = args.outputs.get_types().next().unwrap().into_int_type();
                 let struct_ty =
                     static_array_struct_type(context.iw_context(), index_ty, elem_ty, 0);
-                let len = build_read_len(context.iw_context(), context.builder(), struct_ty, ptr)?;
+                let len = build_read_len(
+                    context.iw_context(), context.builder(), struct_ty, len_ty, ptr)?;
                 args.outputs.finish(context.builder(), [len.into()])
             }
             op => bail!("StaticArrayCodegen: Unsupported op: {op:?}"),

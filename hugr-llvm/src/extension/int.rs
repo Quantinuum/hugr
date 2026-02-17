@@ -942,7 +942,7 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
             )?;
 
             ctx.builder().position_at_end(finish);
-            let result = ctx.builder().build_load(pair_ty, result_ptr, "result")?;
+            let result = ctx.builder().build_load(pair_ty.clone(), result_ptr, "result")?;
             Ok(result)
         } else {
             let quot = ctx
@@ -974,9 +974,7 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
 
     if panic {
         LLVMSumValue::try_new(
-            val_or_panic(ctx, pcg, lower_bounds_check, &ERR_DIV_0, |ctx| {
-                build_divmod(ctx)
-            })?,
+            val_or_panic(ctx, pcg, lower_bounds_check, &ERR_DIV_0, build_divmod)?,
             pair_ty,
         )
     } else {
