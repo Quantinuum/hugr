@@ -354,11 +354,33 @@ macro_rules! check_emission {
 
         emission.verify().unwrap();
 
-        emission.opt(|| {
-            let pb = $crate::emit::test::inkwell::passes::PassManager::create(());
-            pb.add_promote_memory_to_register_pass();
-            pb
-        });
+        // Initialize LLVM targets
+        use $crate::emit::test::inkwell::targets::*;
+        Target::initialize_native(&InitializationConfig::default())
+            .expect("Failed to initialize native target");
+
+        let triple = TargetMachine::get_default_triple();
+        let target = Target::from_triple(&triple).unwrap();
+        let machine = target
+            .create_target_machine(
+                &triple,
+                &TargetMachine::get_host_cpu_name().to_str().unwrap(),
+                &TargetMachine::get_host_cpu_features().to_str().unwrap(),
+                $crate::emit::test::inkwell::OptimizationLevel::Default,
+                RelocMode::Default,
+                CodeModel::Default,
+            )
+            .unwrap();
+
+        // TODO: use new pass manager when available in inkwell
+        emission
+            .module()
+            .run_passes(
+                "mem2reg",
+                &machine,
+                $crate::emit::test::inkwell::passes::PassBuilderOptions::create(),
+            )
+            .unwrap();
 
         let mod_str = emission.module().to_string();
         if $snapshot_name == "" {
