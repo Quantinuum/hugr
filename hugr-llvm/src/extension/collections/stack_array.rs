@@ -6,6 +6,7 @@
 #![allow(deprecated)]
 
 use std::iter;
+use std::iter::zip;
 
 use anyhow::{Ok, Result, anyhow};
 use hugr_core::extension::prelude::option_type;
@@ -250,7 +251,7 @@ fn build_loop<'c, T, H: HugrView<Node = Node>>(
     let exit_block = ctx.new_basic_block("", None);
 
     let (body_block, val) = ctx.build_positioned_new_block("", Some(exit_block), |ctx, bb| {
-        let idx = ctx.builder().build_load(idx_ptr, "")?.into_int_value();
+        let idx = ctx.builder().build_load(idx_ty, idx_ptr, "")?.into_int_value();
         let val = go(ctx, idx)?;
         let builder = ctx.builder();
         let inc_idx = builder.build_int_add(idx, idx_ty.const_int(1, false), "")?;
@@ -261,7 +262,7 @@ fn build_loop<'c, T, H: HugrView<Node = Node>>(
 
     let head_block = ctx.build_positioned_new_block("", Some(body_block), |ctx, bb| {
         let builder = ctx.builder();
-        let idx = builder.build_load(idx_ptr, "")?.into_int_value();
+        let idx = builder.build_load(idx_ty, idx_ptr, "")?.into_int_value();
         let cmp = builder.build_int_compare(IntPredicate::ULT, idx, iters, "")?;
         builder.build_conditional_branch(cmp, body_block, exit_block)?;
         Ok(bb)
@@ -317,11 +318,12 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
         .into_owned();
     let ArrayOp {
         def,
-        ref elem_ty,
+        elem_ty: ref hugr_elem_ty,
         size,
     } = op;
+    let elem_ty = ts.llvm_type(hugr_elem_ty)?;
     let llvm_array_ty = ccg
-        .array_type(&ts, ts.llvm_type(elem_ty)?, size)
+        .array_type(&ts, elem_ty, size)
         .as_basic_type_enum()
         .into_array_type();
     match def {
@@ -378,8 +380,8 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
                         // inside `success_block` we know `index_v` to be in
                         // bounds.
                         let elem_addr =
-                            unsafe { builder.build_in_bounds_gep(ptr, &[index_v], "")? };
-                        builder.build_load(elem_addr, "")
+                            unsafe { builder.build_in_bounds_gep(elem_ty, ptr, &[index_v], "")? };
+                        builder.build_load(elem_ty, elem_addr, "")
                     })?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![elem_v])?;
                     exit_rmb.write(ctx.builder(), [success_v.into(), array_v.into()])?;
@@ -441,17 +443,10 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
                         // inside `success_block` we know `index_v` to be in
                         // bounds.
                         let elem_addr =
-                            unsafe { builder.build_in_bounds_gep(ptr, &[index_v], "")? };
-                        let elem_v = builder.build_load(elem_addr, "")?;
+                            unsafe { builder.build_in_bounds_gep(elem_ty, ptr, &[index_v], "")? };
+                        let elem_v = builder.build_load(elem_ty, elem_addr, "")?;
                         builder.build_store(elem_addr, value_v)?;
-                        let ptr = builder
-                            .build_bit_cast(
-                                ptr,
-                                array_v.get_type().ptr_type(Default::default()),
-                                "",
-                            )?
-                            .into_pointer_value();
-                        let array_v = builder.build_load(ptr, "")?;
+                        let array_v = builder.build_load(array_v.get_type(), ptr, "")?;
                         Ok((elem_v, array_v))
                     })?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![elem_v, array_v])?;
@@ -522,21 +517,14 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
                         // inside `success_block` we know `index1_v` and `index2_v`
                         // to be in bounds.
                         let elem1_addr =
-                            unsafe { builder.build_in_bounds_gep(ptr, &[index1_v], "")? };
-                        let elem1_v = builder.build_load(elem1_addr, "")?;
+                            unsafe { builder.build_in_bounds_gep(elem_ty, ptr, &[index1_v], "")? };
+                        let elem1_v = builder.build_load(elem_ty, elem1_addr, "")?;
                         let elem2_addr =
-                            unsafe { builder.build_in_bounds_gep(ptr, &[index2_v], "")? };
-                        let elem2_v = builder.build_load(elem2_addr, "")?;
+                            unsafe { builder.build_in_bounds_gep(elem_ty, ptr, &[index2_v], "")? };
+                        let elem2_v = builder.build_load(elem_ty, elem2_addr, "")?;
                         builder.build_store(elem1_addr, elem2_v)?;
                         builder.build_store(elem2_addr, elem1_v)?;
-                        let ptr = builder
-                            .build_bit_cast(
-                                ptr,
-                                array_v.get_type().ptr_type(Default::default()),
-                                "",
-                            )?
-                            .into_pointer_value();
-                        builder.build_load(ptr, "")
+                        builder.build_load(array_v.get_type(), ptr, "")
                     })?;
                     let success_v = res_sum_ty.build_tag(builder, 1, vec![array_v])?;
                     exit_rmb.write(ctx.builder(), [success_v.into()])?;
@@ -580,7 +568,7 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
             let r = emit_pop_op(
                 builder,
                 &ts,
-                elem_ty.clone(),
+                hugr_elem_ty.clone(),
                 size,
                 array_v.into_array_value(),
                 true,
@@ -594,7 +582,7 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
             let r = emit_pop_op(
                 builder,
                 &ts,
-                elem_ty.clone(),
+                hugr_elem_ty.clone(),
                 size,
                 array_v.into_array_value(),
                 false,
@@ -610,41 +598,39 @@ fn emit_array_op<'c, H: HugrView<Node = Node>>(
 fn emit_pop_op<'c>(
     builder: &Builder<'c>,
     ts: &TypingSession<'c, '_>,
-    elem_ty: HugrType,
+    hugr_elem_ty: HugrType,
     size: u64,
     array_v: ArrayValue<'c>,
     pop_left: bool,
 ) -> Result<BasicValueEnum<'c>> {
     let ret_ty = ts.llvm_sum_type(option_type(vec![
-        elem_ty.clone(),
-        array_type(size.saturating_add_signed(-1), elem_ty),
+        hugr_elem_ty.clone(),
+        array_type(size.saturating_add_signed(-1), hugr_elem_ty),
     ]))?;
     if size == 0 {
         return Ok(ret_ty.build_tag(builder, 0, vec![])?.into());
     }
     let ctx = builder.get_insert_block().unwrap().get_context();
+    let elem_ty = ts.llvm_type(&hugr_elem_ty)?;
     let (elem_v, array_v) = with_array_alloca(builder, array_v, |ptr| {
         let (elem_ptr, ptr) = {
             if pop_left {
                 let rest_ptr =
-                    unsafe { builder.build_gep(ptr, &[ctx.i32_type().const_int(1, false)], "") }?;
+                    unsafe { builder.build_gep(elem_ty, ptr, &[ctx.i32_type().const_int(1, false)], "") }?;
                 (ptr, rest_ptr)
             } else {
                 let elem_ptr = unsafe {
-                    builder.build_gep(ptr, &[ctx.i32_type().const_int(size - 1, false)], "")
+                    builder.build_gep(elem_ty, ptr, &[ctx.i32_type().const_int(size - 1, false)], "")
                 }?;
                 (elem_ptr, ptr)
             }
         };
-        let elem_v = builder.build_load(elem_ptr, "")?;
+        let elem_v = builder.build_load(elem_ty, elem_ptr, "")?;
         let new_array_ty = array_v
             .get_type()
             .get_element_type()
             .array_type(size as u32 - 1);
-        let ptr = builder
-            .build_bit_cast(ptr, new_array_ty.ptr_type(Default::default()), "")?
-            .into_pointer_value();
-        let array_v = builder.build_load(ptr, "")?;
+        let array_v = builder.build_load(new_array_ty, ptr, "")?;
         Ok((elem_v, array_v))
     })?;
     Ok(ret_ty.build_tag(builder, 1, vec![elem_v, array_v])?.into())
@@ -661,9 +647,9 @@ fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     let elem_ty = ctx.llvm_type(&op.elem_ty)?;
     let array_ty = elem_ty.array_type(op.size as u32);
     // The generator func takes no args and returns a single array element.
-    let func_ty = elem_ty.fn_type([], false); 
+    let func_ty = elem_ty.fn_type(&[], false); 
     let func_ptr = val_as_ptr(func)
-        .map_err(|()| anyhow!("ArrayOpDef::repeat expects a function pointer"))?;
+        .map_err(|_| anyhow!("ArrayOpDef::repeat expects a function pointer"))?;
     let (ptr, array_ptr) = build_array_alloca(builder, array_ty.get_undef())?;
 
     build_loop(ctx, array_len, |ctx, idx| {
@@ -673,13 +659,13 @@ fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
             .try_as_basic_value()
             .basic()
             .ok_or(anyhow!("ArrayOpDef::repeat function must return a value"))?;
-        let elem_addr = unsafe { builder.build_in_bounds_gep(ptr, &[idx], "")? };
+        let elem_addr = unsafe { builder.build_in_bounds_gep(elem_ty, ptr, &[idx], "")? };
         builder.build_store(elem_addr, v)?;
         Ok(())
     })?;
 
     let builder = ctx.builder();
-    let array_v = builder.build_load(array_ptr, "")?;
+    let array_v = builder.build_load(array_ty, array_ptr, "")?;
     Ok(array_v)
 }
 
@@ -713,19 +699,19 @@ fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     }
     let func_ty = get_accumulator_sig(&ts, &src_ty, &tgt_ty, &acc_tys); 
     let func_ptr = val_as_ptr(func)
-        .map_err(|()| anyhow!("ArrayOpDef::scan expects a function pointer"))?;
+        .map_err(|_| anyhow!("ArrayOpDef::scan expects a function pointer"))?;
     
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
-        let src_elem_addr = unsafe { builder.build_in_bounds_gep(src_ptr, &[idx], "")? };
-        let src_elem = builder.build_load(src_elem_addr, "")?;
+        let src_elem_addr = unsafe { builder.build_in_bounds_gep(src_ty, src_ptr, &[idx], "")? };
+        let src_elem = builder.build_load(src_ty, src_elem_addr, "")?;
         let mut args = vec![src_elem.into()];
-        for ptr in acc_ptrs.iter() {
-            args.push(builder.build_load(*ptr, "")?.into());
+        for (ptr, ty) in zip(&acc_ptrs, &acc_tys) {
+            args.push(builder.build_load(*ty, *ptr, "")?.into());
         }
         let call = builder.build_indirect_call(func_ty, func_ptr, args.as_slice(), "")?;
         let call_results = deaggregate_call_result(builder, call, 1 + acc_tys.len())?;
-        let tgt_elem_addr = unsafe { builder.build_in_bounds_gep(tgt_ptr, &[idx], "")? };
+        let tgt_elem_addr = unsafe { builder.build_in_bounds_gep(tgt_ty, tgt_ptr, &[idx], "")? };
         builder.build_store(tgt_elem_addr, call_results[0])?;
         for (ptr, next_act) in acc_ptrs.iter().zip(call_results[1..].iter()) {
             builder.build_store(*ptr, *next_act)?;
@@ -734,10 +720,10 @@ fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     })?;
 
     let builder = ctx.builder();
-    let tgt_array_v = builder.build_load(tgt_array_ptr, "")?;
-    let final_accs = acc_ptrs
+    let tgt_array_v = builder.build_load(tgt_array_ty, tgt_array_ptr, "")?;
+    let final_accs = zip(acc_ptrs, acc_tys)
         .into_iter()
-        .map(|ptr| builder.build_load(ptr, ""))
+        .map(|(ptr, ty)| builder.build_load(ty, ptr, ""))
         .try_collect()?;
     Ok((tgt_array_v, final_accs))
 }

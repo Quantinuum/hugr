@@ -60,7 +60,7 @@ pub trait PreludeCodegen: Clone {
         Ok(session.iw_context().struct_type(
             &[
                 ctx.i32_type().into(),
-                ctx.i8_type().ptr_type(AddressSpace::default()).into(),
+                ctx.ptr_type(AddressSpace::default()).into(),
             ],
             false,
         ))
@@ -75,7 +75,6 @@ pub trait PreludeCodegen: Clone {
     fn string_type<'c>(&self, session: &TypingSession<'c, '_>) -> Result<impl BasicType<'c>> {
         Ok(session
             .iw_context()
-            .i8_type()
             .ptr_type(AddressSpace::default()))
     }
 
@@ -316,7 +315,7 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
         let global = context.get_global(&k.symbol, llvm_type, k.constant)?;
         Ok(context
             .builder()
-            .build_load(global.as_pointer_value(), &k.symbol)?)
+            .build_load(llvm_type, global.as_pointer_value(), &k.symbol)?)
     })
     .custom_const::<ConstString>({
         let pcg = pcg.clone();

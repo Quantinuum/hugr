@@ -266,7 +266,7 @@ fn emit_call_indirect<'c, H: HugrView<Node = Node>>(
         BasicValueEnum::PointerValue(v) => Ok(v),
         _ => Err(anyhow!("emit_call_indirect: Not a pointer")),
     }?;
-    let func_ty = context.llvm_func_type(args.node().signature); 
+    let func_ty = context.llvm_func_type(&args.node().signature)?; 
     let inputs = args.inputs.into_iter().skip(1).map_into().collect_vec();
     let builder = context.builder();
     let call = builder.build_indirect_call(func_ty, func_ptr, inputs.as_slice(), "")?;

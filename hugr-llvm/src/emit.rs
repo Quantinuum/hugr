@@ -10,7 +10,7 @@ use inkwell::{
     context::Context,
     intrinsics::Intrinsic,
     module::{Linkage, Module},
-    types::{AnyType, BasicType, BasicTypeEnum, FunctionType},
+    types::{AnyType, BasicType, BasicTypeEnum, FunctionType, PointerType},
     values::{BasicValueEnum, CallSiteValue, FunctionValue, GlobalValue, PointerValue},
 };
 use std::{collections::HashSet, rc::Rc};
@@ -55,6 +55,8 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
             pub fn llvm_func_type(&self, hugr_type: &HugrFuncType) -> Result<FunctionType<'c>>;
             /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
             pub fn llvm_sum_type(&self, sum_type: HugrSumType) -> Result<LLVMSumType<'c>>;
+            /// Get the global opaque LLVM pointer type
+            pub fn llvm_ptr_type(&self) -> PointerType<'c>;
         }
 
         to self.namer {
@@ -413,11 +415,11 @@ pub fn get_intrinsic<'c>(
 }
 
 /// Checked conversion from BasicValues to PointerValues
-pub fn val_as_ptr<'c>(val: BasicTypeEnum<'c>) -> Result<PointerValue> {
+pub fn val_as_ptr<'c>(val: BasicValueEnum<'c>) -> Result<PointerValue> {
     if let BasicValueEnum::PointerValue(ptr) = val {
         Ok(ptr)
     } else {
-        Err(())
+        Err()
     }
 }
 

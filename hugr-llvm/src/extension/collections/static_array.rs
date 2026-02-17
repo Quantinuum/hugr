@@ -142,6 +142,7 @@ fn build_read_len<'c>(
     struct_ty: StructType<'c>,
     mut ptr: PointerValue<'c>,
 ) -> Result<IntValue<'c>> {
+    // TODO: need to enforce this check without typed pointers
     let canonical_ptr_ty = struct_ty.ptr_type(AddressSpace::default());
     if ptr.get_type() != canonical_ptr_ty {
         ptr = builder.build_pointer_cast(ptr, canonical_ptr_ty, "")?;
@@ -260,14 +261,14 @@ pub trait StaticArrayCodegen: Clone {
         args: EmitOpArgs<'c, '_, ExtensionOp, H>,
         op: StaticArrayOp,
     ) -> Result<()> {
+        let elem_ty = context.llvm_type(&op.elem_ty)?;
         match op.def {
             StaticArrayOpDef::get => {
                 let ptr = args.inputs[0].into_pointer_value();
                 let index = args.inputs[1].into_int_value();
                 let index_ty = index.get_type();
-                let element_llvm_ty = context.llvm_type(&op.elem_ty)?;
                 let struct_ty =
-                    static_array_struct_type(context.iw_context(), index_ty, element_llvm_ty, 0);
+                    static_array_struct_type(context.iw_context(), index_ty, elem_ty, 0);
 
                 let len = build_read_len(context.iw_context(), context.builder(), struct_ty, ptr)?;
 
@@ -307,8 +308,8 @@ pub trait StaticArrayCodegen: Clone {
                         let i32_ty = context.iw_context().i32_type();
                         let indices = [i32_ty.const_zero(), i32_ty.const_int(1, false), index];
                         let element_ptr =
-                            unsafe { context.builder().build_in_bounds_gep(ptr, &indices, "") }?;
-                        let element = context.builder().build_load(element_ptr, "")?;
+                            unsafe { context.builder().build_in_bounds_gep(elem_ty, ptr, &indices, "") }?;
+                        let element = context.builder().build_load(elem_ty, element_ptr, "")?;
                         rmb.write(
                             context.builder(),
                             [result_llvm_sum_ty
@@ -333,10 +334,9 @@ pub trait StaticArrayCodegen: Clone {
             }
             StaticArrayOpDef::len => {
                 let ptr = args.inputs[0].into_pointer_value();
-                let element_llvm_ty = context.llvm_type(&op.elem_ty)?;
                 let index_ty = args.outputs.get_types().next().unwrap().into_int_type();
                 let struct_ty =
-                    static_array_struct_type(context.iw_context(), index_ty, element_llvm_ty, 0);
+                    static_array_struct_type(context.iw_context(), index_ty, elem_ty, 0);
                 let len = build_read_len(context.iw_context(), context.builder(), struct_ty, ptr)?;
                 args.outputs.finish(context.builder(), [len.into()])
             }

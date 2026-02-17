@@ -31,7 +31,7 @@ use crate::{
     types::{HugrSumType, TypingSession},
 };
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow, bail, ensure};
 
 use super::{DefaultPreludeCodegen, PreludeCodegen, conversions::int_type_bounds};
 
@@ -226,17 +226,19 @@ fn emit_ipow<'c, H: HugrView<Node = Node>>(
         let done_bb = ctx.new_basic_block("done", None);
         let pow_body_bb = ctx.new_basic_block("pow_body", Some(done_bb));
         let return_one_bb = ctx.new_basic_block("power_of_zero", Some(pow_body_bb));
-        let pow_bb = ctx.new_basic_block("pow", Some(return_one_bb));
+        let pow_bb = ctx.new_basic_block("pow", Some(return_one_bb)); 
 
-        let acc_p = ctx.builder().build_alloca(lhs.get_type(), "acc_ptr")?;
-        let exp_p = ctx.builder().build_alloca(rhs.get_type(), "exp_ptr")?;
+        let result_ty = lhs.get_type();
+        ensure!(result_ty == rhs.get_type(), "Operands to `ipow` must have the same type");
+        let acc_p = ctx.builder().build_alloca(result_ty, "acc_ptr")?;
+        let exp_p = ctx.builder().build_alloca(result_ty, "exp_ptr")?;
         ctx.builder().build_store(acc_p, lhs)?;
         ctx.builder().build_store(exp_p, rhs)?;
         ctx.builder().build_unconditional_branch(pow_bb)?;
 
-        let zero = rhs.get_type().into_int_type().const_int(0, false);
         // Assumes RHS type is the same as output type (which it should be)
-        let one = rhs.get_type().into_int_type().const_int(1, false);
+        let zero = result_ty.into_int_type().const_int(0, false);
+        let one = result_ty.into_int_type().const_int(1, false);
 
         // Block for just returning one
         ctx.builder().position_at_end(return_one_bb);
@@ -244,8 +246,8 @@ fn emit_ipow<'c, H: HugrView<Node = Node>>(
         ctx.builder().build_unconditional_branch(done_bb)?;
 
         ctx.builder().position_at_end(pow_bb);
-        let acc = ctx.builder().build_load(acc_p, "acc")?;
-        let exp = ctx.builder().build_load(exp_p, "exp")?;
+        let acc = ctx.builder().build_load(result_ty, acc_p, "acc")?;
+        let exp = ctx.builder().build_load(result_ty, exp_p, "exp")?;
 
         // Special case if the exponent is 0 or 1
         ctx.builder().build_switch(
@@ -267,7 +269,7 @@ fn emit_ipow<'c, H: HugrView<Node = Node>>(
         ctx.builder().build_unconditional_branch(pow_bb)?;
 
         ctx.builder().position_at_end(done_bb);
-        let result = ctx.builder().build_load(acc_p, "result")?;
+        let result = ctx.builder().build_load(result_ty, acc_p, "result")?;
         Ok(vec![result.as_basic_value_enum()])
     })
 }
@@ -940,7 +942,7 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
             )?;
 
             ctx.builder().position_at_end(finish);
-            let result = ctx.builder().build_load(result_ptr, "result")?;
+            let result = ctx.builder().build_load(pair_ty, result_ptr, "result")?;
             Ok(result)
         } else {
             let quot = ctx
