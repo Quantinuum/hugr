@@ -26,7 +26,7 @@ cargo add hugr
 
 Please read the [Rust API documentation here][].
 
-Documentation for the HUGR python builder can be found [here](https://quantinuum.github.io/hugr/).
+Documentation for the HUGR Python builder can be found [here](https://quantinuum.github.io/hugr/).
 
 ## Experimental Features
 
