@@ -3,16 +3,17 @@
 use std::sync::{Arc, LazyLock};
 
 use hugr::builder::{
-    BuildError, CFGBuilder, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-    ModuleBuilder,
+    BuildError, CFGBuilder, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    FunctionBuilder, HugrBuilder, ModuleBuilder,
 };
 use hugr::extension::ExtensionRegistry;
 use hugr::extension::prelude::{bool_t, qb_t, usize_t};
+use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::{OpName, Value, handle::FuncID};
 use hugr::std_extensions::STD_REG;
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use hugr::types::Signature;
-use hugr::{CircuitUnit, Extension, Hugr, Node, type_row};
+use hugr::{CircuitUnit, Extension, Hugr, HugrView, Node, type_row};
 
 pub fn simple_dfg_hugr() -> Hugr {
     let dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()])).unwrap();
@@ -160,4 +161,17 @@ pub fn circuit(layers: usize) -> (Hugr, Vec<CircuitLayer>) {
     f_build.finish_with_outputs(outs).unwrap();
 
     (module_builder.finish_hugr().unwrap(), layer_ids)
+}
+
+/// Returns a Hugr that serializes to approximately `byte_size` bytes in binary
+/// format by defining a large metadata payload.
+pub fn big_hugr(byte_size: usize) -> Hugr {
+    let big_payload: String = "a".repeat(byte_size);
+
+    let mut hugr = FunctionBuilder::new("main", Signature::new_endo(vec![]))
+        .unwrap()
+        .finish_hugr()
+        .unwrap();
+    hugr.set_metadata_any(hugr.entrypoint(), "big", big_payload);
+    hugr
 }
