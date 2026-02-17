@@ -12,7 +12,7 @@ use hugr::{Hugr, HugrView};
 use std::hint::black_box;
 
 pub use examples::{
-    BENCH_EXTENSIONS, circuit, dfg_calling_defn_decl, simple_cfg_hugr, simple_dfg_hugr,
+    BENCH_EXTENSIONS, big_hugr, circuit, dfg_calling_defn_decl, simple_cfg_hugr, simple_dfg_hugr,
 };
 
 trait Serializer {
@@ -159,9 +159,36 @@ fn bench_serialization(c: &mut Criterion) {
     group.finish();
 }
 
+/// Benchmark a hugr with a large metadata payload.
+fn bench_big_hugr_serialization(c: &mut Criterion) {
+    let mut group = c.benchmark_group("big_hugr_roundtrip/json");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
+    for size in &[1024, 1024 * 1024] {
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            let h = big_hugr(size);
+            b.iter(|| {
+                black_box(roundtrip(&h, JsonSer));
+            });
+        });
+    }
+    group.finish();
+
+    let mut group = c.benchmark_group("big_hugr_roundtrip/capnp");
+    group.plot_config(PlotConfiguration::default().summary_scale(AxisScale::Logarithmic));
+    for size in &[1024, 1024 * 1024] {
+        group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
+            let h = big_hugr(size);
+            b.iter(|| {
+                black_box(roundtrip(&h, CapnpSer));
+            });
+        });
+    }
+    group.finish();
+}
+
 criterion_group! {
     name = benches;
     config = Criterion::default();
     targets =
-        bench_builder, bench_insertion, bench_serialization
+        bench_builder, bench_insertion, bench_serialization, bench_big_hugr_serialization
 }
