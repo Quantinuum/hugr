@@ -41,8 +41,8 @@ pub trait TypeMapping {
     /// The target type when mapping from [`HugrSumType`]s. This type must be
     /// convertible to `OutV` via `sum_into_out`.
     type SumOutV<'c>;
-    /// The target type when mapping from [`HugrFuncType`]s. This type must be
-    /// convertible to `OutV` via `func_into_out`.
+    /// The target type when mapping from [`HugrFuncType`]s. It is not convertible to
+    /// `OutV`.
     type FuncOutV<'c>;
 
     /// Returns the result of the mapping on `sum_type`, with auxiliary data
@@ -69,10 +69,6 @@ pub trait TypeMapping {
     /// Infallibly convert from the result of `map_sum_type` to the result of
     /// the mapping.
     fn sum_into_out<'c>(&self, sum: Self::SumOutV<'c>) -> Self::OutV<'c>;
-
-    /// Infallibly convert from the result of `map_functype` to the result of
-    /// the mapping.
-    fn func_into_out<'c>(&self, sum: Self::FuncOutV<'c>) -> Self::OutV<'c>;
 
     /// Construct an appropriate result of the mapping when `hugr_type` is not a
     /// function, sum, registered custom type, or composition of same.
@@ -126,9 +122,8 @@ impl<'a, TM: TypeMapping + 'a> TypeMap<'a, TM> {
             TypeEnum::Sum(sum_type) => self
                 .map_sum_type(sum_type, inv)
                 .map(|x| self.type_map.sum_into_out(x)),
-            TypeEnum::Function(function_type) => self
-                .map_function_type(&function_type.as_ref().clone().try_into()?, inv)
-                .map(|x| self.type_map.func_into_out(x)),
+            TypeEnum::Function(function_type) => 
+                panic!("Mapping function types is no longer supported"),
             _ => self.type_map.default_out(inv, hugr_type),
         }
     }

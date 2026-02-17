@@ -415,11 +415,11 @@ pub fn get_intrinsic<'c>(
 }
 
 /// Checked conversion from BasicValues to PointerValues
-pub fn val_as_ptr<'c>(val: BasicValueEnum<'c>) -> Result<PointerValue> {
+pub fn val_as_ptr<'c>(val: BasicValueEnum<'c>) -> Result<PointerValue, ()> {
     if let BasicValueEnum::PointerValue(ptr) = val {
         Ok(ptr)
     } else {
-        Err()
+        Err(())
     }
 }
 

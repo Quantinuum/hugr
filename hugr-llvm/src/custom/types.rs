@@ -40,13 +40,7 @@ impl<'a> TypeMapping for LLVMTypeMapping<'a> {
     type FuncOutV<'c> = FunctionType<'c>;
 
     fn sum_into_out<'c>(&self, sum: Self::SumOutV<'c>) -> Self::OutV<'c> {
-        sum.as_any_type_enum()
-    }
-
-    fn func_into_out<'c>(&self, sum: Self::FuncOutV<'c>) -> Self::OutV<'c> {
-        // TODO: need to convert OutV to AnyTypeEnum in order to return func types
         sum.as_basic_type_enum()
-        //sum.ptr_type(Default::default()).as_basic_type_enum()
     }
 
     fn map_sum_type<'c>(

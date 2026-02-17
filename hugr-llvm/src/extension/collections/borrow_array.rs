@@ -142,10 +142,9 @@ pub trait BorrowArrayCodegen: Clone {
     fn array_type<'c>(
         &self,
         session: &TypingSession<'c, '_>,
-        elem_ty: BasicTypeEnum<'c>,
         _size: u64,
     ) -> impl BasicType<'c> {
-        barray_fat_pointer_ty(session, elem_ty)
+        barray_fat_pointer_ty(session)
     }
 
     /// Emit a [`hugr_core::std_extensions::collections::borrow_array::BArrayValue`].
@@ -303,7 +302,7 @@ impl<CCG: BorrowArrayCodegen> CodegenExtension for BorrowArrayCodegenExtension<C
                             return Err(anyhow!("Invalid type args for array type"));
                         };
                         let elem_ty = ts.llvm_type(ty)?;
-                        Ok(ccg.array_type(&ts, elem_ty, *n).as_basic_type_enum())
+                        Ok(ccg.array_type(&ts, *n).as_basic_type_enum())
                     }
                 },
             )
@@ -412,16 +411,15 @@ fn usize_ty<'c>(ts: &TypingSession<'c, '_>) -> IntType<'c> {
 #[must_use]
 pub fn barray_fat_pointer_ty<'c>(
     session: &TypingSession<'c, '_>,
-    elem_ty: BasicTypeEnum<'c>,
 ) -> StructType<'c> {
     let iw_ctx = session.iw_context();
     let usize_t = usize_ty(session);
     iw_ctx.struct_type(
         &[
             // Pointer to the first array element
-            iw_ctx.ptr_type(AddressSpace::default()).into(),
+            session.llvm_ptr_type().into(),
             // Pointer to the bitarray mask storing whether values have been borrowed
-            iw_ctx.ptr_type(AddressSpace::default()).into(),
+            session.llvm_ptr_type().into(),
             // Offset
             usize_t.into(),
         ],
@@ -440,7 +438,6 @@ pub fn build_barray_fat_pointer<'c, H: HugrView<Node = Node>>(
 ) -> Result<StructValue<'c>> {
     let array_ty = barray_fat_pointer_ty(
         &ctx.typing_session(),
-        elems_ptr.get_type().get_element_type().try_into().unwrap(),
     );
     let array_v = array_ty.get_poison();
     let array_v =

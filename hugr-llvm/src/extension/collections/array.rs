@@ -29,7 +29,7 @@ use hugr_core::types::{TypeArg, TypeEnum};
 use hugr_core::{HugrView, Node};
 use inkwell::builder::Builder;
 use inkwell::intrinsics::Intrinsic;
-use inkwell::types::{BasicType, BasicTypeEnum, FunctionType, IntType, StructType};
+use inkwell::types::{BasicType, BasicTypeEnum, BasicMetadataTypeEnum, FunctionType, IntType, StructType};
 use inkwell::values::{
     BasicValue as _, BasicValueEnum, IntValue, PointerValue, StructValue,
 };
@@ -103,10 +103,9 @@ pub trait ArrayCodegen: Clone {
     fn array_type<'c>(
         &self,
         session: &TypingSession<'c, '_>,
-        elem_ty: BasicTypeEnum<'c>,
         _size: u64,
     ) -> impl BasicType<'c> {
-        array_fat_pointer_ty(session, elem_ty)
+        array_fat_pointer_ty(session)
     }
 
     /// Emit a [`hugr_core::std_extensions::collections::array::ArrayValue`].
@@ -218,8 +217,7 @@ impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
                     let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = hugr_type.args() else {
                         return Err(anyhow!("Invalid type args for array type"));
                     };
-                    let elem_ty = ts.llvm_type(ty)?;
-                    Ok(ccg.array_type(&ts, elem_ty, *n).as_basic_type_enum())
+                    Ok(ccg.array_type(&ts, *n).as_basic_type_enum())
                 }
             })
             .custom_const::<array::ArrayValue>({
@@ -295,24 +293,26 @@ pub fn get_accumulator_sig<'c>(session: &TypingSession<'c, '_>,
 ) -> FunctionType<'c> {
     
     let iw_ctx = session.iw_context();
-    let in_tys = (&[src_ty], acc_tys).concat();
-    let out_tys = (&[tgt_ty], acc_tys).concat();
+    // `fn_type` takes `BasicMetadataTypeEnum` rather than `BasicTypeEnum`
+    let mut in_tys : Vec<BasicMetadataTypeEnum> = vec![(*src_ty).into()];
+    in_tys.extend(acc_tys.iter().map(|ty| BasicMetadataTypeEnum::from(*ty)));
+    let mut out_tys = vec![tgt_ty.clone()];
+    out_tys.extend(acc_tys);
     // LLVM functions have to return a single type
-    let out_aggr_ty = iw_ctx.struct_type(out_tys, false);
+    let out_aggr_ty = iw_ctx.struct_type(&out_tys, false);
 
-    out_aggr_ty.fn_type(in_tys, false)
+    out_aggr_ty.fn_type(&in_tys, false)
 }
 
 /// Returns the LLVM representation of an array value as a fat pointer.
 #[must_use]
 pub fn array_fat_pointer_ty<'c>(
     session: &TypingSession<'c, '_>,
-    elem_ty: BasicTypeEnum<'c>,
 ) -> StructType<'c> {
     let iw_ctx = session.iw_context();
     iw_ctx.struct_type(
         &[
-            iw_ctx.ptr_type(AddressSpace::default()).into(),
+            session.llvm_ptr_type().into(),
             usize_ty(session).into(),
         ],
         false,
@@ -327,7 +327,6 @@ pub fn build_array_fat_pointer<'c, H: HugrView<Node = Node>>(
 ) -> Result<StructValue<'c>> {
     let array_ty = array_fat_pointer_ty(
         &ctx.typing_session(),
-        ptr.get_type().get_element_type().try_into().unwrap(),
     );
     let array_v = array_ty.get_poison();
     let array_v = ctx
