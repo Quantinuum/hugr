@@ -1,4 +1,5 @@
 """HUGR model data structures."""
+
 import warnings
 from collections.abc import Generator, Sequence
 from dataclasses import dataclass, field
