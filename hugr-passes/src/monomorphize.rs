@@ -13,8 +13,8 @@ use hugr_core::{
 use hugr_core::hugr::{HugrView, OpType, hugrmut::HugrMut};
 use itertools::Itertools as _;
 
-use crate::ComposablePass;
 use crate::composable::{ValidatePassError, validate_if_test};
+use crate::{ComposablePass, PassScope};
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
@@ -35,7 +35,7 @@ use crate::composable::{ValidatePassError, validate_if_test};
 pub fn monomorphize(
     hugr: &mut impl HugrMut<Node = Node>,
 ) -> Result<(), ValidatePassError<Node, Infallible>> {
-    validate_if_test(MonomorphizePass, hugr)
+    validate_if_test(MonomorphizePass::default(), hugr)
 }
 
 fn is_polymorphic(fd: &FuncDefn) -> bool {
@@ -196,20 +196,34 @@ fn instantiate(
 /// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
-#[derive(Debug, Clone)]
-pub struct MonomorphizePass;
+#[derive(Debug, Default, Clone)]
+pub struct MonomorphizePass {
+    scope: PassScope,
+}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for MonomorphizePass {
     type Error = Infallible;
     type Result = ();
 
     fn run(&self, h: &mut H) -> Result<(), Self::Error> {
-        let root = h.entrypoint();
-        // If the root is a polymorphic function, then there are no external calls, so nothing to do
-        if !is_polymorphic_funcdefn(h.get_optype(root)) {
-            mono_scan(h, root, None, &mut HashMap::new());
-        }
+        match self.scope {
+            PassScope::EntrypointFlat | PassScope::EntrypointRecursive => {
+                // for module-entrypoint, PassScope says to do nothing. (Monomorphization could.)
+                // for non-module-entrypoint, PassScope says not to touch Hugr outside entrypoint,
+                //     so monomorphization cannot add any new functions --> do nothing.
+                // NOTE we could look to see if there are any existing instantations that
+                //   we could use (!), but not atm.
+            }
+            PassScope::PreserveAll | PassScope::PreserveEntrypoint | PassScope::PreservePublic => {
+                mono_scan(h, h.module_root(), None, &mut HashMap::new())
+            }
+        };
         Ok(())
+    }
+
+    fn with_scope(mut self, scope: &PassScope) -> Self {
+        self.scope = scope.clone();
+        self
     }
 }
 
