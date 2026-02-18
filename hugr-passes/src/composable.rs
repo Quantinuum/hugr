@@ -11,7 +11,12 @@ use hugr_core::hugr::{ValidationError, hugrmut::HugrMut};
 use itertools::Either;
 
 /// An optimization pass that can be sequenced with another and/or wrapped
-/// e.g. by [`ValidatingPass`]
+/// e.g. by [`ValidatingPass`].
+///
+/// Note it is expected that (simple) passes should make reasonable effort to be
+/// idempotent (i.e. such that after running a pass, rerunning it immediately has
+/// no further effect). However this is *not* a requirement, e.g. a sequence of
+/// idempotent passes created by [ComposablePass::then] may not be idempotent itself.
 pub trait ComposablePass<H: HugrMut>: Sized {
     /// Error thrown by this pass.
     type Error: Error;
@@ -56,6 +61,11 @@ pub trait ComposablePass<H: HugrMut>: Sized {
     /// Composed passes may have different configured [`PassScope`]s. Use
     /// [`ComposablePass::with_scope`] after the composition to override all the
     /// scope configurations if needed.
+    ///
+    /// Note this is not necessarily idempotent even if both `self` and `other` are.
+    /// (Idempotency would require rerunning the sequence of both until no change;
+    /// since there is no general/efficient reporting of whether a pass has changed
+    /// the hugr, no such checking or looping is done here.)
     fn then<P: ComposablePass<H>, E: ErrorCombiner<Self::Error, P::Error>>(
         self,
         other: P,
