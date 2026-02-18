@@ -1004,6 +1004,8 @@ class ExtType(Type):
 
 
 def _type_str(name: str, args: Sequence[TypeArg]) -> str:
+    if len(args) == 0:
+        return name
     return f"{name}<{comma_sep_str(args)}>"
 
 
