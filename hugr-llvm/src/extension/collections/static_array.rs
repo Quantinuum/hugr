@@ -15,7 +15,7 @@ use inkwell::{
     AddressSpace, IntPredicate,
     builder::Builder,
     context::Context,
-    types::{BasicType, BasicTypeEnum, IntType, StructType},
+    types::{BasicType, BasicTypeEnum, StructType},
     values::{ArrayValue, BasicValue, BasicValueEnum, IntValue, PointerValue},
 };
 use itertools::Itertools as _;
@@ -140,7 +140,7 @@ fn build_read_len<'c>(
     context: &'c Context,
     builder: &Builder<'c>,
     struct_ty: StructType<'c>,
-    mut ptr: PointerValue<'c>,
+    ptr: PointerValue<'c>,
 ) -> Result<IntValue<'c>> {
     let i32_ty = context.i32_type();
     let indices = [i32_ty.const_zero(), i32_ty.const_zero()];
@@ -260,8 +260,6 @@ pub trait StaticArrayCodegen: Clone {
         op: StaticArrayOp,
     ) -> Result<()> {
         let elem_ty = context.llvm_type(&op.elem_ty)?;
-        // TODO: need to enforce the use of usize_t for input pointers
-        let len_ty = context.llvm_type(&usize_t())?.into_int_type();
         match op.def {
             StaticArrayOpDef::get => {
                 let ptr = args.inputs[0].into_pointer_value();

@@ -259,7 +259,7 @@ fn get_buffer_ptr<'c, H: HugrView<Node = Node>>(
     let global = get_global_buffer(name, size, ctx.get_current_module());
     let ptr = ctx.builder().build_bit_cast(
         global.as_pointer_value(),
-        ctx.iw_context().i8_type().ptr_type(AddressSpace::default()),
+        ctx.iw_context().ptr_type(AddressSpace::default()),
         "",
     )?;
     Ok(ptr.into_pointer_value())

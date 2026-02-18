@@ -33,10 +33,10 @@ use inkwell::types::{BasicType, BasicTypeEnum, BasicMetadataTypeEnum, FunctionTy
 use inkwell::values::{
     BasicValue as _, BasicValueEnum, IntValue, PointerValue, StructValue,
 };
-use inkwell::{AddressSpace, IntPredicate};
+use inkwell::IntPredicate;
 use itertools::Itertools;
 
-use crate::emit::{emit_value, val_as_ptr};
+use crate::emit::emit_value;
 use crate::emit::libc::{emit_libc_free, emit_libc_malloc};
 use crate::{CodegenExtension, CodegenExtsBuilder};
 use crate::{
@@ -214,7 +214,7 @@ impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
             .custom_type((array::EXTENSION_ID, array::ARRAY_TYPENAME), {
                 let ccg = self.0.clone();
                 move |ts, hugr_type| {
-                    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = hugr_type.args() else {
+                    let [TypeArg::BoundedNat(n), _] = hugr_type.args() else {
                         return Err(anyhow!("Invalid type args for array type"));
                     };
                     Ok(ccg.array_type(&ts, *n).as_basic_type_enum())
@@ -461,7 +461,6 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
         size,
     } = op;
     let elem_ty = ts.llvm_type(hugr_elem_ty)?;
-    let ptr_t = ts.llvm_ptr_type();
     match def {
         ArrayOpDef::new_array => {
             let (elem_ptr, array_v) = build_array_alloc(ctx, ccg, elem_ty, size)?;
@@ -850,7 +849,7 @@ pub fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     let (ptr, array_v) = build_array_alloc(ctx, ccg, elem_ty, op.size)?;
     let array_len = usize_ty(&ctx.typing_session()).const_int(op.size, false);
     let func_ty = elem_ty.fn_type(&[], false);
-    let func_ptr = val_as_ptr(func)
+    let func_ptr = PointerValue::try_from(func)
         .map_err(|_| anyhow!("ArrayOpDef::repeat expects a function pointer"))?;
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
@@ -898,7 +897,7 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
         builder.build_store(*ptr, *initial_val)?;
     }
 
-    let func_ptr = val_as_ptr(func)
+    let func_ptr = PointerValue::try_from(func)
         .map_err(|_| anyhow!("ArrayOpDef::scan expects a function pointer"))?;
     let func_ty = get_accumulator_sig(&ctx.typing_session(), &src_elem_ty, &tgt_elem_ty, &acc_tys);
 

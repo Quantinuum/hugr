@@ -11,7 +11,7 @@ use inkwell::{
     intrinsics::Intrinsic,
     module::{Linkage, Module},
     types::{AnyType, BasicType, BasicTypeEnum, FunctionType, PointerType},
-    values::{BasicValueEnum, CallSiteValue, FunctionValue, GlobalValue, PointerValue},
+    values::{BasicValueEnum, CallSiteValue, FunctionValue, GlobalValue},
 };
 use std::{collections::HashSet, rc::Rc};
 
@@ -413,17 +413,6 @@ pub fn get_intrinsic<'c>(
             "failed to get_declaration for intrinsic '{name}' with args '{args:?}'"
         ))
 }
-
-// TODO: just use TryFrom<BasicValueEnum>
-/// Checked conversion from BasicValues to PointerValues
-pub fn val_as_ptr<'c>(val: BasicValueEnum<'c>) -> Result<PointerValue, ()> {
-    if let BasicValueEnum::PointerValue(ptr) = val {
-        Ok(ptr)
-    } else {
-        Err(())
-    }
-}
-
 
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test;

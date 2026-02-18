@@ -207,9 +207,7 @@ pub trait PreludeCodegen: Clone {
         str: &ConstString,
     ) -> Result<BasicValueEnum<'c>> {
         let default_str_type = ctx
-            .iw_context()
-            .i8_type()
-            .ptr_type(AddressSpace::default())
+            .llvm_ptr_type()
             .as_basic_type_enum();
         let str_type = ctx.llvm_type(&str.get_type())?.as_basic_type_enum();
         ensure!(

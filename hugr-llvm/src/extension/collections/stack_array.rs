@@ -25,7 +25,7 @@ use inkwell::values::{
 };
 use itertools::Itertools;
 
-use crate::emit::{emit_value, val_as_ptr};
+use crate::emit::emit_value;
 use crate::{CodegenExtension, CodegenExtsBuilder};
 use crate::extension::collections::array::get_accumulator_sig;
 use crate::{
@@ -648,7 +648,7 @@ fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     let array_ty = elem_ty.array_type(op.size as u32);
     // The generator func takes no args and returns a single array element.
     let func_ty = elem_ty.fn_type(&[], false); 
-    let func_ptr = val_as_ptr(func)
+    let func_ptr = PointerValue::try_from(func)
         .map_err(|_| anyhow!("ArrayOpDef::repeat expects a function pointer"))?;
     let (ptr, array_ptr) = build_array_alloca(builder, array_ty.get_undef())?;
 
@@ -698,7 +698,7 @@ fn emit_scan_op<'c, H: HugrView<Node = Node>>(
         builder.build_store(*ptr, *initial_val)?;
     }
     let func_ty = get_accumulator_sig(&ts, &src_ty, &tgt_ty, &acc_tys); 
-    let func_ptr = val_as_ptr(func)
+    let func_ptr = PointerValue::try_from(func)
         .map_err(|_| anyhow!("ArrayOpDef::scan expects a function pointer"))?;
     
     build_loop(ctx, array_len, |ctx, idx| {

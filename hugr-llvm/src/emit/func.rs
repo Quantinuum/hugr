@@ -5,7 +5,7 @@ use hugr_core::{
     HugrView, Node, NodeIndex, PortIndex, Wire,
     extension::prelude::{either_type, option_type},
     ops::{ExtensionOp, FuncDecl, FuncDefn, constant::CustomConst},
-    types::{Type, TypeEnum},
+    types::Type,
 };
 use inkwell::{
     basic_block::BasicBlock,
