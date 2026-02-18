@@ -1041,7 +1041,7 @@ mod test {
 
         // `Term::TupleType` requires a `Term::Tuple` of the same number of elems
         let usize_and_ty =
-            TypeParam::new_tuple_type([TypeParam::max_nat_type(), TypeBound::Copyable.into()]);
+            TypeParam::new_tuple_type([TypeParam::max_nat_type(), Term::from(TypeBound::Copyable)]);
         check(
             TypeArg::Tuple(vec![5.into(), usize_t().into()]),
             &usize_and_ty,
@@ -1132,8 +1132,8 @@ mod test {
     fn test_try_into_list_elements() {
         // Test successful conversion with List
         let types = vec![Type::new_unit_sum(1), bool_t()];
-        let term = TypeArg::List(types.iter().cloned().map_into());
-        let result = term.try_into();
+        let term = TypeArg::new_list(types.iter().cloned().map_into());
+        let result = TypeRow::try_from(term);
         assert_eq!(result, Ok(TypeRow::from(types)));
 
         // Test failure with non-list

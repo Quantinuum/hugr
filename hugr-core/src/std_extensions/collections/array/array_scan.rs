@@ -13,7 +13,7 @@ use crate::extension::simple_op::{
 use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
 use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{FuncTypeBase, PolyFuncTypeRV, RowVariable, Type, TypeBound, TypeRV};
+use crate::types::{FuncValueType, PolyFuncTypeRV, Type, TypeBound, TypeRV};
 
 use super::array_kind::ArrayKind;
 
@@ -62,29 +62,26 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
             TypeParam::new_list_type(TypeBound::Linear),
         ];
         let n = TypeArg::new_var_use(0, TypeParam::max_nat_type());
-        let t1 = Type::new_var_use(1, TypeBound::Linear);
-        let t2 = Type::new_var_use(2, TypeBound::Linear);
-        let s = TypeRV::new_row_var_use(3, TypeBound::Linear);
+        let src_elem = Type::new_var_use(1, TypeBound::Linear);
+        let tgt_elem = Type::new_var_use(2, TypeBound::Linear);
+        let with_rest = |tys: Vec<Type>| {
+            TypeArg::concat_lists([tys.into(), TypeRV::new_row_var_use(3, TypeBound::Linear)])
+        };
         PolyFuncTypeRV::new(
             params,
-            FuncTypeBase::<RowVariable>::new(
-                vec![
-                    AK::instantiate_ty(array_def, n.clone(), t1.clone())
-                        .expect("Array type instantiation failed")
-                        .into(),
-                    Type::new_function(FuncTypeBase::<RowVariable>::new(
-                        vec![t1.into(), s.clone()],
-                        vec![t2.clone().into(), s.clone()],
-                    ))
-                    .into(),
-                    s.clone(),
-                ],
-                vec![
-                    AK::instantiate_ty(array_def, n, t2)
-                        .expect("Array type instantiation failed")
-                        .into(),
-                    s,
-                ],
+            FuncValueType::new(
+                with_rest(vec![
+                    AK::instantiate_ty(array_def, n.clone(), src_elem.clone())
+                        .expect("Array type instantiation failed"),
+                    Type::new_function(FuncValueType::new(
+                        with_rest(vec![src_elem]),
+                        with_rest(vec![tgt_elem.clone()]),
+                    )),
+                ]),
+                with_rest(vec![
+                    AK::instantiate_ty(array_def, n, tgt_elem)
+                        .expect("Array type instantiation failed"),
+                ]),
             ),
         )
         .into()
@@ -214,21 +211,18 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayScanDef<AK> {
         match type_args {
             [
                 TypeArg::BoundedNat(n),
-                TypeArg::Runtime(src_ty),
-                TypeArg::Runtime(tgt_ty),
+                src_elem_ty,
+                tgt_elem_ty,
                 TypeArg::List(acc_tys),
             ] => {
-                let acc_tys: Result<_, OpLoadError> = acc_tys
-                    .iter()
-                    .map(|acc_ty| match acc_ty {
-                        TypeArg::Runtime(ty) => Ok(ty.clone()),
-                        _ => Err(SignatureError::InvalidTypeArgs.into()),
-                    })
-                    .collect();
+                let src_elem_ty = Type::try_from(src_elem_ty.clone())?;
+                let tgt_elem_ty = Type::try_from(tgt_elem_ty.clone())?;
+                let acc_tys = acc_tys.iter().map(|tm|
+                    Type::try_from(tm.clone())).collect::<Result<Vec<_>,_>>()?;
                 Ok(GenericArrayScan::new(
-                    src_ty.clone(),
-                    tgt_ty.clone(),
-                    acc_tys?,
+                    src_elem_ty,
+                    tgt_elem_ty,
+                    acc_tys,
                     *n,
                 ))
             }

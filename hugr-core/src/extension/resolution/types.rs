@@ -10,8 +10,7 @@ use super::{ExtensionCollectionError, WeakExtensionRegistry};
 use crate::Node;
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{DataflowOpTrait, OpType, Value};
-use crate::types::type_row::TypeRowBase;
-use crate::types::{FuncTypeBase, MaybeRV, SumType, Term, TypeBase, TypeEnum};
+use crate::types::{Signature, SumType, Term, TypeRow};
 
 /// Collects every extension used to define the types in an operation.
 ///
@@ -59,7 +58,7 @@ pub(crate) fn collect_op_types_extensions(
             }
         }
         OpType::CallIndirect(c) => collect_signature_exts(&c.signature, &mut used, &mut missing),
-        OpType::LoadConstant(lc) => collect_type_exts(&lc.datatype, &mut used, &mut missing),
+        OpType::LoadConstant(lc) => collect_term_exts(&lc.datatype, &mut used, &mut missing),
         OpType::LoadFunction(lf) => {
             collect_signature_exts(lf.func_sig.body(), &mut used, &mut missing);
             collect_signature_exts(&lf.instantiation, &mut used, &mut missing);
@@ -121,7 +120,7 @@ pub(crate) fn collect_op_types_extensions(
     }
 }
 
-/// Collect the Extension pointers in the [`CustomType`]s inside a signature.
+/// Collect the Extension pointers in the [`CustomType`]s inside a [Signature].
 ///
 /// # Attributes
 ///
@@ -129,8 +128,8 @@ pub(crate) fn collect_op_types_extensions(
 /// - `used_extensions`: A The registry where to store the used extensions.
 /// - `missing_extensions`: A set of `ExtensionId`s of which the
 ///   `Weak<Extension>` pointer has been invalidated.
-pub(crate) fn collect_signature_exts<RV: MaybeRV>(
-    signature: &FuncTypeBase<RV>,
+pub(crate) fn collect_signature_exts(
+    signature: &Signature,
     used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {
@@ -146,31 +145,31 @@ pub(crate) fn collect_signature_exts<RV: MaybeRV>(
 /// - `used_extensions`: A The registry where to store the used extensions.
 /// - `missing_extensions`: A set of `ExtensionId`s of which the
 ///   `Weak<Extension>` pointer has been invalidated.
-fn collect_type_row_exts<RV: MaybeRV>(
-    row: &TypeRowBase<RV>,
+fn collect_type_row_exts(
+    row: &TypeRow,
     used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {
     for ty in row.iter() {
-        collect_type_exts(ty, used_extensions, missing_extensions);
+        collect_term_exts(ty, used_extensions, missing_extensions);
     }
 }
 
-/// Collect the Extension pointers in the [`CustomType`]s inside a type.
+/// Collect the Extension pointers in the [`CustomType`]s inside a [`Term`].
 ///
 /// # Attributes
 ///
-/// - `typ`: The type to collect the extensions from.
+/// - `term`: The term argument to collect the extensions from.
 /// - `used_extensions`: A The registry where to store the used extensions.
 /// - `missing_extensions`: A set of `ExtensionId`s of which the
 ///   `Weak<Extension>` pointer has been invalidated.
-pub(crate) fn collect_type_exts<RV: MaybeRV>(
-    typ: &TypeBase<RV>,
+pub(crate) fn collect_term_exts(
+    term: &Term,
     used_extensions: &mut WeakExtensionRegistry,
     missing_extensions: &mut ExtensionSet,
 ) {
-    match typ.as_type_enum() {
-        TypeEnum::Extension(custom) => {
+    match term {
+        Term::RuntimeExtension(custom) => {
             for arg in custom.args() {
                 collect_term_exts(arg, used_extensions, missing_extensions);
             }
@@ -185,39 +184,16 @@ pub(crate) fn collect_type_exts<RV: MaybeRV>(
                 }
             }
         }
-        TypeEnum::Function(f) => {
-            collect_type_row_exts(&f.input, used_extensions, missing_extensions);
-            collect_type_row_exts(&f.output, used_extensions, missing_extensions);
+        Term::RuntimeFunction(f) => {
+            collect_term_exts(&f.input, used_extensions, missing_extensions);
+            collect_term_exts(&f.output, used_extensions, missing_extensions);
         }
-        TypeEnum::Sum(SumType::General { rows }) => {
-            for row in rows {
-                collect_type_row_exts(row, used_extensions, missing_extensions);
+        Term::RuntimeSum(g @ SumType::General(_)) => {
+            for row in g.variants() {
+                collect_term_exts(row, used_extensions, missing_extensions);
             }
         }
-        // Other types do not store extensions.
-        TypeEnum::Alias(_)
-        | TypeEnum::RowVar(_)
-        | TypeEnum::Variable(_, _)
-        | TypeEnum::Sum(SumType::Unit { .. }) => {}
-    }
-}
-
-/// Collect the Extension pointers in the [`CustomType`]s inside a [`Term`].
-///
-/// # Attributes
-///
-/// - `term`: The term argument to collect the extensions from.
-/// - `used_extensions`: A The registry where to store the used extensions.
-/// - `missing_extensions`: A set of `ExtensionId`s of which the
-///   `Weak<Extension>` pointer has been invalidated.
-pub(super) fn collect_term_exts(
-    term: &Term,
-    used_extensions: &mut WeakExtensionRegistry,
-    missing_extensions: &mut ExtensionSet,
-) {
-    match term {
-        Term::Runtime(ty) => collect_type_exts(ty, used_extensions, missing_extensions),
-        Term::ConstType(ty) => collect_type_exts(ty, used_extensions, missing_extensions),
+        Term::ConstType(ty) => collect_term_exts(ty, used_extensions, missing_extensions),
         Term::List(elems) => {
             for elem in elems.iter() {
                 collect_term_exts(elem, used_extensions, missing_extensions);
@@ -254,7 +230,8 @@ pub(super) fn collect_term_exts(
         | Term::BoundedNat(_)
         | Term::String(_)
         | Term::Bytes(_)
-        | Term::Float(_) => {}
+        | Term::Float(_)
+        | Term::RuntimeSum(SumType::Unit { .. }) => {}
     }
 }
 
@@ -274,16 +251,16 @@ fn collect_value_exts(
     match value {
         Value::Extension { e } => {
             let typ = e.get_type();
-            collect_type_exts(&typ, used_extensions, missing_extensions);
+            collect_term_exts(&typ, used_extensions, missing_extensions);
         }
         #[expect(deprecated)] // remove when Value::Function removed
         Value::Function { hugr: _ } => {
             // The extensions used by nested hugrs do not need to be counted for the root hugr.
         }
         Value::Sum(s) => {
-            if let SumType::General { rows } = &s.sum_type {
-                for row in rows {
-                    collect_type_row_exts(row, used_extensions, missing_extensions);
+            if matches!(s.sum_type, SumType::General(_)) {
+                for row in s.sum_type.variants() {
+                    collect_term_exts(row, used_extensions, missing_extensions);
                 }
             }
             s.values

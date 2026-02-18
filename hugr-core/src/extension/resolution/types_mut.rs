@@ -5,12 +5,11 @@
 
 use std::sync::Weak;
 
-use super::types::collect_type_exts;
+use super::types::collect_term_exts;
 use super::{ExtensionResolutionError, WeakExtensionRegistry};
 use crate::extension::ExtensionSet;
 use crate::ops::{OpType, Value};
-use crate::types::type_row::TypeRowBase;
-use crate::types::{CustomType, FuncTypeBase, MaybeRV, SumType, Term, TypeBase, TypeEnum};
+use crate::types::{CustomType, FuncValueType, Signature, SumType, Term, Type, TypeRow};
 use crate::{Extension, Node};
 
 /// Replace the dangling extension pointer in the [`CustomType`]s inside an
@@ -125,12 +124,12 @@ pub fn resolve_op_types_extensions(
     Ok(used.into_iter())
 }
 
-/// Update all weak Extension pointers in the [`CustomType`]s inside a signature.
+/// Update all weak Extension pointers in the [`CustomType`]s inside a [Signature].
 ///
 /// Adds the extensions used in the signature to the `used_extensions` registry.
-pub(super) fn resolve_signature_exts<RV: MaybeRV>(
+pub(super) fn resolve_signature_exts(
     node: Option<Node>,
-    signature: &mut FuncTypeBase<RV>,
+    signature: &mut Signature,
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
@@ -139,48 +138,31 @@ pub(super) fn resolve_signature_exts<RV: MaybeRV>(
     Ok(())
 }
 
+/// Update all weak Extension pointers in the [`CustomType`]s inside a [FuncValueType].
+///
+/// Adds the extensions used in the signature to the `used_extensions` registry.
+pub(super) fn resolve_func_type_exts(
+    node: Option<Node>,
+    signature: &mut FuncValueType,
+    extensions: &WeakExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
+) -> Result<(), ExtensionResolutionError> {
+    resolve_term_exts(node, &mut signature.input, extensions, used_extensions)?;
+    resolve_term_exts(node, &mut signature.output, extensions, used_extensions)?;
+    Ok(())
+}
+
 /// Update all weak Extension pointers in the [`CustomType`]s inside a type row.
 ///
 /// Adds the extensions used in the row to the `used_extensions` registry.
-pub(super) fn resolve_type_row_exts<RV: MaybeRV>(
+pub(super) fn resolve_type_row_exts(
     node: Option<Node>,
-    row: &mut TypeRowBase<RV>,
+    row: &mut TypeRow,
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     for ty in row.iter_mut() {
-        resolve_type_exts(node, ty, extensions, used_extensions)?;
-    }
-    Ok(())
-}
-
-/// Update all weak Extension pointers in the [`CustomType`]s inside a type.
-///
-/// Adds the extensions used in the type to the `used_extensions` registry.
-pub(super) fn resolve_type_exts<RV: MaybeRV>(
-    node: Option<Node>,
-    typ: &mut TypeBase<RV>,
-    extensions: &WeakExtensionRegistry,
-    used_extensions: &mut WeakExtensionRegistry,
-) -> Result<(), ExtensionResolutionError> {
-    match typ.as_type_enum_mut() {
-        TypeEnum::Extension(custom) => {
-            resolve_custom_type_exts(node, custom, extensions, used_extensions)?;
-        }
-        TypeEnum::Function(f) => {
-            resolve_type_row_exts(node, &mut f.input, extensions, used_extensions)?;
-            resolve_type_row_exts(node, &mut f.output, extensions, used_extensions)?;
-        }
-        TypeEnum::Sum(SumType::General { rows }) => {
-            for row in rows.iter_mut() {
-                resolve_type_row_exts(node, row, extensions, used_extensions)?;
-            }
-        }
-        // Other types do not store extensions.
-        TypeEnum::Alias(_)
-        | TypeEnum::RowVar(_)
-        | TypeEnum::Variable(_, _)
-        | TypeEnum::Sum(SumType::Unit { .. }) => {}
+        resolve_term_exts(node, ty, extensions, used_extensions)?;
     }
     Ok(())
 }
@@ -211,18 +193,44 @@ pub(super) fn resolve_custom_type_exts(
     Ok(())
 }
 
-/// Update all weak Extension pointers in the [`CustomType`]s inside a [`Term`].
+/// Update all weak Extension pointers in the [`CustomType`]s inside a [`Type`].
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
-pub(super) fn resolve_term_exts(
+pub(crate) fn resolve_type_exts(node: Option<Node>,
+    typ: &mut Type,
+    extensions: &WeakExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
+) -> Result<(), ExtensionResolutionError> {
+    const EMPTY:Type = Type::new_unit_sum(0); // as no Type::default()
+    let tm = std::mem::replace(typ, EMPTY).into();
+    let r = resolve_term_exts(node, tm, extensions, used_extensions);
+    *typ = tm.into();
+    r
+}
+
+/// Update all weak Extension pointers in the [`CustomType`]s inside a [`Term`].
+///
+/// Adds the extensions used in the term to the `used_extensions` registry.
+pub(crate) fn resolve_term_exts(
     node: Option<Node>,
     term: &mut Term,
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     match term {
-        Term::Runtime(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
-        Term::ConstType(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
+        Term::RuntimeExtension(custom) => {
+            resolve_custom_type_exts(node, custom, extensions, used_extensions)?;
+        }
+        Term::RuntimeFunction(f) => {
+            resolve_term_exts(node, &mut f.input, extensions, used_extensions)?;
+            resolve_term_exts(node, &mut f.output, extensions, used_extensions)?;
+        }
+        Term::RuntimeSum(SumType::General(gs)) => {
+            for row in gs.iter_mut() {
+                resolve_term_exts(node, row, extensions, used_extensions)?;
+            }
+        }
+        Term::ConstType(ty) => resolve_term_exts(node, ty, extensions, used_extensions)?,
         Term::List(children)
         | Term::ListConcat(children)
         | Term::Tuple(children)
@@ -247,7 +255,8 @@ pub(super) fn resolve_term_exts(
         | Term::BoundedNat(_)
         | Term::String(_)
         | Term::Bytes(_)
-        | Term::Float(_) => {}
+        | Term::Float(_)
+        | Term::RuntimeSum(SumType::Unit { .. }) => {}
     }
     Ok(())
 }
@@ -269,7 +278,7 @@ pub(super) fn resolve_value_exts(
             // return types with valid extensions after we call `update_extensions`.
             let typ = e.get_type();
             let mut missing = ExtensionSet::new();
-            collect_type_exts(&typ, used_extensions, &mut missing);
+            collect_term_exts(&typ, used_extensions, &mut missing);
             if !missing.is_empty() {
                 return Err(ExtensionResolutionError::InvalidConstTypes {
                     value: e.name(),
@@ -286,9 +295,9 @@ pub(super) fn resolve_value_exts(
             }
         }
         Value::Sum(s) => {
-            if let SumType::General { rows } = &mut s.sum_type {
-                for row in rows.iter_mut() {
-                    resolve_type_row_exts(node, row, extensions, used_extensions)?;
+            if let SumType::General(gs) = &mut s.sum_type {
+                for row in gs.iter_mut() {
+                    resolve_term_exts(node, row, extensions, used_extensions)?;
                 }
             }
             s.values
