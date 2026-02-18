@@ -105,8 +105,8 @@ class Literal(Term):
     value: str | float | int | bytes
 
 
+@deprecated("Lift functions to toplevel")
 @dataclass(frozen=True)
-@deprecated
 class Func(Term):
     """Function constant."""
 
