@@ -12,7 +12,7 @@ use hugr_core::{
     },
 };
 use inkwell::{
-    AddressSpace, IntPredicate,
+    IntPredicate,
     builder::Builder,
     context::Context,
     types::{BasicType, BasicTypeEnum, StructType},
@@ -23,8 +23,10 @@ use itertools::Itertools as _;
 use crate::{
     CodegenExtension, CodegenExtsBuilder,
     emit::{EmitFuncContext, EmitOpArgs, emit_value},
-    types::{HugrType, TypingSession},
 };
+
+#[cfg(test)]
+use crate::types::HugrType;
 
 use anyhow::{Result, anyhow, bail};
 
@@ -154,41 +156,12 @@ fn build_read_len<'c>(
 /// A helper trait for customising the lowering of [`hugr_core::std_extensions::collections::static_array`]
 /// types, [`hugr_core::ops::constant::CustomConst`]s, and ops.
 pub trait StaticArrayCodegen: Clone {
-    /// Return the llvm type of
-    /// [`hugr_core::std_extensions::collections::static_array::STATIC_ARRAY_TYPENAME`].
-    ///
-    /// By default a static array of llvm type `t` and length `l` is stored in a
-    /// global of type `struct { i64, [t * l] }``
-    ///
-    /// The `i64` stores the length of the array.
-    ///
-    /// However a `static_array` `HugrType` is represented by an llvm pointer type
-    /// `struct {i64, [t * 0]}`;  i.e. the array is zero length. This gives all
-    /// static arrays of the same element type a uniform llvm type.
-    ///
-    /// It is legal to index past the end of an array (it is only undefined behaviour
-    /// to index past the allocation).
-    fn static_array_type<'c>(
-        &self,
-        session: TypingSession<'c, '_>,
-        element_type: &HugrType,
-    ) -> Result<BasicTypeEnum<'c>> {
-        let index_type = session.llvm_type(&usize_t())?;
-        let element_type = session.llvm_type(element_type)?;
-        Ok(
-            static_array_struct_type(session.iw_context(), index_type, element_type, 0)
-                .ptr_type(AddressSpace::default())
-                .into(),
-        )
-    }
 
     /// Emit a
     /// [`hugr_core::std_extensions::collections::static_array::StaticArrayValue`].
     ///
-    /// Note that the type of the return value must match the type returned by
-    /// [`Self::static_array_type`].
-    ///
-    /// By default a global is created and we return a pointer to it.
+    /// By default a global is created and we return a pointer to it, so the type of
+    /// the return value is the global opaque pointer type.
     fn static_array_value<'c, H: HugrView<Node = Node>>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
@@ -246,10 +219,7 @@ pub trait StaticArrayCodegen: Clone {
                 })
                 .unwrap()
         };
-        let canonical_type = self
-            .static_array_type(context.typing_session(), value.get_element_type())?
-            .into_pointer_type();
-        Ok(gv.as_pointer_value().const_cast(canonical_type).into())
+        Ok(gv.as_pointer_value().into())
     }
 
     /// Emit a [`hugr_core::std_extensions::collections::static_array::StaticArrayOp`].
@@ -367,12 +337,12 @@ impl<SAC: StaticArrayCodegen + 'static> CodegenExtension for StaticArrayCodegenE
                     static_array::STATIC_ARRAY_TYPENAME,
                 ),
                 {
-                    let sac = self.0.clone();
                     move |ts, custom_type| {
-                        let element_type = custom_type.args()[0]
+                        // check the arg type, even though the return is always ptr
+                        let _ = custom_type.args()[0]
                             .as_runtime()
                             .expect("Type argument for static array must be a type");
-                        sac.static_array_type(ts, &element_type)
+                        Ok(ts.llvm_ptr_type().into())
                     }
                 },
             )

@@ -277,12 +277,12 @@ impl PreludeCodegen for PanicTestPreludeCodegen {
     ) -> Result<()> {
         // Emit a `panic_exit(jmp_buf, msg_buf, msg, msg_buf_len)` runtime call
         let usize_ty = self.usize_type(&ctx.typing_session());
-        let i8_ptr_ty = ctx.iw_context().i8_type().ptr_type(AddressSpace::default());
+        let ptr_ty = ctx.llvm_ptr_type();
         let sig = ctx.iw_context().void_type().fn_type(
             &[
-                i8_ptr_ty.into(),
-                i8_ptr_ty.into(),
-                i8_ptr_ty.into(),
+                ptr_ty.into(),
+                ptr_ty.into(),
+                ptr_ty.into(),
                 usize_ty.into(),
             ],
             false,
