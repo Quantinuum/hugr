@@ -633,7 +633,7 @@ class Sum(Type):
         elif all(len(row) == 0 for row in self.variant_rows):
             return f"UnitSum({len(self.variant_rows)})"
         elif len(self.variant_rows) == 1:
-            return f"Tuple{tuple(self.variant_rows[0])}"
+            return f"Tuple({comma_sep_repr(self.variant_rows[0])})"
         elif len(self.variant_rows) == 2 and len(self.variant_rows[0]) == 0:
             return f"Option({comma_sep_repr(self.variant_rows[1])})"
         elif len(self.variant_rows) == 2:
@@ -650,7 +650,7 @@ class Sum(Type):
         elif all(len(row) == 0 for row in self.variant_rows):
             return f"UnitSum({len(self.variant_rows)})"
         elif len(self.variant_rows) == 1:
-            return f"Tuple{tuple(self.variant_rows[0])}"
+            return f"Tuple({comma_sep_str(self.variant_rows[0])})"
         elif len(self.variant_rows) == 2 and len(self.variant_rows[0]) == 0:
             return f"Option({comma_sep_str(self.variant_rows[1])})"
         elif len(self.variant_rows) == 2:
@@ -1004,8 +1004,6 @@ class ExtType(Type):
 
 
 def _type_str(name: str, args: Sequence[TypeArg]) -> str:
-    if len(args) == 0:
-        return name
     return f"{name}<{comma_sep_str(args)}>"
 
 
