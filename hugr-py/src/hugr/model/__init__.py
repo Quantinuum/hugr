@@ -1,11 +1,11 @@
 """HUGR model data structures."""
-
 import warnings
 from collections.abc import Generator, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
 
 from semver import Version
+from typing_extensions import deprecated
 
 import hugr._hugr.model as rust
 from hugr.tys import Visibility
@@ -106,6 +106,7 @@ class Literal(Term):
 
 
 @dataclass(frozen=True)
+@deprecated
 class Func(Term):
     """Function constant."""
 

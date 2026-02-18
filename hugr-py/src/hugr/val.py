@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
+
 from typing_extensions import deprecated
 
 import hugr._serialization.ops as sops
