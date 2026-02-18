@@ -43,7 +43,7 @@ too_long_first_doc_paragraph = "warn"
 anyhow = "1.0.101"
 insta = { version = "1.46.3" }
 bitvec = "1.0.1"
-capnp = "0.25.0"
+capnp = "0.25.1"
 cgmath = "0.18.0"
 cool_asserts = "2.0.4"
 delegate = "0.13.5"
@@ -72,7 +72,7 @@ strum = "0.27.2"
 tempfile = "3.25"
 thiserror = "2.0.18"
 typetag = "0.2.21"
-clap = { version = "4.5.58" }
+clap = { version = "4.5.59" }
 clio = "0.3.5"
 clap-verbosity-flag = "3.0.4"
 assert_cmd = "2.1"
