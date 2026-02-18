@@ -70,6 +70,10 @@ pub trait TypeMapping {
     /// the mapping.
     fn sum_into_out<'c>(&self, sum: Self::SumOutV<'c>) -> Self::OutV<'c>;
 
+    /// Infallibly convert from the result of `map_function_type` to the result of the
+    /// mapping.
+    fn func_into_out<'c>(&self, sum: Self::FuncOutV<'c>) -> Self::OutV<'c>;
+
     /// Construct an appropriate result of the mapping when `hugr_type` is not a
     /// function, sum, registered custom type, or composition of same.
     fn default_out<'c>(
@@ -122,8 +126,9 @@ impl<'a, TM: TypeMapping + 'a> TypeMap<'a, TM> {
             TypeEnum::Sum(sum_type) => self
                 .map_sum_type(sum_type, inv)
                 .map(|x| self.type_map.sum_into_out(x)),
-            TypeEnum::Function(function_type) => 
-                panic!("Mapping function types is no longer supported"),
+            TypeEnum::Function(function_type) => self
+                .map_function_type(&function_type.as_ref().clone().try_into()?, inv)
+                .map(|x| self.type_map.func_into_out(x)),
             _ => self.type_map.default_out(inv, hugr_type),
         }
     }

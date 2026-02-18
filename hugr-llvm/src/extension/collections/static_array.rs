@@ -26,7 +26,7 @@ use crate::{
     types::{HugrType, TypingSession},
 };
 
-use anyhow::{Result, bail};
+use anyhow::{Result, anyhow, bail};
 
 #[derive(Debug, Clone, derive_more::From)]
 /// A [`CodegenExtension`] that lowers the
@@ -140,12 +140,14 @@ fn build_read_len<'c>(
     context: &'c Context,
     builder: &Builder<'c>,
     struct_ty: StructType<'c>,
-    len_ty: IntType<'c>,
     mut ptr: PointerValue<'c>,
 ) -> Result<IntValue<'c>> {
     let i32_ty = context.i32_type();
     let indices = [i32_ty.const_zero(), i32_ty.const_zero()];
-    let len_ptr = unsafe { builder.build_in_bounds_gep(len_ty, ptr, &indices, "") }?;
+    let len_ptr = unsafe { builder.build_in_bounds_gep(struct_ty, ptr, &indices, "") }?;
+    let len_ty = struct_ty
+        .get_field_type_at_index(0)
+        .ok_or(anyhow!("Struct has no types?"))?;
     Ok(builder.build_load(len_ty, len_ptr, "")?.into_int_value())
 }
 
@@ -269,7 +271,7 @@ pub trait StaticArrayCodegen: Clone {
                     static_array_struct_type(context.iw_context(), index_ty, elem_ty, 0);
 
                 let len = build_read_len(
-                    context.iw_context(), context.builder(), struct_ty, len_ty, ptr)?;
+                    context.iw_context(), context.builder(), struct_ty, ptr)?;
 
                 let result_sum_ty = option_type(op.elem_ty);
                 let rmb = context.new_row_mail_box([&result_sum_ty.clone().into()], "")?;
@@ -307,7 +309,7 @@ pub trait StaticArrayCodegen: Clone {
                         let i32_ty = context.iw_context().i32_type();
                         let indices = [i32_ty.const_zero(), i32_ty.const_int(1, false), index];
                         let element_ptr =
-                            unsafe { context.builder().build_in_bounds_gep(elem_ty, ptr, &indices, "") }?;
+                            unsafe { context.builder().build_in_bounds_gep(struct_ty, ptr, &indices, "") }?;
                         let element = context.builder().build_load(elem_ty, element_ptr, "")?;
                         rmb.write(
                             context.builder(),
@@ -337,7 +339,7 @@ pub trait StaticArrayCodegen: Clone {
                 let struct_ty =
                     static_array_struct_type(context.iw_context(), index_ty, elem_ty, 0);
                 let len = build_read_len(
-                    context.iw_context(), context.builder(), struct_ty, len_ty, ptr)?;
+                    context.iw_context(), context.builder(), struct_ty, ptr)?;
                 args.outputs.finish(context.builder(), [len.into()])
             }
             op => bail!("StaticArrayCodegen: Unsupported op: {op:?}"),

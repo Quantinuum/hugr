@@ -180,17 +180,8 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
         })
     }
 
-    fn get_storage_type(&self, t: &Type) -> Result<BasicTypeEnum<'c>> {
-        match t.as_type_enum() {
-            // `t` can be a function type when constructing an indirect call.
-            // what we want to store in the mailbox is just an opaque pointer.
-            TypeEnum::Function(_) => Ok(self.llvm_ptr_type().as_basic_type_enum()),
-            _ => self.llvm_type(t)
-        }
-    }
-
     fn new_value_mail_box(&mut self, t: &Type, name: impl AsRef<str>) -> Result<ValueMailBox<'c>> {
-        let bte = self.get_storage_type(t)?;
+        let bte = self.llvm_type(t)?;
         let ptr = self.build_prologue(|builder| builder.build_alloca(bte, name.as_ref()))?;
         Ok(ValueMailBox::new(bte, ptr, Some(name.as_ref().into())))
     }
@@ -265,7 +256,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
 
         debug_assert!(
             zip_eq(node.in_value_types(), r.get_types())
-                .all(|((_, t), lt)| self.get_storage_type(&t).unwrap() == lt)
+                .all(|((_, t), lt)| self.llvm_type(&t).unwrap() == lt)
         );
         Ok(r)
     }
@@ -282,7 +273,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
             .collect::<Result<RowMailBox>>()?;
         debug_assert!(
             zip_eq(node.out_value_types(), r.get_types())
-                .all(|((_, t), lt)| self.get_storage_type(&t).unwrap() == lt)
+                .all(|((_, t), lt)| self.llvm_type(&t).unwrap() == lt)
         );
         Ok(r)
     }
@@ -295,7 +286,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
     ) -> Result<ValueMailBox<'c>> {
         let wire = Wire::new(node.node(), port);
         if let Some(mb) = self.env.get(&wire) {
-            debug_assert_eq!(self.get_storage_type(hugr_type).unwrap(), mb.get_type());
+            debug_assert_eq!(self.llvm_type(hugr_type).unwrap(), mb.get_type());
             return Ok(mb.clone());
         }
         let mb = self.new_value_mail_box(

@@ -414,6 +414,7 @@ pub fn get_intrinsic<'c>(
         ))
 }
 
+// TODO: just use TryFrom<BasicValueEnum>
 /// Checked conversion from BasicValues to PointerValues
 pub fn val_as_ptr<'c>(val: BasicValueEnum<'c>) -> Result<PointerValue, ()> {
     if let BasicValueEnum::PointerValue(ptr) = val {
