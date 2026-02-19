@@ -156,7 +156,6 @@ fn build_read_len<'c>(
 /// A helper trait for customising the lowering of [`hugr_core::std_extensions::collections::static_array`]
 /// types, [`hugr_core::ops::constant::CustomConst`]s, and ops.
 pub trait StaticArrayCodegen: Clone {
-
     /// Emit a
     /// [`hugr_core::std_extensions::collections::static_array::StaticArrayValue`].
     ///
@@ -238,8 +237,7 @@ pub trait StaticArrayCodegen: Clone {
                 let struct_ty =
                     static_array_struct_type(context.iw_context(), index_ty, elem_ty, 0);
 
-                let len = build_read_len(
-                    context.iw_context(), context.builder(), struct_ty, ptr)?;
+                let len = build_read_len(context.iw_context(), context.builder(), struct_ty, ptr)?;
 
                 let result_sum_ty = option_type(op.elem_ty);
                 let rmb = context.new_row_mail_box([&result_sum_ty.clone().into()], "")?;
@@ -276,8 +274,11 @@ pub trait StaticArrayCodegen: Clone {
                     |context, bb| {
                         let i32_ty = context.iw_context().i32_type();
                         let indices = [i32_ty.const_zero(), i32_ty.const_int(1, false), index];
-                        let element_ptr =
-                            unsafe { context.builder().build_in_bounds_gep(struct_ty, ptr, &indices, "") }?;
+                        let element_ptr = unsafe {
+                            context
+                                .builder()
+                                .build_in_bounds_gep(struct_ty, ptr, &indices, "")
+                        }?;
                         let element = context.builder().build_load(elem_ty, element_ptr, "")?;
                         rmb.write(
                             context.builder(),
@@ -306,8 +307,7 @@ pub trait StaticArrayCodegen: Clone {
                 let index_ty = args.outputs.get_types().next().unwrap().into_int_type();
                 let struct_ty =
                     static_array_struct_type(context.iw_context(), index_ty, elem_ty, 0);
-                let len = build_read_len(
-                    context.iw_context(), context.builder(), struct_ty, ptr)?;
+                let len = build_read_len(context.iw_context(), context.builder(), struct_ty, ptr)?;
                 args.outputs.finish(context.builder(), [len.into()])
             }
             op => bail!("StaticArrayCodegen: Unsupported op: {op:?}"),

@@ -342,11 +342,8 @@ fn build_alloca_i8_ptr<'c, H: HugrView<Node = Node>>(
     if let Some(val) = value {
         builder.build_store(ptr, val)?;
     }
-    let i8_ptr = builder.build_pointer_cast(
-        ptr,
-        ctx.iw_context().ptr_type(AddressSpace::default()),
-        "",
-    )?;
+    let i8_ptr =
+        builder.build_pointer_cast(ptr, ctx.iw_context().ptr_type(AddressSpace::default()), "")?;
     Ok(i8_ptr)
 }
 

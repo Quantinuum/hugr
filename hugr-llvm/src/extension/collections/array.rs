@@ -27,13 +27,13 @@ use hugr_core::std_extensions::collections::array::{
 };
 use hugr_core::types::{TypeArg, TypeEnum};
 use hugr_core::{HugrView, Node};
+use inkwell::IntPredicate;
 use inkwell::builder::Builder;
 use inkwell::intrinsics::Intrinsic;
-use inkwell::types::{BasicType, BasicTypeEnum, BasicMetadataTypeEnum, FunctionType, IntType, StructType};
-use inkwell::values::{
-    BasicValue as _, BasicValueEnum, IntValue, PointerValue, StructValue,
+use inkwell::types::{
+    BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, IntType, StructType,
 };
-use inkwell::IntPredicate;
+use inkwell::values::{BasicValue as _, BasicValueEnum, IntValue, PointerValue, StructValue};
 use itertools::Itertools;
 
 use crate::emit::emit_value;
@@ -100,11 +100,7 @@ pub trait ArrayCodegen: Clone {
     }
 
     /// Return the llvm type of [`hugr_core::std_extensions::collections::array::ARRAY_TYPENAME`].
-    fn array_type<'c>(
-        &self,
-        session: &TypingSession<'c, '_>,
-        _size: u64,
-    ) -> impl BasicType<'c> {
+    fn array_type<'c>(&self, session: &TypingSession<'c, '_>, _size: u64) -> impl BasicType<'c> {
         array_fat_pointer_ty(session)
     }
 
@@ -287,16 +283,17 @@ fn usize_ty<'c>(ts: &TypingSession<'c, '_>) -> IntType<'c> {
 /// Returns the LLVM signature for an accumulator function
 /// passed to an array scan op. The accumulator has the following signature:
 /// (src_ty, *acc_tys) -> (tgt_ty, *acc_tys)
-pub fn get_accumulator_sig<'c>(session: &TypingSession<'c, '_>,
-    src_ty: &BasicTypeEnum<'c>, tgt_ty: &BasicTypeEnum<'c>,
-    acc_tys: &[BasicTypeEnum<'c>]
+pub fn get_accumulator_sig<'c>(
+    session: &TypingSession<'c, '_>,
+    src_ty: &BasicTypeEnum<'c>,
+    tgt_ty: &BasicTypeEnum<'c>,
+    acc_tys: &[BasicTypeEnum<'c>],
 ) -> FunctionType<'c> {
-
     let iw_ctx = session.iw_context();
     // `fn_type` takes `BasicMetadataTypeEnum` rather than `BasicTypeEnum`
-    let mut in_tys : Vec<BasicMetadataTypeEnum> = vec![(*src_ty).into()];
+    let mut in_tys: Vec<BasicMetadataTypeEnum> = vec![(*src_ty).into()];
     in_tys.extend(acc_tys.iter().map(|ty| BasicMetadataTypeEnum::from(*ty)));
-    let mut out_tys = vec![tgt_ty.clone()];
+    let mut out_tys = vec![*tgt_ty];
     out_tys.extend(acc_tys);
     // LLVM functions have to return a single type
     let out_aggr_ty = iw_ctx.struct_type(&out_tys, false);
@@ -306,15 +303,10 @@ pub fn get_accumulator_sig<'c>(session: &TypingSession<'c, '_>,
 
 /// Returns the LLVM representation of an array value as a fat pointer.
 #[must_use]
-pub fn array_fat_pointer_ty<'c>(
-    session: &TypingSession<'c, '_>,
-) -> StructType<'c> {
+pub fn array_fat_pointer_ty<'c>(session: &TypingSession<'c, '_>) -> StructType<'c> {
     let iw_ctx = session.iw_context();
     iw_ctx.struct_type(
-        &[
-            session.llvm_ptr_type().into(),
-            usize_ty(session).into(),
-        ],
+        &[session.llvm_ptr_type().into(), usize_ty(session).into()],
         false,
     )
 }
@@ -325,9 +317,7 @@ pub fn build_array_fat_pointer<'c, H: HugrView<Node = Node>>(
     ptr: PointerValue<'c>,
     offset: IntValue<'c>,
 ) -> Result<StructValue<'c>> {
-    let array_ty = array_fat_pointer_ty(
-        &ctx.typing_session(),
-    );
+    let array_ty = array_fat_pointer_ty(&ctx.typing_session());
     let array_v = array_ty.get_poison();
     let array_v = ctx
         .builder()
@@ -395,7 +385,10 @@ fn build_loop<'c, T, H: HugrView<Node = Node>>(
     let exit_block = ctx.new_basic_block("", None);
 
     let (body_block, val) = ctx.build_positioned_new_block("", Some(exit_block), |ctx, bb| {
-        let idx = ctx.builder().build_load(idx_ty, idx_ptr, "")?.into_int_value();
+        let idx = ctx
+            .builder()
+            .build_load(idx_ty, idx_ptr, "")?
+            .into_int_value();
         let val = go(ctx, idx)?;
         let builder = ctx.builder();
         let inc_idx = builder.build_int_add(idx, idx_ty.const_int(1, false), "")?;
@@ -433,7 +426,10 @@ pub fn emit_array_value<'c, H: HugrView<Node = Node>>(
     for (i, v) in value.get_contents().iter().enumerate() {
         let llvm_v = emit_value(ctx, v)?;
         let idx = ts.iw_context().i32_type().const_int(i as u64, true);
-        let elem_addr = unsafe { ctx.builder().build_in_bounds_gep(elem_ty, elem_ptr, &[idx], "")? };
+        let elem_addr = unsafe {
+            ctx.builder()
+                .build_in_bounds_gep(elem_ty, elem_ptr, &[idx], "")?
+        };
         ctx.builder().build_store(elem_addr, llvm_v)?;
     }
     Ok(array_v.into())
@@ -467,7 +463,10 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
             let usize_t = usize_ty(&ctx.typing_session());
             for (i, v) in inputs.into_iter().enumerate() {
                 let idx = usize_t.const_int(i as u64, true);
-                let elem_addr = unsafe { ctx.builder().build_in_bounds_gep(elem_ty, elem_ptr, &[idx], "")? };
+                let elem_addr = unsafe {
+                    ctx.builder()
+                        .build_in_bounds_gep(elem_ty, elem_ptr, &[idx], "")?
+                };
                 ctx.builder().build_store(elem_addr, v)?;
             }
             outputs.finish(ctx.builder(), [array_v.into()])
@@ -483,7 +482,8 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
 
             for i in 0..size {
                 let idx = builder.build_int_add(array_offset, usize_t.const_int(i, false), "")?;
-                let elem_addr = unsafe { builder.build_in_bounds_gep(elem_ty, array_ptr, &[idx], "")? };
+                let elem_addr =
+                    unsafe { builder.build_in_bounds_gep(elem_ty, array_ptr, &[idx], "")? };
                 let elem_v = builder.build_load(elem_ty, elem_addr, "")?;
                 result.push(elem_v);
             }
@@ -652,11 +652,13 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
                     // to be in bounds.
                     let index1_v = builder.build_int_add(index1_v, array_offset, "")?;
                     let index2_v = builder.build_int_add(index2_v, array_offset, "")?;
-                    let elem1_addr =
-                        unsafe { builder.build_in_bounds_gep(elem_ty, array_ptr, &[index1_v], "")? };
+                    let elem1_addr = unsafe {
+                        builder.build_in_bounds_gep(elem_ty, array_ptr, &[index1_v], "")?
+                    };
                     let elem1_v = builder.build_load(elem_ty, elem1_addr, "")?;
-                    let elem2_addr =
-                        unsafe { builder.build_in_bounds_gep(elem_ty, array_ptr, &[index2_v], "")? };
+                    let elem2_addr = unsafe {
+                        builder.build_in_bounds_gep(elem_ty, array_ptr, &[index2_v], "")?
+                    };
                     let elem2_v = builder.build_load(elem_ty, elem2_addr, "")?;
                     builder.build_store(elem1_addr, elem2_v)?;
                     builder.build_store(elem2_addr, elem1_v)?;
@@ -758,10 +760,7 @@ pub fn emit_clone_op<'c, H: HugrView<Node = Node>>(
     let memcpy = memcpy_intrinsic
         .get_declaration(
             ctx.get_current_module(),
-            &[
-                ptr_ty.into(), ptr_ty.into(),
-                size_value.get_type().into(),
-            ],
+            &[ptr_ty.into(), ptr_ty.into(), size_value.get_type().into()],
         )
         .unwrap();
     ctx.builder().build_call(
@@ -818,7 +817,8 @@ fn emit_pop_op<'c, H: HugrView<Node = Node>>(
                 usize_ty(&ts).const_int(1, false),
                 "new_offset",
             )?;
-            let elem_ptr = unsafe { builder.build_in_bounds_gep(ptr_ty, array_ptr, &[array_offset], "") }?;
+            let elem_ptr =
+                unsafe { builder.build_in_bounds_gep(ptr_ty, array_ptr, &[array_offset], "") }?;
             (elem_ptr, new_array_offset)
         } else {
             let idx = builder.build_int_add(
@@ -904,7 +904,8 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
         let src_idx = builder.build_int_add(idx, src_offset, "")?;
-        let src_elem_addr = unsafe { builder.build_in_bounds_gep(src_elem_ty, src_ptr, &[src_idx], "")? };
+        let src_elem_addr =
+            unsafe { builder.build_in_bounds_gep(src_elem_ty, src_ptr, &[src_idx], "")? };
         let src_elem = builder.build_load(src_elem_ty, src_elem_addr, "")?;
         let mut args = vec![src_elem.into()];
         for (ptr, ty) in zip(&acc_ptrs, &acc_tys) {
@@ -912,7 +913,8 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
         }
         let call = builder.build_indirect_call(func_ty, func_ptr, args.as_slice(), "")?;
         let call_results = deaggregate_call_result(builder, call, 1 + acc_tys.len())?;
-        let tgt_elem_addr = unsafe { builder.build_in_bounds_gep(tgt_elem_ty, tgt_ptr, &[idx], "")? };
+        let tgt_elem_addr =
+            unsafe { builder.build_in_bounds_gep(tgt_elem_ty, tgt_ptr, &[idx], "")? };
         builder.build_store(tgt_elem_addr, call_results[0])?;
         for (ptr, next_act) in acc_ptrs.iter().zip(call_results[1..].iter()) {
             builder.build_store(*ptr, *next_act)?;
@@ -923,7 +925,6 @@ pub fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     ccg.emit_free_array(ctx, src_ptr)?;
     let builder = ctx.builder();
     let final_accs = zip(acc_ptrs, acc_tys)
-        .into_iter()
         .map(|(ptr, ty)| builder.build_load(ty, ptr, ""))
         .try_collect()?;
     Ok((tgt_array_v.into(), final_accs))

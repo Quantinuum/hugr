@@ -20,14 +20,12 @@ use hugr_core::{HugrView, Node};
 use inkwell::IntPredicate;
 use inkwell::builder::{Builder, BuilderError};
 use inkwell::types::{BasicType, BasicTypeEnum};
-use inkwell::values::{
-    ArrayValue, BasicValue as _, BasicValueEnum, IntValue, PointerValue,
-};
+use inkwell::values::{ArrayValue, BasicValue as _, BasicValueEnum, IntValue, PointerValue};
 use itertools::Itertools;
 
 use crate::emit::emit_value;
-use crate::{CodegenExtension, CodegenExtsBuilder};
 use crate::extension::collections::array::get_accumulator_sig;
+use crate::{CodegenExtension, CodegenExtsBuilder};
 use crate::{
     emit::{EmitFuncContext, RowPromise, deaggregate_call_result},
     types::{HugrType, TypingSession},
@@ -251,7 +249,10 @@ fn build_loop<'c, T, H: HugrView<Node = Node>>(
     let exit_block = ctx.new_basic_block("", None);
 
     let (body_block, val) = ctx.build_positioned_new_block("", Some(exit_block), |ctx, bb| {
-        let idx = ctx.builder().build_load(idx_ty, idx_ptr, "")?.into_int_value();
+        let idx = ctx
+            .builder()
+            .build_load(idx_ty, idx_ptr, "")?
+            .into_int_value();
         let val = go(ctx, idx)?;
         let builder = ctx.builder();
         let inc_idx = builder.build_int_add(idx, idx_ty.const_int(1, false), "")?;
@@ -615,12 +616,18 @@ fn emit_pop_op<'c>(
     let (elem_v, array_v) = with_array_alloca(builder, array_v, |ptr| {
         let (elem_ptr, ptr) = {
             if pop_left {
-                let rest_ptr =
-                    unsafe { builder.build_gep(elem_ty, ptr, &[ctx.i32_type().const_int(1, false)], "") }?;
+                let rest_ptr = unsafe {
+                    builder.build_gep(elem_ty, ptr, &[ctx.i32_type().const_int(1, false)], "")
+                }?;
                 (ptr, rest_ptr)
             } else {
                 let elem_ptr = unsafe {
-                    builder.build_gep(elem_ty, ptr, &[ctx.i32_type().const_int(size - 1, false)], "")
+                    builder.build_gep(
+                        elem_ty,
+                        ptr,
+                        &[ctx.i32_type().const_int(size - 1, false)],
+                        "",
+                    )
                 }?;
                 (elem_ptr, ptr)
             }
@@ -647,7 +654,7 @@ fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     let elem_ty = ctx.llvm_type(&op.elem_ty)?;
     let array_ty = elem_ty.array_type(op.size as u32);
     // The generator func takes no args and returns a single array element.
-    let func_ty = elem_ty.fn_type(&[], false); 
+    let func_ty = elem_ty.fn_type(&[], false);
     let func_ptr = PointerValue::try_from(func)
         .map_err(|_| anyhow!("ArrayOpDef::repeat expects a function pointer"))?;
     let (ptr, array_ptr) = build_array_alloca(builder, array_ty.get_undef())?;
@@ -697,10 +704,10 @@ fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     for (ptr, initial_val) in acc_ptrs.iter().zip(initial_accs) {
         builder.build_store(*ptr, *initial_val)?;
     }
-    let func_ty = get_accumulator_sig(&ts, &src_ty, &tgt_ty, &acc_tys); 
+    let func_ty = get_accumulator_sig(&ts, &src_ty, &tgt_ty, &acc_tys);
     let func_ptr = PointerValue::try_from(func)
         .map_err(|_| anyhow!("ArrayOpDef::scan expects a function pointer"))?;
-    
+
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
         let src_elem_addr = unsafe { builder.build_in_bounds_gep(src_ty, src_ptr, &[idx], "")? };
@@ -722,7 +729,6 @@ fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     let builder = ctx.builder();
     let tgt_array_v = builder.build_load(tgt_array_ty, tgt_array_ptr, "")?;
     let final_accs = zip(acc_ptrs, acc_tys)
-        .into_iter()
         .map(|(ptr, ty)| builder.build_load(ty, ptr, ""))
         .try_collect()?;
     Ok((tgt_array_v, final_accs))

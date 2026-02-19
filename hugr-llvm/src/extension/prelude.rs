@@ -73,9 +73,7 @@ pub trait PreludeCodegen: Clone {
     ///
     /// The default implementation is i8*.
     fn string_type<'c>(&self, session: &TypingSession<'c, '_>) -> Result<impl BasicType<'c>> {
-        Ok(session
-            .iw_context()
-            .ptr_type(AddressSpace::default()))
+        Ok(session.iw_context().ptr_type(AddressSpace::default()))
     }
 
     /// Emit a [`hugr_core::extension::prelude::PRINT_OP_ID`] node.
@@ -206,9 +204,7 @@ pub trait PreludeCodegen: Clone {
         ctx: &mut EmitFuncContext<'c, '_, H>,
         str: &ConstString,
     ) -> Result<BasicValueEnum<'c>> {
-        let default_str_type = ctx
-            .llvm_ptr_type()
-            .as_basic_type_enum();
+        let default_str_type = ctx.llvm_ptr_type().as_basic_type_enum();
         let str_type = ctx.llvm_type(&str.get_type())?.as_basic_type_enum();
         ensure!(
             str_type == default_str_type,

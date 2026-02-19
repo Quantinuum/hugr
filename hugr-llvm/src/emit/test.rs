@@ -94,8 +94,7 @@ impl<'c> Emission<'c> {
         // returns an incorrect value (UINT64_MAX instead of 213) using that approach.
         // Calling via raw fn pointer, as below, works for all cases.
         unsafe {
-            let func : unsafe extern "C" fn () -> T = 
-                ee.get_function(entry.as_ref())?.into_raw();
+            let func: unsafe extern "C" fn() -> T = ee.get_function(entry.as_ref())?.into_raw();
             Ok(func())
         }
     }
@@ -268,12 +267,7 @@ impl PreludeCodegen for PanicTestPreludeCodegen {
         let usize_ty = self.usize_type(&ctx.typing_session());
         let ptr_ty = ctx.llvm_ptr_type();
         let sig = ctx.iw_context().void_type().fn_type(
-            &[
-                ptr_ty.into(),
-                ptr_ty.into(),
-                ptr_ty.into(),
-                usize_ty.into(),
-            ],
+            &[ptr_ty.into(), ptr_ty.into(), ptr_ty.into(), usize_ty.into()],
             false,
         );
         let panic_exit = ctx.get_extern_func(PANIC_EXIT, sig)?;

@@ -226,10 +226,13 @@ fn emit_ipow<'c, H: HugrView<Node = Node>>(
         let done_bb = ctx.new_basic_block("done", None);
         let pow_body_bb = ctx.new_basic_block("pow_body", Some(done_bb));
         let return_one_bb = ctx.new_basic_block("power_of_zero", Some(pow_body_bb));
-        let pow_bb = ctx.new_basic_block("pow", Some(return_one_bb)); 
+        let pow_bb = ctx.new_basic_block("pow", Some(return_one_bb));
 
         let result_ty = lhs.get_type();
-        ensure!(result_ty == rhs.get_type(), "Operands to `ipow` must have the same type");
+        ensure!(
+            result_ty == rhs.get_type(),
+            "Operands to `ipow` must have the same type"
+        );
         let acc_p = ctx.builder().build_alloca(result_ty, "acc_ptr")?;
         let exp_p = ctx.builder().build_alloca(result_ty, "exp_ptr")?;
         ctx.builder().build_store(acc_p, lhs)?;
@@ -942,7 +945,9 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
             )?;
 
             ctx.builder().position_at_end(finish);
-            let result = ctx.builder().build_load(pair_ty.clone(), result_ptr, "result")?;
+            let result = ctx
+                .builder()
+                .build_load(pair_ty.clone(), result_ptr, "result")?;
             Ok(result)
         } else {
             let quot = ctx
@@ -1564,7 +1569,7 @@ mod test {
             2 => assert_eq!(int_exec_ctx.exec_hugr::<i8>(hugr, "main"), arg as i8),
             4 => assert_eq!(int_exec_ctx.exec_hugr::<i16>(hugr, "main"), arg as i16),
             5 => assert_eq!(int_exec_ctx.exec_hugr::<i32>(hugr, "main"), arg as i32),
-            _ => panic!("Unsupported int width {to}")
+            _ => panic!("Unsupported int width {to}"),
         };
     }
 
