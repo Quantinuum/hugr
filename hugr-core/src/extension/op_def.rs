@@ -136,6 +136,11 @@ impl CustomValidator {
         }
     }
 
+    /// Return a reference to the `PolyFuncTypeRV` used by this validator.
+    pub(crate) fn poly_func(&self) -> &PolyFuncTypeRV {
+        &self.poly_func
+    }
+
     /// Return a mutable reference to the `PolyFuncType`.
     pub(super) fn poly_func_mut(&mut self) -> &mut PolyFuncTypeRV {
         &mut self.poly_func
@@ -209,6 +214,15 @@ impl SignatureFunc {
     pub fn ignore_missing_validation(&mut self) {
         if let SignatureFunc::MissingValidateFunc(ts) = self {
             *self = SignatureFunc::PolyFuncType(ts.clone());
+        }
+    }
+
+    /// Return the underlying poly function type when available.
+    pub(crate) fn poly_func_type(&self) -> Option<&PolyFuncTypeRV> {
+        match self {
+            SignatureFunc::PolyFuncType(ts) | SignatureFunc::MissingValidateFunc(ts) => Some(ts),
+            SignatureFunc::CustomValidator(custom) => Some(custom.poly_func()),
+            SignatureFunc::CustomFunc(_) | SignatureFunc::MissingComputeFunc => None,
         }
     }
 
