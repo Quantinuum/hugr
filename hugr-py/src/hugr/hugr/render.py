@@ -85,18 +85,12 @@ class RenderConfig:
     display_node_id: bool = False
     #: If true display full type name on the edges.
     display_link_label: bool = True
-    #: If true truncate long type names on edges to `max_edge_label_length` characters
-    truncate_edge_labels: bool = True
-    #: Max length for edge labels (if truncation is enabled).
-    max_edge_label_length: int = 24
-    #: If true truncate node labels to `max_node_label_length` characters.
-    truncate_node_labels: bool = True
-    #: Max length for node labels (if truncation is enabled).
-    max_node_label_length: int = 24
-    #: If true truncate the metadata display to `max_metadata_length` characters.
-    truncate_metadata: bool = True
-    #: Max length for metadata display (if truncation is enabled).
-    max_metadata_length: int = 20
+    #: Max length for edge labels. None means no truncation.
+    max_edge_label_length: int | None = 24
+    #: Max length for node labels. None means no truncation.
+    max_node_label_length: int | None = 24
+    #: Max length for metadata display. None means no truncation.
+    max_metadata_length: int | None = 20
 
 
 class DotRenderer:
@@ -253,16 +247,20 @@ class DotRenderer:
         """Render a (possibly nested) node to a graphviz graph."""
         meta = hugr[node].metadata
         if len(meta) > 0 and self.config.display_metadata:
-            data = "<BR/><BR/>" + "<BR/>".join(
-                html.escape(key)
-                + ": "
-                + html.escape(
-                    _smart_truncate(str(value), self.config.max_metadata_length)
-                    if self.config.truncate_metadata
-                    else str(value)
+            if self.config.max_metadata_length is not None:
+                data = "<BR/><BR/>" + "<BR/>".join(
+                    html.escape(key)
+                    + ": "
+                    + html.escape(
+                        _smart_truncate(str(value), self.config.max_metadata_length)
+                    )
+                    for key, value in meta.items()
                 )
-                for key, value in meta.items()
-            )
+            else:
+                data = "<BR/><BR/>" + "<BR/>".join(
+                    html.escape(key) + ": " + html.escape(str(value))
+                    for key, value in meta.items()
+                )
         else:
             data = ""
 
@@ -283,7 +281,7 @@ class DotRenderer:
         else:
             op_name = op.name()
 
-        if self.config.truncate_node_labels:
+        if self.config.max_node_label_length is not None:
             op_name = _smart_truncate(
                 op_name, max_length=self.config.max_node_label_length
             )
@@ -385,7 +383,7 @@ class DotRenderer:
             )
             graph.node(tgt, label=f"<{html_label}>", shape="plain")
 
-        if self.config.truncate_edge_labels:
+        if self.config.max_edge_label_length is not None:
             label = _smart_truncate(
                 label=label, max_length=self.config.max_edge_label_length
             )
@@ -428,7 +426,7 @@ def _smart_truncate(label: str, max_length: int = 24) -> str:
     # first token, and optionally also the next token if the string starts with
     # `Token<token` / `Token(token` / etc.
     first_delim_idx = next(
-        (i for i, ch in enumerate(iterable=label) if ch in delimiters),
+        (i for i, ch in enumerate(label) if ch in delimiters),
         len(label),
     )
     protected_end = first_delim_idx
