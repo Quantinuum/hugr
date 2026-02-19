@@ -432,16 +432,17 @@ mod test {
             hugr.private_func_decl,
             hugr.const_def,
         ];
-        scope_preserve(&hugr, &PassScope::Global(Preserve::All), preserve)
+        check_preserve(&hugr, Preserve::All, preserve)
     }
 
-    fn scope_preserve(
+    fn check_preserve(
         hugr: &TestHugr,
-        scope: &PassScope,
-        preserve_chs: impl IntoIterator<Item = Node>,
+        preserve: Preserve,
+        expected_chs: impl IntoIterator<Item = Node>,
     ) {
+        let scope = PassScope::Global(preserve);
         assert!(scope.recursive());
-        let preserve = preserve_chs.into_iter().collect::<HashSet<_>>();
+        let expected_chs = expected_chs.into_iter().collect::<HashSet<_>>();
         assert_eq!(scope.root(&hugr.hugr), Some(hugr.module_root));
         assert_eq!(
             scope.regions(&hugr.hugr).collect_vec(),
@@ -456,14 +457,14 @@ mod test {
             hugr.private_func_decl,
             hugr.const_def,
         ] {
-            let expected = if preserve.contains(&n) {
+            let expected = if expected_chs.contains(&n) {
                 InScope::PreserveInterface
             } else {
                 InScope::Yes
             };
             assert_eq!(scope.in_scope(&hugr.hugr, n), expected, "{:?} among {:?}", n, hugr);
         }
-        let mut preserve = preserve;
+        let mut preserve = expected_chs;
         preserve.insert(hugr.module_root);
         assert_eq!(preserve, scope.preserve_interface(&hugr.hugr).collect());
     }
@@ -471,18 +472,17 @@ mod test {
     #[rstest]
     fn scope_all_public(hugr: TestHugr) {
         let preserve = [hugr.public_func, hugr.public_func_decl];
-        scope_preserve(&hugr, &PassScope::Global(Preserve::Public), preserve)
+        check_preserve(&hugr, Preserve::Public, preserve)
     }
 
     #[rstest]
     fn scope_global_entrypoint(mut hugr: TestHugr) {
-        let scope = &PassScope::Global(Preserve::Entrypoint);
         hugr.hugr.set_entrypoint(hugr.hugr.module_root());
         let preserve = [hugr.public_func, hugr.public_func_decl];
-        scope_preserve(&hugr, scope, preserve);
+        check_preserve(&hugr, Preserve::Entrypoint, preserve);
 
         hugr.hugr.set_entrypoint(hugr.public_func_nested);
         let preserve = [hugr.public_func_nested];
-        scope_preserve(&hugr, scope, preserve)
+        check_preserve(&hugr, Preserve::Entrypoint, preserve)
     }
 }
