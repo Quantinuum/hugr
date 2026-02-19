@@ -222,10 +222,10 @@
       > shape=plain]
   		color="#1CADE4" label="" margin=10 penwidth=1
   	}
-  	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.0" -> 7:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	7:"out.0" -> 6:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.0" -> 3:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	2:"out.0" -> 4:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	5:"out.0" -> 7:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	7:"out.0" -> 6:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	4:"out.0" -> 3:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
   }
   
   '''
@@ -521,15 +521,15 @@
       > shape=plain]
   		color="#1CADE4" label="" margin=10 penwidth=1
   	}
-  	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	2:"out.1" -> 4:"in.1" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.-1" -> 7:"in.-1" [label="" arrowhead=none arrowsize=1.0 color=black fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.0" -> 10:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	10:"out.0" -> 9:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	7:"out.0" -> 6:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.1" -> 6:"in.1" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.0" -> 3:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.1" -> 3:"in.1" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	2:"out.0" -> 4:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	2:"out.1" -> 4:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	5:"out.-1" -> 7:"in.-1" [arrowhead=none arrowsize=1.0 color=black fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=""]
+  	5:"out.0" -> 10:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	10:"out.0" -> 9:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	7:"out.0" -> 6:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	5:"out.1" -> 6:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	4:"out.0" -> 3:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	4:"out.1" -> 3:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
   }
   
   '''
@@ -845,12 +845,12 @@
       > shape=plain]
   		color="#1CADE4" label="" margin=10 penwidth=1
   	}
-  	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.0" -> 7:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	8:"out.0" -> 10:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	10:"out.0" -> 9:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	7:"out.0" -> 6:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.0" -> 3:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	2:"out.0" -> 4:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	5:"out.0" -> 7:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	8:"out.0" -> 10:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	10:"out.0" -> 9:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	7:"out.0" -> 6:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	4:"out.0" -> 3:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
   }
   
   '''
@@ -970,10 +970,10 @@
       > shape=plain]
   		color="#F4A261" label="" margin=10 penwidth=2
   	}
-  	4:"out.0" -> 3:"in.0" [label=Unit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.0" -> 3:"in.1" [label=Unit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.0" -> 3:"in.2" [label=Unit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.0" -> 3:"in.3" [label=Unit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	4:"out.0" -> 3:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Unit]
+  	4:"out.0" -> 3:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Unit]
+  	4:"out.0" -> 3:"in.2" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Unit]
+  	4:"out.0" -> 3:"in.3" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Unit]
   }
   
   '''
@@ -1361,7 +1361,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B><b>[FuncDefn(&lt;jupyter-notebook&gt;)]</b></B><BR/><BR/>label: &lt;b&gt;Bold Label&lt;/b&gt;<BR/>&lt;other-label&gt;: &lt;i&gt;Italic Label&lt;/i&gt;<BR/>meta_can_be_anything: [42, &#x27;string&#x27;, 3.14, True]</FONT></TD></TR>
+                  COLOR="black"><B><b>[FuncDefn(...)]</b></B><BR/><BR/>label: &lt;b&gt;Bold Label&lt;/b&gt;<BR/>&lt;other-label&gt;: &lt;i&gt;Italic Label&lt;/i&gt;<BR/>meta_can_be_anything: [42,...]</FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -1397,8 +1397,8 @@
       > shape=plain]
   		color="#1CADE4" label="" margin=10 penwidth=1
   	}
-  	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	2:"out.0" -> 3:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	2:"out.0" -> 4:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	2:"out.0" -> 3:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
   }
   
   '''
@@ -1714,12 +1714,12 @@
       > shape=plain]
   		color="#1CADE4" label="" margin=10 penwidth=1
   	}
-  	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	8:"out.0" -> 10:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	10:"out.0" -> 9:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.0" -> 7:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	7:"out.0" -> 6:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.0" -> 3:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	2:"out.0" -> 4:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	8:"out.0" -> 10:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	10:"out.0" -> 9:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	5:"out.0" -> 7:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	7:"out.0" -> 6:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	4:"out.0" -> 3:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
   }
   
   '''
@@ -1947,10 +1947,10 @@
       > shape=plain]
   		color="#1CADE4" label="" margin=10 penwidth=1
   	}
-  	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.0" -> 7:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	7:"out.0" -> 6:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.0" -> 3:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	2:"out.0" -> 4:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	5:"out.0" -> 7:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	7:"out.0" -> 6:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	4:"out.0" -> 3:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
   }
   
   '''
@@ -2178,14 +2178,14 @@
       > shape=plain]
   		color="#1CADE4" label="" margin=10 penwidth=1
   	}
-  	2:"out.0" -> 4:"in.0" [label="int&lt;5&gt;" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	2:"out.1" -> 4:"in.1" [label="int&lt;5&gt;" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.0" -> 7:"in.0" [label="int&lt;5&gt;" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.1" -> 7:"in.1" [label="int&lt;5&gt;" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	7:"out.0" -> 6:"in.0" [label="int&lt;5&gt;" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	7:"out.1" -> 6:"in.1" [label="int&lt;5&gt;" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.0" -> 3:"in.0" [label="int&lt;5&gt;" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.1" -> 3:"in.1" [label="int&lt;5&gt;" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	2:"out.0" -> 4:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel="int&lt;5&gt;"]
+  	2:"out.1" -> 4:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel="int&lt;5&gt;"]
+  	5:"out.0" -> 7:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel="int&lt;5&gt;"]
+  	5:"out.1" -> 7:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel="int&lt;5&gt;"]
+  	7:"out.0" -> 6:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel="int&lt;5&gt;"]
+  	7:"out.1" -> 6:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel="int&lt;5&gt;"]
+  	4:"out.0" -> 3:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel="int&lt;5&gt;"]
+  	4:"out.1" -> 3:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel="int&lt;5&gt;"]
   }
   
   '''
@@ -2378,11 +2378,11 @@
       > shape=plain]
   		color="#1CADE4" label="" margin=10 penwidth=1
   	}
-  	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.0" -> 6:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.0" -> 6:"in.1" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.0" -> 3:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.1" -> 3:"in.1" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	2:"out.0" -> 4:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	5:"out.0" -> 6:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	5:"out.0" -> 6:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	4:"out.0" -> 3:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	4:"out.1" -> 3:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
   }
   
   '''
@@ -2522,9 +2522,259 @@
       > shape=plain]
   		color="#F4A261" label="" margin=10 penwidth=2
   	}
-  	1:"out.0" -> 4:"in.1" [label="" arrowhead=none arrowsize=1.0 color="#77CEEF" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	2:"out.0" -> 4:"in.0" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.0" -> 3:"in.0" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	1:"out.0" -> 4:"in.1" [arrowhead=none arrowsize=1.0 color="#77CEEF" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=""]
+  	2:"out.0" -> 4:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
+  	4:"out.0" -> 3:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
+  }
+  
+  '''
+# ---
+# name: test_render_subgraph
+  '''
+  digraph {
+  	bgcolor=white margin=0 nodesep=0.15 rankdir="" ranksep=0.1
+  	subgraph cluster10 {
+  		subgraph cluster11 {
+  			12 [label=<
+      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+          BGCOLOR="#ACCBF9" COLOR="white">
+      
+      <TR>
+          <TD>
+          <TABLE BORDER="0" CELLBORDER="0">
+              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
+          </TABLE>
+          </TD>
+      </TR>
+      
+          <TR>
+              <TD>
+                  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" CELLPADDING="2">
+                      <TR>
+                          <TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.0" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">0</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.1" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">1</FONT></TD>
+                      </TR>
+                  </TABLE>
+              </TD>
+          </TR>
+      
+      </TABLE>
+      > shape=plain]
+  			13 [label=<
+      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+          BGCOLOR="#ACCBF9" COLOR="white">
+      
+          <TR>
+              <TD>
+                  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" CELLPADDING="2">
+                      <TR>
+                          <TD BGCOLOR="white" COLOR="#1CADE4" PORT="in.0" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">0</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="in.1" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">1</FONT></TD>
+                      </TR>
+                  </TABLE>
+              </TD>
+          </TR>
+      
+      <TR>
+          <TD>
+          <TABLE BORDER="0" CELLBORDER="0">
+              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
+          </TABLE>
+          </TD>
+      </TR>
+      
+      </TABLE>
+      > shape=plain]
+  			11 [label=<
+      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+          BGCOLOR="#1CADE4" COLOR="#1CADE4">
+      
+      <TR>
+          <TD>
+          <TABLE BORDER="0" CELLBORDER="0">
+              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
+                  COLOR="black"><B>Case</B></FONT></TD></TR>
+          </TABLE>
+          </TD>
+      </TR>
+      
+      </TABLE>
+      > shape=plain]
+  			color="#1CADE4" label="" margin=10 penwidth=1
+  		}
+  		subgraph cluster14 {
+  			15 [label=<
+      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+          BGCOLOR="#ACCBF9" COLOR="white">
+      
+      <TR>
+          <TD>
+          <TABLE BORDER="0" CELLBORDER="0">
+              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
+                  COLOR="black"><B>Input</B></FONT></TD></TR>
+          </TABLE>
+          </TD>
+      </TR>
+      
+          <TR>
+              <TD>
+                  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" CELLPADDING="2">
+                      <TR>
+                          <TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.0" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">0</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.1" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">1</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.2" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">2</FONT></TD>
+                      </TR>
+                  </TABLE>
+              </TD>
+          </TR>
+      
+      </TABLE>
+      > shape=plain]
+  			16 [label=<
+      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+          BGCOLOR="#ACCBF9" COLOR="white">
+      
+          <TR>
+              <TD>
+                  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" CELLPADDING="2">
+                      <TR>
+                          <TD BGCOLOR="white" COLOR="#1CADE4" PORT="in.0" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">0</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="in.1" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">1</FONT></TD>
+                      </TR>
+                  </TABLE>
+              </TD>
+          </TR>
+      
+      <TR>
+          <TD>
+          <TABLE BORDER="0" CELLBORDER="0">
+              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
+                  COLOR="black"><B>Output</B></FONT></TD></TR>
+          </TABLE>
+          </TD>
+      </TR>
+      
+      </TABLE>
+      > shape=plain]
+  			14 [label=<
+      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+          BGCOLOR="#1CADE4" COLOR="#1CADE4">
+      
+      <TR>
+          <TD>
+          <TABLE BORDER="0" CELLBORDER="0">
+              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
+                  COLOR="black"><B>Case</B></FONT></TD></TR>
+          </TABLE>
+          </TD>
+      </TR>
+      
+      </TABLE>
+      > shape=plain]
+  			color="#1CADE4" label="" margin=10 penwidth=1
+  		}
+  		10 [label=<
+      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+          BGCOLOR="#1CADE4" COLOR="#1CADE4">
+      
+          <TR>
+              <TD>
+                  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" CELLPADDING="2">
+                      <TR>
+                          <TD BGCOLOR="white" COLOR="#1CADE4" PORT="in.0" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">0</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="in.1" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">1</FONT></TD>
+                      </TR>
+                  </TABLE>
+              </TD>
+          </TR>
+      
+      <TR>
+          <TD>
+          <TABLE BORDER="0" CELLBORDER="0">
+              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
+                  COLOR="black"><B>Conditional</B></FONT></TD></TR>
+          </TABLE>
+          </TD>
+      </TR>
+      
+          <TR>
+              <TD>
+                  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" CELLPADDING="2">
+                      <TR>
+                          <TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.0" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">0</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.1" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">1</FONT></TD>
+                      </TR>
+                  </TABLE>
+              </TD>
+          </TR>
+      
+      </TABLE>
+      > shape=plain]
+  		color="#1CADE4" label="" margin=10 penwidth=1
+  	}
+  	7 [label=<
+      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+          BGCOLOR="#ACCBF9" COLOR="white">
+      
+      <TR>
+          <TD>
+          <TABLE BORDER="0" CELLBORDER="0">
+              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
+                  COLOR="black"><B>Node(7)</B></FONT></TD></TR>
+          </TABLE>
+          </TD>
+      </TR>
+      
+      </TABLE>
+      > shape=plain]
+  	7 -> 10:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel="Either(Qubit,...)"]
+  	9 [label=<
+      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+          BGCOLOR="#ACCBF9" COLOR="white">
+      
+      <TR>
+          <TD>
+          <TABLE BORDER="0" CELLBORDER="0">
+              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
+                  COLOR="black"><B>Node(9)</B></FONT></TD></TR>
+          </TABLE>
+          </TD>
+      </TR>
+      
+      </TABLE>
+      > shape=plain]
+  	9 -> 10:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	12:"out.0" -> 13:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
+  	12:"out.1" -> 13:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	15:"out.0" -> 16:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
+  	15:"out.2" -> 16:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	6 [label=<
+      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+          BGCOLOR="#ACCBF9" COLOR="white">
+      
+      <TR>
+          <TD>
+          <TABLE BORDER="0" CELLBORDER="0">
+              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
+                  COLOR="black"><B>Node(6)</B></FONT></TD></TR>
+          </TABLE>
+          </TD>
+      </TR>
+      
+      </TABLE>
+      > shape=plain]
+  	10:"out.0" -> 6 [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
+  	6 [label=<
+      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
+          BGCOLOR="#ACCBF9" COLOR="white">
+      
+      <TR>
+          <TD>
+          <TABLE BORDER="0" CELLBORDER="0">
+              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
+                  COLOR="black"><B>Node(6)</B></FONT></TD></TR>
+          </TABLE>
+          </TD>
+      </TR>
+      
+      </TABLE>
+      > shape=plain]
+  	10:"out.1" -> 6 [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
   }
   
   '''
@@ -2717,12 +2967,12 @@
       > shape=plain]
   		color="#1CADE4" label="" margin=10 penwidth=1
   	}
-  	2:"out.0" -> 4:"in.0" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	2:"out.1" -> 4:"in.1" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.0" -> 6:"in.0" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.1" -> 6:"in.1" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.0" -> 3:"in.0" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.1" -> 3:"in.1" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	2:"out.0" -> 4:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
+  	2:"out.1" -> 4:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
+  	5:"out.0" -> 6:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
+  	5:"out.1" -> 6:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
+  	4:"out.0" -> 3:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
+  	4:"out.1" -> 3:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
   }
   
   '''
@@ -2985,265 +3235,15 @@
       > shape=plain]
   		color="#1CADE4" label="" margin=10 penwidth=1
   	}
-  	2:"out.0" -> 4:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	2:"out.1" -> 4:"in.1" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.0" -> 7:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	5:"out.1" -> 7:"in.1" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	7:"out.0" -> 8:"in.0" [label="Tuple(Bool, Qubit)" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	8:"out.0" -> 6:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	8:"out.1" -> 6:"in.1" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.0" -> 3:"in.0" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	4:"out.1" -> 3:"in.1" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  }
-  
-  '''
-# ---
-# name: test_render_subgraph
-  '''
-  digraph {
-  	bgcolor=white margin=0 nodesep=0.15 rankdir="" ranksep=0.1
-  	subgraph cluster10 {
-  		subgraph cluster11 {
-  			12 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
-          BGCOLOR="#ACCBF9" COLOR="white">
-      
-      <TR>
-          <TD>
-          <TABLE BORDER="0" CELLBORDER="0">
-              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input</B></FONT></TD></TR>
-          </TABLE>
-          </TD>
-      </TR>
-      
-          <TR>
-              <TD>
-                  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" CELLPADDING="2">
-                      <TR>
-                          <TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.0" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">0</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.1" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">1</FONT></TD>
-                      </TR>
-                  </TABLE>
-              </TD>
-          </TR>
-      
-      </TABLE>
-      > shape=plain]
-  			13 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
-          BGCOLOR="#ACCBF9" COLOR="white">
-      
-          <TR>
-              <TD>
-                  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" CELLPADDING="2">
-                      <TR>
-                          <TD BGCOLOR="white" COLOR="#1CADE4" PORT="in.0" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">0</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="in.1" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">1</FONT></TD>
-                      </TR>
-                  </TABLE>
-              </TD>
-          </TR>
-      
-      <TR>
-          <TD>
-          <TABLE BORDER="0" CELLBORDER="0">
-              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output</B></FONT></TD></TR>
-          </TABLE>
-          </TD>
-      </TR>
-      
-      </TABLE>
-      > shape=plain]
-  			11 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
-          BGCOLOR="#1CADE4" COLOR="#1CADE4">
-      
-      <TR>
-          <TD>
-          <TABLE BORDER="0" CELLBORDER="0">
-              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Case</B></FONT></TD></TR>
-          </TABLE>
-          </TD>
-      </TR>
-      
-      </TABLE>
-      > shape=plain]
-  			color="#1CADE4" label="" margin=10 penwidth=1
-  		}
-  		subgraph cluster14 {
-  			15 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
-          BGCOLOR="#ACCBF9" COLOR="white">
-      
-      <TR>
-          <TD>
-          <TABLE BORDER="0" CELLBORDER="0">
-              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Input</B></FONT></TD></TR>
-          </TABLE>
-          </TD>
-      </TR>
-      
-          <TR>
-              <TD>
-                  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" CELLPADDING="2">
-                      <TR>
-                          <TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.0" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">0</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.1" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">1</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.2" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">2</FONT></TD>
-                      </TR>
-                  </TABLE>
-              </TD>
-          </TR>
-      
-      </TABLE>
-      > shape=plain]
-  			16 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
-          BGCOLOR="#ACCBF9" COLOR="white">
-      
-          <TR>
-              <TD>
-                  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" CELLPADDING="2">
-                      <TR>
-                          <TD BGCOLOR="white" COLOR="#1CADE4" PORT="in.0" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">0</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="in.1" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">1</FONT></TD>
-                      </TR>
-                  </TABLE>
-              </TD>
-          </TR>
-      
-      <TR>
-          <TD>
-          <TABLE BORDER="0" CELLBORDER="0">
-              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Output</B></FONT></TD></TR>
-          </TABLE>
-          </TD>
-      </TR>
-      
-      </TABLE>
-      > shape=plain]
-  			14 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
-          BGCOLOR="#1CADE4" COLOR="#1CADE4">
-      
-      <TR>
-          <TD>
-          <TABLE BORDER="0" CELLBORDER="0">
-              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Case</B></FONT></TD></TR>
-          </TABLE>
-          </TD>
-      </TR>
-      
-      </TABLE>
-      > shape=plain]
-  			color="#1CADE4" label="" margin=10 penwidth=1
-  		}
-  		10 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
-          BGCOLOR="#1CADE4" COLOR="#1CADE4">
-      
-          <TR>
-              <TD>
-                  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" CELLPADDING="2">
-                      <TR>
-                          <TD BGCOLOR="white" COLOR="#1CADE4" PORT="in.0" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">0</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="in.1" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">1</FONT></TD>
-                      </TR>
-                  </TABLE>
-              </TD>
-          </TR>
-      
-      <TR>
-          <TD>
-          <TABLE BORDER="0" CELLBORDER="0">
-              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Conditional</B></FONT></TD></TR>
-          </TABLE>
-          </TD>
-      </TR>
-      
-          <TR>
-              <TD>
-                  <TABLE BORDER="0" CELLBORDER="0" CELLSPACING="3" CELLPADDING="2">
-                      <TR>
-                          <TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.0" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">0</FONT></TD><TD BGCOLOR="white" COLOR="#1CADE4" PORT="out.1" BORDER="1"><FONT POINT-SIZE="10.0" FACE="monospace" COLOR="black">1</FONT></TD>
-                      </TR>
-                  </TABLE>
-              </TD>
-          </TR>
-      
-      </TABLE>
-      > shape=plain]
-  		color="#1CADE4" label="" margin=10 penwidth=1
-  	}
-  	7 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
-          BGCOLOR="#ACCBF9" COLOR="white">
-      
-      <TR>
-          <TD>
-          <TABLE BORDER="0" CELLBORDER="0">
-              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Node(7)</B></FONT></TD></TR>
-          </TABLE>
-          </TD>
-      </TR>
-      
-      </TABLE>
-      > shape=plain]
-  	7 -> 10:"in.0" [label="Either(Qubit, (Qubit, int&lt;5&gt;))" arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	9 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
-          BGCOLOR="#ACCBF9" COLOR="white">
-      
-      <TR>
-          <TD>
-          <TABLE BORDER="0" CELLBORDER="0">
-              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Node(9)</B></FONT></TD></TR>
-          </TABLE>
-          </TD>
-      </TR>
-      
-      </TABLE>
-      > shape=plain]
-  	9 -> 10:"in.1" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	12:"out.0" -> 13:"in.0" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	12:"out.1" -> 13:"in.1" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	15:"out.0" -> 16:"in.0" [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	15:"out.2" -> 16:"in.1" [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	6 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
-          BGCOLOR="#ACCBF9" COLOR="white">
-      
-      <TR>
-          <TD>
-          <TABLE BORDER="0" CELLBORDER="0">
-              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Node(6)</B></FONT></TD></TR>
-          </TABLE>
-          </TD>
-      </TR>
-      
-      </TABLE>
-      > shape=plain]
-  	10:"out.0" -> 6 [label=Qubit arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
-  	6 [label=<
-      <TABLE BORDER="1" CELLBORDER="0" CELLSPACING="1" CELLPADDING="1"
-          BGCOLOR="#ACCBF9" COLOR="white">
-      
-      <TR>
-          <TD>
-          <TABLE BORDER="0" CELLBORDER="0">
-              <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Node(6)</B></FONT></TD></TR>
-          </TABLE>
-          </TD>
-      </TR>
-      
-      </TABLE>
-      > shape=plain]
-  	10:"out.1" -> 6 [label=Bool arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5]
+  	2:"out.0" -> 4:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	2:"out.1" -> 4:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
+  	5:"out.0" -> 7:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	5:"out.1" -> 7:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
+  	7:"out.0" -> 8:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel="Tuple(Bool, Qubit)"]
+  	8:"out.0" -> 6:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	8:"out.1" -> 6:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
+  	4:"out.0" -> 3:"in.0" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Bool]
+  	4:"out.1" -> 3:"in.1" [arrowhead=none arrowsize=1.0 color="#1CADE4" fontcolor=black fontname=monospace fontsize=9 penwidth=1.5 xlabel=Qubit]
   }
   
   '''

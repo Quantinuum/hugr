@@ -85,6 +85,12 @@ class RenderConfig:
     display_node_id: bool = False
     #: If true display full type name on the edges.
     display_link_label: bool = True
+    #: Max length for edge labels. None means no truncation.
+    max_edge_label_length: int | None = 24
+    #: Max length for node labels. None means no truncation.
+    max_node_label_length: int | None = 24
+    #: Max length for metadata display. None means no truncation.
+    max_metadata_length: int | None = 20
 
 
 class DotRenderer:
@@ -241,10 +247,20 @@ class DotRenderer:
         """Render a (possibly nested) node to a graphviz graph."""
         meta = hugr[node].metadata
         if len(meta) > 0 and self.config.display_metadata:
-            data = "<BR/><BR/>" + "<BR/>".join(
-                html.escape(key) + ": " + html.escape(str(value))
-                for key, value in meta.items()
-            )
+            if self.config.max_metadata_length is not None:
+                data = "<BR/><BR/>" + "<BR/>".join(
+                    html.escape(key)
+                    + ": "
+                    + html.escape(
+                        _smart_truncate(str(value), self.config.max_metadata_length)
+                    )
+                    for key, value in meta.items()
+                )
+            else:
+                data = "<BR/><BR/>" + "<BR/>".join(
+                    html.escape(key) + ": " + html.escape(str(value))
+                    for key, value in meta.items()
+                )
         else:
             data = ""
 
@@ -264,6 +280,11 @@ class DotRenderer:
             op_name = op.op_def().name
         else:
             op_name = op.name()
+
+        if self.config.max_node_label_length is not None:
+            op_name = _smart_truncate(
+                op_name, max_length=self.config.max_node_label_length
+            )
 
         op_name = html.escape(op_name)
         node_label = (
@@ -362,4 +383,86 @@ class DotRenderer:
             )
             graph.node(tgt, label=f"<{html_label}>", shape="plain")
 
-        graph.edge(src, tgt, label=label, color=color, **edge_attr)
+        if self.config.max_edge_label_length is not None:
+            label = _smart_truncate(
+                label=label, max_length=self.config.max_edge_label_length
+            )
+
+        graph.edge(src, tgt, xlabel=label, color=color, **edge_attr)
+
+
+def _smart_truncate(label: str, max_length: int = 24) -> str:
+    """Truncate a string for display.
+
+    Rules:
+    - If the string fits, return it unchanged.
+        - If truncation is needed, truncate only at delimiters (space or bracket chars).
+    - Never truncate the first word (the initial token before a delimiter), even if it
+      exceeds `max_length`.
+        - If truncation happens inside unmatched brackets, append enough closing
+            brackets after the ellipsis to close any still-open ones.
+            Supported bracket pairs are `()`, `{}`, `[]`, `<>`.
+    """
+    if len(label) <= max_length:
+        return label
+
+    ellipsis = "..."
+
+    delimiters = {
+        " ",
+        "(",
+        ")",
+        "{",
+        "}",
+        "[",
+        "]",
+        "<",
+        ">",
+        ".",
+    }
+    opening_brackets = {"(", "{", "[", "<"}
+
+    # Identify the protected prefix (never truncate this), which is at least the
+    # first token, and optionally also the next token if the string starts with
+    # `Token<token` / `Token(token` / etc.
+    first_delim_idx = next(
+        (i for i, ch in enumerate(label) if ch in delimiters),
+        len(label),
+    )
+    protected_end = first_delim_idx
+    if first_delim_idx < len(label) and label[first_delim_idx] in opening_brackets:
+        second_start = first_delim_idx + 1
+        second_delim_idx = next(
+            (
+                i
+                for i, ch in enumerate(label[second_start:], start=second_start)
+                if ch in delimiters
+            ),
+            len(label),
+        )
+        protected_end = second_delim_idx
+
+    prefix = label[:protected_end].rstrip()
+
+    if prefix == label:
+        return label
+
+    truncated = prefix
+    bracket_pairs = [("(", ")"), ("{", "}"), ("[", "]"), ("<", ">")]
+    # we first try to close parenthesis without the ellipsis
+    # and check if it is the same as the original label
+    for open_ch, close_ch in bracket_pairs:
+        balance = prefix.count(open_ch) - prefix.count(close_ch)
+        if balance > 0:
+            truncated += close_ch * balance
+
+    if truncated == label:
+        return label
+    # If not, we add the ellipsis and then close any still-open parenthesis
+    truncated_w_ellipsis = prefix + ellipsis
+
+    for open_ch, close_ch in bracket_pairs:
+        balance = prefix.count(open_ch) - prefix.count(close_ch)
+        if balance > 0:
+            truncated_w_ellipsis += close_ch * balance
+    return truncated_w_ellipsis
