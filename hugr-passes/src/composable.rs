@@ -2,7 +2,7 @@
 
 mod scope;
 
-pub use scope::{InScope, PassScope};
+pub use scope::{InScope, PassScope, Preserve};
 
 use std::{error::Error, marker::PhantomData};
 
