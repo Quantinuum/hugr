@@ -14,7 +14,7 @@ use hugr_core::{Hugr, HugrView, Node};
 use inkwell::AddressSpace;
 use inkwell::module::{Linkage, Module};
 use inkwell::passes::PassManager;
-use inkwell::values::{BasicValueEnum, GenericValue, GlobalValue, PointerValue};
+use inkwell::values::{BasicValueEnum, GlobalValue, PointerValue};
 
 use super::EmitHugr;
 
@@ -73,29 +73,8 @@ impl<'c> Emission<'c> {
 
     /// JIT and execute the function named `entry` in the inner module.
     ///
-    /// That function must take no arguments and return an `i64`.
-    pub fn exec_u64(&self, entry: impl AsRef<str>) -> Result<u64> {
-        let gv = self.exec_impl(entry)?;
-        Ok(gv.as_int(false))
-    }
-
-    /// JIT and execute the function named `entry` in the inner module.
-    ///
-    /// That function must take no arguments and return an `i64`.
-    pub fn exec_i64(&self, entry: impl AsRef<str>) -> Result<i64> {
-        let gv = self.exec_impl(entry)?;
-        Ok(gv.as_int(true) as i64)
-    }
-
-    /// JIT and execute the function named `entry` in the inner module.
-    ///
-    /// That function must take no arguments and return an `f64`.
-    pub fn exec_f64(&self, entry: impl AsRef<str>) -> Result<f64> {
-        let gv = self.exec_impl(entry)?;
-        Ok(gv.as_float(&self.module.get_context().f64_type()))
-    }
-
-    pub(crate) fn exec_impl(&self, entry: impl AsRef<str>) -> Result<GenericValue<'c>> {
+    /// The function must take no arguments and return FFI-compatible type `T`.
+    pub(crate) fn jit_exec<T>(&self, entry: impl AsRef<str>) -> Result<T> {
         let entry_fv = self
             .module
             .get_function(entry.as_ref())
@@ -107,8 +86,18 @@ impl<'c> Emission<'c> {
             .module
             .create_jit_execution_engine(inkwell::OptimizationLevel::None)
             .map_err(|err| anyhow!("Failed to create execution engine: {err}"))?;
-        let fv = ee.get_function_value(entry.as_ref())?;
-        Ok(unsafe { ee.run_function(fv, &[]) })
+        //let fv = ee.get_function_value(entry.as_ref())?;
+        //Ok(unsafe { ee.run_function(fv, &[]) })
+        //
+        // Above is the old approach to calling the JITed function.  After upgrading to
+        // LLVM 21, a *single function* (remainder of test_divmod_s::bidgiv_negative)
+        // returns an incorrect value (UINT64_MAX instead of 213) using that approach.
+        // Calling via raw fn pointer, as below, works for all cases.
+        unsafe {
+            let func : unsafe extern "C" fn () -> T = 
+                ee.get_function(entry.as_ref())?.into_raw();
+            Ok(func())
+        }
     }
 
     /// JIT and execute the function named `entry` in the inner module.

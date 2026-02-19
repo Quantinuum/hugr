@@ -168,25 +168,25 @@ impl TestContext {
     /// Lower `hugr` to LLVM, then JIT and execute the function named
     /// by `entry_point` in the inner module.
     ///
-    /// That function must take no arguments and return an LLVM `i64`.
-    pub fn exec_hugr_u64(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> u64 {
+    /// That function must take no arguments and return FFI-compatible type `T`.
+    pub fn exec_hugr<T>(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> T {
         let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
         emission.verify().unwrap();
 
-        emission.exec_u64(entry_point).unwrap()
+        emission.jit_exec::<T>(entry_point).unwrap()
+    }
+
+    // legacy wrappers for common types
+    pub fn exec_hugr_u64(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> u64 {
+        self.exec_hugr::<u64>(hugr, entry_point)
     }
 
     pub fn exec_hugr_i64(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> i64 {
-        let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
-        emission.verify().unwrap();
-
-        emission.exec_i64(entry_point).unwrap()
+        self.exec_hugr::<i64>(hugr, entry_point)
     }
 
     pub fn exec_hugr_f64(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> f64 {
-        let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
-
-        emission.exec_f64(entry_point).unwrap()
+        self.exec_hugr::<f64>(hugr, entry_point)
     }
 
     /// Lower `hugr` to LLVM, then JIT and execute the function named `entry_point` in the

@@ -1559,7 +1559,13 @@ mod test {
                 Ok(handle.outputs())
             },
         );
-        assert_eq!(int_exec_ctx.exec_hugr_i64(hugr, "main"), arg);
+        // select correct integer width
+        match to {
+            2 => assert_eq!(int_exec_ctx.exec_hugr::<i8>(hugr, "main"), arg as i8),
+            4 => assert_eq!(int_exec_ctx.exec_hugr::<i16>(hugr, "main"), arg as i16),
+            5 => assert_eq!(int_exec_ctx.exec_hugr::<i32>(hugr, "main"), arg as i32),
+            _ => panic!("Unsupported int width {to}")
+        };
     }
 
     #[rstest]
@@ -1623,7 +1629,7 @@ mod test {
         int_exec_ctx: TestContext,
         #[case] dividend: i64,
         #[case] divisor: u64,
-        #[case] expected_result: (i64, u64),
+        #[case] expected_result: (i8, u8),
     ) {
         let int_ty = INT_TYPES[3].clone();
         let k_dividend = ConstInt::new_s(3, dividend).unwrap();
@@ -1640,8 +1646,8 @@ mod test {
             Some([k_dividend, k_divisor]),
             int_ty,
         );
-        let quot = int_exec_ctx.exec_hugr_i64(quot_hugr, "main");
-        let rem = int_exec_ctx.exec_hugr_u64(rem_hugr, "main");
+        let quot = int_exec_ctx.exec_hugr::<i8>(quot_hugr, "main");
+        let rem = int_exec_ctx.exec_hugr::<u8>(rem_hugr, "main");
         assert_eq!((quot, rem), expected_result);
     }
 }
