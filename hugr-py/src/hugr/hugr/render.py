@@ -93,6 +93,10 @@ class RenderConfig:
     truncate_node_labels: bool = True
     #: Max length for node labels (if truncation is enabled).
     max_node_label_length: int = 24
+    #: If true truncate the metadata display to `max_metadata_length` characters.
+    truncate_metadata: bool = True
+    #: Max length for metadata display (if truncation is enabled).
+    max_metadata_length: int = 20
 
 
 class DotRenderer:
@@ -250,7 +254,13 @@ class DotRenderer:
         meta = hugr[node].metadata
         if len(meta) > 0 and self.config.display_metadata:
             data = "<BR/><BR/>" + "<BR/>".join(
-                html.escape(key) + ": " + html.escape(str(value))
+                html.escape(key)
+                + ": "
+                + html.escape(
+                    _smart_truncate(str(value), self.config.max_metadata_length)
+                    if self.config.truncate_metadata
+                    else str(value)
+                )
                 for key, value in meta.items()
             )
         else:
