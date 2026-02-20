@@ -11,7 +11,8 @@ use itertools::{Either, Itertools};
 
 /// Scope configuration for a pass.
 ///
-/// The scope of a pass defines which parts of a HUGR it is allowed to modify.
+/// The scope of a pass defines which parts of a HUGR it should be applied to,
+/// and which parts it is allowed to modify.
 ///
 /// Each variant defines three properties: [PassScope::root],
 /// [PassScope::preserve_interface], and [PassScope::recursive].
@@ -60,7 +61,7 @@ pub enum PassScope {
     Global(#[from] Preserve),
 }
 
-/// What part of the Hugr should have its interface preserved by optimization passes.
+/// Which nodes in the Hugr should have their interface preserved by optimization passes.
 ///
 /// (Interface means signature/value ports, as well as static ports, and their types;
 /// also name (if public) for linking; and whether the node is a valid dataflow child
@@ -83,11 +84,16 @@ pub enum Preserve {
     /// changing their behaviour or deleting them entirely, so long as this
     /// does not affect behaviour of the public functions (or entrypoint).
     ///
+    /// Thus, appropriate for a Hugr that will be linked as a library.
+    ///
     /// - `preserve_interface`: every public function defined in the module,
     ///   and the entrypoint.
     #[default]
     Public,
     /// Run the pass on the whole Hugr, but preserving behaviour only of the entrypoint.
+    ///
+    /// Thus, appropriate for a Hugr that will be run as an executable, with the
+    /// entrypoint indicating where execution will begin.
     ///
     /// If the entrypoint is the module root, then the same as [Self::Public].
     // ALAN could be Self::All in such case, but if so then Self::Public
@@ -112,10 +118,12 @@ pub enum InScope {
     Yes,
     /// The pass may modify the interior of the node - its [OpType], and its descendants -
     /// but must maintain the same ports (including static [Function] ports and [ControlFlow] ports),
-    /// function name and [Visibility], and behaviour.
+    /// function name and [Visibility], and behaviour. For the [Module], this is equivalent
+    /// to [InScope::No].
     ///
     /// [Function]: [hugr_core::types::EdgeKind::Function]
     /// [ControlFlow]: [EdgeKind::ControlFlow]
+    /// [Module]: OpType::Module
     PreserveInterface,
     /// The pass may not modify this node
     No,
@@ -160,7 +168,7 @@ impl PassScope {
     /// linking).
     ///
     /// We include the [Module] in this list (if it is [Self::root]) as these
-    /// properties must be preserved (such rules out any other changes).
+    /// properties must be preserved (this rules out any other changes).
     ///
     /// [Module]: OpType::Module
     pub fn preserve_interface<'a, H: HugrView>(
@@ -196,7 +204,7 @@ impl PassScope {
     /// [Module]) in the Hugr to be optimized by the pass.
     ///
     /// This computes all the regions to be optimized at once. In general, it is
-    /// more efficient to traverse the Hugr incrementally starting from
+    /// more efficient to traverse the Hugr incrementally starting from the
     /// [PassScope::root] instead.
     ///
     /// [dataflow]: hugr_core::ops::OpTag::DataflowParent
@@ -226,10 +234,6 @@ impl PassScope {
     /// Nodes outside the `root` subtree are never in scope.
     /// Nodes inside the subtree may be either [InScope::Yes] or [InScope::PreserveInterface].
     pub fn in_scope<H: HugrView>(&self, hugr: &H, node: H::Node) -> InScope {
-        // The root module node is never in scope.
-        if node == hugr.module_root() {
-            return InScope::No;
-        };
         let Some(r) = self.root(hugr) else {
             return InScope::No;
         };
@@ -448,7 +452,10 @@ mod test {
             scope.regions(&th.hugr).collect_vec(),
             [th.public_func, th.private_func, th.public_func_nested]
         );
-        assert_eq!(scope.in_scope(&th.hugr, th.module_root), InScope::No);
+        assert_eq!(
+            scope.in_scope(&th.hugr, th.module_root),
+            InScope::PreserveInterface
+        );
         for n in [
             th.public_func,
             th.private_func,
