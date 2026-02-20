@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.4](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.3...hugr-py-v0.15.4) (2026-02-20)
+
+
+### Features
+
+* **hugr-py:** Define typed Metadata protocol ([#2765](https://github.com/Quantinuum/hugr/issues/2765)) ([4390230](https://github.com/Quantinuum/hugr/commit/4390230f0b17b5a5ab12656853c40be195514ef5))
+
+
+### Bug Fixes
+
+* Add truncation options for node and edge labels in rendering ([#2885](https://github.com/Quantinuum/hugr/issues/2885)) ([25c625d](https://github.com/Quantinuum/hugr/commit/25c625d27c7e5a594ad5a0f7e5bc6c044125e590))
+* used_extensions should include transitive requirements ([#2891](https://github.com/Quantinuum/hugr/issues/2891)) ([18e78e4](https://github.com/Quantinuum/hugr/commit/18e78e4f0efa08cb15f6474b875fafa2eee8300a))
+
 ## [0.15.3](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.2...hugr-py-v0.15.3) (2026-02-09)
 
 
