@@ -6,15 +6,18 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use handlers::list_const;
+use hugr_core::hugr::linking::{HugrLinking, NameLinkingPolicy, OnMultiDefn};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::list::list_type_def;
 use thiserror::Error;
 
-use hugr_core::builder::{BuildError, BuildHandle, Dataflow};
+use hugr_core::builder::{
+    BuildError, BuildHandle, Container, Dataflow, DataflowHugr, FunctionBuilder, HugrBuilder,
+};
 use hugr_core::extension::{ExtensionId, OpDef, SignatureError, TypeDef};
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::ops::constant::{OpaqueValue, Sum};
-use hugr_core::ops::handle::{DataflowOpID, FuncID};
+use hugr_core::ops::handle::{DataflowOpID, FuncID, NodeHandle};
 use hugr_core::ops::{
     AliasDefn, CFG, Call, CallIndirect, Case, Conditional, Const, DFG, DataflowBlock, ExitBlock,
     ExtensionOp, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop, Value,
@@ -23,7 +26,7 @@ use hugr_core::types::{
     ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeRow,
     TypeTransformer,
 };
-use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Wire};
+use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Visibility, Wire};
 
 use crate::ComposablePass;
 
@@ -35,21 +38,85 @@ pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linea
 ///
 /// [`DataflowParent`]: hugr_core::ops::OpTag::DataflowParent
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub enum NodeTemplate {
-    /// A single node - so if replacing an existing node, change only the op
+    /// A single node - so if replacing an existing node, change only the op.
+    ///
+    /// An error will be raised if the new op has a static inport; use [Self::LinkedHugr] instead.
     SingleOp(OpType),
-    /// Defines a sub-Hugr to insert, whose root becomes (or replaces) the desired Node.
-    /// The root must be a [CFG], [Conditional], [DFG] or [`TailLoop`].
+    /// Defines a sub-Hugr whose entrypoint-subtree to insert, the entrypoint (which must be
+    /// a [CFG], [Conditional], [DFG] or [`TailLoop`]) becoming (/replacing) the desired Node.
     // Not a FuncDefn, nor Case/DataflowBlock
-    /// Note this will be of limited use before [monomorphization](super::monomorphize())
+    /// Note 1. `CompoundOp` will be of limited use for polymorphic ops (before [monomorphization])
     /// because the new subtree will not be able to use type variables present in the
     /// parent Hugr or previous op.
+    ///
+    /// Edges incoming to the entrypoint subtree will be disconnected.
+    ///
+    /// It is **recommended** to use [Self::LinkedHugr] instead.
+    ///
+    /// [monomorphization]: super::monomorphize
     CompoundOp(Box<Hugr>),
+    /// Defines a sub-Hugr to insert, whose entrypoint becomes (or replaces) the desired Node.
+    /// Other children of the Hugr reachable from the entrypoint will also be inserted
+    /// according to the specified linking policy.
+    LinkedHugr(Box<Hugr>, NameLinkingPolicy),
     /// A Call to an existing function.
+    #[deprecated(
+        note = "Use LinkedHugr with Call entrypoint and FuncDecl",
+        since = "0.24.4"
+    )]
     Call(Node, Vec<TypeArg>),
 }
 
 impl NodeTemplate {
+    /// Creates a [Self::LinkedHugr] from the given Hugr with the default linking policy.
+    pub fn linked_hugr(h: impl Into<Hugr>) -> Self {
+        NodeTemplate::LinkedHugr(Box::new(h.into()), NameLinkingPolicy::default())
+    }
+
+    /// Creates a [`NodeTemplate::LinkedHugr`] creating a call node to the given
+    /// function definition or declaration.
+    ///
+    /// Returns a [`BuildError::UnexpectedType`] if the given Hugr does not have
+    /// a function definition or declaration as entrypoint.
+    pub fn call_to_function(
+        func_def: Hugr,
+        type_args: &[TypeArg],
+    ) -> Result<NodeTemplate, BuildError> {
+        // Create a replacement hugr for the op nodes: Add a `call` node in the `func_def` hugr and set it as entrypoint.
+        let func_op = func_def.entrypoint_optype();
+        let func_signature = match func_op {
+            OpType::FuncDecl(decl) => decl.signature().clone(),
+            OpType::FuncDefn(defn) => defn.signature().clone(),
+            _ => {
+                return Err(BuildError::UnexpectedType {
+                    node: func_def.entrypoint(),
+                    op_desc: "function definition or declaration",
+                });
+            }
+        }
+        .instantiate(type_args)?;
+
+        // Build a new hugr and insert the function definition into it
+        let mut b = FunctionBuilder::new_vis("", func_signature, Visibility::Private).unwrap();
+        let func_id = FuncID::<true>::from(
+            b.module_root_builder()
+                .add_hugr(func_def)
+                .inserted_entrypoint,
+        );
+
+        // Build a call to the function in the new separate function.
+        let call = b.call(&func_id, type_args, b.input_wires()).unwrap();
+        let mut call_hugr = b.finish_hugr_with_outputs(call.outputs()).unwrap();
+        call_hugr.set_entrypoint(call.node());
+
+        Ok(NodeTemplate::LinkedHugr(
+            Box::new(call_hugr),
+            NameLinkingPolicy::default().on_multiple_defn(OnMultiDefn::UseTarget),
+        ))
+    }
+
     /// Adds this instance to the specified [`HugrMut`] as a new node or subtree under a
     /// given parent, returning the unique new child (of that parent) thus created
     ///
@@ -76,6 +143,10 @@ impl NodeTemplate {
             NodeTemplate::CompoundOp(new_h) => {
                 Ok(hugr.insert_hugr(parent, *new_h).inserted_entrypoint)
             }
+            NodeTemplate::LinkedHugr(h, pol) => {
+                Ok(hugr.insert_link_hugr(parent, *h, &pol)?.inserted_entrypoint)
+            }
+            #[expect(deprecated)] // remove together
             NodeTemplate::Call(target, type_args) => {
                 let c = call(hugr, target, type_args)?;
                 let tgt_port = c.called_function_port();
@@ -95,6 +166,8 @@ impl NodeTemplate {
         match self {
             NodeTemplate::SingleOp(opty) => dfb.add_dataflow_op(opty, inputs),
             NodeTemplate::CompoundOp(h) => dfb.add_hugr_with_wires(*h, inputs),
+            NodeTemplate::LinkedHugr(h, pol) => dfb.add_link_hugr_with_wires(*h, &pol, inputs),
+            #[expect(deprecated)] // remove together
             // Really we should check whether func points at a FuncDecl or FuncDefn and create
             // the appropriate variety of FuncID but it doesn't matter for the purpose of making a Call.
             NodeTemplate::Call(func, type_args) => {
@@ -106,30 +179,91 @@ impl NodeTemplate {
         }
     }
 
-    fn replace(self, hugr: &mut impl HugrMut<Node = Node>, n: Node) -> Result<(), BuildError> {
+    fn replace<H: HugrMut<Node = Node>>(
+        self,
+        hugr: &mut H,
+        n: Node,
+        rt: &ReplaceTypes,
+        opts: &ReplacementOptions,
+    ) -> Result<(), ReplaceTypesError> {
+        let ef = |e| ReplaceTypesError::AddTemplateError(n, Box::new(e));
         assert_eq!(hugr.children(n).count(), 0);
-        let new_optype = match self {
-            NodeTemplate::SingleOp(op_type) => op_type,
+        let (new_optype, static_source, static_inport) = match self {
+            NodeTemplate::SingleOp(op_type) => {
+                if op_type.static_input_port().is_some() {
+                    return Err(ef(BuildError::UnexpectedType {
+                        node: n,
+                        op_desc: "Replacement SingleOp without static input",
+                    }));
+                }
+                (op_type, None, None)
+            }
             NodeTemplate::CompoundOp(new_h) => {
+                let root = new_h.entrypoint_optype();
+                if !matches!(
+                    root,
+                    OpType::CFG(_) | OpType::DFG(_) | OpType::Conditional(_) | OpType::TailLoop(_)
+                )
+                //if !root.is_container() || !root.dataflow_signature().is_some() // Using explicit list as per docs
+                {
+                    return Err(ef(BuildError::UnexpectedType {
+                        node: n,
+                        op_desc: "Replacement CompoundOp not a container/dataflow node",
+                    }));
+                }
+                assert!(root.static_input_port().is_none());
                 let new_entrypoint = hugr.insert_hugr(n, *new_h).inserted_entrypoint;
                 let children = hugr.children(new_entrypoint).collect::<Vec<_>>();
                 let root_opty = hugr.remove_node(new_entrypoint);
                 for ch in children {
                     hugr.set_parent(ch, n);
                 }
-                root_opty
+                (root_opty, None, None)
             }
+            NodeTemplate::LinkedHugr(mut h, pol) => {
+                // We have to recursively process any children that *might* be linked in,
+                // before linking, as otherwise they'll signature conflict with other,
+                // already-recursively-processed, functions with which they might be linked.
+                let mut containing_func = h.entrypoint();
+                while let Some(parent) = h.get_parent(containing_func)
+                    && !h.get_optype(parent).is_module()
+                {
+                    containing_func = parent;
+                }
+
+                for ch in h.children(h.module_root()).collect::<Vec<_>>() {
+                    if ch != containing_func {
+                        rt.process_subtree_opts(&mut h, ch, opts)?;
+                    }
+                }
+                let new_entrypoint = hugr
+                    .insert_link_hugr(n, *h, &pol)
+                    .map_err(|e| ef(BuildError::from(e)))?
+                    .inserted_entrypoint;
+                let children = hugr.children(new_entrypoint).collect::<Vec<_>>();
+                let static_source = hugr.static_source(new_entrypoint);
+                let root_opty = hugr.remove_node(new_entrypoint);
+                let static_inport = root_opty.static_input_port();
+                for ch in children {
+                    hugr.set_parent(ch, n);
+                }
+                (root_opty, static_source, static_inport)
+            }
+            #[expect(deprecated)] // remove together
             NodeTemplate::Call(func, type_args) => {
-                let c = call(hugr, func, type_args)?;
-                let static_inport = c.called_function_port();
-                // insert an input for the Call static input
-                hugr.insert_ports(n, Direction::Incoming, static_inport.index(), 1);
-                // connect the function to (what will be) the call
-                hugr.connect(func, 0, n, static_inport);
-                c.into()
+                let c = call(hugr, func, type_args).map_err(ef)?;
+                let called_func_port = c.called_function_port();
+                (c.into(), Some(func), Some(called_func_port))
             }
         };
         *hugr.optype_mut(n) = new_optype;
+        if let Some(static_inport) = static_inport {
+            hugr.insert_ports(n, Direction::Incoming, static_inport.index(), 1);
+            if let Some(static_source) = static_source {
+                hugr.connect(static_source, 0, n, static_inport);
+            }
+        }
+        rt.process_subtree_opts(hugr, n, opts)?;
         Ok(())
     }
 
@@ -141,6 +275,8 @@ impl NodeTemplate {
         let sig = match self {
             NodeTemplate::SingleOp(op_type) => op_type,
             NodeTemplate::CompoundOp(hugr) => hugr.entrypoint_optype(),
+            NodeTemplate::LinkedHugr(hugr, _) => hugr.entrypoint_optype(),
+            #[expect(deprecated)] // remove together, perhaps refactor to return just Signature
             NodeTemplate::Call(_, _) => return Ok(()), // no way to tell
         }
         .dataflow_signature();
@@ -201,7 +337,7 @@ impl ReplacementOptions {
 /// A configuration of what types, ops, and constants should be replaced with what.
 /// May be applied to a Hugr via [`Self::run`].
 ///
-/// Parametrized types and ops will be reparametrized taking into account the
+/// Parametrized types and ops will be reparameterized taking into account the
 /// replacements, but any ops taking/returning the replaced types *not* as a result of
 /// parametrization, will also need to be replaced - see [`Self::replace_op`].
 /// Similarly [Const]s.
@@ -343,7 +479,7 @@ impl ReplaceTypes {
     /// substitution (parametric polymorphism) happening later will not respect this replacement.
     ///
     /// If there are any [`LoadConstant`]s of this type, callers should also call [`Self::replace_consts`]
-    /// (or [`Self::replace_consts_parametrized`]) as the [`LoadConstant`]s will be reparametrized
+    /// (or [`Self::replace_consts_parametrized`]) as the [`LoadConstant`]s will be reparameterized
     /// (and this will break the edge from [Const] to [`LoadConstant`]).
     ///
     /// Note that if `src` is Copyable and `dest` is Linear, then (besides linearity violations)
@@ -389,7 +525,7 @@ impl ReplaceTypes {
     ///
     /// If there are any [`LoadConstant`]s of any of these types, callers should also call
     /// [`Self::replace_consts_parametrized`] (or [`Self::replace_consts`]) as the
-    /// [`LoadConstant`]s will be reparametrized (and this will break the edge from [Const] to
+    /// [`LoadConstant`]s will be reparameterized (and this will break the edge from [Const] to
     /// [`LoadConstant`]).
     /// See [Self::set_replace_type] for more details (including recursion).
     pub fn set_replace_parametrized_type(
@@ -572,6 +708,26 @@ impl ReplaceTypes {
         self.regions = Some(regions.into_iter().collect());
     }
 
+    fn process_subtree_opts(
+        &self,
+        hugr: &mut impl HugrMut<Node = Node>,
+        root: Node,
+        opts: &ReplacementOptions,
+    ) -> Result<(), ReplaceTypesError> {
+        if opts.process_recursive {
+            self.change_subtree(hugr, root, opts.linearize_unchanged)?;
+            // change_subtree does not linearize its root, just as change_node
+            // does not linearize the node it's called on; our caller does.
+        } else if opts.linearize_unchanged {
+            let mut descs = hugr.descendants(root);
+            assert_eq!(descs.next(), Some(root));
+            for n in descs.collect::<Vec<_>>() {
+                self.linearize_outputs(hugr, n)?;
+            }
+        }
+        Ok(())
+    }
+
     fn change_subtree(
         &self,
         hugr: &mut impl HugrMut<Node = Node>,
@@ -675,20 +831,7 @@ impl ReplaceTypes {
                     }
                 };
                 if let Some((replacement, opts)) = replacement {
-                    replacement
-                        .replace(hugr, n)
-                        .map_err(|e| ReplaceTypesError::AddTemplateError(n, Box::new(e)))?;
-                    if opts.process_recursive {
-                        self.change_subtree(hugr, n, opts.linearize_unchanged)?;
-                        // change_subtree does not linearize its root, just as change_node
-                        // does not linearize the node it's called on; our caller does.
-                    } else if opts.linearize_unchanged {
-                        let mut descs = hugr.descendants(n);
-                        assert_eq!(descs.next(), Some(n));
-                        for n in descs.collect::<Vec<_>>() {
-                            self.linearize_outputs(hugr, n)?;
-                        }
-                    }
+                    replacement.replace(hugr, n, self, &opts)?;
                     true
                 } else {
                     changed
@@ -734,6 +877,7 @@ impl ReplaceTypes {
                     false
                 }
             }),
+            #[expect(deprecated)] // remove when Value::Function removed
             Value::Function { hugr } => self.run(&mut **hugr),
         }
     }
@@ -833,14 +977,15 @@ mod test {
         FunctionBuilder, HugrBuilder, ModuleBuilder, SubContainer, TailLoopBuilder, endo_sig,
         inout_sig,
     };
+    use hugr_core::extension::SignatureError;
     use hugr_core::extension::prelude::{
-        ConstUsize, UnwrapBuilder, bool_t, option_type, qb_t, usize_t,
+        ConstUsize, Noop, UnwrapBuilder, bool_t, option_type, qb_t, usize_t,
     };
-    use hugr_core::extension::simple_op::MakeOpDef;
+    use hugr_core::extension::simple_op::{MakeOpDef, MakeRegisteredOp};
     use hugr_core::extension::{TypeDefBound, Version, simple_op::MakeExtensionOp};
-    use hugr_core::hugr::{IdentList, ValidationError};
+    use hugr_core::hugr::{IdentList, ValidationError, hugrmut::HugrMut};
     use hugr_core::ops::constant::{CustomConst, OpaqueValue};
-    use hugr_core::ops::{self, ExtensionOp, OpTrait, OpType, Tag, Value};
+    use hugr_core::ops::{self, ExtensionOp, OpTrait, OpType, Tag, Value, handle::NodeHandle};
     use hugr_core::std_extensions::arithmetic::conversions::ConvertOpDef;
     use hugr_core::std_extensions::arithmetic::int_types::{ConstInt, INT_TYPES};
     use hugr_core::std_extensions::collections::array::{
@@ -855,11 +1000,11 @@ mod test {
     use hugr_core::types::{
         EdgeKind, PolyFuncType, Signature, SumType, Term, Type, TypeArg, TypeBound, TypeRow,
     };
-    use hugr_core::{Direction, Extension, HugrView, Port, type_row};
+    use hugr_core::{Direction, Extension, HugrView, Port, Visibility, type_row};
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::ComposablePass;
+    use crate::{ComposablePass, mangle_name};
 
     use super::{NodeTemplate, ReplaceTypes, handlers::list_const};
 
@@ -1317,8 +1462,11 @@ mod test {
         h.validate().unwrap();
     }
 
-    #[test]
-    fn op_to_call() {
+    #[rstest]
+    fn op_to_call_polymorphic(#[values(true, false)] use_linking: bool) {
+        // Note the resulting Hugr has a polymorphic lowered_read function, which would
+        // mean (re)running monomorphization *after* ReplaceTypes; usually we would expect
+        // monomorphization to happen first so that ReplaceTypes can act upon the concrete types.
         let e = ext();
         let pv = e.get_type(PACKED_VEC).unwrap();
         let inner = pv.instantiate([usize_t().into()]).unwrap();
@@ -1330,9 +1478,10 @@ mod test {
             .module_root_builder()
             .add_hugr(
                 lowered_read(Type::new_var_use(0, TypeBound::Copyable), |sig| {
-                    FunctionBuilder::new(
+                    FunctionBuilder::new_vis(
                         "lowered_read",
                         PolyFuncType::new([TypeBound::Copyable.into()], sig),
+                        Visibility::Public,
                     )
                 })
                 .finish_hugr()
@@ -1348,10 +1497,26 @@ mod test {
             .add_dataflow_op(read_op(&e, usize_t()), [inner, idx])
             .unwrap();
         let mut h = dfb.finish_hugr_with_outputs(res.outputs()).unwrap();
+        let read_poly = h
+            .get_optype(read_func)
+            .as_func_defn()
+            .unwrap()
+            .signature()
+            .clone();
 
         let mut lw = lowerer(&e);
         lw.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, _| {
-            Ok(Some(NodeTemplate::Call(read_func, args.to_owned())))
+            Ok(Some(if use_linking {
+                let mut decl_b = ModuleBuilder::new();
+                let decl_node = decl_b.declare("lowered_read", read_poly.clone()).unwrap();
+                let mut decl_hugr = decl_b.finish_hugr().unwrap();
+                decl_hugr.set_entrypoint(decl_node.node());
+
+                NodeTemplate::call_to_function(decl_hugr, args).unwrap()
+            } else {
+                #[expect(deprecated)] // remove use_linking==false case
+                NodeTemplate::Call(read_func, args.to_owned())
+            }))
         });
         lw.run(&mut h).unwrap();
         h.validate().unwrap();
@@ -1362,6 +1527,93 @@ mod test {
                 .find(|n| h.get_optype(*n).is_extension_op()),
             None
         );
+        assert_eq!(h.children(h.module_root()).count(), 2); // main + lowered_read
+    }
+
+    #[rstest]
+    fn op_to_call_monomorphic(#[values(false, true)] i64_to_usize: bool) {
+        let e = ext();
+        let pv = e.get_type(PACKED_VEC).unwrap();
+        let inner = pv.instantiate([usize_t().into()]).unwrap();
+        let outer = pv
+            .instantiate([Type::new_extension(inner.clone()).into()])
+            .unwrap();
+        let read_outer = read_op(&e, inner.clone().into());
+        let mut dfb = DFGBuilder::new(inout_sig(
+            vec![outer.into(), inner.clone().into(), i64_t()],
+            vec![usize_t(); 2],
+        ))
+        .unwrap();
+
+        let [outer, inner, idx] = dfb.input_wires_arr();
+        let res1 = dfb
+            .add_dataflow_op(read_op(&e, usize_t()), [inner, idx])
+            .unwrap();
+        let [inner] = dfb
+            .add_dataflow_op(read_outer, [outer, idx])
+            .unwrap()
+            .outputs_arr();
+        let res2 = dfb
+            .add_dataflow_op(read_op(&e, usize_t()), [inner, idx])
+            .unwrap();
+        let mut h = dfb
+            .finish_hugr_with_outputs(res1.outputs().chain(res2.outputs()))
+            .unwrap();
+
+        let mut lw = lowerer(&e);
+        lw.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, _| {
+            Ok(Some({
+                let [Term::Runtime(ty)] = args else {
+                    return Err(SignatureError::InvalidTypeArgs.into());
+                };
+
+                let defn_hugr = lowered_read(ty.clone(), |sig| {
+                    FunctionBuilder::new_vis(
+                        mangle_name("lowered_read", args),
+                        sig,
+                        Visibility::Public,
+                    )
+                })
+                .finish_hugr()
+                .unwrap();
+
+                NodeTemplate::call_to_function(defn_hugr, &[]).unwrap()
+            }))
+        });
+        if i64_to_usize {
+            lw.set_replace_type(i64_t().as_extension().unwrap().clone(), usize_t());
+            lw.set_replace_op(
+                &ConvertOpDef::itousize
+                    .without_log_width()
+                    .to_extension_op()
+                    .unwrap(),
+                NodeTemplate::SingleOp(Noop::new(usize_t()).into()),
+            );
+        }
+        lw.run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        assert_eq!(
+            h.entry_descendants()
+                .find(|n| h.get_optype(*n).is_extension_op()),
+            None
+        );
+        assert_eq!(h.children(h.module_root()).count(), 3); // main + lowered_read
+        for n in h.children(h.module_root()) {
+            let fd = h.get_optype(n).as_func_defn().unwrap();
+            let expected_uses_and_vis = if fd.func_name() == "main" {
+                (0, Visibility::Private)
+            } else {
+                let is_array = !fd.signature().body().output[0]
+                    .as_extension()
+                    .unwrap()
+                    .args()
+                    .is_empty();
+                (2 - (is_array as usize), Visibility::Public)
+            };
+            assert_eq!(h.output_neighbours(n).count(), expected_uses_and_vis.0);
+            assert_eq!(fd.visibility(), &expected_uses_and_vis.1);
+        }
     }
 
     #[test]

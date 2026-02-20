@@ -11,8 +11,8 @@ import hugr._serialization.extension as ext_s
 import hugr.model as model
 from hugr.envelope import (
     EnvelopeConfig,
-    make_envelope,
-    make_envelope_str,
+    _make_envelope,
+    _make_envelope_str,
     read_envelope,
     read_envelope_str,
 )
@@ -20,7 +20,7 @@ from hugr.hugr.base import Hugr
 from hugr.ops import FuncDecl, FuncDefn, Op
 
 if TYPE_CHECKING:
-    from hugr.ext import Extension
+    from hugr.ext import Extension, ExtensionRegistry
     from hugr.hugr.node_port import Node
 
 __all__ = [
@@ -54,21 +54,30 @@ class Package:
         )
 
     @staticmethod
-    def from_bytes(envelope: bytes) -> Package:
+    def from_bytes(
+        envelope: bytes, extensions: ExtensionRegistry | None = None
+    ) -> Package:
         """Deserialize a byte string to a Package object.
 
         Some envelope formats can be read from a string. See :meth:`from_str`.
 
         Args:
             envelope: The byte string representing a Package.
+            extensions: If not None, an extension registry to resolve the custom
+                operations and types.
 
         Returns:
             The deserialized Package object.
         """
-        return read_envelope(envelope)
+        package = read_envelope(envelope)
+        if extensions is not None:
+            # TODO: This can be done during deserialization
+            for module in package.modules:
+                module.resolve_extensions(extensions)
+        return package
 
     @staticmethod
-    def from_str(envelope: str) -> Package:
+    def from_str(envelope: str, extensions: ExtensionRegistry | None = None) -> Package:
         """Deserialize a string to a Package object.
 
         Not all envelope formats can be read from a string.
@@ -76,11 +85,18 @@ class Package:
 
         Args:
             envelope: The string representing a Package.
+            extensions: If not None, an extension registry to resolve the custom
+                operations and types.
 
         Returns:
             The deserialized Package object.
         """
-        return read_envelope_str(envelope)
+        package = read_envelope_str(envelope)
+        if extensions is not None:
+            # TODO: This can be done during deserialization
+            for module in package.modules:
+                module.resolve_extensions(extensions)
+        return package
 
     @staticmethod
     def from_model(package: model.Package, extensions: list[Extension] | None = None):
@@ -94,7 +110,7 @@ class Package:
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
         """
         config = config or EnvelopeConfig.BINARY
-        return make_envelope(self, config)
+        return _make_envelope(self, config)
 
     def to_str(self, config: EnvelopeConfig | None = None) -> str:
         """Serialize the package to a HUGR envelope string.
@@ -103,7 +119,7 @@ class Package:
         See :meth:`to_bytes` for a more general method.
         """
         config = config or EnvelopeConfig.TEXT
-        return make_envelope_str(self, config)
+        return _make_envelope_str(self, config)
 
     @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
     def to_json(self) -> str:

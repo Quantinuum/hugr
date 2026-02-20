@@ -23,6 +23,7 @@ if TYPE_CHECKING:
 
     from hugr.build.function import Module
     from hugr.hugr.node_port import Node, OutPort, PortOffset, ToNode, Wire
+    from hugr.metadata import NodeMetadata
     from hugr.tys import TypeParam, TypeRow
 
     from .cfg import Cfg
@@ -195,7 +196,11 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
         return [self.input_node.out(i) for i in range(len(self._input_op().types))]
 
     def add_op(
-        self, op: ops.DataflowOp, /, *args: Wire, metadata: dict[str, Any] | None = None
+        self,
+        op: ops.DataflowOp,
+        /,
+        *args: Wire,
+        metadata: dict[str, Any] | NodeMetadata | None = None,
     ) -> Node:
         """Add a dataflow operation to the graph, wiring in input ports.
 

@@ -330,6 +330,12 @@ fn simpleser() {
     let a = g.add_node(1, 1);
     let b = g.add_node(3, 2);
     let c = g.add_node(1, 1);
+    let a0 = g.add_node(0, 1);
+    let a1 = g.add_node(1, 0);
+    let b0 = g.add_node(0, 1);
+    let b1 = g.add_node(1, 0);
+    let c0 = g.add_node(0, 1);
+    let c1 = g.add_node(1, 0);
 
     g.link_nodes(a, 0, b, 0).unwrap();
     g.link_nodes(a, 0, b, 0).unwrap();
@@ -337,15 +343,22 @@ fn simpleser() {
     g.link_nodes(b, 1, c, 0).unwrap();
     g.link_nodes(b, 1, a, 0).unwrap();
     g.link_nodes(c, 0, a, 0).unwrap();
+    g.link_nodes(a0, 0, a1, 0).unwrap();
+    g.link_nodes(b0, 0, b1, 0).unwrap();
+    g.link_nodes(c0, 0, c1, 0).unwrap();
 
     let mut h = Hierarchy::new();
     let mut op_types = UnmanagedDenseMap::new();
 
     op_types[entrypoint] = gen_optype(&g, entrypoint);
 
-    for n in [a, b, c] {
+    for (n, children) in [(a, [a0, a1]), (b, [b0, b1]), (c, [c0, c1])] {
         h.push_child(n, entrypoint).unwrap();
         op_types[n] = gen_optype(&g, n);
+        for child in children {
+            h.push_child(child, n).unwrap();
+            op_types[child] = gen_optype(&g, child);
+        }
     }
 
     let hugr = Hugr {
@@ -560,6 +573,7 @@ fn roundtrip_sumtype(#[case] sum_type: SumType) {
 #[case(Value::extension(ConstInt::new_u(2,1).unwrap()))]
 #[case(Value::sum(1,[Value::extension(ConstInt::new_u(2,1).unwrap())], SumType::new([vec![], vec![INT_TYPES[2].clone()]])).unwrap())]
 #[case(Value::tuple([Value::false_val(), Value::extension(ConstInt::new_s(2,1).unwrap())]))]
+#[expect(deprecated)] // remove when Value::Function removed
 #[case(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap())]
 fn roundtrip_value(#[case] value: Value) {
     check_testing_roundtrip(value);
@@ -620,6 +634,7 @@ fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
 #[case(ops::AliasDefn { name: "aliasdefn".into(), definition: Type::new_unit_sum(4)})]
 #[case(ops::AliasDecl { name: "aliasdecl".into(), bound: TypeBound::Linear})]
 #[case(ops::Const::new(Value::false_val()))]
+#[expect(deprecated)] // remove when Value::Function removed
 #[case(ops::Const::new(Value::function(crate::builder::test::simple_dfg_hugr()).unwrap()))]
 #[case(ops::Input::new(vec![Type::new_var_use(3,TypeBound::Copyable)]))]
 #[case(ops::Output::new(vec![Type::new_function(FuncValueType::new_endo(type_row![]))]))]

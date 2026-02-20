@@ -6,6 +6,8 @@ pub mod int_op_builder;
 pub mod logic_op_builder;
 pub mod type_map;
 
+#[deprecated(note = "Will be removed along with Value::Function", since = "0.25.0")]
+#[expect(deprecated)]
 pub use inline_constant_functions::inline_constant_functions;
 pub use int_op_builder::IntOpBuilder;
 pub use logic_op_builder::LogicOpBuilder;
