@@ -146,6 +146,9 @@ class Type(Protocol):
     ) -> tuple[Type, ExtensionResolutionResult]:
         """Resolve the extensions required to define this type.
 
+        Does not include transitive dependencies required by the returned
+        extension definitions, to avoid infinite recursion.
+
         Args:
             registry: A registry to resolve unresolved extensions from.
                 If None, opaque types will not be resolved.

@@ -308,6 +308,8 @@ impl Hugr {
             );
         }
 
+        used_extensions.extend_with_dependencies()?;
+
         self.extensions = used_extensions;
         Ok(())
     }
