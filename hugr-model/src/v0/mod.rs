@@ -404,6 +404,7 @@ impl<'py> pyo3::IntoPyObject<'py> for ScopeClosure {
 
 /// The kind of a region.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Default)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub enum RegionKind {
     /// Data flow region.
     #[default]
@@ -451,6 +452,7 @@ impl<'py> pyo3::IntoPyObject<'py> for RegionKind {
 
 /// The name of a variable.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub struct VarName(SmolStr);
 
 impl VarName {
@@ -489,6 +491,7 @@ impl<'py> pyo3::IntoPyObject<'py> for &VarName {
 
 /// The name of a symbol.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub struct SymbolName(SmolStr);
 
 impl SymbolName {
@@ -516,6 +519,7 @@ impl<'py> pyo3::FromPyObject<'_, 'py> for SymbolName {
 
 /// The name of a link.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub struct LinkName(SmolStr);
 
 impl LinkName {
@@ -565,6 +569,7 @@ impl<'py> pyo3::IntoPyObject<'py> for &LinkName {
 /// sequences of arbitrary length. To enable cheap cloning and sharing,
 /// strings and byte sequences use reference counting.
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[cfg_attr(feature="arbitrary", derive(arbitrary::Arbitrary))]
 pub enum Literal {
     /// String literal.
     Str(SmolStr),
