@@ -12,8 +12,9 @@ module root.
 
 from __future__ import annotations
 
+from abc import ABC, ABCMeta, abstractmethod
 from collections import deque
-from enum import Enum
+from enum import Enum, EnumMeta
 from typing import TYPE_CHECKING
 
 from hugr import ops
@@ -25,7 +26,105 @@ if TYPE_CHECKING:
     from hugr.hugr.node_port import Node
 
 
-class LocalScope(Enum):
+class InScope(Enum):
+    """Whether a pass may modify a particular node."""
+
+    YES = "YES"
+    """The pass may modify the node arbitrarily, including changing its interface,
+    behaviour, and/or removing it altogether"""
+
+    PRESERVE_INTERFACE = "PRES_INT"
+    """The pass may modify the interior of the node - its `OpType`, and its
+    descendants - but must maintain the same ports (including static and `ControlFlow`
+    ports), function name and visibility, and execution behaviour.
+
+    For the module root, this is equivalent to `NO`."""
+
+    NO = "NO"
+    """The pass may not modify this node"""
+
+
+class PassScopeBase(ABC):
+    """Abstract superclass for concrete implementations of `PassScope`."""
+
+    @abstractmethod
+    def root(self, hugr: Hugr) -> Node | None:
+        """Returns the root of the subtree to be optimized by the pass,
+        or none if the pass should do nothing.
+        """
+
+    @abstractmethod
+    def preserve_interface(self, hugr: Hugr) -> Iterable[Node]:
+        """Returns a list of nodes, in the subtree beneath `root`, for which
+        the pass must preserve the observable semantics (ports, execution behaviour,
+        linking).
+
+        We include the `Module` in this list (if it is `root`) as these
+        properties must be preserved (this rules out any other changes).
+        """
+
+    @abstractmethod
+    def recursive(self) -> bool:
+        """Returns `true` if the pass should be applied recursively on the
+        descendants of the root regions.
+        """
+
+    def regions(self, hugr: Hugr) -> Iterable[Node]:
+        """Return every region (every [dataflow] or [CFG] container - but excluding
+        `Module`) in the Hugr to be optimized by the pass.
+
+        This computes all the regions to be optimized at once. In general, it is
+        more efficient to traverse the Hugr incrementally starting from the
+        `PassScope.root` instead.
+        """
+        if (r := self.root(hugr)) is None:
+            return
+        if r == hugr.module_root:
+            assert self.recursive()
+        else:
+            yield r
+            if not self.recursive():
+                return
+        to_explore = deque(hugr.children(r))
+        while to_explore:
+            node = to_explore.popleft()
+            if hugr.children(node):
+                yield node
+                to_explore.extend(hugr.children(node))
+
+    def in_scope(self, hugr: Hugr, n: Node) -> InScope:
+        """Returns whether the node may be modified by the pass.
+
+        Nodes outside the `root` subtree are never in scope.
+        Nodes inside the subtree may be `InScope.YES` or `InScope.PRESERVE_INTERFACE`.
+        """
+        if (r := self.root(hugr)) is None:
+            return InScope.NO
+        if r != hugr.module_root:
+            anc: Node | None = n
+            while True:
+                if anc is None:
+                    return InScope.NO
+                if anc == r:
+                    break
+                anc = hugr[anc].parent
+        return (
+            InScope.PRESERVE_INTERFACE
+            if n in self.preserve_interface(hugr)
+            else InScope.YES
+        )
+
+
+class ABCEnumMeta(ABCMeta, EnumMeta):
+    """Custom metaclass for things that inherit from both `ABC` and `Enum`.
+
+    This is to solve the error:
+    `Metaclass conflict: the metaclass of a derived class must be a (non-strict)
+    subclass of the metaclasses of all its bases  [metaclass]`
+    """
+
+
+class LocalScope(PassScopeBase, Enum, metaclass=ABCEnumMeta):
     """A `PassScope` that means the pass should modify the hugr only
     beneath the entrypoint, unless the entrypoint is the module root,
     in which case the pass should do nothing.
@@ -57,30 +156,17 @@ class LocalScope(Enum):
     """
 
     def root(self, hugr: Hugr) -> Node | None:
-        """Returns the root of the subtree to be optimized by the pass,
-        or none if the pass should do nothing.
-        """
         return None if hugr.entrypoint == hugr.module_root else hugr.entrypoint
 
     def preserve_interface(self, hugr: Hugr) -> Iterable[Node]:
-        """Returns a list of nodes, in the subtree beneath [Self::root], for which
-        the pass must preserve the observable semantics (ports, execution behaviour,
-        linking).
-
-        We include the [Module] in this list (if it is [Self::root]) as these
-        properties must be preserved (this rules out any other changes).
-        """
         if (r := self.root(hugr)) is not None:
             yield r
 
     def recursive(self) -> bool:
-        """Returns `true` if the pass should be applied recursively on the
-        descendants of the root regions.
-        """
         return self == LocalScope.RECURSIVE
 
 
-class GlobalScope(Enum):
+class GlobalScope(PassScopeBase, Enum, metaclass=ABCEnumMeta):
     """Run the pass on the whole Hugr. Different variants specify which nodes in the
     Hugr should have their interface preserved by optimization passes.
 
@@ -124,23 +210,12 @@ class GlobalScope(Enum):
        children of the module root; otherwise, just the entrypoint node."""
 
     def root(self, hugr: Hugr) -> Node:
-        """Returns the root of the subtree to be optimized by the pass."""
         return hugr.module_root
 
     def recursive(self) -> bool:
-        """Returns `true` i.e. that the pass should be applied recursively on the
-        descendants of the root region.
-        """
         return True
 
     def preserve_interface(self, hugr: Hugr) -> Iterable[Node]:
-        """Returns a list of nodes, in the subtree beneath [Self::root], for which
-        the pass must preserve the observable semantics (ports, execution behaviour,
-        linking).
-
-        We include the [Module] in this list (if it is [Self::root]) as these
-        properties must be preserved (this rules out any other changes).
-        """
         yield hugr.module_root
         ep = hugr.entrypoint
         if ep != hugr.module_root:
@@ -172,66 +247,3 @@ class GlobalScope(Enum):
 
 # Should be kept in sync with the `PassScope` enum in `hugr-passes`.
 PassScope = LocalScope | GlobalScope
-
-
-def regions(scope: PassScope, hugr: Hugr) -> Iterable[Node]:
-    """Return every region (every [dataflow] or [CFG] container - but excluding
-    `Module`) in the Hugr to be optimized by the pass.
-
-    This computes all the regions to be optimized at once. In general, it is
-    more efficient to traverse the Hugr incrementally starting from the
-    `PassScope.root` instead.
-    """
-    if (r := scope.root(hugr)) is None:
-        return
-    if r == hugr.module_root:
-        assert scope.recursive()
-    else:
-        yield r
-        if not scope.recursive():
-            return
-    to_explore = deque(hugr.children(r))
-    while to_explore:
-        node = to_explore.popleft()
-        if hugr.children(node):
-            yield node
-            to_explore.extend(hugr.children(node))
-
-
-class InScope(Enum):
-    """Whether a pass may modify a particular node."""
-
-    YES = "YES"
-    """The pass may modify the node arbitrarily, including changing its interface,
-    behaviour, and/or removing it altogether"""
-
-    PRESERVE_INTERFACE = "PRES_INT"
-    """The pass may modify the interior of the node - its `OpType`, and its
-    descendants - but must maintain the same ports (including static and `ControlFlow`
-    ports), function name and visibility, and execution behaviour.
-
-    For the module root, this is equivalent to `NO`."""
-
-    NO = "NO"
-    """The pass may not modify this node"""
-
-
-def in_scope(p: PassScope, hugr: Hugr, n: Node) -> InScope:
-    """Returns whether the node may be modified by the pass.
-
-    Nodes outside the `root` subtree are never in scope.
-    Nodes inside the subtree may be `InScope.YES` or `InScope.PRESERVE_INTERFACE`.
-    """
-    if (r := p.root(hugr)) is None:
-        return InScope.NO
-    if r != hugr.module_root:
-        anc: Node | None = n
-        while True:
-            if anc is None:
-                return InScope.NO
-            if anc == r:
-                break
-            anc = hugr[anc].parent
-    return (
-        InScope.PRESERVE_INTERFACE if n in p.preserve_interface(hugr) else InScope.YES
-    )
