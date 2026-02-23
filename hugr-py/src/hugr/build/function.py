@@ -72,7 +72,6 @@ class Module(DefinitionBuilder[ops.Module]):
         Args:
             name: The name of the function.
             signature: The (polymorphic) signature of the function.
-            visibility: The visibility of the function.
 
         Returns:
             The node representing the function declaration.
