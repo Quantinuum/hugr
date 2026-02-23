@@ -65,9 +65,7 @@ class Module(DefinitionBuilder[ops.Module]):
             func.declare_outputs(output_types)
         return func
 
-    def declare_function(
-        self, name: str, signature: PolyFuncType, visibility: Visibility = "Public"
-    ) -> Node:
+    def declare_function(self, name: str, signature: PolyFuncType) -> Node:
         """Add a function declaration to the module.
 
         Args:
@@ -86,7 +84,7 @@ class Module(DefinitionBuilder[ops.Module]):
             Node(1)
         """
         return self.hugr.add_node(
-            ops.FuncDecl(name, signature, visibility=visibility),
+            ops.FuncDecl(name, signature, visibility="Public"),
             self.hugr.entrypoint,
             num_outs=1,
         )
