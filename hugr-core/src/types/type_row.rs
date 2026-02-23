@@ -8,7 +8,7 @@ use std::{
 };
 
 use super::{Substitution, Term, Transformable, Type, TypeTransformer, type_param::TypeParam};
-use crate::{extension::SignatureError, utils::display_list};
+use crate::{extension::SignatureError, types::type_param::TermTypeError, utils::display_list};
 use delegate::delegate;
 use itertools::Itertools;
 
@@ -124,11 +124,19 @@ impl Default for TypeRow {
     }
 }
 
-impl From<Vec<Term>> for TypeRow {
-    fn from(types: Vec<Term>) -> Self {
+impl From<Vec<Type>> for TypeRow {
+    fn from(types: Vec<Type>) -> Self {
         Self {
             types: types.into(),
         }
+    }
+}
+
+impl TryFrom<Vec<Term>> for TypeRow {
+    type Error = TermTypeError;
+
+    fn try_from(value: Vec<Term>) -> Result<Self, Self::Error> {
+        value.into_iter().map(Type::try_from).collect::<Result<Vec<_>,_>>().map(Self::from)
     }
 }
 
@@ -146,15 +154,28 @@ impl From<&'static [Type]> for TypeRow {
     }
 }
 
+impl PartialEq<Term> for TypeRow {
+    fn eq(&self, other: &Term) -> bool {
+        let Term::List(items ) = other else {
+            return false
+        };
+        if self.types.len() != items.len() {
+            return false
+        }
+        self.types.iter().zip_eq(items).all(|(ty, tm)| &**ty == tm)
+    }
+}
+
 /// Fallibly convert a [Term] to a [TypeRow].
 ///
-/// This will fail if `arg` is not a [Term::List].
+/// This will fail if `arg` is not a [Term::List] or any of the elements are not [Type]s
 impl TryFrom<Term> for TypeRow {
     type Error = SignatureError;
 
     fn try_from(value: Term) -> Result<Self, Self::Error> {
         match value {
-            Term::List(elems) => Ok(Self::from(elems)),
+            Term::List(elems) => Ok(
+                elems.into_iter().map(Type::try_from).collect::<Result<Vec<_>,_>>()?.into()),
             _ => Err(SignatureError::InvalidTypeArgs),
         }
     }

@@ -1,19 +1,17 @@
 use std::sync::Arc;
 
 use ordered_float::OrderedFloat;
-use serde_with::serde_as;
+use serde::Serialize;
 
 use super::{FuncValueType, SumType, Term, Type, TypeBound};
 
 use super::custom::CustomType;
 
-use crate::extension::SignatureError;
 use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
-use crate::types::GeneralSum;
 use crate::types::type_param::{SeqPart, TermTypeError, TermVar, UpperBound};
 
-#[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
+#[derive(Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
 pub(crate) enum SerSimpleType {
     Q,
@@ -27,52 +25,67 @@ pub(crate) enum SerSimpleType {
 }
 
 /// For the things that used to be supported as Types
-impl TryFrom<Type> for SerSimpleType {
-    type Error = SignatureError;
-    fn try_from(value: Type) -> Result<Self, SignatureError> {
+impl From<Type> for SerSimpleType {
+    fn from(value: Type) -> Self {
         if value == qb_t() {
-            return Ok(SerSimpleType::Q);
+            return SerSimpleType::Q;
         }
         if value == usize_t() {
-            return Ok(SerSimpleType::I);
+            return SerSimpleType::I;
         }
-        match value {
-            Term::RuntimeExtension(o) => Ok(SerSimpleType::Opaque(o)),
+        match value.into() {
+            Term::RuntimeExtension(o) => return SerSimpleType::Opaque(o),
             //TypeEnum::Alias(a) => SerSimpleType::Alias(a),
-            Term::RuntimeFunction(sig) => Ok(SerSimpleType::G(sig)),
+            Term::RuntimeFunction(sig) => return SerSimpleType::G(sig),
             Term::Variable(tv) => {
                 let i = tv.index();
-                match &*tv.cached_decl {
-                    Term::RuntimeType(b) => return Ok(SerSimpleType::V { i, b: *b }),
-                    Term::ListType(b) => {
-                        if let Term::RuntimeType(b) = &**b {
-                            return Ok(SerSimpleType::R { i, b: *b });
-                        }
-                    }
-                    _ => (),
+                let Term::RuntimeType(b) =  &*tv.cached_decl else {
+                    panic!("Variable with bound {} is not a valid Type", tv.cached_decl);
                 };
-                Err(SignatureError::TypeArgMismatch(
-                    TermTypeError::InvalidValue(tv.cached_decl),
-                ))
+                SerSimpleType::V { i, b: *b }
             }
-            Term::RuntimeSum(st) => Ok(SerSimpleType::Sum(st)),
-            _ => Err(SignatureError::InvalidTypeArgs),
+            Term::RuntimeSum(st) => SerSimpleType::Sum(st),
+            v => panic!("{} was not a valid Type", v)
         }
+        
+    }
+}
+
+impl TryFrom<Term> for SerSimpleType {
+    type Error=TermTypeError;
+
+    fn try_from(value: Term) -> Result<Self, Self::Error> {
+        if let Term::Variable(tv) = &value {
+            if let Term::ListType(t) = &*tv.cached_decl {
+                if let Term::RuntimeType(b) = &**t {
+                    return Ok(SerSimpleType::R { i: tv.index(), b: *b })
+                }
+            }
+        }
+        Type::try_from(value).map(SerSimpleType::from)
     }
 }
 
 impl From<SerSimpleType> for Term {
     fn from(value: SerSimpleType) -> Self {
         match value {
-            SerSimpleType::Q => qb_t(),
-            SerSimpleType::I => usize_t(),
-            SerSimpleType::G(sig) => Type::new_function(*sig),
-            SerSimpleType::Sum(st) => st.into(),
-            SerSimpleType::Opaque(o) => Type::new_extension(o),
+            SerSimpleType::Q => qb_t().into(),
+            SerSimpleType::I => usize_t().into(),
+            SerSimpleType::G(sig) => Type::new_function(*sig).into(),
+            SerSimpleType::Sum(st) => Type::from(st).into(),
+            SerSimpleType::Opaque(o) => Type::new_extension(o).into(),
             SerSimpleType::Alias(_) => todo!("alias?"),
-            SerSimpleType::V { i, b } => Type::new_var_use(i, b),
-            SerSimpleType::R { i, b } => Type::new_row_var_use(i, b),
+            SerSimpleType::V { i, b } => Type::new_var_use(i, b).into(),
+            SerSimpleType::R { i, b } => Term::new_row_var_use(i, b),
         }
+    }
+}
+
+impl TryFrom<SerSimpleType> for Type {
+    type Error= TermTypeError;
+
+    fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
+        Term::from(value).try_into()
     }
 }
 

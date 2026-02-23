@@ -25,7 +25,7 @@ mod weak_registry;
 pub use weak_registry::WeakExtensionRegistry;
 
 pub(crate) use ops::{collect_op_extension, resolve_op_extensions};
-pub(crate) use types::{collect_op_types_extensions, collect_signature_exts};
+pub(crate) use types::{collect_op_types_extensions, collect_signature_exts, collect_term_exts};
 pub(crate) use types_mut::resolve_op_types_extensions;
 use types_mut::{
     resolve_custom_type_exts, resolve_term_exts, resolve_type_exts, resolve_value_exts,

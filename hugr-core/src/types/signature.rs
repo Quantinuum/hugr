@@ -223,7 +223,7 @@ impl Signature {
     /// If any of the input or output types are not runtime types.
     /// See [Self::try_new] or [Self::new_unchecked] for alternatives.
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
-        Self::try_new(input, output)
+        Self {input: input.into(), output: output.into() }
     }
 
     /// Create a new signature with the same input and output types (signature of an endomorphic
@@ -406,13 +406,7 @@ impl From<Signature> for FuncValueType {
 
 impl PartialEq<Signature> for FuncValueType {
     fn eq(&self, other: &Signature) -> bool {
-        // Ideally we should normalize input/output first, but assume e.g. substitute has done so already
-        if let Term::List(input) = &self.input
-            && let Term::List(output) = &self.output
-        {
-            return *input == *other.input && *output == *other.output;
-        }
-        false
+        return other.input == self.input && other.output == self.output
     }
 }
 

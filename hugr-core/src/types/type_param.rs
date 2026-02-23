@@ -17,7 +17,7 @@ use tracing::warn;
 
 use super::{Substitution, Transformable, Type, TypeBound, TypeTransformer};
 use crate::extension::SignatureError;
-use crate::types::{CustomType, FuncValueType, SumType};
+use crate::types::{CustomType, FuncValueType, GeneralSum, SumType, TypeRow};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -168,6 +168,8 @@ pub enum Term {
 }
 
 impl Term {
+    pub(crate) const EMPTY_LIST: Term = Term::List(Vec::new());
+    pub (crate) const EMPTY_LIST_REF: &'static Term = &Self::EMPTY_LIST;
     /// Creates a [`Term::BoundedNatType`] with the maximum bound (`u64::MAX` + 1).
     #[must_use]
     pub const fn max_nat_type() -> Self {
@@ -286,14 +288,37 @@ impl From<Vec<Term>> for Term {
     }
 }
 
+impl From<Vec<Type>> for Term {
+    fn from(value: Vec<Type>) -> Self {
+        TypeRow::from(value).into()
+    }
+}
+
 impl<const N: usize> From<[Term; N]> for Term {
     fn from(value: [Term; N]) -> Self {
         Self::new_list(value)
     }
 }
 
-/// Variable in a [`Term`], that is not a single runtime type (i.e. not a [`Type::new_var_use`]
-/// - it might be a [`Type::new_row_var_use`]).
+impl<const N: usize> From<[Type; N]> for Term {
+    fn from(value: [Type; N]) -> Self {
+        TypeRow::from(value).into()
+    }
+}
+
+impl From<SumType> for Term {
+    fn from(value: SumType) -> Self {
+        Self::RuntimeSum(value)
+    }
+}
+
+impl From<CustomType> for Term {
+    fn from(value: CustomType) -> Self {
+        Self::RuntimeExtension(value)
+    }
+}
+
+/// Variable in a [`Term`]
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize, derive_more::Display,
 )]
@@ -313,6 +338,11 @@ impl Term {
             idx,
             cached_decl: Box::new(decl.into()),
         })
+    }
+
+    #[must_use]
+    pub fn new_row_var_use(idx: usize, b: TypeBound) -> Self {
+        Self::new_var_use(idx, Term::new_list_type(b))
     }
 
     /// Creates a new string literal.
@@ -351,7 +381,7 @@ impl Term {
         }
     }
 
-    pub(super) const fn least_upper_bound(&self) -> Option<TypeBound> {
+    pub(super) fn least_upper_bound(&self) -> Option<TypeBound> {
         match self {
             Self::RuntimeExtension(ct) => Some(ct.bound()),
             Self::RuntimeSum(st) => Some(st.bound()),
@@ -367,7 +397,7 @@ impl Term {
     /// Report if this is a copyable runtime type, i.e. an instance
     /// of [Self::RuntimeType]`(`[TypeBound::Copyable]`)`
     // - i.e.the least upper bound of the type is contained by the copyable bound.
-    const fn copyable(&self) -> bool {
+    fn copyable(&self) -> bool {
         match self.least_upper_bound() {
             Some(b) => TypeBound::Copyable.contains(b),
             None => false,
@@ -394,7 +424,7 @@ impl Term {
     /// [TypeDef]: crate::extension::TypeDef
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            Term::RuntimeSum(SumType::General { rows }) => {
+            Term::RuntimeSum(SumType::General(GeneralSum { rows })) => {
                 rows.iter().try_for_each(|row| row.validate(var_decls))?;
                 Ok(())
             }
@@ -447,20 +477,20 @@ impl Term {
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
-            TypeArg::RuntimeSum(SumType::General(rows)) => {
+            TypeArg::RuntimeSum(SumType::General(GeneralSum {rows})) => {
                 // A substitution of a row variable for an empty list, could make this from
                 // a GeneralSum into a unary SumType.
 
                 // Ok to use panicking `new` as if the substitution is valid we'll still have types.
-                SumType::new(rows.substitute(t).into_owned()).into()
+                Term::RuntimeSum(SumType::new(rows.into_iter().map(|r| r.substitute(t))))
             }
-            TypeArg::RuntimeExtension(cty) => Term::new_extension(cty.substitute(t)),
-            TypeArg::RuntimeFunction(bf) => Term::new_function(bf.substitute(t)),
+            TypeArg::RuntimeExtension(cty) => Term::RuntimeExtension(cty.substitute(t)),
+            TypeArg::RuntimeFunction(bf) => Term::RuntimeFunction(Box::new(bf.substitute(t))),
 
             TypeArg::BoundedNat(_) | TypeArg::String(_) | TypeArg::Bytes(_) | TypeArg::Float(_) => {
                 self.clone()
             } // We do not allow variables as bounds on BoundedNat's
-            TypeArg::List(elems) => Self::List(elems.iter().map(|t| t.substitute(t)).collect()),
+            TypeArg::List(elems) => Self::List(elems.iter().map(|e| e.substitute(t)).collect()),
             TypeArg::ListConcat(lists) => {
                 // When a substitution instantiates spliced list variables, we
                 // may be able to merge the concatenated lists.
@@ -665,11 +695,10 @@ impl Transformable for Term {
                 } else {
                     let args_changed = custom_type.args_mut().transform(tr)?;
                     if args_changed {
-                        *self = Self::new_extension(
+                        *self = 
                             custom_type
                                 .get_type_def(&custom_type.get_extension()?)?
-                                .instantiate(custom_type.args())?,
-                        );
+                                .instantiate(custom_type.args())?.into();
                     }
                     Ok(args_changed)
                 }
@@ -986,10 +1015,11 @@ mod test {
             let arg = args.iter().cloned().map_into().collect_vec().into();
             check_term_type(&arg, param)
         }
-        // Simple cases: a Term::Type is a Term::RuntimeType but singleton sequences are lists
+        // Simple cases: Term::RuntimeXXXs are Term::RuntimeType's
         check(usize_t(), &TypeBound::Copyable.into()).unwrap();
         let seq_param = TypeParam::new_list_type(TypeBound::Copyable);
         check(usize_t(), &seq_param).unwrap_err();
+        // ...but singleton sequences thereof are lists
         check_seq(&[usize_t()], &TypeBound::Linear.into()).unwrap_err();
 
         // Into a list of type, we can fit a single row var

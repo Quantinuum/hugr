@@ -1439,7 +1439,7 @@ impl<'a> Context<'a> {
     }
 
     fn import_type(&mut self, term_id: table::TermId) -> Result<Type, ImportErrorInner> {
-        Type::try_from(self.import_term(term_id)?).map_err(ImportErrorInner::from)
+        Ok(Type::try_from(self.import_term(term_id)?).map_err(SignatureError::from)?)
     }
 
     fn import_term_with_bound(
@@ -1767,7 +1767,8 @@ impl<'a> Context<'a> {
             .into_iter()
             .map(|id| self.import_term(id))
             .collect::<Result<Vec<_>, _>>()?
-            .into())
+            .try_into()
+            .map_err(SignatureError::from)?)
     }
 
     fn import_custom_name(

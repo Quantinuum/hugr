@@ -162,7 +162,7 @@ pub(super) fn resolve_type_row_exts(
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     for ty in row.iter_mut() {
-        resolve_term_exts(node, ty, extensions, used_extensions)?;
+        resolve_type_exts(node, ty, extensions, used_extensions)?;
     }
     Ok(())
 }
@@ -202,9 +202,9 @@ pub(crate) fn resolve_type_exts(node: Option<Node>,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     const EMPTY:Type = Type::new_unit_sum(0); // as no Type::default()
-    let tm = std::mem::replace(typ, EMPTY).into();
-    let r = resolve_term_exts(node, tm, extensions, used_extensions);
-    *typ = tm.into();
+    let mut tm = std::mem::replace(typ, EMPTY).into();
+    let r = resolve_term_exts(node, &mut tm, extensions, used_extensions);
+    *typ = tm.try_into().unwrap();
     r
 }
 
@@ -230,7 +230,7 @@ pub(crate) fn resolve_term_exts(
                 resolve_term_exts(node, row, extensions, used_extensions)?;
             }
         }
-        Term::ConstType(ty) => resolve_term_exts(node, ty, extensions, used_extensions)?,
+        Term::ConstType(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
         Term::List(children)
         | Term::ListConcat(children)
         | Term::Tuple(children)

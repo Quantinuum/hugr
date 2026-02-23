@@ -9,7 +9,7 @@ pub mod type_param;
 pub mod type_row;
 
 use crate::extension::resolution::{
-    ExtensionCollectionError, WeakExtensionRegistry, collect_type_exts,
+    ExtensionCollectionError, WeakExtensionRegistry, collect_term_exts,
 };
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
 use crate::types::type_param::{TermTypeError, check_term_type};
@@ -21,8 +21,6 @@ pub use signature::{FuncValueType, Signature};
 use smol_str::SmolStr;
 pub use type_param::{Term, TypeArg};
 pub use type_row::{TypeRow, TypeRowRV};
-
-pub(crate) use poly_func::PolyFuncTypeBase;
 
 use itertools::FoldWhile::{Continue, Done};
 use itertools::{Either, Itertools as _};
@@ -304,8 +302,8 @@ impl SumType {
     }
 
     /// Initialize a new sum type without checking the variants.
-    pub fn new_unchecked(variants: impl Into<TypeRow>) -> Self {
-        let variants = variants.into();
+    pub fn new_unchecked<V: Into<Term>>(variants: impl IntoIterator<Item=V>) -> Self {
+        let variants = variants.into_iter().map_into().collect::<Vec<_>>();
         let len: usize = variants.len();
         if u8::try_from(len).is_ok() && variants.iter().all(Term::is_empty_list) {
             Self::new_unary(len as u8)
@@ -321,6 +319,8 @@ impl SumType {
     }
 
     /// New tuple (single row of variants).
+    ///
+    /// ALAN take Into<Term> to allow RVs?
     pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
         Self::new([types.into()])
     }
@@ -334,7 +334,7 @@ impl SumType {
     #[must_use]
     pub fn get_variant(&self, tag: usize) -> Option<&Term> {
         match self {
-            SumType::Unit { size } if tag < (*size as usize) => Some(Type::EMPTY_TYPE_LIST_REF),
+            SumType::Unit { size } if tag < (*size as usize) => Some(Term::EMPTY_LIST_REF),
             SumType::General(GeneralSum { rows, .. }) => rows.get(tag),
             _ => None,
         }
@@ -354,7 +354,7 @@ impl SumType {
     #[must_use]
     pub fn as_tuple(&self) -> Option<&Term> {
         match self {
-            SumType::Unit { size } if *size == 1 => Some(Term::EMPTY_TYPE_LIST_REF),
+            SumType::Unit { size } if *size == 1 => Some(Term::EMPTY_LIST_REF),
             SumType::General(GeneralSum { rows, .. }) if rows.len() == 1 => Some(&rows[0]),
             _ => None,
         }
@@ -365,7 +365,7 @@ impl SumType {
     #[must_use]
     pub fn as_option(&self) -> Option<&Term> {
         match self {
-            SumType::Unit { size } if *size == 2 => Some(Term::EMPTY_TYPE_LIST_REF),
+            SumType::Unit { size } if *size == 2 => Some(Term::EMPTY_LIST_REF),
             SumType::General(GeneralSum { rows, .. })
                 if rows.len() == 2 && rows[0].is_empty_list() =>
             {
@@ -383,20 +383,25 @@ impl SumType {
     pub fn variants(&self) -> impl Iterator<Item = &Term> {
         match self {
             SumType::Unit { size } => Either::Left(itertools::repeat_n(
-                Term::EMPTY_TYPE_LIST_REF,
+                Term::EMPTY_LIST_REF,
                 *size as usize,
             )),
             SumType::General(gs) => Either::Right(gs.iter()),
         }
     }
 
-    /// Returns the bound of this sum type.
-    ///
-    /// (Cached; will be [TypeBound::Linear] if any variant is not a list of runtime types.)
-    pub const fn bound(&self) -> TypeBound {
+    fn bound(&self) -> TypeBound {
         match self {
             SumType::Unit { .. } => TypeBound::Copyable,
-            SumType::General(GeneralSum { bound, .. }) => *bound,
+            SumType::General(GeneralSum {rows}) => 
+                if rows.iter().all(|t| check_term_type(t, &Term::new_list_type(TypeBound::Copyable)).is_ok() ) {
+                    TypeBound::Copyable
+                } else {
+                    // That all elements were types was checked in the GeneralSum constructor.
+                    // That may have been bypassed via GeneralSum::new_unchecked, but do no
+                    // check here (we will do so in validate()).
+                    TypeBound::Linear
+                }    
         }
     }
 }
@@ -405,7 +410,7 @@ impl Transformable for SumType {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match self {
             SumType::Unit { .. } => Ok(false),
-            SumType::General { rows } => rows.transform(tr),
+            SumType::General(GeneralSum { rows }) => rows.transform(tr),
         }
     }
 }
@@ -414,7 +419,7 @@ impl From<SumType> for Type {
     fn from(sum: SumType) -> Self {
         match sum {
             SumType::Unit { size } => Type::new_unit_sum(size),
-            SumType::General { rows } => Type::new_sum(rows),
+            SumType::General(GeneralSum { rows }) => Type::new_sum(rows),
         }
     }
 }
@@ -463,8 +468,6 @@ impl Type {
         TypeBound::Copyable,
     );
 
-    const EMPTY_TYPEROW_REF: &'static TypeRow = &Self::EMPTY_TYPEROW;
-
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<FuncValueType>) -> Self {
         Self(
@@ -483,17 +486,19 @@ impl Type {
         }
     }
 
-    pub fn try_new_tuple(elems: impl Into<Term>) -> Result<Self, TermTypeError> {
-        let elems = elems.into();
-    }
-
     /// Initialize a new sum type by providing the possible variant types.
+    /// 
+    /// # Panics
+    /// 
+    /// If any element is not a type or row variable
     #[inline(always)]
     pub fn new_sum<R>(variants: impl IntoIterator<Item = R>) -> Self
     where
-        R: Into<Term>,
+        R: Into<TypeRowRV>,
     {
-        Self::new(Term::RuntimeSum(SumType::new(variants)))
+        let st = SumType::new(variants);
+        let b = st.bound();
+        Self(Term::RuntimeSum(st), b)
     }
 
     /// Initialize a new custom type.
@@ -519,8 +524,8 @@ impl Type {
     /// (i.e. as a [`Term::RuntimeType`]`(bound)`), which may be narrower
     /// than required for the use.
     #[must_use]
-    pub const fn new_var_use(idx: usize, bound: TypeBound) -> Self {
-        Self(Term::Variable(idx, bound), bound)
+    pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
+        Self(Term::new_var_use(idx,bound), bound)
     }
 
     /// Report the least upper [`TypeBound`]
@@ -538,6 +543,7 @@ impl Type {
     }
 
     /// Returns the inner [`CustomType`] if the type is from an extension.
+    // ALAN if we put this on Term, does Deref allow calling it on Type?
     pub fn as_extension(&self) -> Option<&CustomType> {
         match &self.0 {
             Term::RuntimeExtension(ct) => Some(ct),
@@ -559,9 +565,9 @@ impl Type {
     /// [TypeDef]: crate::extension::TypeDef
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.0.validate(var_decls)?;
-        check_term_type(self.0, self.1.into())?;
+        check_term_type(&self.0, &self.1.into())?;
         debug_assert!(
-            self.1 == TypeBound::Copyable || check_term_type(self.0, TypeBound::Copyable).is_err()
+            self.1 == TypeBound::Copyable || check_term_type(&self.0, &TypeBound::Copyable.into()).is_err()
         );
         Ok(())
     }
@@ -576,7 +582,8 @@ impl Type {
         let t = self.0.substitute(s);
         // Must succeed and produce a type assuming substitution valid (RHSes
         // fit within LHS). However, may *narrow* the bound, so recompute.
-        Self(t, t.least_upper_bound().unwrap())
+        let b = t.least_upper_bound().unwrap();
+        Self(t, b)
     }
 
     /// Returns a registry with the concrete extensions used by this type.
@@ -587,7 +594,7 @@ impl Type {
         let mut used = WeakExtensionRegistry::default();
         let mut missing = ExtensionSet::new();
 
-        collect_type_exts(self, &mut used, &mut missing);
+        collect_term_exts(&*self, &mut used, &mut missing);
 
         if missing.is_empty() {
             Ok(used.try_into().expect("all extensions are present"))
@@ -613,7 +620,7 @@ impl TryFrom<Term> for Type {
             Some(b) => Ok(Self(t, b)),
             None => Err(TermTypeError::TypeMismatch {
                 term: Box::new(t),
-                type_: TypeBound::Linear.into(),
+                type_: Box::new(TypeBound::Linear.into()),
             }),
         }
     }
