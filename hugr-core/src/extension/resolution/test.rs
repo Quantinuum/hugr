@@ -19,6 +19,7 @@ use crate::extension::{
 use crate::ops::constant::CustomConst;
 use crate::ops::constant::test::CustomTestValue;
 use crate::ops::{CallIndirect, ExtensionOp, Input, OpType, Tag, Value};
+use crate::std_extensions::arithmetic::conversions::{self, ConvertOpDef};
 use crate::std_extensions::arithmetic::float_types::{self, ConstF64, float64_type};
 use crate::std_extensions::arithmetic::int_ops;
 use crate::std_extensions::arithmetic::int_types::{self, int_type};
@@ -32,7 +33,7 @@ use crate::{Extension, Hugr, HugrView, type_row};
 #[case::empty(Input { types: type_row![]}, ExtensionRegistry::default())]
 // A type with extra extensions in its instantiated type arguments.
 #[case::parametric_op(int_ops::IntOpDef::ieq.with_log_width(4),
-    ExtensionRegistry::new([int_ops::EXTENSION.to_owned(), int_types::EXTENSION.to_owned()]
+    ExtensionRegistry::new([int_ops::EXTENSION.to_owned(), int_types::EXTENSION.to_owned(), PRELUDE.to_owned()]
 ))]
 fn collect_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: ExtensionRegistry) {
     let op = op.into();
@@ -44,7 +45,7 @@ fn collect_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: Ex
 #[case::empty(Input { types: type_row![]}, ExtensionRegistry::default())]
 // A type with extra extensions in its instantiated type arguments.
 #[case::parametric_op(int_ops::IntOpDef::ieq.with_log_width(4),
-    ExtensionRegistry::new([int_ops::EXTENSION.to_owned(), int_types::EXTENSION.to_owned()]
+    ExtensionRegistry::new([int_ops::EXTENSION.to_owned(), int_types::EXTENSION.to_owned(), PRELUDE.to_owned()]
 ))]
 fn resolve_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: ExtensionRegistry) {
     let op = op.into();
@@ -361,6 +362,31 @@ fn resolve_call() {
     for ext in expected_exts {
         assert!(hugr.extensions().contains(&ext));
     }
+
+    check_extension_resolution(hugr);
+}
+
+/// Test that extension resolution is transitive across extension dependencies.
+///
+/// `arithmetic.conversions` depends on `arithmetic.int_types` and
+/// `arithmetic.float_types`, so using an op from the former should cause all
+/// three extensions to be resolved even if the operation itself doesn't
+/// directly use floats.
+#[rstest]
+fn resolve_transitive_extension_deps() {
+    let mut build = DFGBuilder::new(Signature::new(vec![int_type(6)], vec![usize_t()])).unwrap();
+    let [input] = build.input_wires_arr();
+
+    let out = build
+        .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [input])
+        .unwrap();
+
+    let hugr = build
+        .finish_hugr_with_outputs(out.outputs())
+        .unwrap_or_else(|e| panic!("{e}"));
+
+    assert!(hugr.extensions().contains(&conversions::EXTENSION_ID));
+    assert!(hugr.extensions().contains(&float_types::EXTENSION_ID));
 
     check_extension_resolution(hugr);
 }

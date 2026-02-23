@@ -151,6 +151,10 @@ pub enum ExtensionResolutionError<N: HugrNode = Node> {
         /// The missing extension.
         missing_extensions: ExtensionSet,
     },
+    /// Error while collecting extension dependencies.
+    #[display("Error collecting extension dependencies: {_0}")]
+    #[from]
+    ExtensionDependencyError(ExtensionCollectionError<N>),
 }
 
 impl<N: HugrNode> ExtensionResolutionError<N> {
@@ -222,6 +226,17 @@ pub enum ExtensionCollectionError<N: HugrNode = Node> {
     DroppedTypeExtensions {
         /// The type that is missing extensions.
         typ: String,
+        /// The missing extensions.
+        missing_extensions: Vec<ExtensionId>,
+    },
+    /// An extension definition references an extension that is not in the given registry.
+    #[display(
+        "Extension {extension} depends on dropped extensions {}",
+        missing_extensions.join(", ")
+    )]
+    DroppedTransitiveExtensions {
+        /// The extension that is missing dependencies.
+        extension: String,
         /// The missing extensions.
         missing_extensions: Vec<ExtensionId>,
     },

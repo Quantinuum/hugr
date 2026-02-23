@@ -146,6 +146,9 @@ class Type(Protocol):
     ) -> tuple[Type, ExtensionResolutionResult]:
         """Resolve the extensions required to define this type.
 
+        Does not include transitive dependencies required by the returned
+        extension definitions, to avoid infinite recursion.
+
         Args:
             registry: A registry to resolve unresolved extensions from.
                 If None, opaque types will not be resolved.
@@ -633,7 +636,7 @@ class Sum(Type):
         elif all(len(row) == 0 for row in self.variant_rows):
             return f"UnitSum({len(self.variant_rows)})"
         elif len(self.variant_rows) == 1:
-            return f"Tuple{tuple(self.variant_rows[0])}"
+            return f"Tuple({comma_sep_repr(self.variant_rows[0])})"
         elif len(self.variant_rows) == 2 and len(self.variant_rows[0]) == 0:
             return f"Option({comma_sep_repr(self.variant_rows[1])})"
         elif len(self.variant_rows) == 2:
@@ -650,7 +653,7 @@ class Sum(Type):
         elif all(len(row) == 0 for row in self.variant_rows):
             return f"UnitSum({len(self.variant_rows)})"
         elif len(self.variant_rows) == 1:
-            return f"Tuple{tuple(self.variant_rows[0])}"
+            return f"Tuple({comma_sep_str(self.variant_rows[0])})"
         elif len(self.variant_rows) == 2 and len(self.variant_rows[0]) == 0:
             return f"Option({comma_sep_str(self.variant_rows[1])})"
         elif len(self.variant_rows) == 2:
