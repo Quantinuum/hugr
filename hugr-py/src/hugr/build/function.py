@@ -85,9 +85,7 @@ class Module(DefinitionBuilder[ops.Module]):
             Node(1)
         """
         return self.hugr.add_node(
-            ops.FuncDecl(name, signature, visibility="Public"),
-            self.hugr.entrypoint,
-            num_outs=1,
+            ops.FuncDecl(name, signature), self.hugr.entrypoint, num_outs=1
         )
 
     def add_alias_defn(self, name: str, ty: Type) -> Node:
