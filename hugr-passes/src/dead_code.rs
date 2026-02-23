@@ -122,30 +122,28 @@ impl<H: HugrView> DeadCodeElimPass<H> {
             for (i, ch) in h.children(n).enumerate() {
                 if self.must_preserve(h, &mut must_preserve, ch)
                     || match h.get_optype(ch) {
-                        OpType::Case(_) => true, // Include all Cases in Conditionals
-                        OpType::DataflowBlock(_) => h.get_optype(n).is_cfg() && i == 0, // Assumes entry block is always the first child of a CFG.
-                        OpType::ExitBlock(_) => true,
-                        OpType::AliasDecl(_) => true, // and all Aliases (we do not track their uses in types)
-                        OpType::AliasDefn(_) => true,
-                        OpType::Input(_) => true, // Also Dataflow input/output, these are necessary for legality
-                        OpType::Output(_) => true,
-                        // Do not include FuncDecl / FuncDefn / Const unless reachable by static edges (from Call/LoadConst/LoadFunction)
+                        OpType::Case(_)  // Include all Cases in Conditionals
+                        | OpType::ExitBlock(_)
+                        | OpType::AliasDecl(_) // and all Aliases (we do not track their uses in types)
+                        | OpType::AliasDefn(_)
+                        | OpType::Input(_) // Also Dataflow input/output, these are necessary for legality
+                        | OpType::Output(_) => true,
+                        // Assumes entry block is always the first child of a CFG.
+                        OpType::DataflowBlock(_) => h.get_optype(n).is_cfg() && i == 0,
+                        // Do not include FuncDecl / FuncDefn / Const,
+                        // unless reachable by static edges (from Call/LoadConst/LoadFunction)
                         _ => false,
                     }
                 {
                     q.push_back(ch);
                 }
             }
-            if h.get_optype(n).is_dataflow_block() || h.get_optype(n).is_exit_block() {
+            if matches!(h.get_optype(n), OpType::DataflowBlock(_) | OpType::ExitBlock(_) ){
                 // Follow control flow forwards to find reachable basic blocks besides entry and exit.
-                for src in h.output_neighbours(n) {
-                    q.push_back(src);
-                }
+                q.extend(h.output_neighbours(n))
             } else {
                 // Follow dataflow demand (including e.g edges from Call to FuncDefn) backwards.
-                for src in h.input_neighbours(n) {
-                    q.push_back(src);
-                }
+                q.extend(h.input_neighbours(n));
             }
             // Also keep consumers of any linear outputs
             if let Some(sig) = h.signature(n) {
@@ -201,7 +199,7 @@ mod test {
     };
     use hugr_core::extension::prelude::{ConstUsize, bool_t, qb_t, usize_t};
     use hugr_core::extension::{ExtensionId, Version};
-    use hugr_core::ops::ExtensionOp;
+    use hugr_core::ops::{ExtensionOp, OpType};
     use hugr_core::ops::{OpTag, OpTrait, handle::NodeHandle};
     use hugr_core::types::Signature;
     use hugr_core::{Extension, Hugr};
@@ -427,15 +425,36 @@ mod test {
         let mut h = cb.finish_hugr().unwrap();
         h.validate().unwrap();
         let num_nodes_before = h.nodes().count();
+        let cfg_node = h.entrypoint();
+        let num_cfg_children_before: usize = h.children(cfg_node)
+            .filter(|child| matches!(h.get_optype(*child), OpType::DataflowBlock(_)))
+            .count();
 
         // Run pass and check that unreachable block is removed
         DeadCodeElimPass::default().run(&mut h).unwrap();
         h.validate().unwrap();
-        let num_nodes_after = h.nodes().count();
+
+        // Check we removed the expected number of nodes.
         // 7 nodes removed:
         // - 1 block (block_unreachable)
         // - 2 constants (cst_unused, b2_pred)
         // - 4 ops in the unreachable block (2 LoadConst, the block's Input and Output)
+        let num_nodes_after = h.nodes().count();
         assert_eq!(num_nodes_before - num_nodes_after, 7);
+
+        // Check that `block_unreachable` is no longer a valid node.
+        assert!(!h.contains_node(block_unreachable.node()));
+
+        // CFG checks: should still be a CFG and have one less dataflow block child.
+        assert!(h.get_optype(cfg_node).is_cfg());
+        let num_cfg_children_after: usize = h.children(cfg_node)
+            .filter(|child| matches!(h.get_optype(*child), OpType::DataflowBlock(_)))
+            .count();
+        assert_eq!(num_cfg_children_after, num_cfg_children_before - 1);
+
+        // Also the exit block should only have one predecessor now.
+        let exit_preds = h.input_neighbours(exit.node()).collect_vec();
+        assert_eq!(exit_preds.len(), 1);
+
     }
 }
