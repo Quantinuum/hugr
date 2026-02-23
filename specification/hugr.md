@@ -10,8 +10,23 @@ targets.
 
 ![](/hugr/assets/hugr_logo.svg)
 
+## Table of Contents
 
-## Motivation
+- [Motivation](#motivation)
+- [Functional description](#functional-description)
+  - [Type System](#type-system)
+  - [Extension System](#extension-system)
+  - [Replacement and Pattern Matching](#replacement-and-pattern-matching)
+- [Serialization](#serialization)
+- [Architecture](#architecture)
+- [Standard Library](#standard-library)
+- [Glossary](#glossary)
+- [Appendices](#appendices)
+  - [Appendix 1: Rationale for Control Flow](#appendix-rationale-for-control-flow)
+  - [Appendix 2: Node types and their edges](#appendix-node-types-and-their-edges)
+  - [Appendix 3: Binary `compute_signature`](#appendix-binary-compute-signature)
+
+# Motivation
 
 Multiple compilers and tools in the Quantinuum stack use some graph-like
 program representation; be it the quantum circuits encoded as DAGs in
@@ -76,7 +91,7 @@ represent (typed) data or control dependencies.
   replacement graph, along with an efficient routine for performing
   the replacement.
 
-## Functional description
+# Functional description
 
 A HUGR is a directed graph. There are several different types of node, and
 several different types of edge, with different semantics, described below.
@@ -1364,7 +1379,7 @@ Patterns matching edges that traverse DSGs are also possible, but will
 be implemented in terms of the above replacement operations, making use
 of the child-rewiring lists.
 
-## Serialization
+# Serialization
 
 ### Goals
 
@@ -1439,7 +1454,7 @@ Nodes with `Input` and `Output` children are expected to appear earlier in the
 list than those children, and `Input` nodes should appear before their matching
 `Output` nodes.
 
-## Architecture
+# Architecture
 
 The HUGR is implemented as a Rust crate named `hugr`. This
 crate is intended to be a common dependency for all projects, and is published
@@ -1450,7 +1465,7 @@ crate. A base PortGraph is composed with hierarchy (as an alternate
 implementation of `Hierarchy` relationships) and weight components. The
 implementation of this design document is [available on GitHub](https://github.com/quantinuum/hugr).
 
-## Standard Library
+# Standard Library
 
 A collection of extensions form the "standard library" for HUGR, and are defined
 in this repository.
@@ -1735,7 +1750,7 @@ This extension contains the `list` type and value. Lists are dynamically sized, 
 
 
 
-## Glossary
+# Glossary
 
 - **BasicBlock node**: A child of a CFG node (i.e. a basic block
   within a control-flow graph).
@@ -1827,9 +1842,10 @@ This extension contains the `list` type and value. Lists are dynamically sized, 
 - **value edge:** An edge between data-dependency nodes. Has a fixed
   edge type.
 
-## Appendices
+# Appendices
 
-### Appendix 1: Rationale for Control Flow
+<a id="appendix-rationale-for-control-flow"></a>
+## Appendix 1: Rationale for Control Flow
 
 #### **Justification of the need for CFG-nodes**
 
@@ -1908,7 +1924,8 @@ differences include:
   sure any referenced values are kept 'live' for long enough. Not what
   we do in Tierkreis (the closure-maker copies them)\!
 
-### Appendix 2: Node types and their edges
+<a id="appendix-node-types-and-their-edges"></a>
+## Appendix 2: Node types and their edges
 
 The following table shows which edge kinds may adjoin each node type.
 
@@ -1945,8 +1962,8 @@ including `Module`.
 | `UnpackTuple`  | 1, ✱    | ✱, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
 | `Tag`          | 1, 1    | ✱, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
 | `Lift`         | ✱, ✱    | ✱, ✱    | 0, 0    | 0, 0       | 0, 0          | 1, 0        |          |
-
-### Appendix 3: Binary `compute_signature`
+<a id="appendix-binary-compute-signature"></a>
+## Appendix 3: Binary `compute_signature`
 
 When an OpDef provides a binary `compute_signature` function, and an operation node uses that OpDef:
 
