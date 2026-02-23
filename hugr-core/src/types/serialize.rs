@@ -1,16 +1,17 @@
 use std::sync::Arc;
 
 use ordered_float::OrderedFloat;
+use serde_with::serde_as;
 
-use super::{FuncValueType, MaybeRV, RowVariable, SumType, TypeBase, TypeBound, TypeEnum};
+use super::{FuncValueType, SumType, Term, Type, TypeBound};
 
 use super::custom::CustomType;
 
 use crate::extension::SignatureError;
 use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
-use crate::types::type_param::{TermVar, UpperBound};
-use crate::types::{Term, Type};
+use crate::types::GeneralSum;
+use crate::types::type_param::{TermTypeError, TermVar, UpperBound};
 
 #[derive(serde::Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -25,45 +26,53 @@ pub(crate) enum SerSimpleType {
     R { i: usize, b: TypeBound },
 }
 
-impl<RV: MaybeRV> From<TypeBase<RV>> for SerSimpleType {
-    fn from(value: TypeBase<RV>) -> Self {
+/// For the things that used to be supported as Types
+impl TryFrom<Type> for SerSimpleType {
+    type Error = SignatureError;
+    fn try_from(value: Type) -> Result<Self, SignatureError> {
         if value == qb_t() {
-            return SerSimpleType::Q;
+            return Ok(SerSimpleType::Q);
         }
         if value == usize_t() {
-            return SerSimpleType::I;
+            return Ok(SerSimpleType::I);
         }
-        match value.0 {
-            TypeEnum::Extension(o) => SerSimpleType::Opaque(o),
-            TypeEnum::Alias(a) => SerSimpleType::Alias(a),
-            TypeEnum::Function(sig) => SerSimpleType::G(sig),
-            TypeEnum::Variable(i, b) => SerSimpleType::V { i, b },
-            TypeEnum::RowVar(rv) => {
-                let RowVariable(idx, bound) = rv.as_rv();
-                SerSimpleType::R { i: *idx, b: *bound }
+        match value {
+            Term::RuntimeExtension(o) => Ok(SerSimpleType::Opaque(o)),
+            //TypeEnum::Alias(a) => SerSimpleType::Alias(a),
+            Term::RuntimeFunction(sig) => Ok(SerSimpleType::G(sig)),
+            Term::Variable(tv) => {
+                let i = tv.index();
+                match &*tv.cached_decl {
+                    Term::RuntimeType(b) => return Ok(SerSimpleType::V { i, b: *b }),
+                    Term::ListType(b) => {
+                        if let Term::RuntimeType(b) = &**b {
+                            return Ok(SerSimpleType::R { i, b: *b });
+                        }
+                    }
+                    _ => (),
+                };
+                Err(SignatureError::TypeArgMismatch(
+                    TermTypeError::InvalidValue(tv.cached_decl),
+                ))
             }
-            TypeEnum::Sum(st) => SerSimpleType::Sum(st),
+            Term::RuntimeSum(st) => Ok(SerSimpleType::Sum(st)),
+            _ => Err(SignatureError::InvalidTypeArgs),
         }
     }
 }
 
-impl<RV: MaybeRV> TryFrom<SerSimpleType> for TypeBase<RV> {
-    type Error = SignatureError;
-    fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
-        Ok(match value {
-            SerSimpleType::Q => qb_t().into_(),
-            SerSimpleType::I => usize_t().into_(),
-            SerSimpleType::G(sig) => TypeBase::new_function(*sig),
+impl From<SerSimpleType> for Term {
+    fn from(value: SerSimpleType) -> Self {
+        match value {
+            SerSimpleType::Q => qb_t(),
+            SerSimpleType::I => usize_t(),
+            SerSimpleType::G(sig) => Type::new_function(*sig),
             SerSimpleType::Sum(st) => st.into(),
-            SerSimpleType::Opaque(o) => TypeBase::new_extension(o),
-            SerSimpleType::Alias(a) => TypeBase::new_alias(a),
-            SerSimpleType::V { i, b } => TypeBase::new_var_use(i, b),
-            // We can't use new_row_var because that returns TypeRV not TypeBase<RV>.
-            SerSimpleType::R { i, b } => TypeBase::new(TypeEnum::RowVar(
-                RV::try_from_rv(RowVariable(i, b))
-                    .map_err(|var| SignatureError::RowVarWhereTypeExpected { var })?,
-            )),
-        })
+            SerSimpleType::Opaque(o) => Type::new_extension(o),
+            SerSimpleType::Alias(_) => todo!("alias?"),
+            SerSimpleType::V { i, b } => Type::new_var_use(i, b),
+            SerSimpleType::R { i, b } => Type::new_row_var_use(i, b),
+        }
     }
 }
 
@@ -87,7 +96,7 @@ pub(super) enum TypeParamSer {
 #[serde(tag = "tya")]
 pub(super) enum TypeArgSer {
     Type {
-        ty: Type,
+        ty: SerSimpleType,
     },
     BoundedNat {
         n: u64,
@@ -138,7 +147,11 @@ impl From<Term> for TermSer {
             Term::FloatType => TermSer::TypeParam(TypeParamSer::Float),
             Term::ListType(param) => TermSer::TypeParam(TypeParamSer::List { param }),
             Term::ConstType(ty) => TermSer::TypeParam(TypeParamSer::ConstType { ty: *ty }),
-            Term::Runtime(ty) => TermSer::TypeArg(TypeArgSer::Type { ty }),
+            Term::RuntimeFunction(_) | Term::RuntimeExtension(_) | Term::RuntimeSum(_) => {
+                TermSer::TypeArg(TypeArgSer::Type {
+                    ty: value.try_into().unwrap(),
+                })
+            }
             Term::TupleType(params) => TermSer::TypeParam(TypeParamSer::Tuple {
                 params: (*params).into(),
             }),
@@ -170,7 +183,7 @@ impl From<TermSer> for Term {
                 TypeParamSer::ConstType { ty } => Term::ConstType(Box::new(ty)),
             },
             TermSer::TypeArg(arg) => match arg {
-                TypeArgSer::Type { ty } => Term::Runtime(ty),
+                TypeArgSer::Type { ty } => Term::from(ty),
                 TypeArgSer::BoundedNat { n } => Term::BoundedNat(n),
                 TypeArgSer::String { arg } => Term::String(arg),
                 TypeArgSer::Bytes { value } => Term::Bytes(value),
@@ -184,6 +197,11 @@ impl From<TermSer> for Term {
         }
     }
 }
+
+/// Helper for use with [serde_with::serde_as] to serialize a [Term]
+/// that is an instance of [`Term::ListType`]([`Term::RuntimeType`](...))
+/// as a list of types + row variables
+pub(crate) enum SerTypeRowRV {}
 
 /// Helper type that serialises lists as JSON arrays for compatibility.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -231,5 +249,38 @@ mod base64 {
             .decode(base64.as_bytes())
             .map(|v| v.into())
             .map_err(serde::de::Error::custom)
+    }
+}
+
+impl serde_with::SerializeAs<Term> for SerTypeRowRV {
+    fn serialize_as<S: serde::Serializer>(source: &Term, serializer: S) -> Result<S::Ok, S::Error> {
+        let items: Vec<SerSimpleType> = source
+            .clone()
+            .into_list_parts()
+            .map(|part| match part {
+                SeqPart::Item(t) => {
+                    let s = SerSimpleType::try_from(t).unwrap();
+                    assert!(!matches!(s, SerSimpleType::R { .. }));
+                    s
+                }
+                SeqPart::Splice(t) => {
+                    let s = SerSimpleType::try_from(t).unwrap();
+                    assert!(matches!(s, SerSimpleType::R { .. }));
+                    s
+                }
+            })
+            .collect();
+        items.serialize(serializer)
+    }
+}
+
+impl<'de> serde_with::DeserializeAs<'de, Term> for SerTypeRowRV {
+    fn deserialize_as<D: serde::Deserializer<'de>>(deser: D) -> Result<Term, D::Error> {
+        let items: Vec<SerSimpleType> = serde::Deserialize::deserialize(deser)?;
+        let list_parts = items.into_iter().map(|s| match s {
+            SerSimpleType::R { i, b } => SeqPart::Splice(Term::new_row_var_use(i, b)),
+            s => SeqPart::Item(Term::from(s)),
+        });
+        Ok(Term::new_list_from_parts(list_parts))
     }
 }

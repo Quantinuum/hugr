@@ -449,8 +449,10 @@ impl Term {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
             TypeArg::RuntimeSum(SumType::General(rows)) => {
                 // A substitution of a row variable for an empty list, could make this from
-                // a GeneralSum into a unary SumType. Even new_unchecked recomputes the bound.
-                SumType::new_unchecked(rows.substitute(t).into_owned()).into()
+                // a GeneralSum into a unary SumType.
+
+                // Ok to use panicking `new` as if the substitution is valid we'll still have types.
+                SumType::new(rows.substitute(t).into_owned()).into()
             }
             TypeArg::RuntimeExtension(cty) => Term::new_extension(cty.substitute(t)),
             TypeArg::RuntimeFunction(bf) => Term::new_function(bf.substitute(t)),
@@ -1040,8 +1042,16 @@ mod test {
         // `Term::TupleType` requires a `Term::Tuple` of the same number of elems
         let usize_and_ty =
             TypeParam::new_tuple_type([TypeParam::max_nat_type(), TypeBound::Copyable.into()]);
-        check(TypeArg::Tuple(vec![5.into(), usize_t()]), &usize_and_ty).unwrap();
-        check(TypeArg::Tuple(vec![usize_t(), 5.into()]), &usize_and_ty).unwrap_err(); // Wrong way around
+        check(
+            TypeArg::Tuple(vec![5.into(), usize_t().into()]),
+            &usize_and_ty,
+        )
+        .unwrap();
+        check(
+            TypeArg::Tuple(vec![usize_t().into(), 5.into()]),
+            &usize_and_ty,
+        )
+        .unwrap_err(); // Wrong way around
         let two_types = TypeParam::new_tuple_type(Term::new_list([
             TypeBound::Linear.into(),
             TypeBound::Linear.into(),
@@ -1090,11 +1100,11 @@ mod test {
         let Term::List(mut elems) = good_arg.clone() else {
             panic!()
         };
-        elems.push(usize_t());
+        elems.push(usize_t().into());
         assert_eq!(
             check_term_type(&Term::new_list(elems), &outer_param),
             Err(TermTypeError::TypeMismatch {
-                term: Box::new(usize_t()),
+                term: Box::new(usize_t().into()),
                 // The error reports the type expected for each element of the list:
                 type_: Box::new(TypeParam::new_list_type(TypeBound::Linear))
             })
@@ -1118,7 +1128,7 @@ mod test {
     #[test]
     fn test_try_into_list_elements() {
         // Test successful conversion with List
-        let types = vec![Term::new_unit_sum(1), bool_t()];
+        let types = vec![Type::new_unit_sum(1), bool_t()];
         let term = TypeArg::List(types.clone());
         let result = term.try_into();
         assert_eq!(result, Ok(TypeRow::from(types)));

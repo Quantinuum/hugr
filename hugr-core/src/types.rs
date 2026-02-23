@@ -8,7 +8,6 @@ mod signature;
 pub mod type_param;
 pub mod type_row;
 
-
 use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_type_exts,
 };
@@ -25,17 +24,16 @@ pub use type_row::{TypeRow, TypeRowRV};
 
 pub(crate) use poly_func::PolyFuncTypeBase;
 
-use std::ops::Deref;
 use itertools::FoldWhile::{Continue, Done};
 use itertools::{Either, Itertools as _};
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
+use std::ops::Deref;
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 
 use self::type_param::TypeParam;
-
 
 /// A unique identifier for a type.
 pub type TypeName = SmolStr;
@@ -181,7 +179,63 @@ pub enum SumType {
     Unit { size: u8 },
     /// General case of a Sum type.
     #[allow(missing_docs)]
-    General { rows: Vec<TypeRowRV> },
+    General(GeneralSum),
+}
+
+/// General case of a [SumType]. Prefer using [SumType::new] and friends.
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GeneralSum {
+    /// Each term here must be an instance of [Term::ListType]([Term::RuntimeType]), being
+    /// the elements of exactly one variant. (Thus, this explicitly forbids sums with an
+    /// unknown number of variants.)
+    // We could just have a single `rows: Term` here, an instance of
+    //`Term::ListType(Term::ListType(Term::RuntimeType))`, but then many functions like
+    // `len` and `variants` would be impossible. (We might want a separate "FixedAritySum"
+    // rust type supporting those, with try_from(SumType).)
+    rows: Vec<Term>,
+}
+
+impl GeneralSum {
+    /// Initialize a new general sum type. (Note the number of variants is fixed.)
+    ///
+    /// # Panics
+    ///
+    /// If any element of `rows` is not a list (perhaps of variable length) of runtime types.
+    /// See [Self::try_new] or [Self::new_unchecked] for alternatives.
+    pub fn new(rows: impl Into<Vec<Term>>) -> Self {
+        Self::try_new(rows).unwrap()
+    }
+
+    /// Initialize a new general sum type, checking that each variant is a list of runtime types.
+    ///
+    /// # Errors
+    ///
+    /// If any element of `rows` is not a list (perhaps of variable length) of runtime types.
+    pub fn try_new(rows: impl Into<Vec<Term>>) -> Result<Self, TermTypeError> {
+        let rows = rows.into();
+        for row in rows.iter() {
+            check_term_type(row, &Term::new_list_type(TypeBound::Linear))?;
+        }
+        Ok(Self::new_unchecked(rows))
+    }
+
+    /// Initialize a new general sum type without checking the variants.
+    pub fn new_unchecked(rows: impl Into<Vec<Term>>) -> Self {
+        let rows: Vec<Term> = rows.into();
+        Self { rows }
+    }
+
+    /// Returns an iterator over the variants, each an instance of [Term::ListType]`(`[Term::RuntimeType]`)`
+    pub fn iter(&self) -> impl Iterator<Item = &Term> {
+        self.rows.iter()
+    }
+
+    /// Returns a mutable iterator over the variants, each should be an instance
+    /// of [Term::ListType]`(`[Term::RuntimeType]`)` but of course `iter_mut` allows
+    /// bypassing such checks.
+    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Term> {
+        self.rows.iter_mut()
+    }
 }
 
 impl std::hash::Hash for SumType {
@@ -208,9 +262,9 @@ impl std::fmt::Display for SumType {
             SumType::Unit { size } => {
                 display_list_with_separator(itertools::repeat_n("[]", *size as usize), f, "+")
             }
-            SumType::General { rows } => match rows.len() {
-                1 if rows[0].is_empty() => write!(f, "Unit"),
-                2 if rows[0].is_empty() && rows[1].is_empty() => write!(f, "Bool"),
+            SumType::General(GeneralSum { rows, .. }) => match rows.len() {
+                1 if rows[0].is_empty_list() => write!(f, "Unit"),
+                2 if rows[0].is_empty_list() && rows[1].is_empty_list() => write!(f, "Bool"),
                 _ => display_list_with_separator(rows.iter(), f, "+"),
             },
         }
@@ -219,17 +273,44 @@ impl std::fmt::Display for SumType {
 
 impl SumType {
     /// Initialize a new sum type.
+    ///
+    /// # Panics
+    ///
+    /// If any element of `variants` is not a list (perhaps of variable length) of runtime types.
+    /// See [Self::try_new] or [Self::new_unchecked] for alternatives.
     pub fn new<V>(variants: impl IntoIterator<Item = V>) -> Self
     where
-        V: Into<TypeRowRV>,
+        V: Into<Term>,
     {
-        let rows = variants.into_iter().map(Into::into).collect_vec();
+        Self::try_new(variants).unwrap()
+    }
 
-        let len: usize = rows.len();
-        if u8::try_from(len).is_ok() && rows.iter().all(TypeRowRV::is_empty) {
+    /// Initialize a new sum type, checking that each variant is a list of runtime types.
+    ///
+    /// # Errors
+    ///
+    /// If any element of `variants` is not a list (perhaps of variable length) of runtime types.
+    /// See [Self::new_unchecked] for an alternative.
+    pub fn try_new<V: Into<Term>>(
+        variants: impl IntoIterator<Item = V>,
+    ) -> Result<Self, TermTypeError> {
+        let variants = variants.into_iter().map(V::into).collect_vec();
+        let len = variants.len();
+        if u8::try_from(len).is_ok() && variants.iter().all(Term::is_empty_list) {
+            Ok(Self::new_unary(len as u8))
+        } else {
+            GeneralSum::try_new(variants).map(Self::General)
+        }
+    }
+
+    /// Initialize a new sum type without checking the variants.
+    pub fn new_unchecked(variants: impl Into<TypeRow>) -> Self {
+        let variants = variants.into();
+        let len: usize = variants.len();
+        if u8::try_from(len).is_ok() && variants.iter().all(Term::is_empty_list) {
             Self::new_unary(len as u8)
         } else {
-            Self::General { rows }
+            Self::General(GeneralSum::new_unchecked(variants))
         }
     }
 
@@ -251,10 +332,10 @@ impl SumType {
 
     /// Report the tag'th variant, if it exists.
     #[must_use]
-    pub fn get_variant(&self, tag: usize) -> Option<&TypeRowRV> {
+    pub fn get_variant(&self, tag: usize) -> Option<&Term> {
         match self {
-            SumType::Unit { size } if tag < (*size as usize) => Some(TypeRV::EMPTY_TYPEROW_REF),
-            SumType::General { rows } => rows.get(tag),
+            SumType::Unit { size } if tag < (*size as usize) => Some(Type::EMPTY_TYPE_LIST_REF),
+            SumType::General(GeneralSum { rows, .. }) => rows.get(tag),
             _ => None,
         }
     }
@@ -264,45 +345,58 @@ impl SumType {
     pub fn num_variants(&self) -> usize {
         match self {
             SumType::Unit { size } => *size as usize,
-            SumType::General { rows } => rows.len(),
+            SumType::General(GeneralSum { rows, .. }) => rows.len(),
         }
     }
 
-    /// Returns variant row if there is only one variant.
+    /// Returns variant row if there is only one variant
+    /// (will be an instance of [Term::ListType]([Term::RuntimeType]).
     #[must_use]
-    pub fn as_tuple(&self) -> Option<&TypeRowRV> {
+    pub fn as_tuple(&self) -> Option<&Term> {
         match self {
-            SumType::Unit { size } if *size == 1 => Some(TypeRV::EMPTY_TYPEROW_REF),
-            SumType::General { rows } if rows.len() == 1 => Some(&rows[0]),
+            SumType::Unit { size } if *size == 1 => Some(Term::EMPTY_TYPE_LIST_REF),
+            SumType::General(GeneralSum { rows, .. }) if rows.len() == 1 => Some(&rows[0]),
             _ => None,
         }
     }
 
-    /// If the sum matches the convention of `Option[row]`, return the row.
+    /// If the sum matches the convention of `Option[row]`, return the row
+    /// (an instance of [Term::ListType]([Term::RuntimeType]).
     #[must_use]
-    pub fn as_option(&self) -> Option<&TypeRowRV> {
+    pub fn as_option(&self) -> Option<&Term> {
         match self {
-            SumType::Unit { size } if *size == 2 => Some(TypeRV::EMPTY_TYPEROW_REF),
-            SumType::General { rows } if rows.len() == 2 && rows[0].is_empty() => Some(&rows[1]),
+            SumType::Unit { size } if *size == 2 => Some(Term::EMPTY_TYPE_LIST_REF),
+            SumType::General(GeneralSum { rows, .. })
+                if rows.len() == 2 && rows[0].is_empty_list() =>
+            {
+                Some(&rows[1])
+            }
             _ => None,
         }
     }
 
-    /// If a sum is an option of a single type, return the type.
-    #[must_use]
-    pub fn as_unary_option(&self) -> Option<&TypeRV> {
-        self.as_option()
-            .and_then(|row| row.iter().exactly_one().ok())
-    }
+    // ALAN removing as_unary_option.
+    // "If a sum is an option of a single type, return the type. pub fn as_unary_option(&self) -> Option<&TypeRV>"
+    // But of course a TypeRV was not necessarily a single type...
 
-    /// Returns an iterator over the variants.
-    pub fn variants(&self) -> impl Iterator<Item = &TypeRowRV> {
+    /// Returns an iterator over the variants, each an instance of [Term::ListType]`(`[Term::RuntimeType]`)`
+    pub fn variants(&self) -> impl Iterator<Item = &Term> {
         match self {
             SumType::Unit { size } => Either::Left(itertools::repeat_n(
-                TypeRV::EMPTY_TYPEROW_REF,
+                Term::EMPTY_TYPE_LIST_REF,
                 *size as usize,
             )),
-            SumType::General { rows } => Either::Right(rows.iter()),
+            SumType::General(gs) => Either::Right(gs.iter()),
+        }
+    }
+
+    /// Returns the bound of this sum type.
+    ///
+    /// (Cached; will be [TypeBound::Linear] if any variant is not a list of runtime types.)
+    pub const fn bound(&self) -> TypeBound {
+        match self {
+            SumType::Unit { .. } => TypeBound::Copyable,
+            SumType::General(GeneralSum { bound, .. }) => *bound,
         }
     }
 }
@@ -325,7 +419,9 @@ impl From<SumType> for Type {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, PartialEq, derive_more::Display, serde::Serialize, serde::Deserialize)]
+#[derive(
+    Clone, Debug, Eq, Hash, PartialEq, derive_more::Display, serde::Serialize, serde::Deserialize,
+)]
 #[display("{_0}")]
 #[serde(
     into = "serialize::SerSimpleType",
@@ -371,7 +467,10 @@ impl Type {
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<FuncValueType>) -> Self {
-        Self(Term::RuntimeFunction(Box::new(fun_ty.into())), TypeBound::Copyable)
+        Self(
+            Term::RuntimeFunction(Box::new(fun_ty.into())),
+            TypeBound::Copyable,
+        )
     }
 
     /// Initialize a new tuple type by providing the elements.
@@ -386,7 +485,6 @@ impl Type {
 
     pub fn try_new_tuple(elems: impl Into<Term>) -> Result<Self, TermTypeError> {
         let elems = elems.into();
-        
     }
 
     /// Initialize a new sum type by providing the possible variant types.
@@ -410,7 +508,10 @@ impl Type {
     #[must_use]
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(Term::RuntimeSum(SumType::new_unary(size)), TypeBound::Copyable)
+        Self(
+            Term::RuntimeSum(SumType::new_unary(size)),
+            TypeBound::Copyable,
+        )
     }
 
     /// New use (occurrence) of the type variable with specified index.
@@ -459,8 +560,9 @@ impl Type {
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.0.validate(var_decls)?;
         check_term_type(self.0, self.1.into())?;
-        debug_assert!(self.1 == TypeBound::Copyable ||
-            check_term_type(self.0, TypeBound::Copyable).is_err());
+        debug_assert!(
+            self.1 == TypeBound::Copyable || check_term_type(self.0, TypeBound::Copyable).is_err()
+        );
         Ok(())
     }
 
@@ -509,7 +611,10 @@ impl TryFrom<Term> for Type {
     fn try_from(t: Term) -> Result<Self, TermTypeError> {
         match t.least_upper_bound() {
             Some(b) => Ok(Self(t, b)),
-            None => Err(TermTypeError::TypeMismatch { term: Box::new(t), type_: TypeBound::Linear.into() })
+            None => Err(TermTypeError::TypeMismatch {
+                term: Box::new(t),
+                type_: TypeBound::Linear.into(),
+            }),
         }
     }
 }
