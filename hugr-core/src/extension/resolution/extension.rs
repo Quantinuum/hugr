@@ -7,10 +7,13 @@
 use std::mem;
 use std::sync::Arc;
 
-use crate::extension::{Extension, ExtensionId, ExtensionRegistry, OpDef, SignatureFunc, TypeDef};
+use crate::extension::{
+    Extension, ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureFunc, TypeDef,
+};
 
+use super::types::collect_signature_exts;
 use super::types_mut::resolve_signature_exts;
-use super::{ExtensionResolutionError, WeakExtensionRegistry};
+use super::{ExtensionCollectionError, ExtensionResolutionError, WeakExtensionRegistry};
 
 impl ExtensionRegistry {
     /// Given a list of extensions that has been deserialized, create a new
@@ -37,6 +40,55 @@ impl ExtensionRegistry {
                 ext.resolve_references(&weak_registry)?;
             }
             Ok(exts)
+        })
+    }
+
+    /// Expand the registry with transitive extension dependencies.
+    ///
+    /// This includes all extensions required to define the types in the
+    /// operation signatures.
+    pub fn extend_with_dependencies(&mut self) -> Result<(), ExtensionCollectionError> {
+        let mut queue: Vec<Arc<Extension>> = self.exts.values().cloned().collect();
+        let mut seen: std::collections::BTreeSet<ExtensionId> = self.exts.keys().cloned().collect();
+
+        while let Some(ext) = queue.pop() {
+            let deps = collect_extension_deps(&ext)?;
+            for dep in deps {
+                let dep_id = dep.name().clone();
+                if seen.insert(dep_id.clone()) {
+                    self.register_updated(dep.clone());
+                    queue.push(dep);
+                }
+            }
+        }
+
+        Ok(())
+    }
+}
+
+/// Collect extensions referenced by an extension's operation signatures.
+fn collect_extension_deps(
+    extension: &Extension,
+) -> Result<ExtensionRegistry, ExtensionCollectionError> {
+    let mut used = WeakExtensionRegistry::default();
+    let mut missing = ExtensionSet::new();
+
+    for (_, op_def) in extension.operations() {
+        if let Some(signature) = op_def.signature_func().poly_func_type() {
+            let mut local_missing = ExtensionSet::new();
+            collect_signature_exts(signature.body(), &mut used, &mut local_missing);
+            for ext in local_missing {
+                missing.insert(ext);
+            }
+        }
+    }
+
+    if missing.is_empty() {
+        Ok(used.try_into().expect("All extensions are valid"))
+    } else {
+        Err(ExtensionCollectionError::DroppedTransitiveExtensions {
+            extension: extension.name().to_string(),
+            missing_extensions: missing.into_iter().collect(),
         })
     }
 }
