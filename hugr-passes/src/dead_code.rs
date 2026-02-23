@@ -138,7 +138,10 @@ impl<H: HugrView> DeadCodeElimPass<H> {
                     q.push_back(ch);
                 }
             }
-            if matches!(h.get_optype(n), OpType::DataflowBlock(_) | OpType::ExitBlock(_) ){
+            if matches!(
+                h.get_optype(n),
+                OpType::DataflowBlock(_) | OpType::ExitBlock(_)
+            ) {
                 // Follow control flow forwards to find reachable basic blocks besides entry and exit.
                 q.extend(h.output_neighbours(n))
             } else {
@@ -426,7 +429,8 @@ mod test {
         h.validate().unwrap();
         let num_nodes_before = h.nodes().count();
         let cfg_node = h.entrypoint();
-        let num_cfg_children_before: usize = h.children(cfg_node)
+        let num_cfg_children_before: usize = h
+            .children(cfg_node)
             .filter(|child| matches!(h.get_optype(*child), OpType::DataflowBlock(_)))
             .count();
 
@@ -447,7 +451,8 @@ mod test {
 
         // CFG checks: should still be a CFG and have one less dataflow block child.
         assert!(h.get_optype(cfg_node).is_cfg());
-        let num_cfg_children_after: usize = h.children(cfg_node)
+        let num_cfg_children_after: usize = h
+            .children(cfg_node)
             .filter(|child| matches!(h.get_optype(*child), OpType::DataflowBlock(_)))
             .count();
         assert_eq!(num_cfg_children_after, num_cfg_children_before - 1);
@@ -455,6 +460,5 @@ mod test {
         // Also the exit block should only have one predecessor now.
         let exit_preds = h.input_neighbours(exit.node()).collect_vec();
         assert_eq!(exit_preds.len(), 1);
-
     }
 }
