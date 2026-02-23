@@ -85,6 +85,9 @@ class Op(Protocol):
     ) -> tuple[Op, ExtensionResolutionResult]:
         """Resolve the extensions required to define this operation.
 
+        Does not include transitive dependencies required by the returned
+        extension definitions, to avoid infinite recursion.
+
         Args:
             registry: A registry to resolve unresolved extensions from.
 
@@ -103,6 +106,9 @@ class Op(Protocol):
         """Get the extensions used by this operation, optionally resolving
         unresolved types and operations.
 
+        Includes any extension transitively required by the returned extension
+        definitions.
+
         Args:
             resolve_from: Optional extension registry to resolve against.
                 If None, opaque types and Custom ops will not be resolved.
@@ -111,6 +117,7 @@ class Op(Protocol):
             The result containing used and unresolved extensions.
         """
         _, result = self._resolve_used_extensions(resolve_from)
+        result._extend_with_transitive_ops(resolve_from)
         return result
 
 

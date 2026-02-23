@@ -14,6 +14,7 @@ use crate::extension::resolution::{
     ExtensionCollectionError, collect_op_extension, collect_op_types_extensions,
 };
 use std::borrow::Cow;
+use std::cmp::Ordering;
 
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ExtensionId, ExtensionRegistry};
@@ -69,6 +70,51 @@ pub enum OpType {
     CFG,
     Conditional,
     Case,
+}
+
+fn optype_id(optype: &OpType) -> usize {
+    match optype {
+        OpType::Module(_) => 0,
+        OpType::FuncDefn(_) => 1,
+        OpType::FuncDecl(_) => 2,
+        OpType::AliasDecl(_) => 3,
+        OpType::AliasDefn(_) => 4,
+        OpType::Const(_) => 5,
+        OpType::Input(_) => 6,
+        OpType::Output(_) => 7,
+        OpType::Call(_) => 8,
+        OpType::CallIndirect(_) => 9,
+        OpType::LoadConstant(_) => 10,
+        OpType::LoadFunction(_) => 11,
+        OpType::DFG(_) => 12,
+        OpType::ExtensionOp(_) => 13,
+        OpType::OpaqueOp(_) => 14,
+        OpType::Tag(_) => 15,
+        OpType::DataflowBlock(_) => 16,
+        OpType::ExitBlock(_) => 17,
+        OpType::TailLoop(_) => 18,
+        OpType::CFG(_) => 19,
+        OpType::Conditional(_) => 20,
+        OpType::Case(_) => 21,
+    }
+}
+
+impl PartialOrd for OpType {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let a = optype_id(self);
+        let b = optype_id(other);
+        if a < b {
+            Some(Ordering::Less)
+        } else if a > b {
+            Some(Ordering::Greater)
+        } else {
+            match format!("{:?}", self).cmp(&format!("{:?}", other)) {
+                Ordering::Less => Some(Ordering::Less),
+                Ordering::Greater => Some(Ordering::Greater),
+                Ordering::Equal => None,
+            }
+        }
+    }
 }
 
 macro_rules! impl_op_ref_try_into {
@@ -366,6 +412,7 @@ impl OpType {
         if let Some(ext) = collect_op_extension(None, self)? {
             reg.register_updated(ext);
         }
+        reg.extend_with_dependencies()?;
         Ok(reg)
     }
 }

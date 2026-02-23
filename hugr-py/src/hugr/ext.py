@@ -336,6 +336,23 @@ class Extension:
         self.types[type_def.name] = type_def
         return self.types[type_def.name]
 
+    def _resolve_used_extensions(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionResolutionResult:
+        """Collect extension dependencies from this extension's op signatures."""
+        if registry is not None and self.name not in registry:
+            registry.register_updated(self)
+
+        result = ExtensionResolutionResult()
+        for op_def in self.operations.values():
+            poly_func = op_def.signature.poly_func
+            if poly_func is None:
+                continue
+            _, sig_result = poly_func._resolve_used_extensions(registry)
+            result.extend(sig_result)
+
+        return result
+
     @dataclass
     class OperationNotFound(NotFound):
         """Operation not found in extension."""
@@ -564,3 +581,22 @@ class ExtensionResolutionResult:
         self.unresolved_extensions.update(other.unresolved_extensions)
         self.unresolved_ops.update(other.unresolved_ops)
         self.unresolved_types.update(other.unresolved_types)
+
+    def _extend_with_transitive_ops(
+        self, registry: ExtensionRegistry | None = None
+    ) -> None:
+        """Extend the set of extensions with transitive dependencies required by
+        the OpDefs in each extension definition.
+        """
+        queue: list[Extension] = list(self.used_extensions.extensions.values())
+
+        while queue:
+            ext = queue.pop()
+            op_result = ext._resolve_used_extensions(registry)
+
+            self.unresolved_extensions.update(op_result.unresolved_extensions)
+
+            for new_ext in op_result.used_extensions.extensions.values():
+                if new_ext.name not in self.used_extensions:
+                    self.used_extensions.register_updated(new_ext)
+                    queue.append(new_ext)

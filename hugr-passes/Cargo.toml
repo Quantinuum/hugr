@@ -1,6 +1,6 @@
 [package]
 name = "hugr-passes"
-version = "0.25.5"
+version = "0.25.6"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -19,7 +19,7 @@ workspace = true
 bench = false
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.25.5" }
+hugr-core = { path = "../hugr-core", version = "0.25.6" }
 portgraph = { workspace = true }
 ascent = { version = "0.8.0" }
 derive_more = { workspace = true, features = [
@@ -33,8 +33,11 @@ pastey = { workspace = true }
 thiserror = { workspace = true }
 petgraph = { workspace = true }
 strum = { workspace = true }
+fxhash = { workspace = true }
+serde_json = { workspace = true }
 
 [dev-dependencies]
+hugr-core = { path = "../hugr-core", features = ["zstd"] }
 rstest = { workspace = true }
 proptest = { workspace = true }
 proptest-recurse = { version = "0.5.0" }
