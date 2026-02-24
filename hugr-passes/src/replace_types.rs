@@ -21,8 +21,7 @@ use hugr_core::ops::{
     ExtensionOp, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop, Value,
 };
 use hugr_core::types::{
-    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeRow,
-    TypeTransformer,
+    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeRow, TypeTransformer,
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Wire};
 
@@ -816,14 +815,16 @@ impl ReplaceTypes {
                 Ok(any_change)
             }
             Value::Extension { e } => Ok({
-                let new_const = e.get_type().as_extension().and_then(
-                    |exty| match self.consts.get(exty) {
-                        Some(const_fn) => Some(const_fn(e, self)),
-                        None => self
-                            .param_consts
-                            .get(&exty.into())
-                            .and_then(|const_fn| const_fn(e, self).transpose()),
-                    });
+                let new_const =
+                    e.get_type()
+                        .as_extension()
+                        .and_then(|exty| match self.consts.get(exty) {
+                            Some(const_fn) => Some(const_fn(e, self)),
+                            None => self
+                                .param_consts
+                                .get(&exty.into())
+                                .and_then(|const_fn| const_fn(e, self).transpose()),
+                        });
                 if let Some(new_const) = new_const {
                     *value = new_const?;
                     true
@@ -1047,7 +1048,7 @@ mod test {
             .unwrap()
             .outputs_arr();
         let [res] = dfb
-            .build_unwrap_sum(1, option_type([Type::from(elem_ty)]), opt)
+            .build_unwrap_sum(1, option_type([elem_ty]), opt)
             .unwrap();
         dfb.set_outputs([res]).unwrap();
         dfb
@@ -1294,13 +1295,7 @@ mod test {
             h.get_optype(pred.node())
                 .as_load_constant()
                 .map(hugr_core::ops::LoadConstant::constant_type),
-            Some(&Type::new_sum(vec![
-                [Type::from(borrow_array_type(
-                    4,
-                    i64_t()
-                ))];
-                2
-            ]))
+            Some(&Type::new_sum(vec![[borrow_array_type(4, i64_t())]; 2]))
         );
     }
 

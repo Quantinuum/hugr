@@ -223,7 +223,10 @@ impl Signature {
     /// If any of the input or output types are not runtime types.
     /// See [Self::try_new] or [Self::new_unchecked] for alternatives.
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
-        Self {input: input.into(), output: output.into() }
+        Self {
+            input: input.into(),
+            output: output.into(),
+        }
     }
 
     /// Create a new signature with the same input and output types (signature of an endomorphic
@@ -406,7 +409,7 @@ impl From<Signature> for FuncValueType {
 
 impl PartialEq<Signature> for FuncValueType {
     fn eq(&self, other: &Signature) -> bool {
-        return other.input == self.input && other.output == self.output
+        other.input == self.input && other.output == self.output
     }
 }
 
@@ -440,7 +443,10 @@ mod test {
         fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
             let io_strategy = vec(
                 Union::new([
-                    any_with::<Type>(depth).prop_map(Term::from).prop_map(SeqPart::Item).boxed(),
+                    any_with::<Type>(depth)
+                        .prop_map(Term::from)
+                        .prop_map(SeqPart::Item)
+                        .boxed(),
                     (any::<usize>(), any::<TypeBound>())
                         .prop_map(|(idx, bound)| SeqPart::Splice(Term::new_row_var_use(idx, bound)))
                         .boxed(),

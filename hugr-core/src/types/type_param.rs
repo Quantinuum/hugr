@@ -169,7 +169,7 @@ pub enum Term {
 
 impl Term {
     pub(crate) const EMPTY_LIST: Term = Term::List(Vec::new());
-    pub (crate) const EMPTY_LIST_REF: &'static Term = &Self::EMPTY_LIST;
+    pub(crate) const EMPTY_LIST_REF: &'static Term = &Self::EMPTY_LIST;
     /// Creates a [`Term::BoundedNatType`] with the maximum bound (`u64::MAX` + 1).
     #[must_use]
     pub const fn max_nat_type() -> Self {
@@ -477,12 +477,12 @@ impl Term {
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
-            TypeArg::RuntimeSum(SumType::General(GeneralSum {rows})) => {
+            TypeArg::RuntimeSum(SumType::General(GeneralSum { rows })) => {
                 // A substitution of a row variable for an empty list, could make this from
                 // a GeneralSum into a unary SumType.
 
                 // Ok to use panicking `new` as if the substitution is valid we'll still have types.
-                Term::RuntimeSum(SumType::new(rows.into_iter().map(|r| r.substitute(t))))
+                Term::RuntimeSum(SumType::new(rows.iter().map(|r| r.substitute(t))))
             }
             TypeArg::RuntimeExtension(cty) => Term::RuntimeExtension(cty.substitute(t)),
             TypeArg::RuntimeFunction(bf) => Term::RuntimeFunction(Box::new(bf.substitute(t))),
@@ -695,10 +695,10 @@ impl Transformable for Term {
                 } else {
                     let args_changed = custom_type.args_mut().transform(tr)?;
                     if args_changed {
-                        *self = 
-                            custom_type
-                                .get_type_def(&custom_type.get_extension()?)?
-                                .instantiate(custom_type.args())?.into();
+                        *self = custom_type
+                            .get_type_def(&custom_type.get_extension()?)?
+                            .instantiate(custom_type.args())?
+                            .into();
                     }
                     Ok(args_changed)
                 }
@@ -1083,10 +1083,7 @@ mod test {
         )
         .unwrap_err(); // Wrong way around
 
-        let two_types = Term::new_list([
-            TypeBound::Linear.into(),
-            TypeBound::Linear.into(),
-        ]);
+        let two_types = Term::new_list([TypeBound::Linear.into(), TypeBound::Linear.into()]);
         let two_types = TypeParam::new_tuple_type(two_types);
         check(TypeArg::new_var_use(0, two_types.clone()), &two_types).unwrap();
         // not a Row Var which could have any number of elems
@@ -1212,7 +1209,7 @@ mod test {
 
         use super::super::{TermVar, UpperBound};
         use crate::proptest::RecursionDepth;
-        use crate::types::proptest_utils::{any_serde_type_param};
+        use crate::types::proptest_utils::any_serde_type_param;
         use crate::types::{Term, Type, TypeBound};
 
         impl Arbitrary for TermVar {
@@ -1247,7 +1244,7 @@ mod test {
                     any::<f64>()
                         .prop_map(|value| Self::Float(value.into()))
                         .boxed(),
-                    any_with::<Type>(depth).prop_map_into().boxed()
+                    any_with::<Type>(depth).prop_map_into().boxed(),
                 ]);
                 if depth.leaf() {
                     return strat.boxed();

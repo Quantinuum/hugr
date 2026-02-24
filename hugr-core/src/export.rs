@@ -14,7 +14,7 @@ use crate::{
         collections::array::ArrayValue,
     },
     types::type_param::{Term, TermVar},
-    types::{CustomType, Type, EdgeKind, FuncValueType, Signature, SumType, TypeBound, TypeRow},
+    types::{CustomType, EdgeKind, FuncValueType, Signature, SumType, Type, TypeBound, TypeRow},
 };
 
 use hugr_model::v0::bumpalo;
@@ -850,7 +850,7 @@ impl<'a> Context<'a> {
     }
 
     pub fn export_type(&mut self, t: &Type) -> table::TermId {
-        self.export_term(&*t, None)
+        self.export_term(t, None)
     }
 
     pub fn export_signature(&mut self, t: &Signature) -> table::TermId {

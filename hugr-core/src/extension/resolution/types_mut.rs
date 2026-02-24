@@ -196,12 +196,13 @@ pub(super) fn resolve_custom_type_exts(
 /// Update all weak Extension pointers in the [`CustomType`]s inside a [`Type`].
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
-pub(crate) fn resolve_type_exts(node: Option<Node>,
+pub(crate) fn resolve_type_exts(
+    node: Option<Node>,
     typ: &mut Type,
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    const EMPTY:Type = Type::new_unit_sum(0); // as no Type::default()
+    const EMPTY: Type = Type::new_unit_sum(0); // as no Type::default()
     let mut tm = std::mem::replace(typ, EMPTY).into();
     let r = resolve_term_exts(node, &mut tm, extensions, used_extensions);
     *typ = tm.try_into().unwrap();

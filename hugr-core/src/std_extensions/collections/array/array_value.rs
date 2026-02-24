@@ -3,7 +3,6 @@ use serde::{Deserialize, Serialize};
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 
-use crate::extension::SignatureError;
 use crate::extension::resolution::{
     ExtensionResolutionError, WeakExtensionRegistry, resolve_type_extensions,
     resolve_value_extensions,

@@ -26,8 +26,8 @@ use crate::std_extensions::std_reg;
 use crate::test_file;
 use crate::types::type_param::TypeParam;
 use crate::types::{
-    FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Type, TypeArg, TypeBound,
-    TypeRV, Term
+    FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Term, Type, TypeArg,
+    TypeBound, TypeRV,
 };
 use crate::{OutgoingPort, Visibility, type_row};
 use std::fs::File;
@@ -569,10 +569,7 @@ fn polyfunctype2() -> PolyFuncTypeRV {
     let tv1 = TypeRV::new_row_var_use(1, TypeBound::Copyable);
     let params = [TypeBound::Linear, TypeBound::Copyable].map(TypeParam::new_list_type);
     let inputs = Term::concat_lists([
-        Term::new_list([Type::new_function(FuncValueType::new(
-            tv0.clone(),
-            tv1.clone(),
-        )).into()]),
+        Term::new_list([Type::new_function(FuncValueType::new(tv0.clone(), tv1.clone())).into()]),
         tv0,
     ]);
     let res = PolyFuncTypeRV::new(params, FuncValueType::new(inputs, tv1));

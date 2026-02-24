@@ -938,15 +938,15 @@ pub(crate) mod test {
         )?;
 
         // But cannot eval it...
-        let ev = e.instantiate_extension_op(
-            "eval",
-            [vec![usize_t()].into(), rv.clone()],
-        );
+        let ev = e.instantiate_extension_op("eval", [vec![usize_t()].into(), rv.clone()]);
         assert_eq!(
             ev,
-            Err(SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
-                 term: Box::new(rv), type_: Box::new(TypeBound::Linear.into()) })
-            )
+            Err(SignatureError::TypeArgMismatch(
+                TermTypeError::TypeMismatch {
+                    term: Box::new(rv),
+                    type_: Box::new(TypeBound::Linear.into())
+                }
+            ))
         );
         Ok(())
     }

@@ -838,7 +838,7 @@ pub(super) mod test {
             def.validate_args(&args, &decls).unwrap();
             assert_eq!(def.compute_signature(&args), Ok(Signature::new_endo([tv])));
             // But not with an external row variable
-            let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Copyable).into();
+            let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Copyable);
             assert_eq!(
                 def.compute_signature(std::slice::from_ref(&arg)),
                 Err(SignatureError::TypeArgMismatch(

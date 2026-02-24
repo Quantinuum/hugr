@@ -108,18 +108,18 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             )
             .unwrap();
         let panic_exit_sig = PolyFuncTypeRV::new(
-                    [
-                        TypeParam::new_list_type(TypeBound::Linear),
-                        TypeParam::new_list_type(TypeBound::Linear),
-                    ],
-                    FuncValueType::new(
-                        Term::concat_lists([
-                            Term::new_list([Type::new_extension(error_type.clone()).into()]),
-                            TypeRV::new_row_var_use(0, TypeBound::Linear)
-                        ]),
-                        TypeRV::new_row_var_use(1, TypeBound::Linear),
-                    ),
-                );
+            [
+                TypeParam::new_list_type(TypeBound::Linear),
+                TypeParam::new_list_type(TypeBound::Linear),
+            ],
+            FuncValueType::new(
+                Term::concat_lists([
+                    Term::new_list([Type::new_extension(error_type.clone()).into()]),
+                    TypeRV::new_row_var_use(0, TypeBound::Linear),
+                ]),
+                TypeRV::new_row_var_use(1, TypeBound::Linear),
+            ),
+        );
         prelude
             .add_op(
                 PANIC_OP_ID,
@@ -700,8 +700,7 @@ impl MakeExtensionOp for MakeTuple {
         let [TypeArg::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        let tys = elems.clone().try_into()
-            .map_err(SignatureError::from)?;
+        let tys = elems.clone().try_into().map_err(SignatureError::from)?;
         Ok(Self(tys))
     }
 
@@ -969,9 +968,7 @@ impl MakeExtensionOp for Barrier {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
         let type_row = elems.clone().try_into().map_err(SignatureError::from)?;
-        Ok(Self {
-            type_row
-        })
+        Ok(Self { type_row })
     }
 
     fn type_args(&self) -> Vec<TypeArg> {

@@ -27,7 +27,7 @@ use hugr_core::std_extensions::arithmetic::{
     int_types::{ConstInt, INT_TYPES},
 };
 use hugr_core::std_extensions::logic::LogicOp;
-use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
+use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, type_row};
 
 use crate::ComposablePass as _;

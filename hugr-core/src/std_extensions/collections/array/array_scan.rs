@@ -65,7 +65,10 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
         let src_elem = Type::new_var_use(1, TypeBound::Linear);
         let tgt_elem = Type::new_var_use(2, TypeBound::Linear);
         let with_rest = |tys: Vec<Type>| {
-            TypeArg::concat_lists([TypeRow::from(tys).into(), TypeRV::new_row_var_use(3, TypeBound::Linear)])
+            TypeArg::concat_lists([
+                TypeRow::from(tys).into(),
+                TypeRV::new_row_var_use(3, TypeBound::Linear),
+            ])
         };
         PolyFuncTypeRV::new(
             params,
@@ -215,16 +218,16 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayScanDef<AK> {
                 tgt_elem_ty,
                 TypeArg::List(acc_tys),
             ] => {
-                let src_elem_ty = Type::try_from(src_elem_ty.clone()).map_err(SignatureError::from)?;
-                let tgt_elem_ty = Type::try_from(tgt_elem_ty.clone()).map_err(SignatureError::from)?;
-                let acc_tys = acc_tys.iter().map(|tm|
-                    Type::try_from(tm.clone())).collect::<Result<Vec<_>,_>>().map_err(SignatureError::from)?;
-                Ok(GenericArrayScan::new(
-                    src_elem_ty,
-                    tgt_elem_ty,
-                    acc_tys,
-                    *n,
-                ))
+                let src_elem_ty =
+                    Type::try_from(src_elem_ty.clone()).map_err(SignatureError::from)?;
+                let tgt_elem_ty =
+                    Type::try_from(tgt_elem_ty.clone()).map_err(SignatureError::from)?;
+                let acc_tys = acc_tys
+                    .iter()
+                    .map(|tm| Type::try_from(tm.clone()))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(SignatureError::from)?;
+                Ok(GenericArrayScan::new(src_elem_ty, tgt_elem_ty, acc_tys, *n))
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }

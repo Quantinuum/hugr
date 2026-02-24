@@ -302,7 +302,7 @@ impl SumType {
     }
 
     /// Initialize a new sum type without checking the variants.
-    pub fn new_unchecked<V: Into<Term>>(variants: impl IntoIterator<Item=V>) -> Self {
+    pub fn new_unchecked<V: Into<Term>>(variants: impl IntoIterator<Item = V>) -> Self {
         let variants = variants.into_iter().map_into().collect::<Vec<_>>();
         let len: usize = variants.len();
         if u8::try_from(len).is_ok() && variants.iter().all(Term::is_empty_list) {
@@ -321,7 +321,7 @@ impl SumType {
     /// New tuple (single row of variants).
     ///
     /// # Panics
-    /// 
+    ///
     /// If the argument is not of type [Term::ListType]`(`[Term::RuntimeType]`)`
     pub fn new_tuple(types: impl Into<Term>) -> Self {
         Self::new([types.into()])
@@ -384,10 +384,9 @@ impl SumType {
     /// Returns an iterator over the variants, each an instance of [Term::ListType]`(`[Term::RuntimeType]`)`
     pub fn variants(&self) -> impl Iterator<Item = &Term> {
         match self {
-            SumType::Unit { size } => Either::Left(itertools::repeat_n(
-                Term::EMPTY_LIST_REF,
-                *size as usize,
-            )),
+            SumType::Unit { size } => {
+                Either::Left(itertools::repeat_n(Term::EMPTY_LIST_REF, *size as usize))
+            }
             SumType::General(gs) => Either::Right(gs.iter()),
         }
     }
@@ -395,15 +394,19 @@ impl SumType {
     fn bound(&self) -> TypeBound {
         match self {
             SumType::Unit { .. } => TypeBound::Copyable,
-            SumType::General(GeneralSum {rows}) => 
-                if rows.iter().all(|t| check_term_type(t, &Term::new_list_type(TypeBound::Copyable)).is_ok() ) {
+            SumType::General(GeneralSum { rows }) => {
+                if rows
+                    .iter()
+                    .all(|t| check_term_type(t, &Term::new_list_type(TypeBound::Copyable)).is_ok())
+                {
                     TypeBound::Copyable
                 } else {
                     // That all elements were types was checked in the GeneralSum constructor.
                     // That may have been bypassed via GeneralSum::new_unchecked, but do no
                     // check here (we will do so in validate()).
                     TypeBound::Linear
-                }    
+                }
+            }
         }
     }
 }
@@ -489,9 +492,9 @@ impl Type {
     }
 
     /// Initialize a new sum type by providing the possible variant types.
-    /// 
+    ///
     /// # Panics
-    /// 
+    ///
     /// If any element is not a type or row variable
     #[inline(always)]
     pub fn new_sum<R>(variants: impl IntoIterator<Item = R>) -> Self
@@ -527,7 +530,7 @@ impl Type {
     /// than required for the use.
     #[must_use]
     pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
-        Self(Term::new_var_use(idx,bound), bound)
+        Self(Term::new_var_use(idx, bound), bound)
     }
 
     /// Report the least upper [`TypeBound`]
@@ -569,7 +572,8 @@ impl Type {
         self.0.validate(var_decls)?;
         check_term_type(&self.0, &self.1.into())?;
         debug_assert!(
-            self.1 == TypeBound::Copyable || check_term_type(&self.0, &TypeBound::Copyable.into()).is_err()
+            self.1 == TypeBound::Copyable
+                || check_term_type(&self.0, &TypeBound::Copyable.into()).is_err()
         );
         Ok(())
     }
@@ -596,7 +600,7 @@ impl Type {
         let mut used = WeakExtensionRegistry::default();
         let mut missing = ExtensionSet::new();
 
-        collect_term_exts(&*self, &mut used, &mut missing);
+        collect_term_exts(self, &mut used, &mut missing);
 
         if missing.is_empty() {
             Ok(used.try_into().expect("all extensions are present"))
@@ -748,10 +752,7 @@ pub(crate) mod test {
             )),
             //Type::new_alias(AliasDecl::new("my_alias", TypeBound::Copyable)),
         ]);
-        assert_eq!(
-            &t.to_string(),
-            "[usize, [] -> [], my_custom]"
-        );
+        assert_eq!(&t.to_string(), "[usize, [] -> [], my_custom]");
     }
 
     #[rstest::rstest]
@@ -775,11 +776,11 @@ pub(crate) mod test {
     fn as_option() {
         let opt = option_type([usize_t()]);
 
-        assert_eq!(opt.as_option().unwrap().clone(), Term::new_list([usize_t().into()]));
         assert_eq!(
-            Type::new_unit_sum(2).as_sum().unwrap().as_option(),
-            None
+            opt.as_option().unwrap().clone(),
+            Term::new_list([usize_t().into()])
         );
+        assert_eq!(Type::new_unit_sum(2).as_sum().unwrap().as_option(), None);
 
         assert_eq!(
             Type::new_tuple(vec![usize_t()])
@@ -938,7 +939,7 @@ pub(crate) mod test {
 
         use crate::proptest::RecursionDepth;
 
-        use crate::types::{CustomType, FuncValueType, SumType, TypeRow, TypeBound,Type};
+        use crate::types::{CustomType, FuncValueType, SumType, Type, TypeBound, TypeRow};
         use proptest::{prelude::*, strategy::Union};
 
         impl Arbitrary for SumType {
@@ -955,11 +956,11 @@ pub(crate) mod test {
                 }
             }
         }
-    
+
         impl Arbitrary for Type {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
-             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 let strat = Union::new([
                     (any::<usize>(), any::<TypeBound>())
                         .prop_map(|(i, b)| Type::new_var_use(i, b))
@@ -986,13 +987,12 @@ pub(crate) mod test {
 #[cfg(test)]
 pub(super) mod proptest_utils {
     use proptest::collection::vec;
-    use proptest::prelude::{BoxedStrategy, Strategy, any, any_with};
-    use proptest::strategy::Union;
+    use proptest::prelude::{Strategy, any_with};
 
     use crate::proptest::RecursionDepth;
 
     use super::serialize::{ArrayOrTermSer, TermSer, TypeArgSer, TypeParamSer};
-    use super::{CustomType, FuncValueType, SumType, TypeBound, type_param::Term};
+    use super::type_param::Term;
 
     fn term_is_serde_type_arg(t: &Term) -> bool {
         let TermSer::TypeArg(arg) = TermSer::from(t.clone()) else {
@@ -1007,8 +1007,8 @@ pub(super) mod proptest_utils {
             TypeArgSer::Type { ty } => match Term::from(ty) {
                 Term::RuntimeExtension(cty) => cty.args().iter().all(term_is_serde_type_arg),
                 // Do we need to inspect inside function types? sum types?
-                _ => true
-            }
+                _ => true,
+            },
             TypeArgSer::BoundedNat { .. }
             | TypeArgSer::String { .. }
             | TypeArgSer::Bytes { .. }

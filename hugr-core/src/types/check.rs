@@ -3,7 +3,11 @@
 use thiserror::Error;
 
 use super::{Type, TypeRow};
-use crate::{extension::SignatureError, ops::Value, types::{Term, type_param::TermTypeError}};
+use crate::{
+    extension::SignatureError,
+    ops::Value,
+    types::{Term, type_param::TermTypeError},
+};
 
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, PartialEq, Error)]

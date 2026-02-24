@@ -312,9 +312,9 @@ impl HasConcrete for StaticArrayOpDef {
             [arg] => {
                 if !arg.copyable() {
                     Err(SignatureError::from(TermTypeError::TypeMismatch {
-                            type_: Box::new(Copyable.into()),
-                            term: Box::new(arg.clone()),
-                        }))?
+                        type_: Box::new(Copyable.into()),
+                        term: Box::new(arg.clone()),
+                    }))?
                 }
                 let elem_ty = Type::try_from(arg.clone()).unwrap(); // succeeds as copyable
 

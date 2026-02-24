@@ -112,9 +112,8 @@ impl CustomConst for ListValue {
 
         // constant can only hold classic type.
         let ty = match typ.args() {
-            [ty] if ty.least_upper_bound().is_some() =>
-                Type::try_from(ty.clone()).unwrap(), // succeeds as has l-u-b
-            _ => return Err(error())
+            [ty] if ty.least_upper_bound().is_some() => Type::try_from(ty.clone()).unwrap(), // succeeds as has l-u-b
+            _ => return Err(error()),
         };
 
         // check all values are instances of the element type
@@ -360,10 +359,7 @@ impl MakeExtensionOp for ListOpInst {
             return Err(OpLoadError::NotMember(name.to_string()));
         };
 
-        Ok(Self {
-            elem_type,
-            op,
-        })
+        Ok(Self { elem_type, op })
     }
 
     fn type_args(&self) -> Vec<Term> {

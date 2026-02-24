@@ -34,33 +34,34 @@ impl From<Type> for SerSimpleType {
             return SerSimpleType::I;
         }
         match value.into() {
-            Term::RuntimeExtension(o) => return SerSimpleType::Opaque(o),
+            Term::RuntimeExtension(o) => SerSimpleType::Opaque(o),
             //TypeEnum::Alias(a) => SerSimpleType::Alias(a),
-            Term::RuntimeFunction(sig) => return SerSimpleType::G(sig),
+            Term::RuntimeFunction(sig) => SerSimpleType::G(sig),
             Term::Variable(tv) => {
                 let i = tv.index();
-                let Term::RuntimeType(b) =  &*tv.cached_decl else {
+                let Term::RuntimeType(b) = &*tv.cached_decl else {
                     panic!("Variable with bound {} is not a valid Type", tv.cached_decl);
                 };
                 SerSimpleType::V { i, b: *b }
             }
             Term::RuntimeSum(st) => SerSimpleType::Sum(st),
-            v => panic!("{} was not a valid Type", v)
+            v => panic!("{} was not a valid Type", v),
         }
-        
     }
 }
 
 impl TryFrom<Term> for SerSimpleType {
-    type Error=TermTypeError;
+    type Error = TermTypeError;
 
     fn try_from(value: Term) -> Result<Self, Self::Error> {
-        if let Term::Variable(tv) = &value {
-            if let Term::ListType(t) = &*tv.cached_decl {
-                if let Term::RuntimeType(b) = &**t {
-                    return Ok(SerSimpleType::R { i: tv.index(), b: *b })
-                }
-            }
+        if let Term::Variable(tv) = &value
+            && let Term::ListType(t) = &*tv.cached_decl
+            && let Term::RuntimeType(b) = &**t
+        {
+            return Ok(SerSimpleType::R {
+                i: tv.index(),
+                b: *b,
+            });
         }
         Type::try_from(value).map(SerSimpleType::from)
     }
@@ -82,7 +83,7 @@ impl From<SerSimpleType> for Term {
 }
 
 impl TryFrom<SerSimpleType> for Type {
-    type Error= TermTypeError;
+    type Error = TermTypeError;
 
     fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
         Term::from(value).try_into()

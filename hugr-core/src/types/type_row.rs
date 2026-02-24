@@ -136,7 +136,11 @@ impl TryFrom<Vec<Term>> for TypeRow {
     type Error = TermTypeError;
 
     fn try_from(value: Vec<Term>) -> Result<Self, Self::Error> {
-        value.into_iter().map(Type::try_from).collect::<Result<Vec<_>,_>>().map(Self::from)
+        value
+            .into_iter()
+            .map(Type::try_from)
+            .collect::<Result<Vec<_>, _>>()
+            .map(Self::from)
     }
 }
 
@@ -156,11 +160,11 @@ impl From<&'static [Type]> for TypeRow {
 
 impl PartialEq<Term> for TypeRow {
     fn eq(&self, other: &Term) -> bool {
-        let Term::List(items ) = other else {
-            return false
+        let Term::List(items) = other else {
+            return false;
         };
         if self.types.len() != items.len() {
-            return false
+            return false;
         }
         self.types.iter().zip_eq(items).all(|(ty, tm)| &**ty == tm)
     }
@@ -174,8 +178,11 @@ impl TryFrom<Term> for TypeRow {
 
     fn try_from(value: Term) -> Result<Self, Self::Error> {
         match value {
-            Term::List(elems) => Ok(
-                elems.into_iter().map(Type::try_from).collect::<Result<Vec<_>,_>>()?.into()),
+            Term::List(elems) => Ok(elems
+                .into_iter()
+                .map(Type::try_from)
+                .collect::<Result<Vec<_>, _>>()?
+                .into()),
             _ => Err(SignatureError::InvalidTypeArgs),
         }
     }

@@ -6,7 +6,7 @@ use crate::types::{Type, TypeBound};
 use derive_more::From as DerFrom;
 use smol_str::SmolStr;
 
-use super::{AliasDecl, OpTag};
+use super::OpTag;
 
 /// Common trait for handles to a node.
 /// Typically wrappers around [`Node`].

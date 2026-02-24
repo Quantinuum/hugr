@@ -1599,7 +1599,8 @@ impl<'a> Context<'a> {
                         extension,
                         bound,
                         &Arc::downgrade(extension_ref),
-                    )).into())
+                    ))
+                    .into())
                 }
             }
         })()
