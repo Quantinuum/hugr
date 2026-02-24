@@ -21,7 +21,7 @@ use hugr_core::ops::{
     ExtensionOp, Input, LoadConstant, LoadFunction, OpTrait, OpType, Output, Tag, TailLoop, Value,
 };
 use hugr_core::types::{
-    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeEnum, TypeRow,
+    ConstTypeError, CustomType, Signature, Transformable, Type, TypeArg, TypeRow,
     TypeTransformer,
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Wire};
@@ -816,16 +816,14 @@ impl ReplaceTypes {
                 Ok(any_change)
             }
             Value::Extension { e } => Ok({
-                let new_const = match e.get_type().as_type_enum() {
-                    TypeEnum::Extension(exty) => match self.consts.get(exty) {
+                let new_const = e.get_type().as_extension().and_then(
+                    |exty| match self.consts.get(exty) {
                         Some(const_fn) => Some(const_fn(e, self)),
                         None => self
                             .param_consts
                             .get(&exty.into())
                             .and_then(|const_fn| const_fn(e, self).transpose()),
-                    },
-                    _ => None,
-                };
+                    });
                 if let Some(new_const) = new_const {
                     *value = new_const?;
                     true
@@ -977,11 +975,11 @@ mod test {
         ExtensionOp::new(ext.get_op(READ).unwrap().clone(), [t.into()]).unwrap()
     }
 
-    fn just_elem_type(args: &[TypeArg]) -> &Type {
-        let [TypeArg::Runtime(ty)] = args else {
+    fn just_elem_type(args: &[TypeArg]) -> Type {
+        let [ty] = args else {
             panic!("Expected just elem type")
         };
-        ty
+        Type::try_from(ty.clone()).unwrap()
     }
 
     fn ext() -> Arc<Extension> {
@@ -1230,7 +1228,7 @@ mod test {
         // 1. Lower List<T> to BArray<10, T> UNLESS T is usize_t() or i64_t
         lowerer.set_replace_parametrized_type(list_type_def(), |args| {
             let ty = just_elem_type(args);
-            (![usize_t(), i64_t()].contains(ty)).then_some(borrow_array_type(10, ty.clone()))
+            (![usize_t(), i64_t()].contains(&ty)).then_some(borrow_array_type(10, ty.clone()))
         });
         {
             let mut h = backup.clone();
@@ -1324,10 +1322,10 @@ mod test {
                 .unwrap();
             },
         );
-        fn option_contents(ty: &Type) -> Option<Type> {
+        fn option_contents(ty: Type) -> Option<Type> {
             let row = ty.as_sum()?.get_variant(1).unwrap().clone();
-            let elem = row.into_owned().into_iter().exactly_one().unwrap();
-            Some(elem.try_into_type().unwrap())
+            let elems = TypeRow::try_from(row).unwrap();
+            Some(elems.into_owned().into_iter().exactly_one().unwrap())
         }
         let i32_t = || INT_TYPES[5].clone();
         let opt_i32 = Type::from(option_type([i32_t()]));
@@ -1528,9 +1526,10 @@ mod test {
         let mut lw = lowerer(&e);
         lw.set_replace_parametrized_op(e.get_op(READ).unwrap().as_ref(), move |args, _| {
             Ok(Some({
-                let [Term::Runtime(ty)] = args else {
+                let [ty] = args else {
                     return Err(SignatureError::InvalidTypeArgs.into());
                 };
+                let ty = Type::try_from(ty.clone()).map_err(SignatureError::from)?;
                 let mut fb = FunctionBuilder::new("not inserted", endo_sig(vec![])).unwrap();
                 let read_func = fb
                     .module_root_builder()
@@ -1661,9 +1660,10 @@ mod test {
                 .unwrap()
                 .as_ref(),
             move |args, _| {
-                let [sz, Term::Runtime(ty)] = args else {
+                let [sz, ty] = args else {
                     panic!("Expected two args to array-get")
                 };
+                let ty = Type::try_from(ty.clone()).unwrap();
                 if sz != &Term::BoundedNat(64) {
                     return Ok(None);
                 }

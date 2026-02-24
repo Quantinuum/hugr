@@ -799,7 +799,7 @@ fn test_fold_idivmod_checked_u() {
     // x0, x1 := int_u<5>(20), int_u<5>(0)
     // x2 := idivmod_checked_u(x0, x1)
     // output x2 == error
-    let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[5].clone()].into();
+    let intpair: TypeRow = vec![INT_TYPES[5].clone(), INT_TYPES[5].clone()].into();
     let elem_type = Type::new_tuple(intpair);
     let sum_type = sum_with_error([elem_type.clone()]);
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
@@ -847,7 +847,7 @@ fn test_fold_idivmod_checked_s() {
     // x0, x1 := int_s<5>(-20), int_u<5>(0)
     // x2 := idivmod_checked_s(x0, x1)
     // output x2 == error
-    let intpair: TypeRowRV = vec![INT_TYPES[5].clone(), INT_TYPES[5].clone()].into();
+    let intpair: TypeRow = vec![INT_TYPES[5].clone(), INT_TYPES[5].clone()].into();
     let elem_type = Type::new_tuple(intpair);
     let sum_type = sum_with_error([elem_type.clone()]);
     let mut build = DFGBuilder::new(noargfn(vec![sum_type.clone().into()])).unwrap();
