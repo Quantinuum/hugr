@@ -419,7 +419,7 @@ mod test {
     use crate::proptest::RecursionDepth;
     use crate::type_row;
     use crate::types::test::FnTransformer;
-    use crate::types::{CustomType, TypeRow, proptest_utils::any_type, type_param::SeqPart};
+    use crate::types::{CustomType, TypeRow, type_param::SeqPart};
 
     use super::*;
 
@@ -440,7 +440,7 @@ mod test {
         fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
             let io_strategy = vec(
                 Union::new([
-                    any_type(depth).prop_map(SeqPart::Item).boxed(),
+                    any_with::<Type>(depth).prop_map(Term::from).prop_map(SeqPart::Item).boxed(),
                     (any::<usize>(), any::<TypeBound>())
                         .prop_map(|(idx, bound)| SeqPart::Splice(Term::new_row_var_use(idx, bound)))
                         .boxed(),
@@ -483,7 +483,7 @@ mod test {
 
     #[test]
     fn test_transform() {
-        let Some(usz_t) = usize_t().as_extension() else {
+        let Term::RuntimeExtension(usz_t) = usize_t().into() else {
             panic!()
         };
         let tr = FnTransformer(|ct: &CustomType| (ct == &usz_t).then_some(bool_t()));

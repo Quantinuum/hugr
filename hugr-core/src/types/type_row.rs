@@ -208,8 +208,7 @@ mod test {
 
     mod proptest {
         use super::super::TypeRow;
-        use crate::proptest::RecursionDepth;
-        use crate::types::proptest_utils::any_type;
+        use crate::{proptest::RecursionDepth, types::Type};
         use ::proptest::prelude::*;
 
         impl Arbitrary for TypeRow {
@@ -220,7 +219,7 @@ mod test {
                 if depth.leaf() {
                     Just(TypeRow::new()).boxed()
                 } else {
-                    vec(any_type(depth.descend()), 0..4)
+                    vec(any_with::<Type>(depth.descend()), 0..4)
                         .prop_map(|ts| ts.clone().into())
                         .boxed()
                 }
@@ -232,14 +231,13 @@ mod test {
     fn test_try_from_term_to_typerow() {
         // Test successful conversion with List
         let types = vec![Type::new_unit_sum(1), bool_t()];
-        let type_args = types.iter().map(|t| TypeArg::Runtime(t.clone())).collect();
-        let term = TypeArg::List(type_args);
+        let term = Term::new_list(types.iter().cloned().map_into());
         let result = TypeRow::try_from(term);
         assert!(result.is_ok());
         assert_eq!(result.unwrap(), TypeRow::from(types));
 
         // Test failure with non-list
-        let term = TypeArg::Runtime(Type::UNIT);
+        let term = Term::from(Type::UNIT);
         let result = TypeRow::try_from(term);
         assert!(result.is_err());
     }

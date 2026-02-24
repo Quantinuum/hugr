@@ -184,7 +184,7 @@ impl Term {
 
     /// Creates a new [`Term::List`] given a sequence of its items.
     pub fn new_list(items: impl IntoIterator<Item = Term>) -> Self {
-        Self::List(items.into_iter().collect())
+        Self::List(items.into_iter().map_into().collect())
     }
 
     /// Creates a new [`Term::ListType`] given the type of its elements.
@@ -942,7 +942,7 @@ mod test {
     use super::{Substitution, TypeArg, TypeParam, check_term_type};
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::types::type_param::SeqPart;
-    use crate::types::{Term, TypeRow};
+    use crate::types::{Term, Type, TypeRow};
     use crate::types::{TypeBound, TypeRV, type_param::TermTypeError};
 
     #[test]
@@ -1025,7 +1025,7 @@ mod test {
         // Into a list of type, we can fit a single row var
         check(rowvar(0, TypeBound::Copyable), &seq_param).unwrap();
         // or a list of types, or a "concat" of row vars
-        check(vec![], &seq_param).unwrap();
+        check([usize_t()], &seq_param).unwrap();
         check(
             Term::ListConcat(vec![rowvar(0, TypeBound::Copyable); 2]),
             &seq_param,
@@ -1053,7 +1053,7 @@ mod test {
         )
         .unwrap_err();
         // seq of seq of types is not allowed
-        check(vec![usize_t(), vec![usize_t()].into()], &seq_param).unwrap_err();
+        check(vec![Term::from(usize_t()), [usize_t()].into()], &seq_param).unwrap_err();
 
         // Similar for nats (but no equivalent of fancy row vars)
         check(5, &TypeParam::max_nat_type()).unwrap();
@@ -1096,7 +1096,7 @@ mod test {
     #[test]
     fn type_arg_subst_row() {
         let row_param = Term::new_list_type(TypeBound::Copyable);
-        let row_arg: Term = vec![bool_t(), Term::UNIT].into();
+        let row_arg: Term = vec![bool_t(), Type::UNIT].into();
         check_term_type(&row_arg, &row_param).unwrap();
 
         // Now say a row variable referring to *that* row was used
@@ -1104,12 +1104,12 @@ mod test {
         let outer_param = Term::new_list_type(TypeBound::Linear);
         let outer_arg = Term::concat_lists([
             TypeRV::new_row_var_use(0, TypeBound::Copyable),
-            Term::new_list([usize_t()]),
+            Term::new_list([usize_t().into()]),
         ]);
         check_term_type(&outer_arg, &outer_param).unwrap();
 
         let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg]));
-        assert_eq!(outer_arg2, vec![bool_t(), Term::UNIT, usize_t()].into());
+        assert_eq!(outer_arg2, vec![bool_t(), Type::UNIT, usize_t()].into());
 
         // Of course this is still valid (as substitution is guaranteed to preserve validity)
         check_term_type(&outer_arg2, &outer_param).unwrap();
@@ -1124,7 +1124,7 @@ mod test {
             // The row variables here refer to `row_var_decl` above
             vec![usize_t()].into(),
             row_var_use.clone(),
-            Term::concat_lists([row_var_use, Term::new_list([usize_t()])]),
+            Term::concat_lists([row_var_use, Term::new_list([usize_t().into()])]),
         ]);
         check_term_type(&good_arg, &outer_param).unwrap();
 
@@ -1151,9 +1151,9 @@ mod test {
         assert_eq!(
             subst_arg,
             Term::new_list([
-                Term::new_list([usize_t()]),
+                [usize_t()].into(),
                 row_var_arg,
-                Term::new_list([usize_t(), bool_t(), usize_t()])
+                [usize_t(), bool_t(), usize_t()].into()
             ])
         );
     }
@@ -1167,7 +1167,7 @@ mod test {
         assert_eq!(result, Ok(TypeRow::from(types)));
 
         // Test failure with non-list
-        let result = TypeRow::try_from(Term::UNIT);
+        let result = TypeRow::try_from(Term::from(Type::UNIT));
         assert!(result.is_err());
     }
 
@@ -1212,8 +1212,8 @@ mod test {
 
         use super::super::{TermVar, UpperBound};
         use crate::proptest::RecursionDepth;
-        use crate::types::proptest_utils::{any_serde_type_param, any_type};
-        use crate::types::{Term, TypeBound};
+        use crate::types::proptest_utils::{any_serde_type_param};
+        use crate::types::{Term, Type, TypeBound};
 
         impl Arbitrary for TermVar {
             type Parameters = RecursionDepth;
@@ -1247,7 +1247,7 @@ mod test {
                     any::<f64>()
                         .prop_map(|value| Self::Float(value.into()))
                         .boxed(),
-                    any_type(depth),
+                    any_with::<Type>(depth).prop_map_into().boxed()
                 ]);
                 if depth.leaf() {
                     return strat.boxed();
@@ -1256,10 +1256,8 @@ mod test {
                 let depth = depth.descend();
                 strat
                     .or(
-                        // TODO this is a bit dodgy, TypeArgVariables are supposed
-                        // to be constructed from TypeArg::new_var_use. We are only
-                        // using this instance for serialization now, but if we want
-                        // to generate valid TypeArgs this will need to change.
+                        // TODO this means we have two ways to create variables of type
+                        // `RuntimeType`, so we probably get more of them than we should`
                         any_with::<TermVar>(depth).prop_map(Self::Variable).boxed(),
                     )
                     .or(any_with::<Self>(depth)

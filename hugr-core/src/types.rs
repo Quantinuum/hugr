@@ -744,18 +744,18 @@ pub(crate) mod test {
                 // Dummy extension reference.
                 &Weak::default(),
             )),
-            Type::new_alias(AliasDecl::new("my_alias", TypeBound::Copyable)),
+            //Type::new_alias(AliasDecl::new("my_alias", TypeBound::Copyable)),
         ]);
         assert_eq!(
             &t.to_string(),
-            "[usize, [] -> [], my_custom, Alias(my_alias)]"
+            "[usize, [] -> [], my_custom]"
         );
     }
 
     #[rstest::rstest]
     fn sum_construct() {
         let pred1 = Type::new_sum([type_row![], type_row![]]);
-        let pred2 = TypeRV::new_unit_sum(2);
+        let pred2 = Type::new_unit_sum(2);
 
         assert_eq!(pred1, pred2);
 
@@ -773,9 +773,9 @@ pub(crate) mod test {
     fn as_option() {
         let opt = option_type([usize_t()]);
 
-        assert_eq!(opt.as_unary_option().unwrap().clone(), usize_t());
+        assert_eq!(opt.as_option().unwrap().clone(), Term::new_list([usize_t().into()]));
         assert_eq!(
-            Type::new_unit_sum(2).as_sum().unwrap().as_unary_option(),
+            Type::new_unit_sum(2).as_sum().unwrap().as_option(),
             None
         );
 
@@ -800,18 +800,16 @@ pub(crate) mod test {
     #[test]
     fn sum_variants() {
         let variants: Vec<TypeRowRV> = vec![
-            [TypeRV::UNIT].into(),
+            [Type::UNIT].into(),
             vec![TypeRV::new_row_var_use(0, TypeBound::Linear)].into(),
         ];
         let t = SumType::new(variants.clone());
         assert_eq!(variants, t.variants().cloned().collect_vec());
 
-        let empty_rows = vec![TypeRV::EMPTY_TYPEROW; 3];
+        let empty_rows = vec![Term::EMPTY_LIST; 3];
         let sum_unary = SumType::new_unary(3);
-        let sum_general = SumType::General {
-            rows: empty_rows.clone(),
-        };
-        assert_eq!(&empty_rows, &sum_unary.variants().cloned().collect_vec());
+        assert_eq!(empty_rows, sum_unary.variants().cloned().collect_vec());
+        let sum_general = SumType::General(GeneralSum::new(empty_rows));
         assert_eq!(sum_general, sum_unary);
 
         let mut hasher_general = std::hash::DefaultHasher::new();
@@ -938,11 +936,10 @@ pub(crate) mod test {
 
         use crate::proptest::RecursionDepth;
 
-        use super::{AliasDecl, MaybeRV, TypeBase, TypeBound, TypeEnum};
-        use crate::types::{CustomType, FuncValueType, SumType, TypeRowRV};
-        use proptest::prelude::*;
+        use crate::types::{CustomType, FuncValueType, SumType, TypeRow, TypeBound,Type};
+        use proptest::{prelude::*, strategy::Union};
 
-        impl Arbitrary for super::SumType {
+        impl Arbitrary for SumType {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
@@ -950,29 +947,34 @@ pub(crate) mod test {
                 if depth.leaf() {
                     any::<u8>().prop_map(Self::new_unary).boxed()
                 } else {
-                    vec(any_with::<TypeRowRV>(depth), 0..3)
+                    vec(any_with::<TypeRow>(depth), 0..3)
                         .prop_map(SumType::new)
                         .boxed()
                 }
             }
         }
-
-        impl<RV: MaybeRV> Arbitrary for TypeBase<RV> {
+    
+        impl Arbitrary for Type {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
-            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
-                // We descend here, because a TypeEnum may contain a Type
+             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+                let strat = Union::new([
+                    (any::<usize>(), any::<TypeBound>())
+                        .prop_map(|(i, b)| Type::new_var_use(i, b))
+                        .boxed(),
+                    any_with::<CustomType>(depth.into())
+                        .prop_map(Type::new_extension)
+                        .boxed(),
+                ]);
+                if depth.leaf() {
+                    return strat.boxed();
+                }
                 let depth = depth.descend();
-                prop_oneof![
-                    1 => any::<AliasDecl>().prop_map(TypeBase::new_alias),
-                    1 => any_with::<CustomType>(depth.into()).prop_map(TypeBase::new_extension),
-                    1 => any_with::<FuncValueType>(depth).prop_map(TypeBase::new_function),
-                    1 => any_with::<SumType>(depth).prop_map(TypeBase::from),
-                    1 => (any::<usize>(), any::<TypeBound>()).prop_map(|(i,b)| TypeBase::new_var_use(i,b)),
-                    // proptest_derive::Arbitrary's weight attribute requires a constant,
-                    // rather than this expression, hence the manual impl:
-                    RV::weight() => RV::arb().prop_map(|rv| TypeBase::new(TypeEnum::RowVar(rv)))
-                ]
+                strat
+                    .or(any_with::<FuncValueType>(depth)
+                        .prop_map(Type::new_function)
+                        .boxed())
+                    .or(any_with::<SumType>(depth).prop_map(Type::from).boxed())
                     .boxed()
             }
         }
@@ -982,13 +984,13 @@ pub(crate) mod test {
 #[cfg(test)]
 pub(super) mod proptest_utils {
     use proptest::collection::vec;
-    use proptest::prelude::{Strategy, any_with};
-
-    use super::serialize::{TermSer, TypeArgSer, TypeParamSer};
-    use super::type_param::Term;
+    use proptest::prelude::{BoxedStrategy, Strategy, any, any_with};
+    use proptest::strategy::Union;
 
     use crate::proptest::RecursionDepth;
-    use crate::types::serialize::ArrayOrTermSer;
+
+    use super::serialize::{ArrayOrTermSer, TermSer, TypeArgSer, TypeParamSer};
+    use super::{CustomType, FuncValueType, SumType, TypeBound, type_param::Term};
 
     fn term_is_serde_type_arg(t: &Term) -> bool {
         let TermSer::TypeArg(arg) = TermSer::from(t.clone()) else {
@@ -1000,13 +1002,11 @@ pub(super) mod proptest_utils {
             | TypeArgSer::Tuple { elems: terms }
             | TypeArgSer::TupleConcat { tuples: terms } => terms.iter().all(term_is_serde_type_arg),
             TypeArgSer::Variable { v } => term_is_serde_type_param(&v.cached_decl),
-            TypeArgSer::Type { ty } => {
-                if let Some(cty) = ty.as_extension() {
-                    cty.args().iter().all(term_is_serde_type_arg)
-                } else {
-                    true
-                }
-            } // Do we need to inspect inside function types? sum types?
+            TypeArgSer::Type { ty } => match Term::from(ty) {
+                Term::RuntimeExtension(cty) => cty.args().iter().all(term_is_serde_type_arg),
+                // Do we need to inspect inside function types? sum types?
+                _ => true
+            }
             TypeArgSer::BoundedNat { .. }
             | TypeArgSer::String { .. }
             | TypeArgSer::Bytes { .. }

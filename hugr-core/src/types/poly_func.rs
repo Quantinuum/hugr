@@ -249,7 +249,7 @@ pub(crate) mod test {
             t,
             Signature::new(
                 vec![Type::new_extension(
-                    list_def.instantiate([usize_t()]).unwrap()
+                    list_def.instantiate([usize_t().into()]).unwrap()
                 )],
                 vec![usize_t()]
             )
@@ -266,10 +266,8 @@ pub(crate) mod test {
 
         // Valid schema...
         let good_array = array_type_parametric(size_var.clone(), ty_var.clone())?;
-        let good_ts = PolyFuncTypeBase::new_validated(
-            type_params.clone(),
-            Signature::new_endo([good_array]),
-        )?;
+        let good_ts =
+            PolyFuncType::new_validated(type_params.clone(), Signature::new_endo([good_array]))?;
 
         // Sanity check (good args)
         good_ts.instantiate(&[5u64.into(), usize_t().into()])?;
@@ -303,7 +301,7 @@ pub(crate) mod test {
             &Arc::downgrade(&array::EXTENSION),
         ));
         let bad_ts =
-            PolyFuncTypeBase::new_validated(type_params.clone(), Signature::new_endo([bad_array]));
+            PolyFuncType::new_validated(type_params.clone(), Signature::new_endo([bad_array]));
         assert_eq!(bad_ts.err(), Some(arg_err));
 
         Ok(())
@@ -452,8 +450,8 @@ pub(crate) mod test {
         let pf = PolyFuncTypeRV::new_validated(
             [TypeParam::new_list_type(TP_ANY)],
             FuncValueType::new(
-                Term::concat_lists([Term::new_list([usize_t()]), rty.clone()]),
-                [Term::new_runtime_tuple(rty)],
+                Term::concat_lists([Term::new_list([usize_t().into()]), rty.clone()]),
+                [Type::new_tuple(rty)],
             ),
         )
         .unwrap();
@@ -470,17 +468,17 @@ pub(crate) mod test {
             t2,
             Signature::new(
                 vec![usize_t(), usize_t(), bool_t()],
-                vec![Type::new_runtime_tuple(vec![usize_t(), bool_t()])]
+                vec![Type::new_tuple(vec![usize_t(), bool_t()])]
             )
         );
     }
 
     #[test]
     fn row_variables_inner() {
-        let inner_fty = Type::new_function(FuncValueType::new_endo([Term::new_row_var_use(
+        let inner_fty = Type::new_function(FuncValueType::new_endo(Term::new_row_var_use(
             0,
             TypeBound::Copyable,
-        )]));
+        )));
         let pf = PolyFuncType::new_validated(
             [Term::new_list_type(TypeBound::Copyable)],
             Signature::new(vec![usize_t(), inner_fty.clone()], vec![inner_fty]),
@@ -489,7 +487,7 @@ pub(crate) mod test {
 
         let inner3 = Type::new_function(Signature::new_endo([usize_t(), bool_t(), usize_t()]));
         let t3 = pf
-            .instantiate(&[Term::new_list([usize_t(), bool_t(), usize_t()])])
+            .instantiate(&[[usize_t(), bool_t(), usize_t()].into()])
             .unwrap();
         assert_eq!(
             t3,
