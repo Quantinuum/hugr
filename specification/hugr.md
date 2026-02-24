@@ -40,7 +40,7 @@ The HUGR should provide a generic graph representation of a program,
 where each node contains a specific kind of operation and edges
 represent (typed) data or control dependencies.
 
-### Goals
+Goals:
 
 - Modular design, allowing new operations, data types, and rewrite
   methods defined by third-parties.
@@ -52,7 +52,7 @@ represent (typed) data or control dependencies.
 - Provide a common interface for rewrite operations with support for
   opaque types.
 
-### Non-goals
+Non-goals:
 
 - Translations to other representations. While the HUGR should be able
   to encode programs in languages such as QIR, the translation should
@@ -62,7 +62,7 @@ represent (typed) data or control dependencies.
   the semantics of any extension operations defined outside the core
   set in this document, which will be most in actual use.
 
-### Main requirements
+Main requirements:
 
 - A directed graph structure with extensible operation types in the
   nodes and data types in the edges.
