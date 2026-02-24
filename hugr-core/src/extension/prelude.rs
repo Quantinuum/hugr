@@ -632,15 +632,15 @@ impl MakeOpDef for TupleOpDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         let rv = TypeRV::new_row_var_use(0, TypeBound::Linear);
-        let tuple_type = TypeRV::new_tuple(vec![rv.clone()]);
+        let tuple_type = Type::new_tuple(rv.clone());
 
         let param = TypeParam::new_list_type(TypeBound::Linear);
         match self {
             TupleOpDef::MakeTuple => {
-                PolyFuncTypeRV::new([param], FuncValueType::new([rv], [tuple_type]))
+                PolyFuncTypeRV::new([param], FuncValueType::new(rv, [tuple_type]))
             }
             TupleOpDef::UnpackTuple => {
-                PolyFuncTypeRV::new([param], FuncValueType::new([tuple_type], [rv]))
+                PolyFuncTypeRV::new([param], FuncValueType::new([tuple_type], rv))
             }
         }
         .into()
@@ -907,7 +907,7 @@ impl MakeOpDef for BarrierDef {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
             vec![TypeParam::new_list_type(TypeBound::Linear)],
-            FuncValueType::new_endo([TypeRV::new_row_var_use(0, TypeBound::Linear)]),
+            FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Linear)),
         )
         .into()
     }

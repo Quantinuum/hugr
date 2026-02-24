@@ -320,8 +320,10 @@ impl SumType {
 
     /// New tuple (single row of variants).
     ///
-    /// ALAN take Into<Term> to allow RVs?
-    pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
+    /// # Panics
+    /// 
+    /// If the argument is not of type [Term::ListType]`(`[Term::RuntimeType]`)`
+    pub fn new_tuple(types: impl Into<Term>) -> Self {
         Self::new([types.into()])
     }
 
@@ -478,11 +480,11 @@ impl Type {
 
     /// Initialize a new tuple type by providing the elements.
     #[inline(always)]
-    pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
+    pub fn new_tuple(types: impl Into<Term>) -> Self {
         let row = types.into();
-        match row.len() {
-            0 => Self::UNIT,
-            _ => Self::new_sum([row]),
+        match row.is_empty_list() {
+            true => Self::UNIT,
+            false => Self::new_sum([row]),
         }
     }
 
