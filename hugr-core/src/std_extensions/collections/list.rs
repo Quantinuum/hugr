@@ -111,13 +111,15 @@ impl CustomConst for ListValue {
             .map_err(|_| error())?;
 
         // constant can only hold classic type.
-        let [TypeArg::Runtime(ty)] = typ.args() else {
-            return Err(error());
+        let ty = match typ.args() {
+            [ty] if ty.least_upper_bound().is_some() =>
+                Type::try_from(ty.clone()).unwrap(), // succeeds as has l-u-b
+            _ => return Err(error())
         };
 
         // check all values are instances of the element type
         for v in &self.0 {
-            if v.get_type() != *ty {
+            if v.get_type() != ty {
                 return Err(error());
             }
         }
@@ -349,16 +351,17 @@ impl MakeExtensionOp for ListOpInst {
     fn from_extension_op(
         ext_op: &ExtensionOp,
     ) -> Result<Self, crate::extension::simple_op::OpLoadError> {
-        let [Term::Runtime(ty)] = ext_op.args() else {
+        let [ty] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs.into());
         };
+        let elem_type = ty.clone().try_into().map_err(SignatureError::from)?;
         let name = ext_op.unqualified_id();
         let Ok(op) = ListOp::from_str(name) else {
             return Err(OpLoadError::NotMember(name.to_string()));
         };
 
         Ok(Self {
-            elem_type: ty.clone(),
+            elem_type,
             op,
         })
     }

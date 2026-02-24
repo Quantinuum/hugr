@@ -381,7 +381,7 @@ impl Term {
         }
     }
 
-    pub(super) fn least_upper_bound(&self) -> Option<TypeBound> {
+    pub(crate) fn least_upper_bound(&self) -> Option<TypeBound> {
         match self {
             Self::RuntimeExtension(ct) => Some(ct.bound()),
             Self::RuntimeSum(st) => Some(st.bound()),
@@ -397,7 +397,7 @@ impl Term {
     /// Report if this is a copyable runtime type, i.e. an instance
     /// of [Self::RuntimeType]`(`[TypeBound::Copyable]`)`
     // - i.e.the least upper bound of the type is contained by the copyable bound.
-    fn copyable(&self) -> bool {
+    pub(crate) fn copyable(&self) -> bool {
         match self.least_upper_bound() {
             Some(b) => TypeBound::Copyable.contains(b),
             None => false,

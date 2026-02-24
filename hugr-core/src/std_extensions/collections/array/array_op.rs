@@ -326,12 +326,12 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayOpDef<AK> {
 
     fn instantiate(&self, type_args: &[Term]) -> Result<Self::Concrete, OpLoadError> {
         let (ty, size) = match (self, type_args) {
-            (GenericArrayOpDef::discard_empty, [Term::Runtime(ty)]) => (ty.clone(), 0),
-            (_, [Term::BoundedNat(n), Term::Runtime(ty)]) => (ty.clone(), *n),
+            (GenericArrayOpDef::discard_empty, [ty]) => (ty.clone(), 0),
+            (_, [Term::BoundedNat(n), ty]) => (ty.clone(), *n),
             _ => return Err(SignatureError::InvalidTypeArgs.into()),
         };
 
-        Ok(self.to_concrete(ty.clone(), size))
+        Ok(self.to_concrete(ty.try_into().map_err(SignatureError::from)?, size))
     }
 }
 

@@ -107,23 +107,24 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
                 extension_ref,
             )
             .unwrap();
-        prelude
-            .add_op(
-                PANIC_OP_ID,
-                "Panic with input error".to_string(),
-                PolyFuncTypeRV::new(
+        let panic_exit_sig = PolyFuncTypeRV::new(
                     [
                         TypeParam::new_list_type(TypeBound::Linear),
                         TypeParam::new_list_type(TypeBound::Linear),
                     ],
                     FuncValueType::new(
-                        vec![
-                            TypeRV::new_extension(error_type.clone()),
-                            TypeRV::new_row_var_use(0, TypeBound::Linear),
-                        ],
-                        vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
+                        Term::concat_lists([
+                            Term::new_list([Type::new_extension(error_type.clone()).into()]),
+                            TypeRV::new_row_var_use(0, TypeBound::Linear)
+                        ]),
+                        TypeRV::new_row_var_use(1, TypeBound::Linear),
                     ),
-                ),
+                );
+        prelude
+            .add_op(
+                PANIC_OP_ID,
+                "Panic with input error".to_string(),
+                panic_exit_sig.clone(),
                 extension_ref,
             )
             .unwrap();
@@ -131,19 +132,7 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             .add_op(
                 EXIT_OP_ID,
                 "Exit with input error".to_string(),
-                PolyFuncTypeRV::new(
-                    [
-                        TypeParam::new_list_type(TypeBound::Linear),
-                        TypeParam::new_list_type(TypeBound::Linear),
-                    ],
-                    FuncValueType::new(
-                        vec![
-                            TypeRV::new_extension(error_type),
-                            TypeRV::new_row_var_use(0, TypeBound::Linear),
-                        ],
-                        vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
-                    ),
-                ),
+                panic_exit_sig,
                 extension_ref,
             )
             .unwrap();
@@ -711,14 +700,9 @@ impl MakeExtensionOp for MakeTuple {
         let [TypeArg::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        let tys: Result<Vec<Type>, _> = elems
-            .iter()
-            .map(|a| match a {
-                TypeArg::Runtime(ty) => Ok(ty.clone()),
-                _ => Err(SignatureError::InvalidTypeArgs),
-            })
-            .collect();
-        Ok(Self(tys?.into()))
+        let tys = elems.clone().try_into()
+            .map_err(SignatureError::from)?;
+        Ok(Self(tys))
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
@@ -766,14 +750,8 @@ impl MakeExtensionOp for UnpackTuple {
         let [Term::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        let tys: Result<Vec<Type>, _> = elems
-            .iter()
-            .map(|a| match a {
-                Term::Runtime(ty) => Ok(ty.clone()),
-                _ => Err(SignatureError::InvalidTypeArgs),
-            })
-            .collect();
-        Ok(Self(tys?.into()))
+        let tys = elems.clone().try_into().map_err(SignatureError::from)?;
+        Ok(Self(tys))
     }
 
     fn type_args(&self) -> Vec<Term> {
@@ -881,10 +859,10 @@ impl MakeExtensionOp for Noop {
         Self: Sized,
     {
         let _def = NoopDef::from_def(ext_op.def())?;
-        let [TypeArg::Runtime(ty)] = ext_op.args() else {
+        let [t] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        Ok(Self(ty.clone()))
+        Ok(Self(t.clone().try_into().map_err(SignatureError::from)?))
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
@@ -990,15 +968,9 @@ impl MakeExtensionOp for Barrier {
         let [TypeArg::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        let tys: Result<Vec<Type>, _> = elems
-            .iter()
-            .map(|a| match a {
-                TypeArg::Runtime(ty) => Ok(ty.clone()),
-                _ => Err(SignatureError::InvalidTypeArgs),
-            })
-            .collect();
+        let type_row = elems.clone().try_into().map_err(SignatureError::from)?;
         Ok(Self {
-            type_row: tys?.into(),
+            type_row
         })
     }
 
