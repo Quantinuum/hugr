@@ -344,9 +344,9 @@ pub fn decompose_array_fat_pointer<'c>(
 
 /// Helper function to allocate a fat array pointer.
 ///
-/// Returns a pointer and a struct: The pointer points to the first element of the array (i.e. it
-/// is of type `elem_ty.ptr_type()`). The struct is the fat pointer of the that stores an additional
-/// offset (initialised to be 0).
+/// Returns a pointer and a struct: The pointer points to the first element of the
+/// array, and the struct (aka fat array pointer) contains that pointer and an offset
+/// (initialised to 0).
 pub fn build_array_alloc<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ccg: &impl ArrayCodegen,
@@ -358,14 +358,10 @@ pub fn build_array_alloc<'c, H: HugrView<Node = Node>>(
     let size_value = ctx
         .builder()
         .build_int_mul(length, elem_ty.size_of().unwrap(), "")?;
-    let ptr = ccg.emit_allocate_array(ctx, size_value)?;
-    let elem_ptr = ctx
-        .builder()
-        .build_bit_cast(ptr, ctx.llvm_ptr_type(), "")?
-        .into_pointer_value();
+    let array_ptr = ccg.emit_allocate_array(ctx, size_value)?;
     let offset = usize_t.const_zero();
-    let array_v = build_array_fat_pointer(ctx, elem_ptr, offset)?;
-    Ok((elem_ptr, array_v))
+    let array_v = build_array_fat_pointer(ctx, array_ptr, offset)?;
+    Ok((array_ptr, array_v))
 }
 
 /// Helper function to build a loop that repeats for a given number of iterations.

@@ -481,12 +481,7 @@ fn alloc_typed_array<'c, H: HugrView<Node = Node>>(
         .builder()
         .build_int_mul(num_elems, elem_ty.size_of().unwrap(), "array_size")?;
     let ptr = ccg.emit_allocate_array(ctx, size)?;
-    Ok((
-        ctx.builder()
-            .build_bit_cast(ptr, ctx.llvm_ptr_type(), "")?
-            .into_pointer_value(),
-        size,
-    ))
+    Ok((ptr, size))
 }
 
 /// Helper function to allocate a fat borrow array pointer.

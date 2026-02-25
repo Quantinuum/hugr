@@ -11,7 +11,6 @@ use hugr_core::extension::ExtensionRegistry;
 use hugr_core::ops::handle::FuncID;
 use hugr_core::types::TypeRow;
 use hugr_core::{Hugr, HugrView, Node};
-use inkwell::AddressSpace;
 use inkwell::module::{Linkage, Module};
 use inkwell::passes::PassManager;
 use inkwell::values::{BasicValueEnum, GlobalValue, PointerValue};
@@ -238,19 +237,14 @@ fn alloc_shared_buffer(name: &str, size: usize, module: &Module, ee: &ExecutionE
     buf
 }
 
-/// Builds an `i8*` [`PointerValue`] to a global buffer with the given name.
+/// Builds a [`PointerValue`] to a global buffer with the given name.
 fn get_buffer_ptr<'c, H: HugrView<Node = Node>>(
     name: &str,
     size: usize,
     ctx: &mut EmitFuncContext<'c, '_, H>,
 ) -> Result<PointerValue<'c>> {
     let global = get_global_buffer(name, size, ctx.get_current_module());
-    let ptr = ctx.builder().build_bit_cast(
-        global.as_pointer_value(),
-        ctx.iw_context().ptr_type(AddressSpace::default()),
-        "",
-    )?;
-    Ok(ptr.into_pointer_value())
+    Ok(global.as_pointer_value())
 }
 
 /// Prelude codegen that exits the current thread on panic instead of aborting.

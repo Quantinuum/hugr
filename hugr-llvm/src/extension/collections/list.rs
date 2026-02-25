@@ -331,7 +331,7 @@ fn emit_list_value<'c, H: HugrView<Node = Node>>(
 ///
 /// Optionally also stores a value at that location.
 ///
-/// Returns an i8 pointer to the allocated memory.
+/// Returns a pointer to the allocated memory.
 fn build_alloca_i8_ptr<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ty: BasicTypeEnum<'c>,
@@ -342,12 +342,10 @@ fn build_alloca_i8_ptr<'c, H: HugrView<Node = Node>>(
     if let Some(val) = value {
         builder.build_store(ptr, val)?;
     }
-    let i8_ptr =
-        builder.build_pointer_cast(ptr, ctx.iw_context().ptr_type(AddressSpace::default()), "")?;
-    Ok(i8_ptr)
+    Ok(ptr)
 }
 
-/// Helper function to load a value from an i8 pointer.
+/// Helper function to load a value from a pointer.
 fn build_load_i8_ptr<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     i8_ptr: PointerValue<'c>,

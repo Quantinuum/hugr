@@ -195,26 +195,20 @@ impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
     }
 }
 
-/// Helper function to allocate an array on the stack.
-///
-/// Returns two pointers: The first one is a pointer to the first element of the
-/// array (i.e. it is of type `array.get_element_type().ptr_type()`) whereas the
-/// second one points to the whole array value, i.e. it is of type `array.ptr_type()`.
+/// Helper function to allocate an array on the stack. Returns a pointer to the
+/// first element of the array.
 fn build_array_alloca<'c>(
     builder: &Builder<'c>,
     array: ArrayValue<'c>,
-) -> Result<(PointerValue<'c>, PointerValue<'c>), BuilderError> {
+) -> Result<PointerValue<'c>, BuilderError> {
     let array_ty = array.get_type();
     let array_len: IntValue<'c> = {
         let ctx = builder.get_insert_block().unwrap().get_context();
         ctx.i32_type().const_int(array_ty.len() as u64, false)
     };
     let ptr = builder.build_array_alloca(array_ty.get_element_type(), array_len, "")?;
-    let array_ptr = builder
-        .build_bit_cast(ptr, array_ty.ptr_type(Default::default()), "")?
-        .into_pointer_value();
-    builder.build_store(array_ptr, array)?;
-    Result::Ok((ptr, array_ptr))
+    builder.build_store(ptr, array)?;
+    Result::Ok(ptr)
 }
 
 /// Helper function to allocate an array on the stack and pass a pointer to it
@@ -228,7 +222,7 @@ fn with_array_alloca<'c, T, E: From<BuilderError>>(
     array: ArrayValue<'c>,
     go: impl FnOnce(PointerValue<'c>) -> Result<T, E>,
 ) -> Result<T, E> {
-    let (ptr, _) = build_array_alloca(builder, array)?;
+    let ptr = build_array_alloca(builder, array)?;
     go(ptr)
 }
 
@@ -657,7 +651,7 @@ fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
     let func_ty = elem_ty.fn_type(&[], false);
     let func_ptr = PointerValue::try_from(func)
         .map_err(|_| anyhow!("ArrayOpDef::repeat expects a function pointer"))?;
-    let (ptr, array_ptr) = build_array_alloca(builder, array_ty.get_undef())?;
+    let array_ptr = build_array_alloca(builder, array_ty.get_undef())?;
 
     build_loop(ctx, array_len, |ctx, idx| {
         let builder = ctx.builder();
@@ -666,7 +660,7 @@ fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
             .try_as_basic_value()
             .basic()
             .ok_or(anyhow!("ArrayOpDef::repeat function must return a value"))?;
-        let elem_addr = unsafe { builder.build_in_bounds_gep(elem_ty, ptr, &[idx], "")? };
+        let elem_addr = unsafe { builder.build_in_bounds_gep(elem_ty, array_ptr, &[idx], "")? };
         builder.build_store(elem_addr, v)?;
         Ok(())
     })?;
@@ -693,8 +687,8 @@ fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     let src_ty = src_array_val.get_type().get_element_type();
     let tgt_ty = ts.llvm_type(&op.tgt_ty)?;
     let tgt_array_ty = tgt_ty.array_type(op.size as u32);
-    let (src_ptr, _) = build_array_alloca(builder, src_array_val)?;
-    let (tgt_ptr, tgt_array_ptr) = build_array_alloca(builder, tgt_array_ty.get_undef())?;
+    let src_ptr = build_array_alloca(builder, src_array_val)?;
+    let tgt_ptr = build_array_alloca(builder, tgt_array_ty.get_undef())?;
 
     let acc_tys: Vec<_> = op.acc_tys.iter().map(|ty| ts.llvm_type(ty)).try_collect()?;
     let acc_ptrs: Vec<_> = acc_tys
@@ -727,7 +721,7 @@ fn emit_scan_op<'c, H: HugrView<Node = Node>>(
     })?;
 
     let builder = ctx.builder();
-    let tgt_array_v = builder.build_load(tgt_array_ty, tgt_array_ptr, "")?;
+    let tgt_array_v = builder.build_load(tgt_array_ty, tgt_ptr, "")?;
     let final_accs = zip(acc_ptrs, acc_tys)
         .map(|(ptr, ty)| builder.build_load(ty, ptr, ""))
         .try_collect()?;

@@ -54,13 +54,10 @@ pub fn emit_libc_free<H: HugrView<Node = Node>>(
     ptr: BasicMetadataValueEnum,
 ) -> Result<()> {
     let iw_ctx = context.typing_session().iw_context();
-    let ptr_ty = iw_ctx.ptr_type(AddressSpace::default());
-    let ptr = context
-        .builder()
-        .build_bit_cast(ptr.into_pointer_value(), ptr_ty, "")?;
+    let ptr_ty = context.llvm_ptr_type();
 
     let free_sig = iw_ctx.void_type().fn_type(&[ptr_ty.into()], false);
     let free = context.get_extern_func("free", free_sig)?;
-    context.builder().build_call(free, &[ptr.into()], "")?;
+    context.builder().build_call(free, &[ptr], "")?;
     Ok(())
 }
