@@ -151,7 +151,7 @@ jobs:
         run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-fail-fast
       - name: Build hugr-persistent
         if: ${{ needs.changes.outputs.rust == 'true'}}
         run: cargo nextest r -p hugr-persistent --verbose --no-run
