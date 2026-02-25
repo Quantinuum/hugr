@@ -323,7 +323,7 @@ impl SumType {
     /// # Panics
     ///
     /// If the argument is not of type [Term::ListType]`(`[Term::RuntimeType]`)`
-    pub fn new_tuple(types: impl Into<Term>) -> Self {
+    pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
         Self::new([types.into()])
     }
 
@@ -780,7 +780,20 @@ pub(crate) mod test {
             opt.as_option().unwrap().clone(),
             Term::new_list([usize_t().into()])
         );
-        assert_eq!(Type::new_unit_sum(2).as_sum().unwrap().as_option(), None);
+        // Two empty variants is like an option of empty.
+        // ALAN note there used to be as_unary_option...
+        assert_eq!(
+            Type::new_unit_sum(2).as_sum().unwrap().as_option(),
+            Some(&Term::new_list([]))
+        );
+
+        assert_eq!(
+            Type::new_sum(vec![[usize_t()]; 2])
+                .as_sum()
+                .unwrap()
+                .as_option(),
+            None
+        );
 
         assert_eq!(
             Type::new_tuple(vec![usize_t()])
@@ -804,7 +817,7 @@ pub(crate) mod test {
     fn sum_variants() {
         let variants: Vec<TypeRowRV> = vec![
             [Type::UNIT].into(),
-            vec![TypeRV::new_row_var_use(0, TypeBound::Linear)].into(),
+            TypeRV::new_row_var_use(0, TypeBound::Linear),
         ];
         let t = SumType::new(variants.clone());
         assert_eq!(variants, t.variants().cloned().collect_vec());

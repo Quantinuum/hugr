@@ -233,7 +233,8 @@ fn escape_dollar(str: impl AsRef<str>) -> String {
 fn write_type_arg_str(arg: &TypeArg, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
     match arg {
         TypeArg::RuntimeExtension(cty) => {
-            f.write_fmt(format_args!("e({})", escape_dollar(cty.to_string())))
+            // ALAN make this "e({})" to better distinguish? Or make function "t({})" also?
+            f.write_fmt(format_args!("t({})", escape_dollar(cty.to_string())))
         }
         TypeArg::RuntimeSum(sty) => {
             f.write_fmt(format_args!("t({})", escape_dollar(sty.to_string())))

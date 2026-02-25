@@ -183,7 +183,7 @@ impl TryFrom<Term> for TypeRow {
                 .map(Type::try_from)
                 .collect::<Result<Vec<_>, _>>()?
                 .into()),
-            _ => Err(SignatureError::InvalidTypeArgs),
+            v => Err(TermTypeError::InvalidValue(Box::new(v)).into()),
         }
     }
 }

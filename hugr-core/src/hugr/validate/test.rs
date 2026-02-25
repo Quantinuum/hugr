@@ -497,7 +497,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
     Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
         let inputs = TypeRV::new_row_var_use(0, TypeBound::Linear);
         let outputs = TypeRV::new_row_var_use(1, TypeBound::Linear);
-        let evaled_fn = Type::new_function(FuncValueType::new([inputs.clone()], [outputs.clone()]));
+        let evaled_fn = Type::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone()],
             FuncValueType::new(Term::concat_lists([[evaled_fn].into(), inputs]), outputs),

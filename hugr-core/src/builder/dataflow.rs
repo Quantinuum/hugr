@@ -930,7 +930,7 @@ pub(crate) mod test {
                 Signature::new(
                     [Type::new_function(FuncValueType::new(
                         [usize_t()],
-                        [rv.clone()],
+                        rv.clone(),
                     ))],
                     [],
                 ),
@@ -939,6 +939,14 @@ pub(crate) mod test {
 
         // But cannot eval it...
         let ev = e.instantiate_extension_op("eval", [vec![usize_t()].into(), rv.clone()]);
+        assert_eq!(
+            ev,
+            Err(SignatureError::TypeArgMismatch(
+                TermTypeError::InvalidValue(Box::new(rv.clone()))
+            ))
+        );
+
+        let ev = e.instantiate_extension_op("eval", [vec![usize_t()].into(), [rv.clone()].into()]);
         assert_eq!(
             ev,
             Err(SignatureError::TypeArgMismatch(
