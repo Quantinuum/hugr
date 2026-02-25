@@ -102,7 +102,7 @@ macro_rules! include_schema {
             LazyLock::new(|| {
                 NamedSchema::new(stringify!($name), {
                     let schema_val: serde_json::Value = serde_json::from_str(include_str!(
-                        concat!("../../../../specification/schema/", $path, "_live.json")
+                        concat!("../../../../resources/json-schema/", $path, "_live.json")
                     ))
                     .unwrap();
                     Validator::options()

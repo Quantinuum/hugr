@@ -279,10 +279,10 @@ jobs:
       - name: Generate the updated definitions
         run: |
           chmod +x target/debug/hugr
-          ./target/debug/hugr gen-extensions -o specification/std_extensions
+          ./target/debug/hugr gen-extensions -o resources/std_extensions
       - name: Check if the declarations are up to date
         run: |
-          git diff --exit-code --name-only specification/std_extensions/
+          git diff --exit-code --name-only resources/std_extensions/
           if [ $? -ne 0 ]; then
             echo "The serialized standard extensions are not up to date"
             echo "Please run 'just gen-extensions' and commit the changes"

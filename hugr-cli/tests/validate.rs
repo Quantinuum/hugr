@@ -40,7 +40,7 @@ fn val_cmd(mut cmd: Command) -> Command {
 // path to the fully serialized float extension
 const FLOAT_EXT_FILE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
-    "/../specification/std_extensions/arithmetic/float/types.json"
+    "/../resources/std_extensions/arithmetic/float/types.json"
 );
 
 /// A test package, containing a module-rooted HUGR.
