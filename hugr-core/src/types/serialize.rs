@@ -273,7 +273,8 @@ impl serde_with::SerializeAs<Term> for SerTypeRowRV {
             .into_list_parts()
             .map(|part| match part {
                 SeqPart::Item(t) => {
-                    let s = SerSimpleType::try_from(t).unwrap();
+                    let t = Type::try_from(t).unwrap();
+                    let s = SerSimpleType::from(t);
                     assert!(!matches!(s, SerSimpleType::R { .. }));
                     s
                 }

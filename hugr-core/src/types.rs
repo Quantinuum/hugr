@@ -17,6 +17,7 @@ use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
+use serde_with::serde_as;
 pub use signature::{FuncValueType, Signature};
 use smol_str::SmolStr;
 pub use type_param::{Term, TypeArg};
@@ -181,6 +182,7 @@ pub enum SumType {
 }
 
 /// General case of a [SumType]. Prefer using [SumType::new] and friends.
+#[serde_as]
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GeneralSum {
     /// Each term here must be an instance of [Term::ListType]([Term::RuntimeType]), being
@@ -190,6 +192,7 @@ pub struct GeneralSum {
     //`Term::ListType(Term::ListType(Term::RuntimeType))`, but then many functions like
     // `len` and `variants` would be impossible. (We might want a separate "FixedAritySum"
     // rust type supporting those, with try_from(SumType).)
+    #[serde_as(as="Vec<crate::types::serialize::SerTypeRowRV>")]
     rows: Vec<Term>,
 }
 
