@@ -21,24 +21,16 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 /// [`FuncDefn`]: crate::ops::FuncDefn
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct Signature {
-    /// Value inputs of the function.
-    ///
-    /// Each *element* must [check_term_type] against [Term::RuntimeType] of
-    /// [TypeBound::Linear], hence the arity is fixed as the length of the row.
+    /// Value inputs of the function. (Fixed arity as the length of the row.)
     pub input: TypeRow,
-    /// Value outputs of the function.
-    ///
-    /// /// Each *element* must [check_term_type] against [Term::RuntimeType] of
-    /// [TypeBound::Linear], hence the arity is fixed as the length of the row.
+    /// Value outputs of the function. (Fixed arity as the length of the row.)
     pub output: TypeRow,
 }
 
 /// A function value whose number of inputs and outputs may be unknown.
 ///
-/// ([FuncValueType::input] and [FuncValueType::output] are arbitrary [Term]s.)
-///
-/// Each must type-check against [Term::ListType]`(`Term::RuntimeType`(`[TypeBound::Linear]`))`
-/// so can include variables containing unknown numbers of types.
+/// That is, both [FuncValueType::input] and [FuncValueType::output] may include
+/// variables containing unknown numbers of types.
 ///
 /// Used for [`OpDef`]'s and may be used as a type (of function-pointer values)
 /// on wires of a Hugr (see [`Type::new_function`]) but not a valid node type.
