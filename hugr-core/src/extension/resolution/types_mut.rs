@@ -9,7 +9,7 @@ use super::types::collect_term_exts;
 use super::{ExtensionResolutionError, WeakExtensionRegistry};
 use crate::extension::ExtensionSet;
 use crate::ops::{OpType, Value};
-use crate::types::{CustomType, FuncValueType, Signature, SumType, Term, Type, TypeRow};
+use crate::types::{CustomType, FuncValueType, Signature, SumType, Term, Type, TypeRow, TypeRowRV};
 use crate::{Extension, Node};
 
 /// Replace the dangling extension pointer in the [`CustomType`]s inside an
@@ -147,8 +147,8 @@ pub(super) fn resolve_func_type_exts(
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    resolve_term_exts(node, &mut signature.input, extensions, used_extensions)?;
-    resolve_term_exts(node, &mut signature.output, extensions, used_extensions)?;
+    resolve_typerow_rv_exts(node, &mut signature.input, extensions, used_extensions)?;
+    resolve_typerow_rv_exts(node, &mut signature.output, extensions, used_extensions)?;
     Ok(())
 }
 
@@ -164,6 +164,21 @@ pub(super) fn resolve_type_row_exts(
     for ty in row.iter_mut() {
         resolve_type_exts(node, ty, extensions, used_extensions)?;
     }
+    Ok(())
+}
+
+/// Update all weak Extension pointers in the [`CustomType`]s inside a type row.
+///
+/// Adds the extensions used in the row to the `used_extensions` registry.
+fn resolve_typerow_rv_exts(
+    node: Option<Node>,
+    row: &mut TypeRowRV,
+    extensions: &WeakExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
+) -> Result<(), ExtensionResolutionError> {
+    let mut t = Term::from(std::mem::take(row));
+    resolve_term_exts(node, &mut t, extensions, used_extensions)?;
+    *row = TypeRowRV::new_unchecked(t);
     Ok(())
 }
 
@@ -223,12 +238,11 @@ pub(crate) fn resolve_term_exts(
             resolve_custom_type_exts(node, custom, extensions, used_extensions)?;
         }
         Term::RuntimeFunction(f) => {
-            resolve_term_exts(node, &mut f.input, extensions, used_extensions)?;
-            resolve_term_exts(node, &mut f.output, extensions, used_extensions)?;
+            resolve_func_type_exts(node, &mut *f, extensions, used_extensions)?;
         }
-        Term::RuntimeSum(SumType::General(gs)) => {
-            for row in gs.iter_mut() {
-                resolve_term_exts(node, row, extensions, used_extensions)?;
+        Term::RuntimeSum(SumType::General { rows }) => {
+            for row in rows.iter_mut() {
+                resolve_typerow_rv_exts(node, row, extensions, used_extensions)?;
             }
         }
         Term::ConstType(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
@@ -296,9 +310,9 @@ pub(super) fn resolve_value_exts(
             }
         }
         Value::Sum(s) => {
-            if let SumType::General(gs) = &mut s.sum_type {
-                for row in gs.iter_mut() {
-                    resolve_term_exts(node, row, extensions, used_extensions)?;
+            if let SumType::General { rows } = &mut s.sum_type {
+                for row in rows.iter_mut() {
+                    resolve_typerow_rv_exts(node, row, extensions, used_extensions)?;
                 }
             }
             s.values

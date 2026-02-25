@@ -25,7 +25,7 @@ use crate::std_extensions::logic::test::{and_op, or_op};
 use crate::types::type_param::{TermTypeError, TypeArg};
 use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Term, Type, TypeBound,
-    TypeRow,
+    TypeRow, TypeRowRV,
 };
 use crate::{Direction, Hugr, IncomingPort, Node, const_extension_ids, test_file, type_row};
 
@@ -495,17 +495,17 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
     let rowp = TypeParam::new_list_type(TypeBound::Linear);
     Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
-        let inputs = Term::new_row_var_use(0, TypeBound::Linear);
-        let outputs = Term::new_row_var_use(1, TypeBound::Linear);
+        let inputs = TypeRowRV::just_row_var(0, TypeBound::Linear);
+        let outputs = TypeRowRV::just_row_var(1, TypeBound::Linear);
         let evaled_fn = Type::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone()],
-            FuncValueType::new(Term::concat_lists([[evaled_fn].into(), inputs]), outputs),
+            FuncValueType::new(TypeRowRV::from([evaled_fn]).concat(inputs), outputs),
         );
         ext.add_op("eval".into(), String::new(), pf, extension_ref)
             .unwrap();
 
-        let rv = |idx| Term::new_row_var_use(idx, TypeBound::Linear);
+        let rv = |idx| TypeRowRV::just_row_var(idx, TypeBound::Linear);
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
             Signature::new(
@@ -514,8 +514,8 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
                     Type::new_function(FuncValueType::new(rv(1), rv(3))),
                 ],
                 [Type::new_function(FuncValueType::new(
-                    Term::concat_lists([rv(0), rv(1)]),
-                    Term::concat_lists([rv(2), rv(3)]),
+                    rv(0).concat(rv(1)),
+                    rv(2).concat(rv(3)),
                 ))],
             ),
         );
@@ -555,11 +555,10 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
 fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
     let tv = Term::new_row_var_use(0, TypeBound::Linear);
-    let inner_ft = Type::new_function(FuncValueType::new_endo(tv.clone()));
-    let ft_usz = Type::new_function(FuncValueType::new_endo(Term::concat_lists([
-        tv.clone(),
-        [usize_t()].into(),
-    ])));
+    let inner_ft = Type::new_function(FuncValueType::new_endo(TypeRowRV::new(tv.clone())));
+    let ft_usz = Type::new_function(FuncValueType::new_endo(
+        TypeRowRV::new(tv.clone()).concat([usize_t()]),
+    ));
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(

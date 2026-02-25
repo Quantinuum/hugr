@@ -3,7 +3,10 @@ use std::iter;
 use crate::{
     Wire,
     builder::{BuildError, BuildHandle, Dataflow, DataflowSubContainer, SubContainer},
-    extension::prelude::{ConstError, PANIC_OP_ID},
+    extension::{
+        SignatureError,
+        prelude::{ConstError, PANIC_OP_ID},
+    },
     ops::handle::DataflowOpID,
     types::{SumType, Type, TypeArg, TypeRow},
 };
@@ -74,7 +77,8 @@ pub trait UnwrapBuilder: Dataflow {
                 let tr_rv = sum_type.get_variant(i).unwrap().to_owned();
                 TypeRow::try_from(tr_rv)
             })
-            .collect::<Result<_, _>>()?;
+            .collect::<Result<_, _>>()
+            .map_err(SignatureError::from)?;
 
         // TODO don't panic if tag >= num_variants
         let output_row = variants.get(tag).unwrap();

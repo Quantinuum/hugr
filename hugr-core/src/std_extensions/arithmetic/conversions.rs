@@ -13,7 +13,7 @@ use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc};
 use crate::ops::{ExtensionOp, OpName};
 use crate::std_extensions::arithmetic::int_ops::int_polytype;
 use crate::std_extensions::arithmetic::int_types::int_type;
-use crate::types::{Term, TypeArg};
+use crate::types::TypeArg;
 
 use super::float_types::float64_type;
 use super::int_types::{get_log_width, int_tv};
@@ -62,11 +62,9 @@ impl MakeOpDef for ConvertOpDef {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         use ConvertOpDef::*;
         match self {
-            trunc_s | trunc_u => int_polytype(
-                1,
-                [float64_type()],
-                [Term::from(sum_with_error([int_tv(0)]))],
-            ),
+            trunc_s | trunc_u => {
+                int_polytype(1, [float64_type()], [sum_with_error([int_tv(0)]).into()])
+            }
             convert_s | convert_u => int_polytype(1, vec![int_tv(0)], vec![float64_type()]),
             itobool => int_polytype(0, vec![int_type(0)], vec![bool_t()]),
             ifrombool => int_polytype(0, vec![bool_t()], vec![int_type(0)]),

@@ -9,6 +9,7 @@ use super::custom::CustomType;
 
 use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
+use crate::types::TypeRowRV;
 use crate::types::type_param::{SeqPart, TermTypeError, TermVar, UpperBound};
 
 #[derive(Serialize, serde::Deserialize, Clone, Debug)]
@@ -212,11 +213,6 @@ impl From<TermSer> for Term {
     }
 }
 
-/// Helper for use with [serde_with::serde_as] to serialize a [Term]
-/// that is an instance of [`Term::ListType`]([`Term::RuntimeType`](...))
-/// as a list of types + row variables
-pub(crate) enum SerTypeRowRV {}
-
 /// Helper type that serialises lists as JSON arrays for compatibility.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
@@ -266,9 +262,10 @@ mod base64 {
     }
 }
 
-impl serde_with::SerializeAs<Term> for SerTypeRowRV {
-    fn serialize_as<S: serde::Serializer>(source: &Term, serializer: S) -> Result<S::Ok, S::Error> {
-        let items: Vec<SerSimpleType> = source
+impl serde::Serialize for TypeRowRV {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        let items: Vec<SerSimpleType> = self
+            .0
             .clone()
             .into_list_parts()
             .map(|part| match part {
@@ -289,13 +286,13 @@ impl serde_with::SerializeAs<Term> for SerTypeRowRV {
     }
 }
 
-impl<'de> serde_with::DeserializeAs<'de, Term> for SerTypeRowRV {
-    fn deserialize_as<D: serde::Deserializer<'de>>(deser: D) -> Result<Term, D::Error> {
+impl<'de> serde::Deserialize<'de> for TypeRowRV {
+    fn deserialize<D: serde::Deserializer<'de>>(deser: D) -> Result<Self, D::Error> {
         let items: Vec<SerSimpleType> = serde::Deserialize::deserialize(deser)?;
         let list_parts = items.into_iter().map(|s| match s {
             SerSimpleType::R { i, b } => SeqPart::Splice(Term::new_row_var_use(i, b)),
             s => SeqPart::Item(Term::from(s)),
         });
-        Ok(Term::new_list_from_parts(list_parts))
+        Ok(TypeRowRV::try_from(Term::new_list_from_parts(list_parts)).unwrap())
     }
 }

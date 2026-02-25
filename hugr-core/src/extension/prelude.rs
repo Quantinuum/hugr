@@ -113,11 +113,9 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
                 TypeParam::new_list_type(TypeBound::Linear),
             ],
             FuncValueType::new(
-                Term::concat_lists([
-                    Term::new_list([Type::new_extension(error_type.clone()).into()]),
-                    Term::new_row_var_use(0, TypeBound::Linear),
-                ]),
-                Term::new_row_var_use(1, TypeBound::Linear),
+                TypeRowRV::new([Type::new_extension(error_type.clone())])
+                    .concat(TypeRowRV::just_row_var(0, TypeBound::Linear)),
+                TypeRowRV::just_row_var(1, TypeBound::Linear),
             ),
         );
         prelude
@@ -323,7 +321,7 @@ pub fn either_type(ty_left: impl Into<TypeRowRV>, ty_right: impl Into<TypeRowRV>
 
 /// A constant optional value with a given value.
 ///
-/// See [`option_type`].
+/// See [`SumType::new_option`].
 #[must_use]
 pub fn const_some(value: Value) -> Value {
     const_some_tuple([value])
@@ -333,7 +331,7 @@ pub fn const_some(value: Value) -> Value {
 ///
 /// For single values, use [`const_some`].
 ///
-/// See [`option_type`].
+/// See [`SumType::new_option`].
 pub fn const_some_tuple(values: impl IntoIterator<Item = Value>) -> Value {
     const_right_tuple(TypeRow::new(), values)
 }
@@ -364,11 +362,7 @@ pub fn const_left_tuple(
     ty_right: impl Into<TypeRowRV>,
 ) -> Value {
     let values = values.into_iter().collect_vec();
-    let types: TypeRowRV = values
-        .iter()
-        .map(|v| Term::from(v.get_type()))
-        .collect_vec()
-        .into();
+    let types: TypeRowRV = values.iter().map(|v| v.get_type()).collect_vec().into();
     let typ = either_type(types, ty_right);
     Value::sum(0, values, typ).unwrap()
 }
@@ -392,11 +386,7 @@ pub fn const_right_tuple(
     values: impl IntoIterator<Item = Value>,
 ) -> Value {
     let values = values.into_iter().collect_vec();
-    let types: TypeRowRV = values
-        .iter()
-        .map(|v| Term::from(v.get_type()))
-        .collect_vec()
-        .into();
+    let types: TypeRowRV = values.iter().map(|v| v.get_type()).collect_vec().into();
     let typ = either_type(ty_left, types);
     Value::sum(1, values, typ).unwrap()
 }
@@ -631,7 +621,7 @@ impl MakeOpDef for TupleOpDef {
     }
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
-        let rv = Term::new_row_var_use(0, TypeBound::Linear);
+        let rv = TypeRowRV::just_row_var(0, TypeBound::Linear);
         let tuple_type = Type::new_tuple(rv.clone());
 
         let param = TypeParam::new_list_type(TypeBound::Linear);
@@ -906,7 +896,7 @@ impl MakeOpDef for BarrierDef {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
             vec![TypeParam::new_list_type(TypeBound::Linear)],
-            FuncValueType::new_endo(Term::new_row_var_use(0, TypeBound::Linear)),
+            FuncValueType::new_endo(TypeRowRV::just_row_var(0, TypeBound::Linear)),
         )
         .into()
     }

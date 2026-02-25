@@ -13,7 +13,7 @@ use crate::extension::simple_op::{
 use crate::extension::{ExtensionId, OpDef, SignatureError, SignatureFunc, TypeDef};
 use crate::ops::{ExtensionOp, OpName};
 use crate::types::type_param::{TypeArg, TypeParam};
-use crate::types::{FuncValueType, PolyFuncTypeRV, Term, Type, TypeBound, TypeRow};
+use crate::types::{FuncValueType, PolyFuncTypeRV, Term, Type, TypeBound, TypeRow, TypeRowRV};
 
 use super::array_kind::ArrayKind;
 
@@ -65,10 +65,10 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
         let src_elem = Type::new_var_use(1, TypeBound::Linear);
         let tgt_elem = Type::new_var_use(2, TypeBound::Linear);
         let with_rest = |tys: Vec<Type>| {
-            TypeArg::concat_lists([
+            TypeRowRV::new(TypeArg::concat_lists([
                 TypeRow::from(tys).into(),
                 Term::new_row_var_use(3, TypeBound::Linear),
-            ])
+            ]))
         };
         PolyFuncTypeRV::new(
             params,

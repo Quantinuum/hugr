@@ -17,7 +17,6 @@ use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
 pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
-use serde_with::serde_as;
 pub use signature::{FuncValueType, Signature};
 use smol_str::SmolStr;
 pub use type_param::{Term, TypeArg};
@@ -178,65 +177,7 @@ pub enum SumType {
     Unit { size: u8 },
     /// General case of a Sum type.
     #[allow(missing_docs)]
-    General(GeneralSum),
-}
-
-/// General case of a [SumType]. Prefer using [SumType::new] and friends.
-#[serde_as]
-#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
-pub struct GeneralSum {
-    /// Each term here must be an instance of [Term::ListType]([Term::RuntimeType]), being
-    /// the elements of exactly one variant. (Thus, this explicitly forbids sums with an
-    /// unknown number of variants.)
-    // We could just have a single `rows: Term` here, an instance of
-    //`Term::ListType(Term::ListType(Term::RuntimeType))`, but then many functions like
-    // `len` and `variants` would be impossible. (We might want a separate "FixedAritySum"
-    // rust type supporting those, with try_from(SumType).)
-    #[serde_as(as = "Vec<crate::types::serialize::SerTypeRowRV>")]
-    rows: Vec<Term>,
-}
-
-impl GeneralSum {
-    /// Initialize a new general sum type. (Note the number of variants is fixed.)
-    ///
-    /// # Panics
-    ///
-    /// If any element of `rows` is not a list (perhaps of variable length) of runtime types.
-    /// See [Self::try_new] or [Self::new_unchecked] for alternatives.
-    pub fn new(rows: impl Into<Vec<Term>>) -> Self {
-        Self::try_new(rows).unwrap()
-    }
-
-    /// Initialize a new general sum type, checking that each variant is a list of runtime types.
-    ///
-    /// # Errors
-    ///
-    /// If any element of `rows` is not a list (perhaps of variable length) of runtime types.
-    pub fn try_new(rows: impl Into<Vec<Term>>) -> Result<Self, TermTypeError> {
-        let rows = rows.into();
-        for row in rows.iter() {
-            check_term_type(row, &Term::new_list_type(TypeBound::Linear))?;
-        }
-        Ok(Self::new_unchecked(rows))
-    }
-
-    /// Initialize a new general sum type without checking the variants.
-    pub fn new_unchecked(rows: impl Into<Vec<Term>>) -> Self {
-        let rows: Vec<Term> = rows.into();
-        Self { rows }
-    }
-
-    /// Returns an iterator over the variants, each an instance of [Term::ListType]`(`[Term::RuntimeType]`)`
-    pub fn iter(&self) -> impl Iterator<Item = &Term> {
-        self.rows.iter()
-    }
-
-    /// Returns a mutable iterator over the variants, each should be an instance
-    /// of [Term::ListType]`(`[Term::RuntimeType]`)` but of course `iter_mut` allows
-    /// bypassing such checks.
-    pub fn iter_mut(&mut self) -> impl Iterator<Item = &mut Term> {
-        self.rows.iter_mut()
-    }
+    General { rows: Vec<TypeRowRV> },
 }
 
 impl std::hash::Hash for SumType {
@@ -263,7 +204,7 @@ impl std::fmt::Display for SumType {
             SumType::Unit { size } => {
                 display_list_with_separator(itertools::repeat_n("[]", *size as usize), f, "+")
             }
-            SumType::General(GeneralSum { rows, .. }) => match rows.len() {
+            SumType::General { rows } => match rows.len() {
                 1 if rows[0].is_empty_list() => write!(f, "Unit"),
                 2 if rows[0].is_empty_list() && rows[1].is_empty_list() => write!(f, "Bool"),
                 _ => display_list_with_separator(rows.iter(), f, "+"),
@@ -274,44 +215,16 @@ impl std::fmt::Display for SumType {
 
 impl SumType {
     /// Initialize a new sum type.
-    ///
-    /// # Panics
-    ///
-    /// If any element of `variants` is not a list (perhaps of variable length) of runtime types.
-    /// See [Self::try_new] or [Self::new_unchecked] for alternatives.
     pub fn new<V>(variants: impl IntoIterator<Item = V>) -> Self
     where
-        V: Into<Term>,
+        V: Into<TypeRowRV>,
     {
-        Self::try_new(variants).unwrap()
-    }
-
-    /// Initialize a new sum type, checking that each variant is a list of runtime types.
-    ///
-    /// # Errors
-    ///
-    /// If any element of `variants` is not a list (perhaps of variable length) of runtime types.
-    /// See [Self::new_unchecked] for an alternative.
-    pub fn try_new<V: Into<Term>>(
-        variants: impl IntoIterator<Item = V>,
-    ) -> Result<Self, TermTypeError> {
         let variants = variants.into_iter().map(V::into).collect_vec();
         let len = variants.len();
-        if u8::try_from(len).is_ok() && variants.iter().all(Term::is_empty_list) {
-            Ok(Self::new_unary(len as u8))
-        } else {
-            GeneralSum::try_new(variants).map(Self::General)
-        }
-    }
-
-    /// Initialize a new sum type without checking the variants.
-    pub fn new_unchecked<V: Into<Term>>(variants: impl IntoIterator<Item = V>) -> Self {
-        let variants = variants.into_iter().map_into().collect::<Vec<_>>();
-        let len: usize = variants.len();
-        if u8::try_from(len).is_ok() && variants.iter().all(Term::is_empty_list) {
+        if u8::try_from(len).is_ok() && variants.iter().all(|tr| tr.is_empty_list()) {
             Self::new_unary(len as u8)
         } else {
-            Self::General(GeneralSum::new_unchecked(variants))
+            Self::General { rows: variants }
         }
     }
 
@@ -337,10 +250,10 @@ impl SumType {
 
     /// Report the tag'th variant, if it exists.
     #[must_use]
-    pub fn get_variant(&self, tag: usize) -> Option<&Term> {
+    pub fn get_variant(&self, tag: usize) -> Option<&TypeRowRV> {
         match self {
-            SumType::Unit { size } if tag < (*size as usize) => Some(Term::EMPTY_LIST_REF),
-            SumType::General(GeneralSum { rows, .. }) => rows.get(tag),
+            SumType::Unit { size } if tag < (*size as usize) => Some(TypeRowRV::EMPTY_REF),
+            SumType::General { rows } => rows.get(tag),
             _ => None,
         }
     }
@@ -350,7 +263,7 @@ impl SumType {
     pub fn num_variants(&self) -> usize {
         match self {
             SumType::Unit { size } => *size as usize,
-            SumType::General(GeneralSum { rows, .. }) => rows.len(),
+            SumType::General { rows } => rows.len(),
         }
     }
 
@@ -360,7 +273,7 @@ impl SumType {
     pub fn as_tuple(&self) -> Option<&Term> {
         match self {
             SumType::Unit { size } if *size == 1 => Some(Term::EMPTY_LIST_REF),
-            SumType::General(GeneralSum { rows, .. }) if rows.len() == 1 => Some(&rows[0]),
+            SumType::General { rows } if rows.len() == 1 => Some(&rows[0]),
             _ => None,
         }
     }
@@ -371,9 +284,7 @@ impl SumType {
     pub fn as_option(&self) -> Option<&Term> {
         match self {
             SumType::Unit { size } if *size == 2 => Some(Term::EMPTY_LIST_REF),
-            SumType::General(GeneralSum { rows, .. })
-                if rows.len() == 2 && rows[0].is_empty_list() =>
-            {
+            SumType::General { rows } if rows.len() == 2 && rows[0].is_empty_list() => {
                 Some(&rows[1])
             }
             _ => None,
@@ -385,28 +296,25 @@ impl SumType {
     // But of course a Term was not necessarily a single type...
 
     /// Returns an iterator over the variants, each an instance of [Term::ListType]`(`[Term::RuntimeType]`)`
-    pub fn variants(&self) -> impl Iterator<Item = &Term> {
+    pub fn variants(&self) -> impl Iterator<Item = &TypeRowRV> {
         match self {
             SumType::Unit { size } => {
-                Either::Left(itertools::repeat_n(Term::EMPTY_LIST_REF, *size as usize))
+                Either::Left(itertools::repeat_n(TypeRowRV::EMPTY_REF, *size as usize))
             }
-            SumType::General(gs) => Either::Right(gs.iter()),
+            SumType::General { rows } => Either::Right(rows.iter()),
         }
     }
 
     fn bound(&self) -> TypeBound {
         match self {
             SumType::Unit { .. } => TypeBound::Copyable,
-            SumType::General(GeneralSum { rows }) => {
+            SumType::General { rows } => {
                 if rows
                     .iter()
                     .all(|t| check_term_type(t, &Term::new_list_type(TypeBound::Copyable)).is_ok())
                 {
                     TypeBound::Copyable
                 } else {
-                    // That all elements were types was checked in the GeneralSum constructor.
-                    // That may have been bypassed via GeneralSum::new_unchecked, but do no
-                    // check here (we will do so in validate()).
                     TypeBound::Linear
                 }
             }
@@ -418,7 +326,7 @@ impl Transformable for SumType {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match self {
             SumType::Unit { .. } => Ok(false),
-            SumType::General(GeneralSum { rows }) => rows.transform(tr),
+            SumType::General { rows } => rows.transform(tr),
         }
     }
 }
@@ -427,7 +335,7 @@ impl From<SumType> for Type {
     fn from(sum: SumType) -> Self {
         match sum {
             SumType::Unit { size } => Type::new_unit_sum(size),
-            SumType::General(GeneralSum { rows }) => Type::new_sum(rows),
+            SumType::General { rows } => Type::new_sum(rows),
         }
     }
 }
@@ -483,7 +391,7 @@ impl Type {
 
     /// Initialize a new tuple type by providing the elements.
     #[inline(always)]
-    pub fn new_tuple(types: impl Into<Term>) -> Self {
+    pub fn new_tuple(types: impl Into<TypeRowRV>) -> Self {
         let row = types.into();
         match row.is_empty_list() {
             true => Self::UNIT,
@@ -800,15 +708,15 @@ pub(crate) mod test {
     fn sum_variants() {
         let variants: Vec<TypeRowRV> = vec![
             [Type::UNIT].into(),
-            Term::new_row_var_use(0, TypeBound::Linear),
+            TypeRowRV::just_row_var(0, TypeBound::Linear),
         ];
         let t = SumType::new(variants.clone());
         assert_eq!(variants, t.variants().cloned().collect_vec());
 
-        let empty_rows = vec![Term::EMPTY_LIST; 3];
+        let empty_rows = vec![TypeRowRV::EMPTY; 3];
         let sum_unary = SumType::new_unary(3);
         assert_eq!(empty_rows, sum_unary.variants().cloned().collect_vec());
-        let sum_general = SumType::General(GeneralSum::new(empty_rows));
+        let sum_general = SumType::General { rows: empty_rows };
         assert_eq!(sum_general, sum_unary);
 
         let mut hasher_general = std::hash::DefaultHasher::new();

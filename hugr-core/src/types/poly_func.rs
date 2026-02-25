@@ -185,7 +185,7 @@ pub(crate) mod test {
     use crate::types::type_param::{Term, TermTypeError, TypeArg, TypeParam};
     use crate::types::{
         CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound,
-        TypeName,
+        TypeName, TypeRowRV,
     };
 
     impl Arbitrary for PolyFuncType {
@@ -425,7 +425,7 @@ pub(crate) mod test {
         let decl = Term::new_list_type(TP_ANY);
         let e = PolyFuncTypeRV::new_validated(
             [decl.clone()],
-            FuncValueType::new([usize_t()], Term::new_row_var_use(0, TypeBound::Copyable)),
+            FuncValueType::new([usize_t()], TypeRowRV::just_row_var(0, TypeBound::Copyable)),
         )
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
@@ -446,11 +446,11 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables() {
-        let rty = Term::new_row_var_use(0, TypeBound::Linear);
+        let rty = TypeRowRV::just_row_var(0, TypeBound::Linear);
         let pf = PolyFuncTypeRV::new_validated(
             [TypeParam::new_list_type(TP_ANY)],
             FuncValueType::new(
-                Term::concat_lists([Term::new_list([usize_t().into()]), rty.clone()]),
+                TypeRowRV::from([usize_t()]).concat(rty.clone()),
                 [Type::new_tuple(rty)],
             ),
         )
@@ -475,7 +475,7 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables_inner() {
-        let inner_fty = Type::new_function(FuncValueType::new_endo(Term::new_row_var_use(
+        let inner_fty = Type::new_function(FuncValueType::new_endo(TypeRowRV::just_row_var(
             0,
             TypeBound::Copyable,
         )));

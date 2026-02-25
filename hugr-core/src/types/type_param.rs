@@ -17,7 +17,7 @@ use tracing::warn;
 
 use super::{Substitution, Transformable, Type, TypeBound, TypeTransformer};
 use crate::extension::SignatureError;
-use crate::types::{CustomType, FuncValueType, GeneralSum, SumType, TypeRow};
+use crate::types::{CustomType, FuncValueType, SumType, TypeRow};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -441,7 +441,7 @@ impl Term {
     /// [TypeDef]: crate::extension::TypeDef
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            Term::RuntimeSum(SumType::General(GeneralSum { rows })) => {
+            Term::RuntimeSum(SumType::General { rows }) => {
                 rows.iter().try_for_each(|row| row.validate(var_decls))?;
                 Ok(())
             }
@@ -494,11 +494,9 @@ impl Term {
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
-            TypeArg::RuntimeSum(SumType::General(GeneralSum { rows })) => {
-                // A substitution of a row variable for an empty list, could make this from
-                // a GeneralSum into a unary SumType.
-
-                // Ok to use panicking `new` as if the substitution is valid we'll still have types.
+            TypeArg::RuntimeSum(SumType::General { rows }) => {
+                // A substitution of a row variable for an empty list,
+                // could make the general case into a unary SumType.
                 Term::RuntimeSum(SumType::new(rows.iter().map(|r| r.substitute(t))))
             }
             TypeArg::RuntimeExtension(cty) => Term::RuntimeExtension(cty.substitute(t)),

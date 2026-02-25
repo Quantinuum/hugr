@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::envelope::description::GeneratorDesc;
 use crate::metadata::{self, Metadata};
-use crate::types::FuncValueType;
+use crate::types::{FuncValueType, TypeRowRV};
 use crate::{
     Direction, Hugr, HugrView, Node, Port,
     envelope::description::{ExtensionDesc, ModuleDesc},
@@ -1510,7 +1510,12 @@ impl<'a> Context<'a> {
                 let variants = (|| {
                     self.import_closed_list(variants)?
                         .iter()
-                        .map(|variant| self.import_term(*variant))
+                        .map(|variant| {
+                            self.import_term(*variant).and_then(|tm| {
+                                TypeRowRV::try_from(tm)
+                                    .map_err(|e| ImportErrorInner::Signature(e.into()))
+                            })
+                        })
                         .collect::<Result<Vec<_>, _>>()
                 })()
                 .map_err(|err| error_context!(err, "adt variants"))?;
@@ -1650,9 +1655,12 @@ impl<'a> Context<'a> {
             let inputs = self
                 .import_term(inputs)
                 .map_err(|err| error_context!(err, "function inputs"))?;
+            let inputs = TypeRowRV::try_from(inputs).map_err(SignatureError::from)?;
             let outputs = self
                 .import_term(outputs)
                 .map_err(|err| error_context!(err, "function outputs"))?;
+            let outputs = TypeRowRV::try_from(outputs).map_err(SignatureError::from)?;
+
             Ok(FuncValueType::new(inputs, outputs))
         })()
         .map_err(|err| error_context!(err, "function type"))

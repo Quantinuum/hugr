@@ -188,7 +188,7 @@ pub(crate) fn collect_term_exts(
             collect_term_exts(&f.input, used_extensions, missing_extensions);
             collect_term_exts(&f.output, used_extensions, missing_extensions);
         }
-        Term::RuntimeSum(g @ SumType::General(_)) => {
+        Term::RuntimeSum(g @ SumType::General { .. }) => {
             for row in g.variants() {
                 collect_term_exts(row, used_extensions, missing_extensions);
             }
@@ -258,7 +258,7 @@ fn collect_value_exts(
             // The extensions used by nested hugrs do not need to be counted for the root hugr.
         }
         Value::Sum(s) => {
-            if matches!(s.sum_type, SumType::General(_)) {
+            if matches!(s.sum_type, SumType::General { .. }) {
                 for row in s.sum_type.variants() {
                     collect_term_exts(row, used_extensions, missing_extensions);
                 }

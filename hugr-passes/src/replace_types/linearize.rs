@@ -276,7 +276,8 @@ impl Linearizer for DelegatingLinearizer {
                 let variants = sum_type
                     .variants()
                     .map(|trv| trv.clone().try_into())
-                    .collect::<Result<Vec<TypeRow>, _>>()?;
+                    .collect::<Result<Vec<TypeRow>, _>>()
+                    .map_err(SignatureError::from)?;
                 let mut cb = ConditionalBuilder::new(
                     variants.clone(),
                     vec![],

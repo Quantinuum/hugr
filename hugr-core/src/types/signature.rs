@@ -1,7 +1,6 @@
 //! Abstract and concrete Signature types.
 
-use itertools::Either;
-use serde_with::serde_as;
+use itertools::{Either, Itertools as _};
 
 use std::fmt::{self, Display};
 
@@ -13,8 +12,7 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_signature_exts,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
-use crate::types::type_param::{TermTypeError, check_term_type};
-use crate::types::{Term, TypeBound};
+use crate::types::{Term, TypeRowRV};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 /// The concept of "signature" in the spec - a list of inputs and outputs being
@@ -46,34 +44,12 @@ pub struct Signature {
 /// on wires of a Hugr (see [`Type::new_function`]) but not a valid node type.
 ///
 /// [`OpDef`]: crate::extension::OpDef
-#[serde_as]
-#[derive(Clone, Debug, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+#[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 pub struct FuncValueType {
     /// Value inputs of the function.
-    ///
-    /// Must [check_term_type] against [Term::ListType] of [Term::RuntimeType],
-    /// hence there may be variables ranging over lists of types, and so the
-    /// arity may vary according to the length of list with whose those variables
-    /// are instantiated.
-    #[serde_as(as = "crate::types::serialize::SerTypeRowRV")]
-    pub input: Term,
+    pub input: TypeRowRV,
     /// Value outputs of the function.
-    ///
-    /// Must [check_term_type] against [Term::ListType] of [Term::RuntimeType],
-    /// hence there may be variables ranging over lists of types, and so the
-    /// arity may vary according to the length of list with whose those variables
-    /// are instantiated.
-    #[serde_as(as = "crate::types::serialize::SerTypeRowRV")]
-    pub output: Term,
-}
-
-impl Default for FuncValueType {
-    fn default() -> Self {
-        Self {
-            input: Term::new_list(Vec::new()),
-            output: Term::new_list(Vec::new()),
-        }
-    }
+    pub output: TypeRowRV,
 }
 
 macro_rules! func_type_general {
@@ -130,80 +106,23 @@ func_type_general!(FuncValueType, Term);
 
 impl FuncValueType {
     /// Create a new FuncValueType with specified inputs and outputs.
-    ///
-    /// # Panics
-    ///
-    /// If the inputs, or outputs, are not each lists of runtime types.
-    /// See [Self::try_new] and [Self::new_unchecked] for alternatives.
-    pub fn new(input: impl Into<Term>, output: impl Into<Term>) -> Self {
-        Self::try_new(input, output).unwrap()
-    }
-
-    /// Create a new FuncValueType with specified inputs and outputs.
-    ///
-    /// # Errors
-    ///
-    /// If the inputs, or outputs, are not each lists of runtime types.
-    /// See [Self::new_unchecked].
-    pub fn try_new(input: impl Into<Term>, output: impl Into<Term>) -> Result<Self, TermTypeError> {
+    pub fn new(input: impl Into<TypeRowRV>, output: impl Into<TypeRowRV>) -> Self {
         let input = input.into();
         let output = output.into();
-        check_term_type(&input, &Term::new_list_type(TypeBound::Linear))?;
-        check_term_type(&output, &Term::new_list_type(TypeBound::Linear))?;
-        Ok(Self::new_unchecked(input, output))
-    }
-
-    /// Create a new FuncValueType with specified inputs and outputs.
-    /// No checks are performed as to whether the inputs and outputs are appropriate
-    /// (i.e. lists of runtime types).
-    pub fn new_unchecked(input: impl Into<Term>, output: impl Into<Term>) -> Self {
-        Self {
-            input: input.into(),
-            output: output.into(),
-        }
+        Self { input, output }
     }
 
     /// Create a new signature with the same input and output types (signature of an endomorphic
     /// function).
-    ///
-    /// # Panics
-    ///
-    /// If the row is not a list of runtime types.
-    /// See [Self::try_new_endo] and [Self::new_endo_unchecked] for alternatives.
-    pub fn new_endo(row: impl Into<Term>) -> Self {
-        Self::try_new_endo(row).unwrap()
-    }
-
-    /// Create a new signature with the same input and output types (signature of an endomorphic
-    /// function).
-    ///
-    /// # Errors
-    ///
-    /// If the row is not a list of runtime types.
-    pub fn try_new_endo(row: impl Into<Term>) -> Result<Self, TermTypeError> {
+    pub fn new_endo(row: impl Into<TypeRowRV>) -> Self {
         let row = row.into();
-        check_term_type(&row, &Term::new_list_type(TypeBound::Linear))?;
-        Ok(Self::new_endo_unchecked(row))
-    }
-
-    /// Create a new signature with the same input and output types (signature of an endomorphic
-    /// function).
-    /// No checks are performed as to whether the row is appropriate
-    /// (i.e. a list of runtime types).
-    pub fn new_endo_unchecked(row: impl Into<Term>) -> Self {
-        let row = row.into();
-        Self::new_unchecked(row.clone(), row)
+        Self::new(row.clone(), row)
     }
 
     // ALAN definitely opportunities to deduplicate between Signature/FuncValueType here...
     pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.input.validate(var_decls)?;
-        self.output.validate(var_decls)?;
-        // check_term_type does not look at inputs/outputs, so do that here
-        for t in [&self.input, &self.output] {
-            check_term_type(t, &Term::new_list_type(TypeBound::Linear))?;
-        }
-        Ok(())
+        self.output.validate(var_decls)
     }
 
     /// True if both inputs and outputs are necessarily empty
@@ -398,7 +317,13 @@ impl From<Signature> for FuncValueType {
 
 impl PartialEq<Signature> for FuncValueType {
     fn eq(&self, other: &Signature) -> bool {
-        other.input == self.input && other.output == self.output
+        let (Term::List(ins), Term::List(outs)) = (&self.input.0, &self.output.0) else {
+            return false;
+        };
+        fn eq(xs: &[Type], ys: &[Term]) -> bool {
+            xs.len() == ys.len() && xs.iter().zip_eq(ys).all(|(x, y)| &**x == y)
+        }
+        eq(&other.input, ins) && eq(&other.output, outs)
     }
 }
 
@@ -410,6 +335,7 @@ mod test {
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
     use crate::proptest::RecursionDepth;
     use crate::type_row;
+    use crate::types::TypeBound;
     use crate::types::test::FnTransformer;
     use crate::types::{CustomType, TypeRow, type_param::SeqPart};
 
@@ -442,9 +368,9 @@ mod test {
                 ]),
                 0..3,
             )
-            .prop_map(Term::new_list_from_parts);
+            .prop_map(|parts| TypeRowRV::try_from(Term::new_list_from_parts(parts)).unwrap());
             (io_strategy.clone(), io_strategy)
-                .prop_map(|(input, output)| FuncValueType::new_unchecked(input, output))
+                .prop_map(|(input, output)| FuncValueType::new(input, output))
                 .boxed()
         }
         type Strategy = BoxedStrategy<Self>;

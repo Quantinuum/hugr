@@ -477,7 +477,7 @@ pub(crate) mod test {
     use crate::ops::{FuncDecl, FuncDefn, OpParent, OpTag, OpTrait, Value, handle::NodeHandle};
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::{TermTypeError, TypeParam};
-    use crate::types::{EdgeKind, FuncValueType, Signature, Term, Type, TypeBound};
+    use crate::types::{EdgeKind, FuncValueType, Signature, Term, Type, TypeBound, TypeRowRV};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{Wire, builder::test::n_identity, type_row};
 
@@ -930,7 +930,7 @@ pub(crate) mod test {
                 Signature::new(
                     [Type::new_function(FuncValueType::new(
                         [usize_t()],
-                        rv.clone(),
+                        TypeRowRV::new(rv.clone()),
                     ))],
                     [],
                 ),
