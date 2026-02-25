@@ -10,5 +10,5 @@ contact_links:
     url: https://quantinuum.github.io/hugr/
     about: Read the API documentation for the Python library
   - name: 📖 Specification
-    url: https://github.com/Quantinuum/hugr/blob/main/specification/hugr.md
+    url: https://github.com/Quantinuum/hugr/blob/main/specification/index.md
     about: Read the HUGR specification

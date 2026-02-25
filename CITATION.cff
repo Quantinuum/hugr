@@ -5,7 +5,7 @@ title: "HUGR: A Quantum-Classical Intermediate Representation"
 message: >-
   HUGR can be cited as below. For an up-to-date definition
   of the specification, see the [HUGR
-  specification](https://github.com/quantinuum/hugr/blob/main/specification/hugr.md)
+  specification](https://github.com/quantinuum/hugr/blob/main/specification/index.md)
 keywords:
   - quantum computing
   - compilers
