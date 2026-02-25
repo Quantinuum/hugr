@@ -217,11 +217,6 @@ impl FuncValueType {
 
 impl Signature {
     /// Create a new signature with specified inputs and outputs.
-    ///
-    /// # Panics
-    ///
-    /// If any of the input or output types are not runtime types.
-    /// See [Self::try_new] or [Self::new_unchecked] for alternatives.
     pub fn new(input: impl Into<TypeRow>, output: impl Into<TypeRow>) -> Self {
         Self {
             input: input.into(),
@@ -231,11 +226,6 @@ impl Signature {
 
     /// Create a new signature with the same input and output types (signature of an endomorphic
     /// function).
-    ///
-    /// # Panics
-    ///
-    /// If any element of the row is not a runtime type.
-    /// See [Self::try_new_endo] or [Self::new_endo_unchecked] for alternatives.
     pub fn new_endo(row: impl Into<TypeRow>) -> Self {
         let row = row.into();
         Self::new(row.clone(), row)
@@ -247,8 +237,7 @@ impl Signature {
         Ok(())
     }
 
-    /// True if both inputs and outputs are necessarily empty.
-    /// (For [`FuncValueType`], even after any possible substitution of row variables)
+    /// True if both inputs and outputs are empty.
     #[inline(always)]
     #[must_use]
     pub fn is_empty(&self) -> bool {

@@ -433,12 +433,10 @@ impl Term {
     }
 
     /// Checks all variables used in the type are in the provided list
-    /// of bound variables, rejecting any [`RowVariable`]s if `allow_row_vars` is False;
-    /// and that for each [`CustomType`] the corresponding
+    /// of bound variables, and that for each [`CustomType`] the corresponding
     /// [`TypeDef`] is in the [`ExtensionRegistry`] and the type arguments
     /// [validate] and fit into the def's declared parameters.
     ///
-    /// [RowVariable]: TypeEnum::RowVariable
     /// [validate]: crate::types::type_param::TypeArg::validate
     /// [TypeDef]: crate::extension::TypeDef
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {

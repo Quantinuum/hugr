@@ -165,8 +165,7 @@ pub enum LinearizeError {
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
     /// We cannot linearize (insert copy and discard functions) for
-    /// [Variable](TypeEnum::Variable)s, [Row variables](TypeEnum::RowVar),
-    /// or [Alias](TypeEnum::Alias)es.
+    /// [Variable](Term::Variable)s.
     #[error("Cannot linearize type {_0}")]
     UnsupportedType(Box<Type>),
     /// Neither does linearization make sense for copyable types
@@ -191,7 +190,7 @@ impl DelegatingLinearizer {
 
     /// Configures this instance that the specified monomorphic type can be copied and/or
     /// discarded via the provided [`NodeTemplate`]s - directly or as part of a compound type
-    /// e.g. [`TypeEnum::Sum`].
+    /// e.g. [`Term::RuntimeSum`].
     /// `copy` should have exactly one inport, of type `src`, and two outports, of same type;
     /// `discard` should have exactly one inport, of type 'src', and no outports.
     ///

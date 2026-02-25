@@ -4,7 +4,7 @@ use hugr_core::{
     extension::simple_op::MakeExtensionOp as _,
     ops::ExtensionOp,
     std_extensions::collections::list::{self, ListOp, ListValue},
-    types::{SumType, Type, TypeArg},
+    types::{SumType, Type},
 };
 use inkwell::values::FunctionValue;
 use inkwell::{
