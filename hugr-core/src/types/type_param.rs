@@ -959,8 +959,7 @@ mod test {
     use super::{Substitution, TypeArg, TypeParam, check_term_type};
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::types::type_param::SeqPart;
-    use crate::types::{Term, Type, TypeRow};
-    use crate::types::{TypeBound, TypeRV, type_param::TermTypeError};
+    use crate::types::{Term, Type, TypeBound, TypeRow, type_param::TermTypeError};
 
     #[test]
     fn new_list_from_parts_items() {
@@ -1021,7 +1020,7 @@ mod test {
 
     #[test]
     fn type_arg_fits_param() {
-        let rowvar = TypeRV::new_row_var_use;
+        let rowvar = Term::new_row_var_use;
         fn check(arg: impl Into<TypeArg>, param: &TypeParam) -> Result<(), TermTypeError> {
             check_term_type(&arg.into(), param)
         }
@@ -1117,7 +1116,7 @@ mod test {
         // to instantiate an outer "row parameter" (list of type).
         let outer_param = Term::new_list_type(TypeBound::Linear);
         let outer_arg = Term::concat_lists([
-            TypeRV::new_row_var_use(0, TypeBound::Copyable),
+            Term::new_row_var_use(0, TypeBound::Copyable),
             Term::new_list([usize_t().into()]),
         ]);
         check_term_type(&outer_arg, &outer_param).unwrap();

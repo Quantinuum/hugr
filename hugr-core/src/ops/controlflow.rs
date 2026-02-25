@@ -351,7 +351,7 @@ mod test {
     use crate::{
         extension::prelude::{qb_t, usize_t},
         ops::{Conditional, DataflowOpTrait, DataflowParent},
-        types::{Signature, Substitution, Type, TypeArg, TypeBound, TypeRV},
+        types::{Signature, Substitution, Term, Type, TypeArg, TypeBound},
     };
 
     use super::{DataflowBlock, TailLoop};
@@ -378,11 +378,7 @@ mod test {
         let tv1 = Type::new_var_use(1, TypeBound::Linear);
         let cond = Conditional {
             sum_rows: vec![[usize_t()].into(), [tv1.clone()].into()],
-            other_inputs: vec![Type::new_tuple(TypeRV::new_row_var_use(
-                0,
-                TypeBound::Linear,
-            ))]
-            .into(),
+            other_inputs: vec![Type::new_tuple(Term::new_row_var_use(0, TypeBound::Linear))].into(),
             outputs: vec![usize_t(), tv1].into(),
         };
         let cond2 = cond.substitute(&Substitution::new(&[

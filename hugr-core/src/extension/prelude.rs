@@ -18,7 +18,7 @@ use crate::ops::{NamedOp, Value};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Term, Type,
-    TypeBound, TypeName, TypeRV, TypeRow, TypeRowRV,
+    TypeBound, TypeName, TypeRow, TypeRowRV,
 };
 use crate::utils::sorted_consts;
 use crate::{Extension, type_row};
@@ -115,9 +115,9 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             FuncValueType::new(
                 Term::concat_lists([
                     Term::new_list([Type::new_extension(error_type.clone()).into()]),
-                    TypeRV::new_row_var_use(0, TypeBound::Linear),
+                    Term::new_row_var_use(0, TypeBound::Linear),
                 ]),
-                TypeRV::new_row_var_use(1, TypeBound::Linear),
+                Term::new_row_var_use(1, TypeBound::Linear),
             ),
         );
         prelude
@@ -366,7 +366,7 @@ pub fn const_left_tuple(
     let values = values.into_iter().collect_vec();
     let types: TypeRowRV = values
         .iter()
-        .map(|v| TypeRV::from(v.get_type()))
+        .map(|v| Term::from(v.get_type()))
         .collect_vec()
         .into();
     let typ = either_type(types, ty_right);
@@ -394,7 +394,7 @@ pub fn const_right_tuple(
     let values = values.into_iter().collect_vec();
     let types: TypeRowRV = values
         .iter()
-        .map(|v| TypeRV::from(v.get_type()))
+        .map(|v| Term::from(v.get_type()))
         .collect_vec()
         .into();
     let typ = either_type(ty_left, types);
@@ -631,7 +631,7 @@ impl MakeOpDef for TupleOpDef {
     }
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
-        let rv = TypeRV::new_row_var_use(0, TypeBound::Linear);
+        let rv = Term::new_row_var_use(0, TypeBound::Linear);
         let tuple_type = Type::new_tuple(rv.clone());
 
         let param = TypeParam::new_list_type(TypeBound::Linear);
@@ -906,7 +906,7 @@ impl MakeOpDef for BarrierDef {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
             vec![TypeParam::new_list_type(TypeBound::Linear)],
-            FuncValueType::new_endo(TypeRV::new_row_var_use(0, TypeBound::Linear)),
+            FuncValueType::new_endo(Term::new_row_var_use(0, TypeBound::Linear)),
         )
         .into()
     }

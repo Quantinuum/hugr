@@ -477,7 +477,7 @@ pub(crate) mod test {
     use crate::ops::{FuncDecl, FuncDefn, OpParent, OpTag, OpTrait, Value, handle::NodeHandle};
     use crate::std_extensions::logic::test::and_op;
     use crate::types::type_param::{TermTypeError, TypeParam};
-    use crate::types::{EdgeKind, FuncValueType, Signature, Type, TypeBound, TypeRV};
+    use crate::types::{EdgeKind, FuncValueType, Signature, Term, Type, TypeBound};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{Wire, builder::test::n_identity, type_row};
 
@@ -921,7 +921,7 @@ pub(crate) mod test {
     #[test]
     fn no_outer_row_variables() -> Result<(), BuildError> {
         let e = crate::hugr::validate::test::extension_with_eval_parallel();
-        let rv = TypeRV::new_row_var_use(0, TypeBound::Copyable);
+        let rv = Term::new_row_var_use(0, TypeBound::Copyable);
         // Can *declare* a function that takes a function-value of unknown #args
         FunctionBuilder::new(
             "bad_eval",

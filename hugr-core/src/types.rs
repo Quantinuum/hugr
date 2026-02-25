@@ -381,8 +381,8 @@ impl SumType {
     }
 
     // ALAN removing as_unary_option.
-    // "If a sum is an option of a single type, return the type. pub fn as_unary_option(&self) -> Option<&TypeRV>"
-    // But of course a TypeRV was not necessarily a single type...
+    // "If a sum is an option of a single type, return the type. pub fn as_unary_option(&self) -> Option<&Term>"
+    // But of course a Term was not necessarily a single type...
 
     /// Returns an iterator over the variants, each an instance of [Term::ListType]`(`[Term::RuntimeType]`)`
     pub fn variants(&self) -> impl Iterator<Item = &Term> {
@@ -463,9 +463,6 @@ impl From<SumType> for Type {
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 /// ```
 pub struct Type(Term, TypeBound);
-
-/// Legacy alias (for a list of types) - not statically checked.
-pub type TypeRV = Term;
 
 impl Type {
     /// An empty `TypeRow` or `TypeRowRV`. Provided here for convenience
@@ -803,7 +800,7 @@ pub(crate) mod test {
     fn sum_variants() {
         let variants: Vec<TypeRowRV> = vec![
             [Type::UNIT].into(),
-            TypeRV::new_row_var_use(0, TypeBound::Linear),
+            Term::new_row_var_use(0, TypeBound::Linear),
         ];
         let t = SumType::new(variants.clone());
         assert_eq!(variants, t.variants().cloned().collect_vec());
