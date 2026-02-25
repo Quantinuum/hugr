@@ -192,7 +192,7 @@ pub struct GeneralSum {
     //`Term::ListType(Term::ListType(Term::RuntimeType))`, but then many functions like
     // `len` and `variants` would be impossible. (We might want a separate "FixedAritySum"
     // rust type supporting those, with try_from(SumType).)
-    #[serde_as(as="Vec<crate::types::serialize::SerTypeRowRV>")]
+    #[serde_as(as = "Vec<crate::types::serialize::SerTypeRowRV>")]
     rows: Vec<Term>,
 }
 
@@ -540,23 +540,6 @@ impl Type {
     #[inline(always)]
     pub const fn least_upper_bound(&self) -> TypeBound {
         self.1
-    }
-
-    /// Returns the inner [`SumType`] if the type is a sum.
-    pub fn as_sum(&self) -> Option<&SumType> {
-        match &self.0 {
-            Term::RuntimeSum(s) => Some(s),
-            _ => None,
-        }
-    }
-
-    /// Returns the inner [`CustomType`] if the type is from an extension.
-    // ALAN if we put this on Term, does Deref allow calling it on Type?
-    pub fn as_extension(&self) -> Option<&CustomType> {
-        match &self.0 {
-            Term::RuntimeExtension(ct) => Some(ct),
-            _ => None,
-        }
     }
 
     /// Report if the type is copyable - i.e.the least upper bound of the type

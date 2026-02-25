@@ -250,6 +250,22 @@ impl Term {
             _ => false,
         }
     }
+
+    /// Returns the inner [`CustomType`] if this `Term` is a [Self::RuntimeExtension]
+    pub fn as_extension(&self) -> Option<&CustomType> {
+        match self {
+            Term::RuntimeExtension(ct) => Some(ct),
+            _ => None,
+        }
+    }
+
+    /// Returns the inner [`SumType`] if this `Term` is a [Self::RuntimeSum].
+    pub fn as_sum(&self) -> Option<&SumType> {
+        match self {
+            Term::RuntimeSum(s) => Some(s),
+            _ => None,
+        }
+    }
 }
 
 impl From<TypeBound> for Term {
@@ -331,6 +347,7 @@ pub struct TermVar {
 impl Term {
     /// Makes a `TypeArg` representing a use (occurrence) of the type variable
     /// with the specified index.
+    ///
     /// `decl` must be exactly that with which the variable was declared.
     #[must_use]
     pub fn new_var_use(idx: usize, decl: impl Into<Term>) -> Self {
@@ -340,6 +357,8 @@ impl Term {
         })
     }
 
+    /// Makes a `Term` representing a use (occurrence) of a variable whose
+    /// kind is a [Term::ListType] of [Term::RuntimeType].
     #[must_use]
     pub fn new_row_var_use(idx: usize, b: TypeBound) -> Self {
         Self::new_var_use(idx, Term::new_list_type(b))
