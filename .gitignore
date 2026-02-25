@@ -34,6 +34,7 @@ htmlcov/
 
 # Jupyter Notebook
 .ipynb_checkpoints
+jupyter_execute
 
 # Environments
 .env

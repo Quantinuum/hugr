@@ -24,6 +24,7 @@ myst_enable_extensions = [
     "colon_fence",
     "amsmath",
 ]
+nb_execution_mode = "off"
 
 html_theme = "furo"
 

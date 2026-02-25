@@ -86,6 +86,12 @@ gen-extensions:
 build-py-docs:
     cd hugr-py/docs && ./build.sh
 
+clean-py-docs:
+    rm -rf hugr-py/docs/build
+    rm -rf hugr-py/docs/jupyter_execute
+    rm -rf hugr-py/docs/api-docs/generated
+    rm -rf hugr-py/docs/.jupyter_cache
+
 # Run rust semver-checks to detect breaking changes since the last release.
 semver-checks:
     cargo semver-checks
