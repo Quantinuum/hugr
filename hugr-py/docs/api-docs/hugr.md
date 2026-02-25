@@ -1,3 +1,6 @@
+---
+file_format: mystnb
+---
 # HUGR design document
 
 The Hierarchical Unified Graph Representation (HUGR, pronounced *hugger*
@@ -93,14 +96,15 @@ outlined in [Node Operations](#node-operations)
 but may be [extended by Extensions](#extension-system).
 
 ### Simple HUGR example
+```{eval-rst}
+.. mermaid::
 
-```mermaid
-graph  LR
-    Input -->|0:0| H
-    H -->|0:0| CNOT
-    Input -->|1:1| CNOT
-    CNOT -->|0:0| Output
-    CNOT -->|1:1| Output
+  graph  LR
+      Input -->|0:0| H
+      H -->|0:0| CNOT
+      Input -->|1:1| CNOT
+      CNOT -->|0:0| Output
+      CNOT -->|1:1| Output
 ```
 
 In the example above, a 2-qubit circuit is described as a dataflow
@@ -307,29 +311,31 @@ The example below shows two DFGs, one nested within the other. Each has an Input
 and an Output node, whose outputs and inputs respectively match the inputs and
 outputs of the containing DFG.
 
-```mermaid
-flowchart
-    direction TB
-    subgraph DFG0
-        direction TB
-        Input0 --> op0
-        Input0 --> op1
-        op0 --> op1
-        subgraph DFG1
-            direction TB
-            Input1 --> op2
-            Input1 --> op3
-            op2 --> op4
-            op3 --> op4
-            op4 --> Output1
-        end
-        op0 --> DFG1
-        op1 --> DFG1
-        DFG1 --> Output0
-    end
-    A --> DFG0
-    A --> DFG0
-    DFG0 --> B
+```{eval-rst}
+.. mermaid::
+
+  flowchart
+      direction TB
+      subgraph DFG0
+          direction TB
+          Input0 --> op0
+          Input0 --> op1
+          op0 --> op1
+          subgraph DFG1
+              direction TB
+              Input1 --> op2
+              Input1 --> op3
+              op2 --> op4
+              op3 --> op4
+              op4 --> Output1
+          end
+          op0 --> DFG1
+          op1 --> DFG1
+          DFG1 --> Output0
+      end
+      A --> DFG0
+      A --> DFG0
+      DFG0 --> B
 ```
 
 #### Control Flow
