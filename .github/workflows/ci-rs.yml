@@ -353,7 +353,7 @@ jobs:
       - name: Run tests with all features, with coverage instrumentation
         run: cargo llvm-cov --no-report --all-features --doctests
       - name: Run hugr-llvm tests, with coverage instrumentation
-        run: cargo llvm-cov --no-report -p hugr-llvm --features llvm14-0 --doctests
+        run: cargo llvm-cov --no-report -p hugr-llvm --features llvm${{ env.LLVM_FEATURE_NAME }} --doctests
       - name: Run hugr-persistent tests, with coverage instrumentation
         run: cargo llvm-cov --no-report -p hugr-persistent --doctests
       - name: Generate coverage report
