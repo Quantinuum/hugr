@@ -26,7 +26,8 @@ pub struct TypeRow {
 }
 
 /// Row of types and/or row variables, the number of actual types is thus
-/// unknown
+/// unknown.
+///
 /// Legacy alias. Used to indicate a [Term] that `check_term_type`s against
 /// [Term::ListType] of [Term::RuntimeType] (of a [TypeBound]), i.e. one of
 /// * A [Term::Variable] of type [Term::ListType] (of [Term::RuntimeType]...)
