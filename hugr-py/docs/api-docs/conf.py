@@ -13,6 +13,16 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
+    "sphinxcontrib.mermaid",
+    "myst_nb",
+]
+
+myst_enable_extensions = [
+    "dollarmath",
+    "html_image",
+    "attrs_inline",
+    "colon_fence",
+    "amsmath",
 ]
 
 html_theme = "furo"
