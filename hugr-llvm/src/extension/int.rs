@@ -1509,7 +1509,7 @@ mod test {
     }
 
     #[rstest]
-    #[case("inarrow_s", 6, 2, 4)]
+    #[case("inarrow_s", 6, 3, 4)]
     #[case("inarrow_s", 6, 5, (1 << 5) - 1)]
     #[case("inarrow_s", 6, 4, -1)]
     #[case("inarrow_s", 6, 4, -(1 << 4) - 1)]
@@ -1564,13 +1564,7 @@ mod test {
                 Ok(handle.outputs())
             },
         );
-        // select correct integer width
-        match to {
-            2 => assert_eq!(int_exec_ctx.exec_hugr::<i8>(hugr, "main"), arg as i8),
-            4 => assert_eq!(int_exec_ctx.exec_hugr::<i16>(hugr, "main"), arg as i16),
-            5 => assert_eq!(int_exec_ctx.exec_hugr::<i32>(hugr, "main"), arg as i32),
-            _ => panic!("Unsupported int width {to}"),
-        };
+        int_exec_ctx.check_int_hugr(hugr, "main", to, arg as u64, true);
     }
 
     #[rstest]
@@ -1592,8 +1586,7 @@ mod test {
                     .outputs_arr();
                 hugr_builder.finish_hugr_with_outputs([signed]).unwrap()
             });
-        let act = int_exec_ctx.exec_hugr_i64(hugr, "main");
-        assert_eq!(act, val as i64);
+        int_exec_ctx.check_int_hugr(hugr, "main", log_width, val, true);
     }
 
     #[rstest]
@@ -1619,8 +1612,8 @@ mod test {
                     .outputs_arr();
                 hugr_builder.finish_hugr_with_outputs([res]).unwrap()
             });
-        let act = int_exec_ctx.exec_hugr_u64(hugr, "main");
-        assert_eq!(act, (val as u64) + 42);
+        let expected = (val as u64) + 42;
+        int_exec_ctx.check_int_hugr(hugr, "main", log_width, expected, false);
     }
 
     // Log width fixed at 3 (i.e. divmod : Fn(i8, u8) -> (i8, u8)
