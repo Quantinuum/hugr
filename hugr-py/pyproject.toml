@@ -40,7 +40,7 @@ dependencies = [
 hugr = "hugr._hugr:run_cli"
 
 [project.optional-dependencies]
-docs = ["sphinx>=8.1.3,<10.0.0", "furo"]
+docs = ["sphinx>=8.1.3,<10.0.0", "furo", "myst-nb", "sphinxcontrib-mermaid"]
 pytket = ["pytket >= 1.34.0"]
 
 [project.urls]
