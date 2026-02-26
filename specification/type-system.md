@@ -61,14 +61,6 @@ The same mechanism is also used for polymorphic OpDefs, see [Extension Implement
 (extension-tracking)=
 ## Extension Tracking
 
-(extension-tracking)=
-## Extension Tracking
-
-Each function type carries an `Extensions` component that records which extensions
-are required to interpret the node. The identity/lift operation is always available
-for `AnyType`, and this tracking is used to check that operations are only applied
-when their required extensions are available.
-
 Within the type of the Function node, and within the body (Hugr) of a `FuncDefn`,
 types may contain "type variables" referring to those TypeParams.
 The type variable is typically a type, but not necessarily, depending upon the TypeParam.
