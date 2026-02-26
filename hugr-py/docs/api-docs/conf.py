@@ -13,12 +13,14 @@ extensions = [
     "sphinx.ext.autosummary",
     "sphinx.ext.viewcode",
     "sphinx.ext.intersphinx",
+    "myst_parser",
+    "sphinxcontrib.mermaid",
 ]
 
 html_theme = "furo"
 
 
-html_title = f"HUGR-py v{hugr.__version__} API documentation."
+html_title = f"HUGR-py v{hugr.__version__} documentation."
 
 html_theme_options = {
     "sidebar_hide_name": False,
@@ -33,6 +35,15 @@ autosummary_generate = True
 templates_path = ["_templates"]
 exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "conftest.py"]
 
+myst_enable_extensions = [
+    "html_image",
+    "colon_fence",
+    "dollarmath",
+    "amsmath",
+    "attrs_inline",
+]
+myst_fence_as_directive = ["mermaid"]
+mermaid_params = ["--theme", "dark", "--backgroundColor", "transparent"]
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
