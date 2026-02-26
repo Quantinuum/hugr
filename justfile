@@ -86,6 +86,11 @@ gen-extensions:
 build-py-docs:
     cd hugr-py/docs && ./build.sh
 
+# Clean the files generating by the sphinx build in hugr-py/docs.
+clean-py-docs:
+    rm -rf hugr-py/docs/build
+    rm -rf hugr-py/docs/api-docs/generated
+
 # Run rust semver-checks to detect breaking changes since the last release.
 semver-checks:
     cargo semver-checks
