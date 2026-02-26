@@ -1,9 +1,11 @@
 # Configuration file for the Sphinx documentation builder.  # noqa: INP001
 # See https://www.sphinx-doc.org/en/master/usage/configuration.html
+from datetime import datetime
+
 import hugr
 
 project = "HUGR Python"
-copyright = "2025, Quantinuum"
+copyright = f"{datetime.now().year}, Quantinuum"
 author = "Quantinuum"
 
 extensions = [
