@@ -139,6 +139,9 @@ class LocalScope(PassScopeBase, Enum, metaclass=ABCEnumMeta):
     If the entrypoint is the module root, does nothing.
 
     The pass is allowed, but not required, to optimize descendant regions too.
+    (For passes where it makes sense to distinguish flat from `EntrypointRecursive`,
+    this is encouraged, but for many passes it does not make sense so both `EntrypointXXX`
+    variants may behave the same.)
 
     - `recursive`: `false`.
     """
@@ -167,12 +170,15 @@ class LocalScope(PassScopeBase, Enum, metaclass=ABCEnumMeta):
 
 
 class GlobalScope(PassScopeBase, Enum, metaclass=ABCEnumMeta):
-    """Run the pass on the whole Hugr. Different variants specify which nodes in the
-    Hugr should have their interface preserved by optimization passes.
+    """Run the pass on the whole Hugr, regardless of the entrypoint.
 
-    (Interface means signature/value ports, as well as static ports, and their types;
-    also name (if public) for linking; and whether the node is a valid dataflow child
-    or is a `DataflowBlock`, `ExitBlock` or `Module`).
+    For lowering passes, signature changes etc. should be applied across the Hugr.
+
+    For optimization passes, different variants specify which nodes in the Hugr
+    must have their interface preserved. (Interface means signature/value ports,
+    as well as static ports, and their types; also name (if public) for linking;
+    and whether the node is a valid dataflow child or is a `DataflowBlock`,
+    `ExitBlock` or `Module`).
 
     - `root`: The hugr module_root
     - `recursive`: true
