@@ -279,6 +279,7 @@ load\_constants, and other such
 tidies. This might be global, or by tracking which parts of the Hugr
 have been touched.
 
+(metadata-updates-on-replacement)=
 ## Metadata updates on replacement
 
 When requesting a replacement on Γ the caller may optionally provide

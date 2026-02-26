@@ -1,3 +1,4 @@
+(standard-library)=
 # Standard Library
 
 A collection of extensions form the "standard library" for HUGR, and are defined
@@ -28,7 +29,7 @@ so must be supported by all third-party tooling.
 | `new_array<N, T>` | `T` x N      | `array<N, T>` | Create an array from all the inputs.                                                                                                                                                                               |
 | `panic`           | `error`, ... | ...           | Immediately end execution and pass contents of error to context. Inputs following the `error`, and all outputs, are arbitrary; these only exist so that structural constraints such as linearity can be satisfied. |
 
-[^1] The existence of an output stream, and the processing of it either during
+[^1]: The existence of an output stream, and the processing of it either during
 or after program execution, is runtime-dependent. If no output stream exists
 then the `print` function is a no-op.
 
@@ -50,6 +51,7 @@ The following operations are defined:
 Note that an `and<0>` operation produces the constant value "true" and an
 `or<0>` operation produces the constant value "false".
 
+(arithmetic-extensions)=
 ## Arithmetic Extensions
 
 Types and operations for integer and
@@ -189,7 +191,7 @@ except where stated.
 | `fceil`           | `float64`            | `float64` | ceiling                                                                  |
 | `ftostring`       | `float64`            | `string`  | string representation[^2]                                                  |
 
-[^2] The exact specification of the float-to-string conversion is
+[^2]: The exact specification of the float-to-string conversion is
 implementation-dependent.
 
 ### `arithmetic.conversions`

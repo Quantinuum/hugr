@@ -33,11 +33,12 @@ Type ::= Sum([#]) -- disjoint union of rows of other types, tagged by unsigned i
 
 Tuples are represented as Sum types with a single variant. The type `(int<1>,int<2>)` is represented as `Sum([#(int<1>,int<2>)])`.
 
-The majority of types will be Opaque ones defined by extensions including the [standard library](#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
+The majority of types will be Opaque ones defined by extensions including the [standard library](stdlib.md#standard-library). However a number of types can be constructed using only the core type constructors: for example the empty tuple type, aka `unit`, with exactly one instance (so 0 bits of data); the empty sum, with no instances; the empty Function type (taking no arguments and producing no results - `void -> void`); and compositions thereof.
 
 Sums are `CopyableType` if all their components are; they are also fixed-size if their components are.
 
-### Polymorphism
+(polymorphism)=
+## Polymorphism
 
 While function *values* passed around the graph at runtime have types that are monomorphic,
 `FuncDecl` and `FuncDefn` nodes have not types but *type schemes* that are *polymorphic*---that is,
@@ -56,6 +57,9 @@ TypeParam ::= Type(Any|Copyable)
 ```
 
 The same mechanism is also used for polymorphic OpDefs, see [Extension Implementation](#extension-implementation).
+
+(extension-tracking)=
+## Extension Tracking
 
 Within the type of the Function node, and within the body (Hugr) of a `FuncDefn`,
 types may contain "type variables" referring to those TypeParams.
@@ -89,7 +93,7 @@ a valid type as long as the TypeArgs match the declared TypeParams, which can be
 (Note that within a polymorphic type scheme, type variables of kind `List`, `Tuple` or `Opaque` will only be usable
 as arguments to Opaque types---see [Extension System](#extension-system).)
 
-#### Row Variables
+### Row Variables
 
 Type variables of kind `TypeParam::List(TypeParam::Type(_))` are known as
 "row variables" and along with type parameters of the same kinds are given special
@@ -111,6 +115,7 @@ For example, a polymorphic FuncDefn might declare a row variable X of kind
 
 Note that since a row variable does not have kind Type, it cannot be used as the type of an edge.
 
+(extension-system)=
 ## Extension System
 
 ### Goals and constraints
@@ -169,6 +174,7 @@ Ultimately though, we cannot avoid the "stringly" type problem if we
 want *runtime* extensibility - extensions that can be specified and used
 at runtime. In many cases this is desirable.
 
+(extension-implementation)=
 ### Extension Implementation
 
 Extensions may provide a number of named **TypeDef**s and **OpDef**s.
@@ -191,7 +197,7 @@ However, for OpDef's, greater flexibility is allowed: each OpDef *either*
 For example, the TypeDef for `array` in the prelude declares two TypeParams: a `BoundedUSize`
 (the array length) and a `Type`. Any valid instantiation (e.g. `array<5, usize>`) is a type.
 Much the same applies for OpDef's that provide a `Function` type, but binary `compute_signature`
-introduces the possibility of failure (see full details in [appendix](#appendix-3-binary-compute_signature)).
+introduces the possibility of failure (see full details in [appendix](appendix-compute-signature.md)).
 
 When serializing the node, we also serialize the type arguments; we can also serialize
 the resulting (computed) type with the operation, and this will be useful when the type

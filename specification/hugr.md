@@ -12,7 +12,7 @@ or at runtime. Each node is uniquely identified by its **node index**,
 although this may not be stable under graph structure modifications.
 Each node is defined by its **operation**; the possible operations are
 outlined in [Node Operations](#node-operations)
-but may be [extended by Extensions](#extension-system).
+but may be [extended by Extensions](type-system.md#extension-system).
 
 ## Simple HUGR example
 
@@ -51,7 +51,7 @@ carry an edge weight:
 - `Const` edges are similar to `Value` edges but carry static data (knowable at
   compilation time). These have as edge weight a `CopyableType`.
 - `Function` edges refer to a statically-known function, but with a type scheme
-  that (unlike values) may be polymorphic---see [Polymorphism](#polymorphism).
+  that (unlike values) may be polymorphic---see [Polymorphism](type-system.md#polymorphism).
 - `ControlFlow` edges represent possible flows of control from one part of the
   program to another. They have no edge weight.
 - `Hierarchy` edges express the relationship between container nodes and their
@@ -65,7 +65,7 @@ A `Value` edge can carry data of any `AnyType`: these include the `CopyableType`
 (which can be freely copied or discarded - i.e. ordinary classical data)
 as well as anything which cannot - e.g. quantum data.
 A `Const` edge can only carry a `CopyableType`. For
-more details see the [Type System](#type-system) section.
+more details see the [Type System](type-system.md) section.
 
 As well as the type, Dataflow edges are also parametrized by a
 `Locality`, which declares whether the edge crosses levels in the hierarchy. See
@@ -146,6 +146,7 @@ most one `Order` edge between any two nodes.
 from one region (basic block) of the program to another. These are
 always local, i.e. source and target have the same parent.
 
+(node-operations)=
 ## Node Operations
 
 Here we define some core types of operation required to represent
@@ -163,7 +164,7 @@ edges. The following operations are *only* valid as immediate children of a
 `Module` node.
 
 - `FuncDecl`: an external function declaration. The name of the function,
-  a list of type parameters (TypeParams, see [Type System](#type-system))
+  a list of type parameters (TypeParams, see [Type System](type-system.md))
   and function attributes (relevant for compilation)
   define the node weight. The node has an outgoing `Function`
   edge for each use of the function. The function name is used at link time to
@@ -180,6 +181,7 @@ edges. The following operations are *only* valid as immediate children of a
 
 There may also be other [scoped definitions](#scoped-definitions).
 
+(scoped-definitions)=
 ### Scoped Definitions
 
 The following operations are valid at the module level as well as in dataflow
@@ -196,6 +198,7 @@ root Module node has a `FuncDefn` child with function name
 "main", that is the designated entry point. Modules that act as libraries need
 not be executable.
 
+(dataflow)=
 ### Dataflow
 
 Within dataflow regions, which include function definitions,
@@ -254,6 +257,7 @@ flowchart
     DFG0 --> B
 ```
 
+(control-flow)=
 ### Control Flow
 
 In a dataflow graph, the evaluation semantics are simple: all nodes in
@@ -362,6 +366,7 @@ flowchart TB
  L_Process_Conditional_0@{ curve: natural }
 ```
 
+(control-flow-graphs)=
 #### Control Flow Graphs
 
 When Conditional and `TailLoop` are not sufficient, the HUGR allows
@@ -471,6 +476,7 @@ flowchart
     linkStyle 25,26,27,28,29,30,31 stroke:#ff3,stroke-width:4px;
 ```
 
+(hierarchical-relationships-and-constraints)=
 ### Hierarchical Relationships and Constraints
 
 To clarify the possible hierarchical relationships, using the operation
@@ -514,6 +520,7 @@ The common parent may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 | Value          | Local, Ext or Dom - see [Edge Locality](#edge-locality) |
 | Static         | Local or Ext - see [Edge Locality](#edge-locality) |
 
+(edge-locality)=
 ## Edge Locality
 
 There are three possible `CopyableType` edge localities:
@@ -694,7 +701,7 @@ flowchart
 
 Each node in the HUGR may have arbitrary metadata attached to it. This
 is preserved during graph modifications, and,
-[when possible](#metadata-updates-on-replacement), copied when rewriting.
+[when possible](rewriting.md#metadata-updates-on-replacement), copied when rewriting.
 
 For each node, the metadata is a dictionary keyed by strings. Keys are
 used to identify applications or users so these do not (accidentally)
@@ -711,7 +718,7 @@ engine)?
 -->
 Reserved metadata keys used by the HUGR tooling are prefixed with `core.`.
 Use of this prefix by external tooling may cause issues.
-Keys used by the reference implementation are described in the separate [Metadata](https://github.com/quantinuum/hugr/blob/main/specification/metadata.md) documentation.
+Keys used by the reference implementation are described in the separate [Metadata](metadata.md) documentation.
 
 <!---
 
