@@ -26,11 +26,14 @@ use itertools::{Either, Itertools};
 #[derive(Debug, Clone, PartialEq, Eq, derive_more::From, Hash, derive_more::Display)]
 #[non_exhaustive]
 pub enum PassScope {
-    /// Run the pass only on the entrypoint region.
+    /// Run the pass on the entrypoint region.
     ///
     /// If the entrypoint is the module root, does nothing.
     ///
     /// The pass is allowed, but not required, to optimize descendant regions too.
+    /// (For passes where it makes sense to distinguish flat from [Self::EntrypointRecursive],
+    /// this is encouraged, but for many passes it does not make sense so both EntrypointXXX
+    /// variants may behave the same.)
     ///
     /// - `root`: The entrypoint node, if it is not the module root.
     /// - `preserve_interface`: the entrypoint node
