@@ -10,7 +10,7 @@
 //! that is not a direct descendent (subject to causality constraints).
 //!
 //! The specification can be found
-//! [here](https://github.com/CQCL/hugr/blob/main/specification/index.md).
+//! [here](https://github.com/CQCL/hugr/blob/main/specification/hugr.md).
 //!
 //! This crate provides a Rust implementation of HUGR and the standard extensions defined in the
 //! specification.

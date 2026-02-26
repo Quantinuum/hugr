@@ -14,7 +14,7 @@ This is the API documentation for the HUGR Python package.
 .. toctree::
 
    Github <https://github.com/quantinuum/hugr>
-   HUGR Specification <https://github.com/quantinuum/hugr/blob/main/specification/index.md>
+   HUGR Specification <https://github.com/quantinuum/hugr/blob/main/specification/hugr.md>
    pypi <https://pypi.org/project/hugr/>
 
 

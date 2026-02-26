@@ -32,7 +32,7 @@ body:
       description: Where is the documentation issue?
       placeholder: |
         - URL: https://...
-        - File: docs/spec/index.md
+        - File: docs/spec/hugr.md
         - API docs for: hugr::ops::OpType
 
   - type: textarea

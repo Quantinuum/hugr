@@ -16,7 +16,7 @@ The API documentation for this package is [here](https://quantinuum.github.io/hu
 This library is intended to be used as a dependency for other high-level tools.
 See [`guppylang`][] and [`tket2`][] for examples of such tools.
 
-The HUGR specification is [here](https://github.com/quantinuum/hugr/blob/main/specification/index.md).
+The HUGR specification is [here](https://github.com/quantinuum/hugr/blob/main/specification/hugr.md).
 
   [`guppylang`]: https://pypi.org/project/guppylang/
   [`tket2`]: https://github.com/quantinuum/tket2

@@ -4,7 +4,7 @@
 //!
 //! See the [specification] and [`ExtensionSetDeclaration`] for more details.
 //!
-//! [specification]: https://github.com/CQCL/hugr/blob/main/specification/index.md#declarative-format
+//! [specification]: https://github.com/CQCL/hugr/blob/main/specification/hugr.md#declarative-format
 //! [`ExtensionSetDeclaration`]: super::ExtensionSetDeclaration
 
 use itertools::Itertools;
