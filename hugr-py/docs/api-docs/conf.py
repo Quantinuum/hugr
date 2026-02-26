@@ -25,6 +25,7 @@ html_theme_options = {
 }
 html_static_path = ["../_static"]
 html_logo = "../_static/hugr_logo_no_bg.svg"
+html_show_sourcelink = False
 
 # General sphinx configs
 autosummary_generate = True
@@ -47,10 +48,13 @@ myst_enable_extensions = [
     "attrs_inline",
 ]
 myst_fence_as_directive = ["mermaid"]
+
+# Mermaid configs
+#
+# This doesn't actually work, the theme is still set to default :/
+# See https://github.com/mgaitan/sphinxcontrib-mermaid/issues/39
 mermaid_params = ["--theme", "dark", "--backgroundColor", "transparent"]
 
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
 }
-
-html_show_sourcelink = False
