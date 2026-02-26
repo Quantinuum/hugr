@@ -17,24 +17,28 @@ extensions = [
     "sphinxcontrib.mermaid",
 ]
 
+# HTML configs
 html_theme = "furo"
-
-
 html_title = f"HUGR-py v{hugr.__version__} documentation."
-
 html_theme_options = {
     "sidebar_hide_name": False,
 }
-
 html_static_path = ["../_static"]
-
 html_logo = "../_static/hugr_logo_no_bg.svg"
 
+# General sphinx configs
 autosummary_generate = True
-
 templates_path = ["_templates"]
-exclude_patterns = ["_build", "Thumbs.db", ".DS_Store", "conftest.py"]
+exclude_patterns = [
+    "_build",
+    "Thumbs.db",
+    ".DS_Store",
+    "conftest.py",
+    # Included inside the index
+    "specification/motivation.md",
+]
 
+# Support markdown files for the specification docs.
 myst_enable_extensions = [
     "html_image",
     "colon_fence",

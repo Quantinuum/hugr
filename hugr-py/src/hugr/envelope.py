@@ -19,11 +19,13 @@ Envelope header
 
 The binary header format is 10 bytes, with the following fields:
 
-| Field  | Size (bytes) | Description |
-|--------|--------------|-------------|
++--------+--------------+--------------------------------------------------------------------------------+
+| Field  | Size (bytes) | Description                                                                    |
++========+==============+================================================================================+
 | Magic  | 8            | :class:`hugr.envelope.MAGIC_NUMBERS` constant identifying the envelope format. |
-| Format | 1            | :class:`hugr.envelope.EnvelopeFormat` describing the payload format. |
-| Flags  | 1            | Additional configuration flags. |
+| Format | 1            | :class:`hugr.envelope.EnvelopeFormat` describing the payload format.           |
+| Flags  | 1            | Additional configuration flags.                                                |
++--------+--------------+--------------------------------------------------------------------------------+
 
 Flags:
 

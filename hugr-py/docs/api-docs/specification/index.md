@@ -8,7 +8,7 @@ operations, that facilitates compilation and encodes complete programs,
 with subprograms that may execute on different (quantum and classical)
 targets.
 
-```{include} ../../../../specification/index.md
+```{include} ../../../../specification/motivation.md
 ```
 
 ```{toctree}
