@@ -1,10 +1,11 @@
-HUGR Python API Documentation
+HUGR Documentation
 ==================================
 
-This is the API documentation for the HUGR Python package.
+Python API v\ |hugr_py_version| reference
+-----------------------------------------
 
 .. autosummary::
-   :caption: API Reference
+   :caption: Python API Reference
    :toctree: generated
    :template: autosummary/module.rst
    :recursive:
@@ -12,27 +13,33 @@ This is the API documentation for the HUGR Python package.
    hugr
 
 Indices and tables
-------------------
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
 
-Hugr specification
-~~~~~~~~~~~~~~~~~~
+External links
+
+.. toctree::
+
+   PyPI <https://pypi.org/project/hugr/>
+   Github <https://github.com/quantinuum/hugr/tree/main/hugr-py>
+
+Rust API v\ |hugr_rs_version| reference
+---------------------------------------
+
+.. toctree::
+   :caption: Rust API Reference
+
+   Rust crate <https://crates.io/crates/hugr >
+   Rust API docs <https://docs.rs/hugr/latest/hugr/>
+   Github <https://github.com/quantinuum/hugr/tree/main/hugr>
+
+HUGR specification
+------------------
 
 .. toctree::
    :caption: Specification
-   :maxdepth: 2
+   :maxdepth: 1
 
    specification/index
-
-External links
-~~~~~~~~~~~~~~
-
-.. toctree::
-   :caption: Links
-
-   Github <https://github.com/quantinuum/hugr>
-   PyPI <https://pypi.org/project/hugr/>
-   Rust API <https://docs.rs/hugr/latest/hugr/>

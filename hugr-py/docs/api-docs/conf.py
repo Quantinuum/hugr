@@ -1,9 +1,13 @@
 # Configuration file for the Sphinx documentation builder.  # noqa: INP001
 # See https://www.sphinx-doc.org/en/master/usage/configuration.html
+from pathlib import Path
+
+import tomllib
+
 import hugr
 
-project = "HUGR Python"
-copyright = "2025, Quantinuum"
+project = "HUGR"
+copyright = "2024, Quantinuum"
 author = "Quantinuum"
 
 extensions = [
@@ -20,7 +24,7 @@ extensions = [
 
 # HTML configs
 html_theme = "furo"
-html_title = f"HUGR-py v{hugr.__version__} documentation"
+html_title = "HUGR documentation"
 html_theme_options = {
     "sidebar_hide_name": False,
 }
@@ -60,3 +64,28 @@ mermaid_params = ["--theme", "dark", "--backgroundColor", "transparent"]
 intersphinx_mapping = {
     "python": ("https://docs.python.org/3/", None),
 }
+
+
+# -----------------------------------------------------------------------------
+# Custom variables used in the rendered documents.
+# -----------------------------------------------------------------------------
+
+
+def _read_hugr_rs_version() -> str:
+    """Read the hugr crate version from hugr/Cargo.toml.
+
+    Note: `tomllib` is only available in Python 3.11 and later.
+    """
+    cargo_toml = Path(__file__).resolve().parents[3] / "hugr" / "Cargo.toml"
+    with cargo_toml.open("rb") as f:
+        data = tomllib.load(f)
+    return data["package"]["version"]
+
+
+hugr_py_version = hugr.__version__
+hugr_rs_version = _read_hugr_rs_version()
+
+rst_epilog = f"""
+.. |hugr_py_version| replace:: {hugr_py_version}
+.. |hugr_rs_version| replace:: {hugr_rs_version}
+"""
