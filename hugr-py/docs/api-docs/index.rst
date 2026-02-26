@@ -4,6 +4,8 @@ HUGR Documentation
 Python API v\ |hugr_py_version| reference
 -----------------------------------------
 
+API documentation
+
 .. autosummary::
    :caption: Python API Reference
    :toctree: generated
