@@ -221,7 +221,7 @@ jobs:
         id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.89"
+          toolchain: "1.90"
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@master
         with:
