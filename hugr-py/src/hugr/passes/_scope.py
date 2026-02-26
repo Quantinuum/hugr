@@ -233,21 +233,18 @@ class GlobalScope(PassScopeBase, Enum, metaclass=ABCEnumMeta):
                 continue
             match self:
                 case GlobalScope.PRESERVE_ALL:
-                    pass
+                    pass  # Fall through to yield all module children
                 case (
                     GlobalScope.PRESERVE_ENTRYPOINT  # entrypoint == module_root above
                     | GlobalScope.PRESERVE_PUBLIC
                 ):
                     op = hugr[n].op
                     match op:
-                        case ops.FuncDefn():
-                            if op.visibility != "Public":
-                                continue
-                        case ops.FuncDecl():
+                        case ops.FuncDefn() | ops.FuncDecl():
                             if op.visibility != "Public":
                                 continue
                         case _:
-                            pass
+                            continue  # Not a public function, so don't preserve
             yield n
 
 
