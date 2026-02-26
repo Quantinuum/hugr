@@ -12,7 +12,7 @@ or at runtime. Each node is uniquely identified by its **node index**,
 although this may not be stable under graph structure modifications.
 Each node is defined by its **operation**; the possible operations are
 outlined in [Node Operations](#node-operations)
-but may be [extended by Extensions](type-system.md#extension-system).
+but may be [extended by Extensions](extensions.md).
 
 ## Simple HUGR example
 
@@ -226,7 +226,7 @@ the following basic dataflow operations are available (in addition to the
   The signature of the operation comprises the output signature of the child
   Input node (as input) and the input signature of the child Output node (as
   output).
-- `ExtensionOp`: an operation defined by an [Extension](#extension-system).
+- `ExtensionOp`: an operation defined by an [Extension](extensions.md).
 
 The example below shows two DFGs, one nested within the other. Each has an Input
 and an Output node, whose outputs and inputs respectively match the inputs and

@@ -17,6 +17,7 @@ This specification is organized into the following sections:
 - [Motivation](motivation.md)
 - [HUGR: Structure and Semantics](hugr.md)
 - [Type System](type-system.md)
+- [Extension system](extensions.md)
 - [Replacement and Pattern Matching](rewriting.md)
 - [Serialization](serialization.md)
 - [Standard Library](stdlib.md)
