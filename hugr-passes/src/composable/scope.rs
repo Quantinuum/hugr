@@ -99,8 +99,6 @@ pub enum Preserve {
     /// entrypoint indicating where execution will begin.
     ///
     /// If the entrypoint is the module root, then the same as [Self::Public].
-    // ALAN could be Self::All in such case, but if so then Self::Public
-    // with entrypoint==module_root should also be equivalent to Self::All, so no.
     ///
     /// - `preserve_interface`: if the entrypoint node is the module root, then all
     ///   children of the module root; otherwise, just the entrypoint node.
