@@ -140,8 +140,8 @@ class LocalScope(PassScopeBase, Enum, metaclass=ABCEnumMeta):
 
     The pass is allowed, but not required, to optimize descendant regions too.
     (For passes where it makes sense to distinguish flat from `EntrypointRecursive`,
-    this is encouraged, but for many passes it does not make sense so both `EntrypointXXX`
-    variants may behave the same.)
+    this is encouraged, but for many passes it does not make sense so both
+    `EntrypointXXX` variants may behave the same.)
 
     - `recursive`: `false`.
     """
