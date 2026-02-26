@@ -1,1 +1,2 @@
-../../../../specification/motivation.md
+```{include} ../../../../specification/motivation.md
+```

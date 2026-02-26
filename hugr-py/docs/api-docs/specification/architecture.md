@@ -1,1 +1,2 @@
-../../../../specification/architecture.md
+```{include} ../../../../specification/architecture.md
+```

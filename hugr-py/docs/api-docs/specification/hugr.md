@@ -1,1 +1,2 @@
-../../../../specification/hugr.md
+```{include} ../../../../specification/hugr.md
+```

@@ -1,1 +1,2 @@
-../../../../specification/serialization.md
+```{include} ../../../../specification/serialization.md
+```

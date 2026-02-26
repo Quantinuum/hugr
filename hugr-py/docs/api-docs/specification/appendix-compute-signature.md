@@ -1,1 +1,2 @@
-../../../../specification/appendix-compute-signature.md
+```{include} ../../../../specification/appendix-compute-signature.md
+```

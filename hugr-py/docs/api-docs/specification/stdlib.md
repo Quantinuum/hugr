@@ -1,1 +1,2 @@
-../../../../specification/stdlib.md
+```{include} ../../../../specification/stdlib.md
+```

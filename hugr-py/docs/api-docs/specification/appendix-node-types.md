@@ -1,1 +1,2 @@
-../../../../specification/appendix-node-types.md
+```{include} ../../../../specification/appendix-node-types.md
+```

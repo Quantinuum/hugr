@@ -1,1 +1,2 @@
-../../../../specification/extensions.md
+```{include} ../../../../specification/extensions.md
+```

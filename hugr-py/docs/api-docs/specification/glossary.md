@@ -1,1 +1,2 @@
-../../../../specification/glossary.md
+```{include} ../../../../specification/glossary.md
+```

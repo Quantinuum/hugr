@@ -1,1 +1,2 @@
-../../../../specification/type-system.md
+```{include} ../../../../specification/type-system.md
+```
