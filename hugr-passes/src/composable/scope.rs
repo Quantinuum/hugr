@@ -19,8 +19,8 @@ use itertools::{Either, Itertools};
 ///
 /// From these, [PassScope::regions] and [PassScope::in_scope] can be derived.
 ///
-/// A pass will always optimize the entrypoint region, unless it is set to the
-/// module root.
+/// A pass will always optimize the entrypoint region, unless the entrypoint
+/// is the module root.
 //
 // This enum should be kept in sync with the `PassScope` enum in `hugr-py`.
 #[derive(Debug, Clone, PartialEq, Eq, derive_more::From, Hash, derive_more::Display)]
