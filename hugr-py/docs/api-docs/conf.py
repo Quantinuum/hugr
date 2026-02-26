@@ -19,7 +19,7 @@ extensions = [
 
 # HTML configs
 html_theme = "furo"
-html_title = f"HUGR-py v{hugr.__version__} documentation."
+html_title = f"HUGR-py v{hugr.__version__} documentation"
 html_theme_options = {
     "sidebar_hide_name": False,
 }
