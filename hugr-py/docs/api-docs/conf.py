@@ -2,8 +2,6 @@
 # See https://www.sphinx-doc.org/en/master/usage/configuration.html
 from pathlib import Path
 
-import tomllib
-
 import hugr
 
 project = "HUGR"
@@ -72,10 +70,15 @@ intersphinx_mapping = {
 
 
 def _read_hugr_rs_version() -> str:
-    """Read the hugr crate version from hugr/Cargo.toml.
-
-    Note: `tomllib` is only available in Python 3.11 and later.
-    """
+    """Read the hugr crate version from hugr/Cargo.toml."""
+    try:
+        # Note: `tomllib` is only available in Python 3.11 and later.
+        #
+        # Docs are generated with Python 3.14, but we catch the ImportError
+        # here to avoid breaking the tests.
+        import tomllib  # type: ignore[import-not-found]
+    except ModuleNotFoundError:
+        return " unknown"
     cargo_toml = Path(__file__).resolve().parents[3] / "hugr" / "Cargo.toml"
     with cargo_toml.open("rb") as f:
         data = tomllib.load(f)
