@@ -7,7 +7,7 @@ import tomllib
 import hugr
 
 project = "HUGR"
-copyright = "2024, Quantinuum"
+copyright = "2026, Quantinuum"
 author = "Quantinuum"
 
 extensions = [
