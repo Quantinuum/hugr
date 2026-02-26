@@ -18,7 +18,7 @@ use crate::ops::{NamedOp, Value};
 use crate::types::type_param::{TypeArg, TypeParam};
 use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, SumType, Term, Type,
-    TypeBound, TypeName, TypeRV, TypeRow, TypeRowRV,
+    TypeBound, TypeName, TypeRow, TypeRowRV,
 };
 use crate::utils::sorted_consts;
 use crate::{Extension, type_row};
@@ -107,23 +107,22 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
                 extension_ref,
             )
             .unwrap();
+        let panic_exit_sig = PolyFuncTypeRV::new(
+            [
+                TypeParam::new_list_type(TypeBound::Linear),
+                TypeParam::new_list_type(TypeBound::Linear),
+            ],
+            FuncValueType::new(
+                TypeRowRV::new([Type::new_extension(error_type.clone())])
+                    .concat(TypeRowRV::just_row_var(0, TypeBound::Linear)),
+                TypeRowRV::just_row_var(1, TypeBound::Linear),
+            ),
+        );
         prelude
             .add_op(
                 PANIC_OP_ID,
                 "Panic with input error".to_string(),
-                PolyFuncTypeRV::new(
-                    [
-                        TypeParam::new_list_type(TypeBound::Linear),
-                        TypeParam::new_list_type(TypeBound::Linear),
-                    ],
-                    FuncValueType::new(
-                        vec![
-                            TypeRV::new_extension(error_type.clone()),
-                            TypeRV::new_row_var_use(0, TypeBound::Linear),
-                        ],
-                        vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
-                    ),
-                ),
+                panic_exit_sig.clone(),
                 extension_ref,
             )
             .unwrap();
@@ -131,19 +130,7 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             .add_op(
                 EXIT_OP_ID,
                 "Exit with input error".to_string(),
-                PolyFuncTypeRV::new(
-                    [
-                        TypeParam::new_list_type(TypeBound::Linear),
-                        TypeParam::new_list_type(TypeBound::Linear),
-                    ],
-                    FuncValueType::new(
-                        vec![
-                            TypeRV::new_extension(error_type),
-                            TypeRV::new_row_var_use(0, TypeBound::Linear),
-                        ],
-                        vec![TypeRV::new_row_var_use(1, TypeBound::Linear)],
-                    ),
-                ),
+                panic_exit_sig,
                 extension_ref,
             )
             .unwrap();
@@ -334,7 +321,7 @@ pub fn either_type(ty_left: impl Into<TypeRowRV>, ty_right: impl Into<TypeRowRV>
 
 /// A constant optional value with a given value.
 ///
-/// See [`option_type`].
+/// See [`SumType::new_option`].
 #[must_use]
 pub fn const_some(value: Value) -> Value {
     const_some_tuple([value])
@@ -344,7 +331,7 @@ pub fn const_some(value: Value) -> Value {
 ///
 /// For single values, use [`const_some`].
 ///
-/// See [`option_type`].
+/// See [`SumType::new_option`].
 pub fn const_some_tuple(values: impl IntoIterator<Item = Value>) -> Value {
     const_right_tuple(TypeRow::new(), values)
 }
@@ -375,11 +362,7 @@ pub fn const_left_tuple(
     ty_right: impl Into<TypeRowRV>,
 ) -> Value {
     let values = values.into_iter().collect_vec();
-    let types: TypeRowRV = values
-        .iter()
-        .map(|v| TypeRV::from(v.get_type()))
-        .collect_vec()
-        .into();
+    let types: TypeRowRV = values.iter().map(|v| v.get_type()).collect_vec().into();
     let typ = either_type(types, ty_right);
     Value::sum(0, values, typ).unwrap()
 }
@@ -403,11 +386,7 @@ pub fn const_right_tuple(
     values: impl IntoIterator<Item = Value>,
 ) -> Value {
     let values = values.into_iter().collect_vec();
-    let types: TypeRowRV = values
-        .iter()
-        .map(|v| TypeRV::from(v.get_type()))
-        .collect_vec()
-        .into();
+    let types: TypeRowRV = values.iter().map(|v| v.get_type()).collect_vec().into();
     let typ = either_type(ty_left, types);
     Value::sum(1, values, typ).unwrap()
 }
@@ -642,16 +621,16 @@ impl MakeOpDef for TupleOpDef {
     }
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
-        let rv = TypeRV::new_row_var_use(0, TypeBound::Linear);
-        let tuple_type = TypeRV::new_tuple(vec![rv.clone()]);
+        let rv = TypeRowRV::just_row_var(0, TypeBound::Linear);
+        let tuple_type = Type::new_tuple(rv.clone());
 
         let param = TypeParam::new_list_type(TypeBound::Linear);
         match self {
             TupleOpDef::MakeTuple => {
-                PolyFuncTypeRV::new([param], FuncValueType::new([rv], [tuple_type]))
+                PolyFuncTypeRV::new([param], FuncValueType::new(rv, [tuple_type]))
             }
             TupleOpDef::UnpackTuple => {
-                PolyFuncTypeRV::new([param], FuncValueType::new([tuple_type], [rv]))
+                PolyFuncTypeRV::new([param], FuncValueType::new([tuple_type], rv))
             }
         }
         .into()
@@ -711,14 +690,8 @@ impl MakeExtensionOp for MakeTuple {
         let [TypeArg::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        let tys: Result<Vec<Type>, _> = elems
-            .iter()
-            .map(|a| match a {
-                TypeArg::Runtime(ty) => Ok(ty.clone()),
-                _ => Err(SignatureError::InvalidTypeArgs),
-            })
-            .collect();
-        Ok(Self(tys?.into()))
+        let tys = elems.clone().try_into().map_err(SignatureError::from)?;
+        Ok(Self(tys))
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
@@ -766,14 +739,8 @@ impl MakeExtensionOp for UnpackTuple {
         let [Term::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        let tys: Result<Vec<Type>, _> = elems
-            .iter()
-            .map(|a| match a {
-                Term::Runtime(ty) => Ok(ty.clone()),
-                _ => Err(SignatureError::InvalidTypeArgs),
-            })
-            .collect();
-        Ok(Self(tys?.into()))
+        let tys = elems.clone().try_into().map_err(SignatureError::from)?;
+        Ok(Self(tys))
     }
 
     fn type_args(&self) -> Vec<Term> {
@@ -881,10 +848,10 @@ impl MakeExtensionOp for Noop {
         Self: Sized,
     {
         let _def = NoopDef::from_def(ext_op.def())?;
-        let [TypeArg::Runtime(ty)] = ext_op.args() else {
+        let [t] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        Ok(Self(ty.clone()))
+        Ok(Self(t.clone().try_into().map_err(SignatureError::from)?))
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
@@ -929,7 +896,7 @@ impl MakeOpDef for BarrierDef {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
             vec![TypeParam::new_list_type(TypeBound::Linear)],
-            FuncValueType::new_endo([TypeRV::new_row_var_use(0, TypeBound::Linear)]),
+            FuncValueType::new_endo(TypeRowRV::just_row_var(0, TypeBound::Linear)),
         )
         .into()
     }
@@ -990,16 +957,8 @@ impl MakeExtensionOp for Barrier {
         let [TypeArg::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        let tys: Result<Vec<Type>, _> = elems
-            .iter()
-            .map(|a| match a {
-                TypeArg::Runtime(ty) => Ok(ty.clone()),
-                _ => Err(SignatureError::InvalidTypeArgs),
-            })
-            .collect();
-        Ok(Self {
-            type_row: tys?.into(),
-        })
+        let type_row = elems.clone().try_into().map_err(SignatureError::from)?;
+        Ok(Self { type_row })
     }
 
     fn type_args(&self) -> Vec<TypeArg> {

@@ -7,7 +7,7 @@ use hugr_core::builder::{
 use hugr_core::extension::{SignatureError, TypeDef};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::borrow_array::borrow_array_type_def;
-use hugr_core::types::{CustomType, Signature, Type, TypeArg, TypeEnum, TypeRow};
+use hugr_core::types::{CustomType, Signature, Term, Type, TypeArg, TypeRow};
 use hugr_core::{HugrView, IncomingPort, Node, Wire, hugr::hugrmut::HugrMut, ops::Tag};
 use itertools::Itertools;
 
@@ -106,7 +106,7 @@ pub trait Linearizer {
 
 /// A configuration for implementing [Linearizer] by delegating to
 /// type-specific callbacks, and by  composing them in order to handle compound types
-/// such as [`TypeEnum::Sum`]s.
+/// such as [`Term::RuntimeSum`]s.
 #[derive(Clone)]
 pub struct DelegatingLinearizer {
     // Keyed by lowered type, as only needed when there is an op outputting such
@@ -165,8 +165,7 @@ pub enum LinearizeError {
     #[error(transparent)]
     SignatureError(#[from] SignatureError),
     /// We cannot linearize (insert copy and discard functions) for
-    /// [Variable](TypeEnum::Variable)s, [Row variables](TypeEnum::RowVar),
-    /// or [Alias](TypeEnum::Alias)es.
+    /// [Variable](Term::Variable)s.
     #[error("Cannot linearize type {_0}")]
     UnsupportedType(Box<Type>),
     /// Neither does linearization make sense for copyable types
@@ -191,7 +190,7 @@ impl DelegatingLinearizer {
 
     /// Configures this instance that the specified monomorphic type can be copied and/or
     /// discarded via the provided [`NodeTemplate`]s - directly or as part of a compound type
-    /// e.g. [`TypeEnum::Sum`].
+    /// e.g. [`Term::RuntimeSum`].
     /// `copy` should have exactly one inport, of type `src`, and two outports, of same type;
     /// `discard` should have exactly one inport, of type 'src', and no outports.
     ///
@@ -272,12 +271,13 @@ impl Linearizer for DelegatingLinearizer {
         }
         assert!(num_outports != 1);
 
-        match typ.as_type_enum() {
-            TypeEnum::Sum(sum_type) => {
+        match &**typ {
+            Term::RuntimeSum(sum_type) => {
                 let variants = sum_type
                     .variants()
                     .map(|trv| trv.clone().try_into())
-                    .collect::<Result<Vec<TypeRow>, _>>()?;
+                    .collect::<Result<Vec<TypeRow>, _>>()
+                    .map_err(SignatureError::from)?;
                 let mut cb = ConditionalBuilder::new(
                     variants.clone(),
                     vec![],
@@ -319,7 +319,7 @@ impl Linearizer for DelegatingLinearizer {
                     cb.finish_hugr().unwrap(),
                 )))
             }
-            TypeEnum::Extension(cty) => {
+            Term::RuntimeExtension(cty) => {
                 if let Some((copy, discard)) = self.copy_discard.get(cty) {
                     Ok(if num_outports == 0 {
                         discard.clone()
@@ -352,7 +352,7 @@ impl Linearizer for DelegatingLinearizer {
                     Ok(tmpl)
                 }
             }
-            TypeEnum::Function(_) => panic!("Ruled out above as copyable"),
+            Term::RuntimeFunction(_) => panic!("Ruled out above as copyable"),
             _ => Err(LinearizeError::UnsupportedType(Box::new(typ.clone()))),
         }
     }
@@ -844,10 +844,11 @@ mod test {
         );
         let drop_op = drop_ext.get_op("drop").unwrap();
         lowerer.set_replace_parametrized_op(drop_op, |args, rt| {
-            let [TypeArg::Runtime(ty)] = args else {
+            let [ty] = args else {
                 panic!("Expected just one type")
             };
-            Ok(Some(rt.get_linearizer().copy_discard_op(ty, 0)?))
+            let ty = Type::try_from(ty.clone()).unwrap();
+            Ok(Some(rt.get_linearizer().copy_discard_op(&ty, 0)?))
         });
 
         let build_hugr = |ty: Type| {

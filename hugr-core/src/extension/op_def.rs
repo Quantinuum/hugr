@@ -590,7 +590,7 @@ pub(super) mod test {
     use crate::ops::OpName;
     use crate::std_extensions::collections::list;
     use crate::types::type_param::{TermTypeError, TypeParam};
-    use crate::types::{PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRV};
+    use crate::types::{PolyFuncTypeRV, Signature, Term, Type, TypeArg, TypeBound};
     use crate::{Extension, const_extension_ids};
 
     const_extension_ids! {
@@ -838,7 +838,7 @@ pub(super) mod test {
             def.validate_args(&args, &decls).unwrap();
             assert_eq!(def.compute_signature(&args), Ok(Signature::new_endo([tv])));
             // But not with an external row variable
-            let arg: TypeArg = TypeRV::new_row_var_use(0, TypeBound::Copyable).into();
+            let arg: TypeArg = Term::new_row_var_use(0, TypeBound::Copyable);
             assert_eq!(
                 def.compute_signature(std::slice::from_ref(&arg)),
                 Err(SignatureError::TypeArgMismatch(

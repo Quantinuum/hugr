@@ -286,8 +286,9 @@ mod test {
     }
 
     #[test]
-    fn simple_alias() -> Result<(), BuildError> {
-        let build_result = {
+    #[should_panic(expected = "not implemented: Type aliases")]
+    fn simple_alias() {
+        fn build() -> Result<Hugr, BuildError> {
             let mut module_builder = ModuleBuilder::new();
 
             let qubit_state_type =
@@ -301,10 +302,9 @@ mod test {
                 ),
             )?;
             n_identity(f_build)?;
-            module_builder.finish_hugr()
-        };
-        assert_matches!(build_result, Ok(_));
-        Ok(())
+            Ok(module_builder.finish_hugr()?)
+        }
+        assert_matches!(build(), Ok(_));
     }
 
     #[test]

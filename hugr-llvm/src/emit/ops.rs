@@ -7,7 +7,7 @@ use hugr_core::ops::{
 };
 use hugr_core::{
     HugrView, NodeIndex,
-    types::{SumType, Type, TypeEnum},
+    types::{SumType, Type},
 };
 use inkwell::types::BasicTypeEnum;
 use inkwell::values::{BasicValueEnum, CallableValue};
@@ -101,11 +101,11 @@ where
 }
 
 fn get_exactly_one_sum_type(ts: impl IntoIterator<Item = Type>) -> Result<SumType> {
-    let Some(TypeEnum::Sum(sum_type)) = ts
+    let Some(sum_type) = ts
         .into_iter()
-        .map(|t| t.as_type_enum().clone())
         .exactly_one()
         .ok()
+        .and_then(|t| t.as_sum().cloned())
     else {
         Err(anyhow!("Not exactly one SumType"))?
     };

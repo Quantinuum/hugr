@@ -25,7 +25,7 @@ mod weak_registry;
 pub use weak_registry::WeakExtensionRegistry;
 
 pub(crate) use ops::{collect_op_extension, resolve_op_extensions};
-pub(crate) use types::{collect_op_types_extensions, collect_signature_exts, collect_type_exts};
+pub(crate) use types::{collect_op_types_extensions, collect_signature_exts, collect_term_exts};
 pub(crate) use types_mut::resolve_op_types_extensions;
 use types_mut::{
     resolve_custom_type_exts, resolve_term_exts, resolve_type_exts, resolve_value_exts,
@@ -39,11 +39,11 @@ use crate::core::HugrNode;
 use crate::ops::constant::ValueName;
 use crate::ops::custom::OpaqueOpError;
 use crate::ops::{NamedOp, OpName, OpType, Value};
-use crate::types::{CustomType, FuncTypeBase, MaybeRV, TypeArg, TypeBase, TypeName};
+use crate::types::{CustomType, Signature, Type, TypeArg, TypeName};
 
 /// Update all weak Extension pointers inside a type.
-pub fn resolve_type_extensions<RV: MaybeRV>(
-    typ: &mut TypeBase<RV>,
+pub fn resolve_type_extensions(
+    typ: &mut Type,
     extensions: &WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     let mut used_extensions = WeakExtensionRegistry::default();
@@ -242,8 +242,8 @@ impl<N: HugrNode> ExtensionCollectionError<N> {
     }
 
     /// Create a new error when signature extensions have been dropped.
-    pub fn dropped_signature<RV: MaybeRV>(
-        signature: &FuncTypeBase<RV>,
+    pub fn dropped_signature(
+        signature: &Signature,
         missing_extension: impl IntoIterator<Item = ExtensionId>,
     ) -> Self {
         Self::DroppedSignatureExtensions {
@@ -253,8 +253,8 @@ impl<N: HugrNode> ExtensionCollectionError<N> {
     }
 
     /// Create a new error when signature extensions have been dropped.
-    pub fn dropped_type<RV: MaybeRV>(
-        typ: &TypeBase<RV>,
+    pub fn dropped_type(
+        typ: &Type,
         missing_extension: impl IntoIterator<Item = ExtensionId>,
     ) -> Self {
         Self::DroppedTypeExtensions {
