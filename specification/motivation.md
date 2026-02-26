@@ -1,15 +1,3 @@
-# HUGR Specification
-
-The Hierarchical Unified Graph Representation (HUGR, pronounced *hugger*
-🫂) is a proposed new
-common internal representation used across TKET2, Tierkreis, and the L3
-compiler. The HUGR project aims to give a faithful representation of
-operations, that facilitates compilation and encodes complete programs,
-with subprograms that may execute on different (quantum and classical)
-targets.
-
-![](/hugr/assets/hugr_logo.svg)
-
 ## Motivation
 
 Multiple compilers and tools in the Quantinuum stack use some graph-like
@@ -74,21 +62,3 @@ represent (typed) data or control dependencies.
 - A space efficient and user friendly specification of a subgraph and
   replacement graph, along with an efficient routine for performing
   the replacement.
-
-## Contents
-
-This specification is organized into the following sections:
-
-- [Motivation](#motivation)
-- [HUGR: Structure and Semantics](https://github.com/quantinuum/hugr/blob/main/specification/hugr.md)
-- [Type System](https://github.com/quantinuum/hugr/blob/main/specification/type-system.md)
-- [Replacement and Pattern Matching](https://github.com/quantinuum/hugr/blob/main/specification/rewriting.md)
-- [Serialization](https://github.com/quantinuum/hugr/blob/main/specification/serialization.md)
-- [Standard Library](https://github.com/quantinuum/hugr/blob/main/specification/stdlib.md)
-- [Core Metadata Specification](https://github.com/quantinuum/hugr/blob/main/specification/metadata.md)
-- [Architecture](https://github.com/quantinuum/hugr/blob/main/specification/appendices.md#architecture)
-- [Glossary](https://github.com/quantinuum/hugr/blob/main/specification/appendices.md#glossary)
-- Appendices
-  - [Rationale for Control Flow](https://github.com/quantinuum/hugr/blob/main/specification/appendices.md#appendix-rationale-for-control-flow)
-  - [Node types and their edges](https://github.com/quantinuum/hugr/blob/main/specification/appendices.md#appendix-node-types-and-their-edges)
-  - [Binary `compute_signature`](https://github.com/quantinuum/hugr/blob/main/specification/appendices.md#appendix-binary-compute-signature)
