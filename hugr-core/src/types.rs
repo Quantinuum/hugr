@@ -461,6 +461,9 @@ impl Type {
     /// [TypeDef]: crate::extension::TypeDef
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.0.validate(var_decls)?;
+        // ALAN even this should be only a debug-assert really:
+        // we have no unchecked access from outside crate::types
+        // so it must be a bug in our caching logic if this is wrong:
         check_term_type(&self.0, &self.1.into())?;
         debug_assert!(
             self.1 == TypeBound::Copyable
