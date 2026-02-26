@@ -17,6 +17,7 @@ targets.
 
 hugr
 type-system
+extensions
 rewriting
 serialization
 stdlib
