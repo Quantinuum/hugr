@@ -15,6 +15,8 @@ extensions = [
     "sphinx.ext.intersphinx",
     "myst_parser",
     "sphinxcontrib.mermaid",
+    "sphinxcontrib.icon",
+    "sphinx_favicon",
 ]
 
 # HTML configs
@@ -26,6 +28,7 @@ html_theme_options = {
 html_static_path = ["../_static"]
 html_logo = "../_static/hugr_logo_no_bg.svg"
 html_show_sourcelink = False
+favicons = [{"href": "hugr_logo_no_bg.svg"}]
 
 # General sphinx configs
 autosummary_generate = True

@@ -33,5 +33,6 @@ External links
 .. toctree::
    :caption: Links
 
-   Github <https://github.com/quantinuum/hugr>
-   pypi <https://pypi.org/project/hugr/>
+   :icon:`fa-brands fa-github` Github <https://github.com/quantinuum/hugr>
+   :icon:`fa-brands fa-python` PyPI <https://pypi.org/project/hugr/>
+   :icon:`fa-brands fa-rust` Rust API <https://docs.rs/hugr/latest/hugr/>
