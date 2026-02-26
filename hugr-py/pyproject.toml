@@ -45,7 +45,6 @@ docs = [
     "furo",
     "myst-parser>=4.0,<6",
     "sphinxcontrib-mermaid~=1.0",
-    "sphinx-icon~=0.2.2",
     "sphinx-favicon~=1.1.0",
 ]
 pytket = ["pytket >= 1.34.0"]
