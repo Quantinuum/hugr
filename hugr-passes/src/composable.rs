@@ -36,7 +36,7 @@ pub trait ComposablePass<H: HugrMut>: Sized {
     /// From `hugr >=0.26.0`, passes must respect the scope configuration.
     //
     // For hugr passes, this is tracked by <https://github.com/Quantinuum/hugr/issues/2771>
-    fn with_scope(self, scope: &PassScope) -> Self {
+    fn with_scope(self, scope: impl Into<PassScope>) -> Self {
         // Currently passes are not required to respect the scope configuration.
         // <https://github.com/Quantinuum/hugr/issues/2771>
         //
@@ -87,9 +87,10 @@ pub trait ComposablePass<H: HugrMut>: Sized {
                 Ok((res1, res2))
             }
 
-            fn with_scope(self, scope: &PassScope) -> Self {
+            fn with_scope(self, scope: impl Into<PassScope>) -> Self {
+                let scope = scope.into();
                 Self(
-                    self.0.with_scope(scope),
+                    self.0.with_scope(scope.clone()),
                     self.1.with_scope(scope),
                     PhantomData,
                 )
@@ -157,7 +158,7 @@ impl<P: ComposablePass<H>, H: HugrMut, E: Error, F: Fn(P::Error) -> E> Composabl
         self.0.run(hugr).map_err(&self.1)
     }
 
-    fn with_scope(self, scope: &PassScope) -> Self {
+    fn with_scope(self, scope: impl Into<PassScope>) -> Self {
         Self(self.0.with_scope(scope), self.1, PhantomData)
     }
 }
@@ -239,7 +240,7 @@ where
         Ok(res)
     }
 
-    fn with_scope(self, scope: &PassScope) -> Self {
+    fn with_scope(self, scope: impl Into<PassScope>) -> Self {
         Self(self.0.with_scope(scope), self.1)
     }
 }
@@ -280,9 +281,10 @@ impl<
             .transpose()
     }
 
-    fn with_scope(self, scope: &PassScope) -> Self {
+    fn with_scope(self, scope: impl Into<PassScope>) -> Self {
+        let scope = scope.into();
         Self(
-            self.0.with_scope(scope),
+            self.0.with_scope(scope.clone()),
             self.1.with_scope(scope),
             PhantomData,
         )
