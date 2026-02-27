@@ -244,11 +244,6 @@ jobs:
         run: |
           # rm Cargo.lock
           # cargo add -p hugr half@2.4.1
-      # FIXME: remove after debugging
-      - name: Dump env
-        run: |
-            printenv
-            cc --version
       - name: Build with no features
         run: cargo minimal-versions --direct test --verbose  --no-default-features --no-run
       - name: Tests with no features
