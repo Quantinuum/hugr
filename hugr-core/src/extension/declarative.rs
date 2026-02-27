@@ -21,7 +21,7 @@
 //! load_extensions(DECLARATIVE_YAML, &mut reg).unwrap();
 //! ```
 //!
-//! [specification]: https://github.com/CQCL/hugr/blob/main/specification/hugr.md#declarative-format
+//! [specification]: https://quantinuum.github.io/hugr/specification/extensions.html
 
 mod ops;
 mod signature;
