@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.25.7](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.6...hugr-v0.25.7) - 2026-02-27
+
+### New Features
+
+- Define pass application scopes ([#2772](https://github.com/Quantinuum/hugr/pull/2772))
+
 ## [0.25.6](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.5...hugr-v0.25.6) - 2026-02-20
 
 ### Bug Fixes
