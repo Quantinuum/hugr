@@ -22,7 +22,7 @@ class TestHugr:
 
 
 @pytest.fixture
-def test_hug() -> TestHugr:
+def test_hugr() -> TestHugr:
     mod = Module()
     module_root = mod.hugr.module_root
 
@@ -59,117 +59,117 @@ def test_hug() -> TestHugr:
 @pytest.mark.parametrize(
     ("scope", "recursive"), [(LocalScope.FLAT, False), (LocalScope.RECURSIVE, True)]
 )
-def test_local_scope(test_hug: TestHugr, scope: PassScope, recursive: bool):
+def test_local_scope(test_hugr: TestHugr, scope: PassScope, recursive: bool):
     assert scope.recursive() == recursive
 
     # When the entrypoint is the module root,
     # the pass should not be applied to any regions.
-    test_hug.hugr.entrypoint = test_hug.module_root
-    assert scope.root(test_hug.hugr) is None
-    assert list(scope.regions(test_hug.hugr)) == []
-    for n, _ in test_hug.hugr.nodes():
-        assert scope.in_scope(test_hug.hugr, n) == InScope.NO
+    test_hugr.hugr.entrypoint = test_hugr.module_root
+    assert scope.root(test_hugr.hugr) is None
+    assert list(scope.regions(test_hugr.hugr)) == []
+    for n, _ in test_hugr.hugr.nodes():
+        assert scope.in_scope(test_hugr.hugr, n) == InScope.NO
 
     # Public function with a nested DFG
-    test_hug.hugr.entrypoint = test_hug.public_func
-    assert scope.root(test_hug.hugr) == test_hug.public_func
+    test_hugr.hugr.entrypoint = test_hugr.public_func
+    assert scope.root(test_hugr.hugr) == test_hugr.public_func
     expected_regions = (
-        [test_hug.public_func, test_hug.public_func_nested]
+        [test_hugr.public_func, test_hugr.public_func_nested]
         if recursive
-        else [test_hug.public_func]
+        else [test_hugr.public_func]
     )
-    assert list(scope.regions(test_hug.hugr)) == expected_regions
+    assert list(scope.regions(test_hugr.hugr)) == expected_regions
 
-    assert scope.in_scope(test_hug.hugr, test_hug.module_root) == InScope.NO
+    assert scope.in_scope(test_hugr.hugr, test_hugr.module_root) == InScope.NO
     assert (
-        scope.in_scope(test_hug.hugr, test_hug.public_func)
+        scope.in_scope(test_hugr.hugr, test_hugr.public_func)
         == InScope.PRESERVE_INTERFACE
     )
 
-    assert scope.in_scope(test_hug.hugr, test_hug.public_func_nested) == InScope.YES
+    assert scope.in_scope(test_hugr.hugr, test_hugr.public_func_nested) == InScope.YES
 
     for n in [
-        test_hug.module_root,
-        test_hug.private_func,
-        test_hug.public_func_decl,
-        test_hug.private_func_decl,
-        test_hug.const_def,
+        test_hugr.module_root,
+        test_hugr.private_func,
+        test_hugr.public_func_decl,
+        test_hugr.private_func_decl,
+        test_hugr.const_def,
     ]:
-        assert scope.in_scope(test_hug.hugr, n) == InScope.NO
+        assert scope.in_scope(test_hugr.hugr, n) == InScope.NO
 
     # DFG inside a function
-    test_hug.hugr.entrypoint = test_hug.public_func_nested
-    assert scope.root(test_hug.hugr) == test_hug.public_func_nested
-    assert list(scope.regions(test_hug.hugr)) == [test_hug.public_func_nested]
+    test_hugr.hugr.entrypoint = test_hugr.public_func_nested
+    assert scope.root(test_hugr.hugr) == test_hugr.public_func_nested
+    assert list(scope.regions(test_hugr.hugr)) == [test_hugr.public_func_nested]
 
     for n in [
-        test_hug.module_root,
-        test_hug.public_func,
-        test_hug.private_func,
-        test_hug.public_func_decl,
-        test_hug.private_func_decl,
-        test_hug.const_def,
+        test_hugr.module_root,
+        test_hugr.public_func,
+        test_hugr.private_func,
+        test_hugr.public_func_decl,
+        test_hugr.private_func_decl,
+        test_hugr.const_def,
     ]:
-        assert scope.in_scope(test_hug.hugr, n) == InScope.NO
+        assert scope.in_scope(test_hugr.hugr, n) == InScope.NO
     assert (
-        scope.in_scope(test_hug.hugr, test_hug.public_func_nested)
+        scope.in_scope(test_hugr.hugr, test_hugr.public_func_nested)
         == InScope.PRESERVE_INTERFACE
     )
 
 
-def test_preserve_all(test_hug: TestHugr):
+def test_preserve_all(test_hugr: TestHugr):
     preserve = [
-        test_hug.public_func,
-        test_hug.private_func,
-        test_hug.public_func_decl,
-        test_hug.private_func_decl,
-        test_hug.const_def,
+        test_hugr.public_func,
+        test_hugr.private_func,
+        test_hugr.public_func_decl,
+        test_hugr.private_func_decl,
+        test_hugr.const_def,
     ]
-    check_preserve(test_hug, GlobalScope.PRESERVE_ALL, preserve)
+    check_preserve(test_hugr, GlobalScope.PRESERVE_ALL, preserve)
 
 
 def check_preserve(
-    test_hug: TestHugr, scope: GlobalScope, expected_chs: Iterable[Node]
+    test_hugr: TestHugr, scope: GlobalScope, expected_chs: Iterable[Node]
 ):
     assert scope.recursive()
     expected_chs = set(expected_chs)
-    assert scope.root(test_hug.hugr) == test_hug.module_root
-    assert set(scope.regions(test_hug.hugr)) == {
-        test_hug.public_func,
-        test_hug.private_func,
-        test_hug.public_func_nested,
+    assert scope.root(test_hugr.hugr) == test_hugr.module_root
+    assert set(scope.regions(test_hugr.hugr)) == {
+        test_hugr.public_func,
+        test_hugr.private_func,
+        test_hugr.public_func_nested,
     }
 
     assert (
-        scope.in_scope(test_hug.hugr, test_hug.module_root)
+        scope.in_scope(test_hugr.hugr, test_hugr.module_root)
         == InScope.PRESERVE_INTERFACE
     )
 
     for n in [
-        test_hug.public_func,
-        test_hug.private_func,
-        test_hug.public_func_decl,
-        test_hug.public_func_nested,
-        test_hug.private_func_decl,
-        test_hug.const_def,
+        test_hugr.public_func,
+        test_hugr.private_func,
+        test_hugr.public_func_decl,
+        test_hugr.public_func_nested,
+        test_hugr.private_func_decl,
+        test_hugr.const_def,
     ]:
         expected = InScope.PRESERVE_INTERFACE if n in expected_chs else InScope.YES
-        assert scope.in_scope(test_hug.hugr, n) == expected, f"{n} among {test_hug}"
+        assert scope.in_scope(test_hugr.hugr, n) == expected, f"{n} among {test_hugr}"
 
-    expected_chs.add(test_hug.module_root)  # Things to preserve
-    assert set(scope.preserve_interface(test_hug.hugr)) == expected_chs
-
-
-def test_preserve_public(test_hug: TestHugr):
-    preserve = [test_hug.public_func, test_hug.public_func_decl]
-    check_preserve(test_hug, GlobalScope.PRESERVE_PUBLIC, preserve)
+    expected_chs.add(test_hugr.module_root)  # Things to preserve
+    assert set(scope.preserve_interface(test_hugr.hugr)) == expected_chs
 
 
-def test_preserve_entrypoint(test_hug: TestHugr):
-    test_hug.hugr.entrypoint = test_hug.hugr.module_root
-    preserve = [test_hug.public_func, test_hug.public_func_decl]
-    check_preserve(test_hug, GlobalScope.PRESERVE_ENTRYPOINT, preserve)
+def test_preserve_public(test_hugr: TestHugr):
+    preserve = [test_hugr.public_func, test_hugr.public_func_decl]
+    check_preserve(test_hugr, GlobalScope.PRESERVE_PUBLIC, preserve)
 
-    test_hug.hugr.entrypoint = test_hug.public_func_nested
-    preserve = [test_hug.public_func_nested]
-    check_preserve(test_hug, GlobalScope.PRESERVE_ENTRYPOINT, preserve)
+
+def test_preserve_entrypoint(test_hugr: TestHugr):
+    test_hugr.hugr.entrypoint = test_hugr.hugr.module_root
+    preserve = [test_hugr.public_func, test_hugr.public_func_decl]
+    check_preserve(test_hugr, GlobalScope.PRESERVE_ENTRYPOINT, preserve)
+
+    test_hugr.hugr.entrypoint = test_hugr.public_func_nested
+    preserve = [test_hugr.public_func_nested]
+    check_preserve(test_hugr, GlobalScope.PRESERVE_ENTRYPOINT, preserve)
