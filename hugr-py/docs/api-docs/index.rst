@@ -1,10 +1,26 @@
 HUGR Documentation
 ==================================
 
+The Hierarchical Unified Graph Representation (HUGR, pronounced *hugger*) is the
+common representation of quantum circuits and operations in the Quantinuum
+ecosystem.
+
+It provides a high-fidelity representation of operations, that facilitates
+compilation and encodes runnable programs.
+
 Python API v\ |hugr_py_version| reference
 -----------------------------------------
 
+The ``hugr`` python package provides a high-level API for constructing HUGRs from
+basic operations, and for serializing and deserializing them.
+
+It is intended to be used as a dependency for other high-level tools, but can
+also be used directly for simple tasks.
+
+For performance critical tasks, see the rust API reference.
+
 API documentation
+^^^^^^^^^^^^^^^^^
 
 .. autosummary::
    :caption: Python API Reference
@@ -15,12 +31,14 @@ API documentation
    hugr
 
 Indices and tables
+^^^^^^^^^^^^^^^^^^
 
 * :ref:`genindex`
 * :ref:`modindex`
 * :ref:`search`
 
 External links
+^^^^^^^^^^^^^^
 
 .. toctree::
 
@@ -29,6 +47,12 @@ External links
 
 Rust API v\ |hugr_rs_version| reference
 ---------------------------------------
+
+The ``hugr`` rust crate provides a low-level API for efficient manipulation
+of HUGRs.
+
+Between other features, the library includes a builder interface, serialisation
+and deserialisation support, a pass framework, and lowerings to LLVM IR.
 
 .. toctree::
    :caption: Rust API Reference
@@ -39,6 +63,8 @@ Rust API v\ |hugr_rs_version| reference
 
 HUGR specification
 ------------------
+
+The formal specification of the HUGR data model is available here:
 
 .. toctree::
    :caption: Specification
