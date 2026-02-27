@@ -28,7 +28,7 @@ html_theme_options = {
     "sidebar_hide_name": False,
 }
 html_static_path = ["../_static"]
-html_logo = "../_static/hugr_logo_no_bg.svg"
+html_logo = "../_static/hugr_logo.svg"
 html_show_sourcelink = False
 favicons = [{"href": "hugr_logo_no_bg.svg"}]
 
