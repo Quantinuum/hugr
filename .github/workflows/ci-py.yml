@@ -6,7 +6,7 @@ on:
       - main
   pull_request:
     branches:
-      - '**'
+      - "**"
   merge_group:
     types: [checks_requested]
   workflow_dispatch: {}
@@ -42,7 +42,7 @@ jobs:
 
     strategy:
       matrix:
-        python-version: ['3.10', '3.14']
+        python-version: ["3.10", "3.14"]
 
     steps:
       - uses: actions/checkout@v6
@@ -75,8 +75,8 @@ jobs:
     strategy:
       matrix:
         python-version:
-          - { py: '3.10', coverage: false }
-          - { py: '3.14', coverage: true }
+          - { py: "3.10", coverage: false }
+          - { py: "3.14", coverage: true }
     steps:
       - uses: actions/checkout@v6
 
@@ -133,11 +133,11 @@ jobs:
 
       - name: Generate the updated schema
         run: |
-          uv run scripts/generate_schema.py specification/schema/
+          uv run scripts/generate_schema.py resources/json-schema/
 
       - name: Check if the schema is up to date
         run: |
-          git diff --exit-code --name-only specification/schema/
+          git diff --exit-code --name-only resources/json-schema/
           if [ $? -ne 0 ]; then
             echo "The serialization schema is not up to date"
             echo "Please run 'just update-schema' and commit the changes"
@@ -152,25 +152,25 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          fetch-depth: 0  # Need full history to compare with main
+          fetch-depth: 0 # Need full history to compare with main
 
       - name: Set up Python
         uses: actions/setup-python@v6
         with:
-          python-version: '3.10'
+          python-version: "3.10"
 
       - name: Check if extension versions are updated
         run: |
-            # Check against latest tag on the target branch
-            # When not on a pull request, base_ref should be empty so we default to HEAD
-            if [ -z "$TARGET_REF" ]; then
-              BASE_SHA="HEAD~1"
-            else
-              BASE_SHA=$(git rev-parse origin/$TARGET_REF)
-            fi
-            echo "Comparing to ref: $BASE_SHA"
+          # Check against latest tag on the target branch
+          # When not on a pull request, base_ref should be empty so we default to HEAD
+          if [ -z "$TARGET_REF" ]; then
+            BASE_SHA="HEAD~1"
+          else
+            BASE_SHA=$(git rev-parse origin/$TARGET_REF)
+          fi
+          echo "Comparing to ref: $BASE_SHA"
 
-            python ./scripts/check_extension_versions.py $BASE_SHA
+          python ./scripts/check_extension_versions.py $BASE_SHA
         env:
           TARGET_REF: ${{ github.base_ref }}
 
