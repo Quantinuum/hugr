@@ -1,8 +1,8 @@
 [default.extend-identifiers]
-bck = "bck" # BiMap uses abbreviation
+bck = "bck"                     # BiMap uses abbreviation
 ser_it = "ser_it"
 SerCollection = "SerCollection"
-strat = "strat" # common abbreviation for strategy
+strat = "strat"                 # common abbreviation for strategy
 # some arithmetic op names:
 inot = "inot"
 fle = "fle"
@@ -14,3 +14,39 @@ ine = "ine"
 # llvm generic parameters
 OT = "OT"
 ot = "ot"
+inports = "inports" # not import
+bimap = "bimap"     # bi-directional map
+
+
+[default.extend-words]
+bck = "bck"                     # BiMap uses abbreviation
+ser_it = "ser_it"
+SerCollection = "SerCollection"
+strat = "strat"                 # common abbreviation for strategy
+# some arithmetic op names:
+inot = "inot"
+fle = "fle"
+flt = "flt"
+olt = "olt"
+OLT = "OLT"
+FLT = "FLT"
+ine = "ine"
+# llvm generic parameters
+OT = "OT"
+ot = "ot"
+inports = "inports" # not import
+inport = "inport"
+bimap = "bimap"     # bi-directional map
+edn = "edn"         # hugr model text file format
+
+tru = "tru"   # not clashing with keyword true
+fals = "fals" # not clashing with keyword false
+
+Ser = "Ser"     # Serialization related
+DeSer = "DeSer" # Deserialization related
+
+typs = "types"
+
+parametrize = "parametrize"     # valid alternative to parameterize
+parametrized = "parametrized"
+reparametrize = "reparametrize"

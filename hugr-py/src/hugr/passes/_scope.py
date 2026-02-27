@@ -1,13 +1,20 @@
 """Scope configuration for a pass.
 
-This defines the parts of the HUGR that a pass should be applied to, and
-which parts is it allowed to modify.
+A `PassScope` defines the parts of a HUGR that a pass should be applied to, and
+which parts is it allowed to modify. Each variant defines three properties: `root`,
+`preserve_interface` and `recursive`.
+
+From these, `regions` and `in_scope` can be derived.
+
+A pass will always optimize the entrypoint region, unless the entrypoint is the
+module root.
 """
 
 from __future__ import annotations
 
+from abc import ABC, ABCMeta, abstractmethod
 from collections import deque
-from enum import Enum
+from enum import Enum, EnumMeta
 from typing import TYPE_CHECKING
 
 from hugr import ops
@@ -19,142 +26,227 @@ if TYPE_CHECKING:
     from hugr.hugr.node_port import Node
 
 
-class PassScope(Enum):
-    """Scope configuration for a pass.
+class InScope(Enum):
+    """Whether a pass may modify a particular node."""
 
-    The scope of a pass defines which parts of a HUGR it is allowed to modify.
+    YES = "YES"
+    """The pass may modify the node arbitrarily, including changing its interface,
+    behaviour, and/or removing it altogether"""
 
-    Each variant defines the following properties:
-    - `roots` is a set of **regions** in the HUGR that the pass should be
-      applied to.
-      - The pass **MUST NOT** modify the container nodes of the regions defined
-        in `roots`. This includes the optype and ports of the node.
-    - `scope` is a set of **nodes** in the HUGR that the pass **MAY** modify.
-      - This set is closed under descendants, meaning that all the descendants
-        of a node in `scope` are also in scope.
-      - Nodes that are not in `scope` **MUST** remain unchanged.
-      - Regions parents defined in `roots` are never in scope, as they should
-        not be modified.
-      - The entrypoint node is never in scope.
-    - `recursive` is a boolean flag indicating whether the pass **SHOULD**
-      optimize the descendants of the regions in `roots`.
-      - If this flag is `false`, the pass **MAY** still modify the descendant
-        regions.
+    PRESERVE_INTERFACE = "PRES_INT"
+    """The pass may modify the interior of the node - its `OpType`, and its
+    descendants - but must maintain the same ports (including static and `ControlFlow`
+    ports), function name and visibility, and execution behaviour.
 
-    A pass will always optimize the entrypoint region, unless it is set to the
-    module root.
+    For the module root, this is equivalent to `NO`."""
+
+    NO = "NO"
+    """The pass may not modify this node"""
+
+
+class PassScopeBase(ABC):
+    """Abstract superclass for concrete implementations of `PassScope`."""
+
+    @abstractmethod
+    def root(self, hugr: Hugr) -> Node | None:
+        """Returns the root of the subtree to be optimized by the pass,
+        or none if the pass should do nothing.
+        """
+
+    @abstractmethod
+    def preserve_interface(self, hugr: Hugr) -> Iterable[Node]:
+        """Returns a list of nodes, in the subtree beneath `root`, for which
+        the pass must preserve the observable semantics (ports, execution behaviour,
+        linking).
+
+        We include the `Module` in this list (if it is `root`) as these
+        properties must be preserved (this rules out any other changes).
+        """
+
+    @abstractmethod
+    def recursive(self) -> bool:
+        """Returns `true` if the pass should be applied recursively on the
+        descendants of the root regions.
+        """
+
+    def regions(self, hugr: Hugr) -> Iterable[Node]:
+        """Return every region (every [dataflow] or [CFG] container - but excluding
+        `Module`) in the Hugr to be optimized by the pass.
+
+        This computes all the regions to be optimized at once. In general, it is
+        more efficient to traverse the Hugr incrementally starting from the
+        `PassScope.root` instead.
+        """
+        if (r := self.root(hugr)) is None:
+            return
+        if r == hugr.module_root:
+            assert self.recursive()
+        else:
+            yield r
+            if not self.recursive():
+                return
+        to_explore = deque(hugr.children(r))
+        while to_explore:
+            node = to_explore.popleft()
+            if hugr.children(node):
+                yield node
+                to_explore.extend(hugr.children(node))
+
+    def in_scope(self, hugr: Hugr, n: Node) -> InScope:
+        """Returns whether the node may be modified by the pass.
+
+        Nodes outside the `root` subtree are never in scope.
+        Nodes inside the subtree may be `InScope.YES` or `InScope.PRESERVE_INTERFACE`.
+        """
+        if (r := self.root(hugr)) is None:
+            return InScope.NO
+        if r != hugr.module_root:
+            anc: Node | None = n
+            while True:
+                if anc is None:
+                    return InScope.NO
+                if anc == r:
+                    break
+                anc = hugr[anc].parent
+        return (
+            InScope.PRESERVE_INTERFACE
+            if n in self.preserve_interface(hugr)
+            else InScope.YES
+        )
+
+
+class ABCEnumMeta(ABCMeta, EnumMeta):
+    """Custom metaclass for things that inherit from both `ABC` and `Enum`.
+
+    This is to solve the error:
+    `Metaclass conflict: the metaclass of a derived class must be a (non-strict)
+    subclass of the metaclasses of all its bases  [metaclass]`
     """
 
-    # This enum should be kept in sync with the `PassScope` enum in `hugr-passes`.
 
-    ENTRYPOINT_FLAT = "EntrypointFlat"
+class LocalScope(PassScopeBase, Enum, metaclass=ABCEnumMeta):
+    """A `PassScope` that means the pass should modify the hugr only
+    beneath the entrypoint, unless the entrypoint is the module root,
+    in which case the pass should do nothing.
+
+    - `root`: The entrypoint, unless that is the module root.
+    - `preserve_interface`: the entrypoint, unless that is the module root
+    """
+
+    FLAT = "EntrypointFlat"
     """Run the pass only on the entrypoint region.
 
-    - `roots`: The entrypoint node, if it is not the module root.
-    - `scope`: The descendants of the entrypoint node, if `entrypoint` is
-      not the module root.
+    If the entrypoint is the module root, does nothing.
+
+    The pass is allowed, but not required, to optimize descendant regions too.
+    (For passes where it makes sense to distinguish flat from `EntrypointRecursive`,
+    this is encouraged, but for many passes it does not make sense so both
+    `EntrypointXXX` variants may behave the same.)
+
     - `recursive`: `false`.
     """
 
-    ENTRYPOINT_RECURSIVE = "EntrypointRecursive"
+    RECURSIVE = "EntrypointRecursive"
     """Run the pass on the entrypoint region and all its descendants.
 
-    - `roots`: The entrypoint node, if it is not the module root.
-    - `scope`: The descendants of the entrypoint node, if `entrypoint` is
-      not the module root.
+    For an idempotent pass, this means that immediately rerunning the pass on
+    any subregion (i.e. with the entrypoint set to any descendant of
+    the current value), must have no effect.
+
+    If the entrypoint is the module root, does nothing.
+
     - `recursive`: `true`.
     """
 
-    ALL = "All"
-    """Run the pass on all regions and nodes in the Hugr.
+    def root(self, hugr: Hugr) -> Node | None:
+        return None if hugr.entrypoint == hugr.module_root else hugr.entrypoint
 
-    - `roots`: Every function defined in the module.
-    - `scope`: The whole Hugr, except nodes in the module root region and
-      the entrypoint node.
-    - `recursive`: `true`.
-    """
-
-    ALL_PUBLIC = "AllPublic"
-    """Run the pass on all public functions in the Hugr.
-
-    Private functions and constant definitions may be modified, or even
-    removed, by the pass.
-
-    - `roots`: Every public function defined in the module.
-    - `scope`: The whole Hugr, except public function definitions and
-      declarations in the module root and the entrypoint node.
-    - `recursive`: `true`.
-    """
-
-    def roots(self, hugr: Hugr) -> Iterable[Node]:
-        """Returns the root nodes to be optimized by the pass."""
-        match self:
-            case PassScope.ENTRYPOINT_FLAT | PassScope.ENTRYPOINT_RECURSIVE:
-                yield hugr.entrypoint
-            case PassScope.ALL:
-                for node in hugr.children(hugr.module_root):
-                    if isinstance(hugr[node].op, ops.FuncDefn):
-                        yield node
-            case PassScope.ALL_PUBLIC:
-                for node in hugr.children(hugr.module_root):
-                    op = hugr[node].op
-                    if isinstance(op, ops.FuncDefn) and op.visibility == "Public":
-                        yield node
-
-    def regions(self, hugr: Hugr) -> Iterable[Node]:
-        """Returns the regions to be optimized by the pass."""
-        to_explore = deque(self.roots(hugr))
-        while to_explore:
-            node = to_explore.popleft()
-            yield node
-            if self.recursive():
-                to_explore.extend(n for n in hugr.children(node) if hugr.children(n))
-
-    def in_scope(self, hugr: Hugr, node: Node) -> bool:
-        """Returns whether the node is in scope for the pass."""
-        # The root module node is never in scope.
-        if node == hugr.module_root:
-            return False
-        # The entrypoint node is never in scope.
-        if node == hugr.entrypoint:
-            return False
-
-        match self:
-            case PassScope.ENTRYPOINT_FLAT | PassScope.ENTRYPOINT_RECURSIVE:
-                if hugr.entrypoint == hugr.module_root:
-                    return False
-                # The node is in scope if one of its ancestors is the entrypoint.
-                parent = hugr[node].parent
-                while parent is not None:
-                    if parent == hugr.entrypoint:
-                        return True
-                    parent = hugr[parent].parent
-                return False
-
-            case PassScope.ALL:
-                # Any node not in the module root is in scope.
-                return hugr[node].parent != hugr.module_root
-
-            case PassScope.ALL_PUBLIC:
-                if hugr[node].parent != hugr.module_root:
-                    return True
-                # For module children, only private functions
-                # declarations/definitions and const are in scope.
-                op = hugr[node].op
-                match op:
-                    case ops.FuncDefn():
-                        return op.visibility == "Private"
-                    case ops.FuncDecl():
-                        return op.visibility == "Private"
-                    case _:
-                        return True
+    def preserve_interface(self, hugr: Hugr) -> Iterable[Node]:
+        if (r := self.root(hugr)) is not None:
+            yield r
 
     def recursive(self) -> bool:
-        """Returns whether the pass should be applied recursively on the
-        descendants of the root regions.
-        """
-        match self:
-            case PassScope.ENTRYPOINT_FLAT:
-                return False
-            case PassScope.ENTRYPOINT_RECURSIVE | PassScope.ALL | PassScope.ALL_PUBLIC:
-                return True
+        return self == LocalScope.RECURSIVE
+
+
+class GlobalScope(PassScopeBase, Enum, metaclass=ABCEnumMeta):
+    """Run the pass on the whole Hugr, regardless of the entrypoint.
+
+    For lowering passes, signature changes etc. should be applied across the Hugr.
+
+    For optimization passes, different variants specify which nodes in the Hugr
+    must have their interface preserved. (Interface means signature/value ports,
+    as well as static ports, and their types; also name (if public) for linking;
+    and whether the node is a valid dataflow child or is a `DataflowBlock`,
+    `ExitBlock` or `Module`).
+
+    - `root`: The hugr module_root
+    - `recursive`: true
+    """
+
+    PRESERVE_ALL = "GlobalAll"
+    """Optimization passes must preserve interface and behaviour of every module child,
+    as well as the entrypoint.
+
+    - `preserve_interface`: every public function defined in the module,
+       and the entrypoint."""
+
+    PRESERVE_PUBLIC = "GlobalPublic"
+    """Optimization passes must preserve interface and behaviour of all public
+    functions, as well as the entrypoint.
+
+    Private functions and constant definitions may be modified, including
+    changing their behaviour or deleting them entirely, so long as this
+    does not affect behaviour of the public functions (or entrypoint).
+
+    Thus, appropriate for a Hugr that will be linked as a library.
+
+    - `preserve_interface`: Every public function defined in the module', plus
+      the entrypoint."""
+
+    PRESERVE_ENTRYPOINT = "GlobalEntrypoint"
+    """Run the pass on the whole Hugr, but preserving behaviour only of the entrypoint.
+
+    Thus, appropriate for a Hugr that will be run as an executable, with the entrypoint
+    indicating where execution will begin.
+
+    If the entrypoint is the module root, then the same as [Self::Public].
+
+    - `preserve_interface`: if the entrypoint node is the module root, then all
+       children of the module root; otherwise, just the entrypoint node."""
+
+    def root(self, hugr: Hugr) -> Node:
+        return hugr.module_root
+
+    def recursive(self) -> bool:
+        return True
+
+    def preserve_interface(self, hugr: Hugr) -> Iterable[Node]:
+        yield hugr.module_root
+        ep = hugr.entrypoint
+        if ep != hugr.module_root:
+            yield ep
+            if self == GlobalScope.PRESERVE_ENTRYPOINT:
+                return  # That's all, folks
+        for n in hugr.children(hugr.module_root):
+            if n == ep:
+                continue
+            match self:
+                case GlobalScope.PRESERVE_ALL:
+                    pass  # Fall through to yield all module children
+                case (
+                    GlobalScope.PRESERVE_ENTRYPOINT  # entrypoint == module_root above
+                    | GlobalScope.PRESERVE_PUBLIC
+                ):
+                    op = hugr[n].op
+                    match op:
+                        case ops.FuncDefn() | ops.FuncDecl():
+                            if op.visibility != "Public":
+                                continue
+                        case _:
+                            continue  # Not a public function, so don't preserve
+            yield n
+
+
+# Should be kept in sync with the `PassScope` enum in `hugr-passes`.
+PassScope = LocalScope | GlobalScope

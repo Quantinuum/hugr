@@ -48,6 +48,7 @@ TaggedResult = tuple[str, DataValue]
 REG_INDEX_PATTERN = re.compile(r"^([a-z][\w_]*)\[(\d+)\]$")
 
 BitChar = Literal["0", "1"]
+DigitChar = Literal["0", "1", "2", "3", "4", "5", "6", "7", "8", "9"]
 
 
 @dataclass
@@ -140,6 +141,13 @@ def _cast_primitive_bit(data: DataValue) -> BitChar:
     if isinstance(data, int) and data in {0, 1}:
         return str(data)  # type: ignore[return-value]
     msg = f"Expected bit data for register value found {data}"
+    raise ValueError(msg)
+
+
+def _cast_primitive_digit(data: DataValue) -> DigitChar:
+    if isinstance(data, int) and 0 <= data <= 9:
+        return str(data)  # type: ignore[return-value]
+    msg = f"Expected single digit data (0-9) for register value found {data}"
     raise ValueError(msg)
 
 
@@ -267,10 +275,31 @@ class QsysResult(Sequence):
             Counter({(('a', '10'),): 1, (('a', '01'),): 1})
 
         Raises:
-            ValueError: If any value is a float.
+            ValueError: If any primitive value is a float or not in {0,1}.
         """
         return Counter(
             tuple((tag, _flat_bitstring(data)) for tag, data in d.items())
+            for d in self._collated_shots_iter()
+        )
+
+    def collated_digitstring_counts(self) -> Counter[tuple[tuple[str, str], ...]]:
+        """Calculate counts of digit strings for each tag by collating across shots
+        using `QsysResult.tag_collated_shots`. Each `result` entry per shot is seen
+        to be appending to the digitstring for that tag.
+
+        If the result value is a list, it is flattened and appended to the digitstring.
+
+        Example:
+            >>> shots = [QsysShot([("a", 1), ("a", 2)]), QsysShot([("a", [3, 4])])]
+            >>> res = QsysResult(shots)
+            >>> res.collated_digitstring_counts()
+            Counter({(('a', '12'),): 1, (('a', '34'),): 1})
+
+        Raises:
+            ValueError: If any primitive value is a float or not in 0-9.
+        """
+        return Counter(
+            tuple((tag, _flat_digitstring(data)) for tag, data in d.items())
             for d in self._collated_shots_iter()
         )
 
@@ -282,6 +311,10 @@ class HShots(QsysResult):
 
 def _flat_bitstring(data: Iterable[DataValue]) -> str:
     return "".join(_cast_primitive_bit(prim) for prim in _flatten(data))
+
+
+def _flat_digitstring(data: Iterable[DataValue]) -> str:
+    return "".join(_cast_primitive_digit(prim) for prim in _flatten(data))
 
 
 def _flatten(itr: Iterable[DataValue]) -> Iterable[DataPrimitive]:

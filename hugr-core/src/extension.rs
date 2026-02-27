@@ -860,7 +860,6 @@ pub mod test {
         ) -> Arc<Self> {
             Self::new_arc(name, Version::new(0, 0, 0), init)
         }
-
         /// Create a new extension for testing, with a 0 version.
         pub(crate) fn try_new_test_arc(
             name: ExtensionId,

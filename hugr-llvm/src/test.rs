@@ -192,8 +192,8 @@ impl TestContext {
     /// Lower `hugr` to LLVM, then JIT and execute the function named `entry_point` in the
     /// inner module.
     ///
-    /// Takes care of safely handling panics ocurring in the program and returns the produced
-    /// panic message, or an empty string if no panic ocurred.
+    /// Takes care of safely handling panics occurring in the program and returns the produced
+    /// panic message, or an empty string if no panic occurred.
     ///
     /// For this to work, [`Emission::exec_panicking`] must be used together with the
     /// [`crate::emit::test::PanicTestPreludeCodegen`].

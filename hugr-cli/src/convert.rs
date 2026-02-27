@@ -23,7 +23,7 @@ pub struct ConvertArgs {
     #[clap(short, long, value_parser, default_value = "-")]
     pub output: Output,
 
-    /// Output format. One of: json, model, model-exts, model-text, model-text-exts
+    /// Output format. One of: json, model, model-exts, s-expression, s-expression-exts
     #[clap(short, long, value_name = "FORMAT")]
     pub format: Option<String>,
 
@@ -75,8 +75,10 @@ impl ConvertArgs {
                     "json" => EnvelopeFormat::PackageJson,
                     "model" => EnvelopeFormat::Model,
                     "model-exts" => EnvelopeFormat::ModelWithExtensions,
-                    "model-text" => EnvelopeFormat::ModelText,
-                    "model-text-exts" => EnvelopeFormat::ModelTextWithExtensions,
+                    "model-text" | "s-expression" => EnvelopeFormat::ModelText,
+                    "model-text-exts" | "s-expression-exts" => {
+                        EnvelopeFormat::ModelTextWithExtensions
+                    }
                     _ => Err(CliError::InvalidFormat(fmt.clone()))?,
                 },
                 None => env_config.header.config().format, // Use input format if not specified

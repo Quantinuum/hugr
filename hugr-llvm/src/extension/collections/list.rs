@@ -415,7 +415,7 @@ mod test {
     }
 
     #[rstest]
-    fn test_const_list_emmission(mut llvm_ctx: TestContext) {
+    fn test_const_list_emission(mut llvm_ctx: TestContext) {
         let elem_ty = usize_t();
         let contents = (1..4).map(|i| Value::extension(ConstUsize::new(i)));
         let es = ExtensionRegistry::new([list::EXTENSION.to_owned(), prelude::PRELUDE.to_owned()]);

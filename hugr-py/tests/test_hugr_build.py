@@ -448,9 +448,9 @@ def simple_fn() -> Function:
     h = f.add_op(H, q)
     q = h.out(0)
 
-    nnot = f.add_op(Not, b)
+    not_node = f.add_op(Not, b)
 
-    f.set_outputs(q, nnot, b)
+    f.set_outputs(q, not_node, b)
     validate(Package([f.hugr], [QUANTUM_EXT]))
     return f
 

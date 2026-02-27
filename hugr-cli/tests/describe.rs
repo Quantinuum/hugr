@@ -27,6 +27,7 @@ use serde_json::Value;
 use serde_json::json;
 use std::io::Write;
 use std::sync::Arc;
+
 #[fixture]
 fn cmd() -> Command {
     assert_cmd::cargo::cargo_bin_cmd!("hugr")
@@ -55,7 +56,7 @@ fn empty_package_file(empty_package: Package) -> NamedTempFile {
 }
 
 #[fixture]
-fn invalid_package() -> Vec<u8> {
+fn invalid_package_buffer() -> Vec<u8> {
     let header = EnvelopeHeader {
         format: EnvelopeFormat::Model,
         ..Default::default()
@@ -69,7 +70,7 @@ fn invalid_package() -> Vec<u8> {
 }
 
 #[fixture]
-fn package_with_exts() -> Vec<u8> {
+fn package_with_exts() -> Package {
     let test_ext = Extension::new_arc(
         ExtensionId::new_unchecked("resolved_ext"),
         Version::new(0, 1, 0),
@@ -116,18 +117,39 @@ fn package_with_exts() -> Vec<u8> {
         Version::new(0, 1, 0),
     );
     package.extensions = ExtensionRegistry::new([Arc::new(packed_ext), test_ext]);
-    let mut buffer = Vec::new();
     package
+}
+
+#[fixture]
+fn package_with_exts_default_buffer(package_with_exts: Package) -> Vec<u8> {
+    let mut buffer = Vec::new();
+    package_with_exts
         .store(&mut buffer, EnvelopeConfig::default())
         .unwrap();
     buffer
 }
 
 #[fixture]
-fn package_with_exts_file(package_with_exts: Vec<u8>) -> NamedTempFile {
-    let file = assert_fs::NamedTempFile::new("valid_with_extensions.hugr").unwrap();
+fn package_with_exts_json_buffer(package_with_exts: Package) -> Vec<u8> {
+    let mut buffer = Vec::new();
+    package_with_exts
+        .store(&mut buffer, EnvelopeConfig::text())
+        .unwrap();
+    buffer
+}
 
-    file.write_binary(&package_with_exts).unwrap();
+#[fixture]
+fn package_with_exts_default_file(package_with_exts_default_buffer: Vec<u8>) -> NamedTempFile {
+    let file = assert_fs::NamedTempFile::new("valid_with_extensions_default.hugr").unwrap();
+    file.write_binary(&package_with_exts_default_buffer)
+        .unwrap();
+    file
+}
+
+#[fixture]
+fn package_with_exts_json_file(package_with_exts_json_buffer: Vec<u8>) -> NamedTempFile {
+    let file = assert_fs::NamedTempFile::new("valid_with_extensions_json.hugr").unwrap();
+    file.write_binary(&package_with_exts_json_buffer).unwrap();
     file
 }
 
@@ -141,14 +163,14 @@ fn test_describe_basic(empty_package_file: NamedTempFile, mut describe_cmd: Comm
 }
 
 #[rstest]
-fn test_describe_json(package_with_exts_file: NamedTempFile, mut describe_cmd: Command) {
-    describe_cmd.arg(package_with_exts_file.path());
+fn test_describe_default(package_with_exts_default_file: NamedTempFile, mut describe_cmd: Command) {
+    describe_cmd.arg(package_with_exts_default_file.path());
     describe_cmd.arg("--json");
     describe_cmd.arg("--packaged-extensions");
     let output = describe_cmd.assert().success().get_output().stdout.clone();
     let json: Value = serde_json::from_slice(&output).unwrap();
     let expected_json = json!({
-      "header": "EnvelopeHeader(PackageJson)",
+      "header": "EnvelopeHeader(ModelWithExtensions)",
       "modules": [
         {
           "entrypoint": {
@@ -181,11 +203,11 @@ fn test_describe_json(package_with_exts_file: NamedTempFile, mut describe_cmd: C
 
 #[rstest]
 fn test_describe_packaged_extensions(
-    package_with_exts_file: NamedTempFile,
+    package_with_exts_default_file: NamedTempFile,
     mut describe_cmd: Command,
 ) {
     describe_cmd.args([
-        package_with_exts_file.path(),
+        package_with_exts_default_file.path(),
         std::path::Path::new("--packaged-extensions"),
     ]);
     describe_cmd
@@ -214,8 +236,11 @@ fn test_describe_output_redirection(empty_package_file: NamedTempFile, mut descr
 }
 
 #[rstest]
-fn test_no_resolved_extensions(package_with_exts: Vec<u8>, mut describe_cmd: Command) {
-    describe_cmd.write_stdin(package_with_exts);
+fn test_no_resolved_extensions(
+    package_with_exts_default_buffer: Vec<u8>,
+    mut describe_cmd: Command,
+) {
+    describe_cmd.write_stdin(package_with_exts_default_buffer);
 
     describe_cmd.arg("--no-resolved-extensions");
     describe_cmd
@@ -226,8 +251,8 @@ fn test_no_resolved_extensions(package_with_exts: Vec<u8>, mut describe_cmd: Com
 }
 
 #[rstest]
-fn test_public_symbols(package_with_exts: Vec<u8>, mut describe_cmd: Command) {
-    describe_cmd.write_stdin(package_with_exts);
+fn test_public_symbols(package_with_exts_default_buffer: Vec<u8>, mut describe_cmd: Command) {
+    describe_cmd.write_stdin(package_with_exts_default_buffer);
 
     describe_cmd.arg("--public-symbols");
     describe_cmd
@@ -238,8 +263,11 @@ fn test_public_symbols(package_with_exts: Vec<u8>, mut describe_cmd: Command) {
 }
 
 #[rstest]
-fn test_generator_claimed_extensions(package_with_exts: Vec<u8>, mut describe_cmd: Command) {
-    describe_cmd.write_stdin(package_with_exts);
+fn test_generator_claimed_extensions(
+    package_with_exts_default_buffer: Vec<u8>,
+    mut describe_cmd: Command,
+) {
+    describe_cmd.write_stdin(package_with_exts_default_buffer);
 
     describe_cmd.arg("--generator-claimed-extensions");
     describe_cmd
@@ -250,8 +278,8 @@ fn test_generator_claimed_extensions(package_with_exts: Vec<u8>, mut describe_cm
 }
 
 #[rstest]
-fn test_describe_invalid_package(invalid_package: Vec<u8>, mut describe_cmd: Command) {
-    describe_cmd.write_stdin(invalid_package);
+fn test_describe_invalid_package(invalid_package_buffer: Vec<u8>, mut describe_cmd: Command) {
+    describe_cmd.write_stdin(invalid_package_buffer);
     describe_cmd
         .assert()
         .failure()
@@ -260,8 +288,8 @@ fn test_describe_invalid_package(invalid_package: Vec<u8>, mut describe_cmd: Com
 }
 
 #[rstest]
-fn test_describe_invalid_package_json(invalid_package: Vec<u8>, mut describe_cmd: Command) {
-    describe_cmd.write_stdin(invalid_package);
+fn test_describe_invalid_package_json(invalid_package_buffer: Vec<u8>, mut describe_cmd: Command) {
+    describe_cmd.write_stdin(invalid_package_buffer);
 
     describe_cmd.arg("--json");
     describe_cmd

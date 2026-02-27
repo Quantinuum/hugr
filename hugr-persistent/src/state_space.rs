@@ -1,4 +1,4 @@
-//! Store of commits that are refered to in [`PersistentHugr`]s.
+//! Store of commits that are referred to in [`PersistentHugr`]s.
 
 use std::{
     cell::{Ref, RefCell},

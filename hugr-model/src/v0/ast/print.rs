@@ -190,7 +190,7 @@ fn print_seq_part<'a>(printer: &mut Printer<'a>, part: &'a SeqPart) {
     }
 }
 
-/// Print the parts of a list [`Term`], merging spreaded lists.
+/// Print the parts of a list [`Term`], merging spread lists.
 fn print_list_parts<'a>(printer: &mut Printer<'a>, parts: &'a [SeqPart]) {
     for part in parts {
         match part {
@@ -201,7 +201,7 @@ fn print_list_parts<'a>(printer: &mut Printer<'a>, parts: &'a [SeqPart]) {
     }
 }
 
-/// Print the parts of a tuple [`Term`], merging spreaded tuples.
+/// Print the parts of a tuple [`Term`], merging spread tuples.
 fn print_tuple_parts<'a>(printer: &mut Printer<'a>, parts: &'a [SeqPart]) {
     for part in parts {
         match part {

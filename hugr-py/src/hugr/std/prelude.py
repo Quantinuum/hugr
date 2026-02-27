@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass
 
 from hugr import val
-from hugr.std import _load_extension
+from hugr.std._util import _load_extension
 
 PRELUDE_EXTENSION = _load_extension("prelude")
 

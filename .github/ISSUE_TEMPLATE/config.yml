@@ -1,0 +1,14 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 💬 GitHub Discussions
+    url: https://github.com/Quantinuum/hugr/discussions
+    about: Ask questions and discuss ideas with the community
+  - name: "🦀 Rust library documentation"
+    url: https://docs.rs/hugr
+    about: Read the API documentation for the Rust library
+  - name: "🐍 Python library documentation"
+    url: https://quantinuum.github.io/hugr/
+    about: Read the API documentation for the Python library
+  - name: 📖 Specification
+    url: https://github.com/Quantinuum/hugr/blob/main/specification/hugr.md
+    about: Read the HUGR specification

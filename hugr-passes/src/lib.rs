@@ -5,6 +5,7 @@ pub mod const_fold;
 pub mod dataflow;
 pub mod dead_code;
 pub mod force_order;
+pub mod hash;
 pub mod inline_dfgs;
 pub mod inline_funcs;
 pub mod lower;
@@ -18,6 +19,8 @@ pub mod untuple;
 mod dead_funcs;
 mod half_node;
 mod monomorphize;
+#[cfg(test)]
+mod utils;
 
 // Main pass interfaces
 pub use composable::{ComposablePass, InScope, PassScope};

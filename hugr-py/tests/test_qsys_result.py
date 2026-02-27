@@ -154,6 +154,55 @@ def test_collate_tag():
     ]
 
 
+def test_collated_digitstring_counts():
+    shotlist = []
+    for _ in range(10):
+        shot = QsysShot()
+        _ = [
+            shot.append(reg, 3)
+            for reg, size in (("c", 3), ("d", 5))
+            for _ in range(size)
+        ]
+        shotlist.append(shot)
+
+    int_shot = QsysShot((("c", 1), ("d", 2), ("d", 0), ("e", 4)))
+    assert int_shot.collate_tags() == {"c": [1], "d": [2, 0], "e": [4]}
+
+    lst_shot = QsysShot([("lst", [1, 0, 2]), ("lst", [1, 0, 2])])
+    shots = QsysResult([*shotlist, int_shot, lst_shot])
+
+    counter = shots.collated_digitstring_counts()
+    assert counter == Counter(
+        {
+            (("c", "333"), ("d", "33333")): 10,
+            (("c", "1"), ("d", "20"), ("e", "4")): 1,
+            (("lst", "102102"),): 1,
+        }
+    )
+
+
+@pytest.mark.parametrize(
+    "value",
+    [2, -1, 1.0, [1, 2, 0]],
+)
+def test_collated_counts_bad_values(value):
+    """Test that collated_counts raises ValueError for non-bit values."""
+    shots = QsysResult([QsysShot([("a", value)])])
+    with pytest.raises(ValueError, match="Expected bit"):
+        _ = shots.collated_counts()
+
+
+@pytest.mark.parametrize(
+    "value",
+    [10, -1, 1.0, [1, 15, 0]],
+)
+def test_collated_digitstring_counts_bad_values(value):
+    """Test that collated_digitstring_counts raises ValueError for non-digit values."""
+    shots = QsysResult([QsysShot([("a", value)])])
+    with pytest.raises(ValueError, match="Expected single digit"):
+        _ = shots.collated_digitstring_counts()
+
+
 def test_qsys_shot_sequence_behavior():
     """Test that QsysShot implements Sequence protocol correctly."""
     shot = QsysShot([("a", 1), ("b", 2), ("c", 3)])

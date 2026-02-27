@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow, bail};
 use hugr_core::Node;
 use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::ops::{
@@ -118,6 +118,7 @@ pub fn emit_value<'c, H: HugrView<Node = Node>>(
 ) -> Result<BasicValueEnum<'c>> {
     match v {
         Value::Extension { e } => context.emit_custom_const(e.value()),
+        #[expect(deprecated)] // Yay, will be able to remove this
         Value::Function { .. } => bail!(
             "Value::Function Const nodes are not supported. \
             Ensure you eliminate these from the HUGR before lowering to LLVM. \
@@ -384,6 +385,12 @@ fn emit_optype<'c, H: HugrView<Node = Node>>(
         OpType::TailLoop(x) => emit_tail_loop(context, args.into_ot(x)),
         _ => Err(anyhow!("Invalid child for Dataflow Parent: {node}")),
     }
+    .with_context(|| {
+        format!(
+            "Failed to emit LLVM for node {node} with optype {}",
+            node.as_ref()
+        )
+    })
 }
 
 /// Emit a custom operation with a single input.

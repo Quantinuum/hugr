@@ -238,7 +238,7 @@ pub const CORE_TUPLE_TYPE: &str = "core.tuple";
 /// - **Result:** `(core.fn ?inputs ?outputs ?ext)`
 pub const CORE_CALL: &str = "core.call";
 
-/// Operation to call a functiion known at runtime.
+/// Operation to call a function known at runtime.
 ///
 /// - **Parameter:** `?inputs : (core.list core.type)`
 /// - **Parameter:** `?outputs : (core.list core.type)`

@@ -1081,7 +1081,7 @@ impl<'a> Context<'a> {
                 let symbol = self.resolve_symbol(model::COMPAT_CONST_JSON);
                 self.make_term(table::Term::Apply(symbol, args))
             }
-
+            #[expect(deprecated)] // Remove when Value::Function removed
             Value::Function { hugr } => {
                 let outer_hugr = std::mem::replace(&mut self.hugr, hugr);
                 let outer_node_to_id = std::mem::take(&mut self.node_to_id);

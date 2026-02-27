@@ -86,6 +86,11 @@ gen-extensions:
 build-py-docs:
     cd hugr-py/docs && ./build.sh
 
+# Clean the files generating by the sphinx build in hugr-py/docs.
+clean-py-docs:
+    rm -rf hugr-py/docs/build
+    rm -rf hugr-py/docs/api-docs/generated
+
 # Run rust semver-checks to detect breaking changes since the last release.
 semver-checks:
     cargo semver-checks
@@ -108,3 +113,8 @@ _run_lang language rust_cmd python_cmd:
         {{ rust_cmd }}
         {{ python_cmd }}
     fi
+
+# Regenerates all hugr definitions inside `test_files/`
+recompile-test-hugrs:
+    @echo "---- Recompiling example guppy programs ----"
+    just test_files/recompile

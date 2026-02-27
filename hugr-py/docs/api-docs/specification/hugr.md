@@ -1,0 +1,2 @@
+```{include} ../../../../specification/hugr.md
+```

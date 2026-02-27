@@ -1,3 +1,4 @@
+#![expect(deprecated)] // Remove pass when Value::Function is removed
 use hugr_core::{
     HugrView, Node, NodeIndex as _,
     hugr::{hugrmut::HugrMut, internal::HugrMutInternals},
@@ -11,6 +12,7 @@ fn const_fn_name(konst_n: Node) -> String {
     format!("const_fun_{}", konst_n.index())
 }
 
+#[deprecated(note = "Will be removed along with Value::Function", since = "0.25.0")]
 pub fn inline_constant_functions(hugr: &mut impl HugrMut<Node = Node>) -> Result<()> {
     while inline_constant_functions_impl(hugr)? {}
     Ok(())
