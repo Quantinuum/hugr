@@ -14,7 +14,7 @@ ecosystem.
 It provides a high-fidelity representation of operations, that facilitates
 compilation and encodes runnable programs.
 
-The HUGR specification is [here](https://github.com/quantinuum/hugr/blob/main/specification/hugr.md).
+The HUGR specification is [here](https://quantinuum.github.io/hugr/specification/index.html).
 
 ## Overview
 
