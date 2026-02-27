@@ -1,5 +1,18 @@
 # Changelog
 
+## [0.15.5](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.4...hugr-py-v0.15.5) (2026-02-27)
+
+
+### Features
+
+* Define pass application scopes ([#2772](https://github.com/Quantinuum/hugr/issues/2772)) ([847b864](https://github.com/Quantinuum/hugr/commit/847b8640582f229d45577439bd58c587242b52fc))
+* deprecate Function (Value) in hugr-py too ([#2882](https://github.com/Quantinuum/hugr/issues/2882)) ([043fec2](https://github.com/Quantinuum/hugr/commit/043fec20d9ef973bf1162d250b667c1a57fa3de2))
+
+
+### Documentation
+
+* Add specification to sphinx docs ([#2907](https://github.com/Quantinuum/hugr/issues/2907)) ([46ea04b](https://github.com/Quantinuum/hugr/commit/46ea04b17e176cf54f1ddbc63efd72aa4dcc31f0))
+
 ## [0.15.4](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.3...hugr-py-v0.15.4) (2026-02-20)
 
 
