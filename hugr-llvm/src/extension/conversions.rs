@@ -643,7 +643,7 @@ mod test {
                 .add_default_prelude_extensions()
                 .add_default_int_extensions()
         });
-        assert_eq!(i, exec_ctx.exec_hugr_u64(hugr, "main"));
+        assert_eq!(i != 0, exec_ctx.exec_hugr::<bool>(hugr, "main"));
     }
 
     #[rstest]

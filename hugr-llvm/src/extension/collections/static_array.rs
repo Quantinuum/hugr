@@ -12,7 +12,7 @@ use hugr_core::{
     },
 };
 use inkwell::{
-    AddressSpace, IntPredicate,
+    IntPredicate,
     builder::Builder,
     context::Context,
     types::{BasicType, BasicTypeEnum, StructType},
@@ -23,10 +23,12 @@ use itertools::Itertools as _;
 use crate::{
     CodegenExtension, CodegenExtsBuilder,
     emit::{EmitFuncContext, EmitOpArgs, emit_value},
-    types::{HugrType, TypingSession},
 };
 
-use anyhow::{Result, bail};
+#[cfg(test)]
+use crate::types::HugrType;
+
+use anyhow::{Result, anyhow, bail};
 
 #[derive(Debug, Clone, derive_more::From)]
 /// A [`CodegenExtension`] that lowers the
@@ -140,56 +142,25 @@ fn build_read_len<'c>(
     context: &'c Context,
     builder: &Builder<'c>,
     struct_ty: StructType<'c>,
-    mut ptr: PointerValue<'c>,
+    ptr: PointerValue<'c>,
 ) -> Result<IntValue<'c>> {
-    let canonical_ptr_ty = struct_ty.ptr_type(AddressSpace::default());
-    if ptr.get_type() != canonical_ptr_ty {
-        ptr = builder.build_pointer_cast(ptr, canonical_ptr_ty, "")?;
-    }
     let i32_ty = context.i32_type();
     let indices = [i32_ty.const_zero(), i32_ty.const_zero()];
-    let len_ptr = unsafe { builder.build_in_bounds_gep(ptr, &indices, "") }?;
-    Ok(builder.build_load(len_ptr, "")?.into_int_value())
+    let len_ptr = unsafe { builder.build_in_bounds_gep(struct_ty, ptr, &indices, "") }?;
+    let len_ty = struct_ty
+        .get_field_type_at_index(0)
+        .ok_or(anyhow!("Struct has no types?"))?;
+    Ok(builder.build_load(len_ty, len_ptr, "")?.into_int_value())
 }
 
 /// A helper trait for customising the lowering of [`hugr_core::std_extensions::collections::static_array`]
 /// types, [`hugr_core::ops::constant::CustomConst`]s, and ops.
 pub trait StaticArrayCodegen: Clone {
-    /// Return the llvm type of
-    /// [`hugr_core::std_extensions::collections::static_array::STATIC_ARRAY_TYPENAME`].
-    ///
-    /// By default a static array of llvm type `t` and length `l` is stored in a
-    /// global of type `struct { i64, [t * l] }``
-    ///
-    /// The `i64` stores the length of the array.
-    ///
-    /// However a `static_array` `HugrType` is represented by an llvm pointer type
-    /// `struct {i64, [t * 0]}`;  i.e. the array is zero length. This gives all
-    /// static arrays of the same element type a uniform llvm type.
-    ///
-    /// It is legal to index past the end of an array (it is only undefined behaviour
-    /// to index past the allocation).
-    fn static_array_type<'c>(
-        &self,
-        session: TypingSession<'c, '_>,
-        element_type: &HugrType,
-    ) -> Result<BasicTypeEnum<'c>> {
-        let index_type = session.llvm_type(&usize_t())?;
-        let element_type = session.llvm_type(element_type)?;
-        Ok(
-            static_array_struct_type(session.iw_context(), index_type, element_type, 0)
-                .ptr_type(AddressSpace::default())
-                .into(),
-        )
-    }
-
     /// Emit a
     /// [`hugr_core::std_extensions::collections::static_array::StaticArrayValue`].
     ///
-    /// Note that the type of the return value must match the type returned by
-    /// [`Self::static_array_type`].
-    ///
-    /// By default a global is created and we return a pointer to it.
+    /// By default a global is created and we return a pointer to it, so the type of
+    /// the return value is the global opaque pointer type.
     fn static_array_value<'c, H: HugrView<Node = Node>>(
         &self,
         context: &mut EmitFuncContext<'c, '_, H>,
@@ -247,10 +218,7 @@ pub trait StaticArrayCodegen: Clone {
                 })
                 .unwrap()
         };
-        let canonical_type = self
-            .static_array_type(context.typing_session(), value.get_element_type())?
-            .into_pointer_type();
-        Ok(gv.as_pointer_value().const_cast(canonical_type).into())
+        Ok(gv.as_pointer_value().into())
     }
 
     /// Emit a [`hugr_core::std_extensions::collections::static_array::StaticArrayOp`].
@@ -260,14 +228,14 @@ pub trait StaticArrayCodegen: Clone {
         args: EmitOpArgs<'c, '_, ExtensionOp, H>,
         op: StaticArrayOp,
     ) -> Result<()> {
+        let elem_ty = context.llvm_type(&op.elem_ty)?;
         match op.def {
             StaticArrayOpDef::get => {
                 let ptr = args.inputs[0].into_pointer_value();
                 let index = args.inputs[1].into_int_value();
                 let index_ty = index.get_type();
-                let element_llvm_ty = context.llvm_type(&op.elem_ty)?;
                 let struct_ty =
-                    static_array_struct_type(context.iw_context(), index_ty, element_llvm_ty, 0);
+                    static_array_struct_type(context.iw_context(), index_ty, elem_ty, 0);
 
                 let len = build_read_len(context.iw_context(), context.builder(), struct_ty, ptr)?;
 
@@ -306,9 +274,12 @@ pub trait StaticArrayCodegen: Clone {
                     |context, bb| {
                         let i32_ty = context.iw_context().i32_type();
                         let indices = [i32_ty.const_zero(), i32_ty.const_int(1, false), index];
-                        let element_ptr =
-                            unsafe { context.builder().build_in_bounds_gep(ptr, &indices, "") }?;
-                        let element = context.builder().build_load(element_ptr, "")?;
+                        let element_ptr = unsafe {
+                            context
+                                .builder()
+                                .build_in_bounds_gep(struct_ty, ptr, &indices, "")
+                        }?;
+                        let element = context.builder().build_load(elem_ty, element_ptr, "")?;
                         rmb.write(
                             context.builder(),
                             [result_llvm_sum_ty
@@ -333,10 +304,9 @@ pub trait StaticArrayCodegen: Clone {
             }
             StaticArrayOpDef::len => {
                 let ptr = args.inputs[0].into_pointer_value();
-                let element_llvm_ty = context.llvm_type(&op.elem_ty)?;
                 let index_ty = args.outputs.get_types().next().unwrap().into_int_type();
                 let struct_ty =
-                    static_array_struct_type(context.iw_context(), index_ty, element_llvm_ty, 0);
+                    static_array_struct_type(context.iw_context(), index_ty, elem_ty, 0);
                 let len = build_read_len(context.iw_context(), context.builder(), struct_ty, ptr)?;
                 args.outputs.finish(context.builder(), [len.into()])
             }
@@ -367,12 +337,12 @@ impl<SAC: StaticArrayCodegen + 'static> CodegenExtension for StaticArrayCodegenE
                     static_array::STATIC_ARRAY_TYPENAME,
                 ),
                 {
-                    let sac = self.0.clone();
                     move |ts, custom_type| {
-                        let element_type = custom_type.args()[0]
+                        // check the arg type, even though the return is always ptr
+                        let _ = custom_type.args()[0]
                             .as_runtime()
                             .expect("Type argument for static array must be a type");
-                        sac.static_array_type(ts, &element_type)
+                        Ok(ts.llvm_ptr_type().into())
                     }
                 },
             )

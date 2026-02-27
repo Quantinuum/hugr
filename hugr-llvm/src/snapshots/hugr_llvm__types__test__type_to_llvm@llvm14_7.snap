@@ -1,5 +1,0 @@
----
-source: hugr-llvm/src/types.rs
-expression: "[Bool] -> [[]+[]+[]]"
----
-"i2 (i1)*"

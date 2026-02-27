@@ -12,7 +12,7 @@ use inkwell::{
     builder::Builder,
     context::Context,
     module::{Linkage, Module},
-    types::{BasicType, BasicTypeEnum, FunctionType},
+    types::{BasicType, BasicTypeEnum, FunctionType, PointerType},
     values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue, IntValue},
 };
 use itertools::{Itertools, zip_eq};
@@ -72,6 +72,8 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
             pub fn llvm_func_type(&self, hugr_type: &HugrFuncType) -> Result<FunctionType<'c> >;
             /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
             pub fn llvm_sum_type(&self, sum_type: HugrSumType) -> Result<LLVMSumType<'c>>;
+            /// Get the global opaque LLVM pointer type
+            pub fn llvm_ptr_type(&self) -> PointerType<'c>;
             /// Adds or gets the [FunctionValue] in the [inkwell::module::Module] corresponding to the given [FuncDefn].
             ///
             /// The name of the result may have been mangled.

@@ -21,9 +21,9 @@ env:
   RUSTC_WRAPPER: "sccache"
   HUGR_TEST_SCHEMA: "1"
   # different strings for install action and feature name
-  # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
-  LLVM_VERSION: "14.0"
-  LLVM_FEATURE_NAME: "14-0"
+  # should match https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
+  LLVM_VERSION: "21.1"
+  LLVM_FEATURE_NAME: "21-1"
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -221,7 +221,7 @@ jobs:
         id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.89"
+          toolchain: "1.91"
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -353,7 +353,7 @@ jobs:
       - name: Run tests with all features, with coverage instrumentation
         run: cargo llvm-cov --no-report --all-features --doctests
       - name: Run hugr-llvm tests, with coverage instrumentation
-        run: cargo llvm-cov --no-report -p hugr-llvm --features llvm14-0 --doctests
+        run: cargo llvm-cov --no-report -p hugr-llvm --features llvm${{ env.LLVM_FEATURE_NAME }} --doctests
       - name: Run hugr-persistent tests, with coverage instrumentation
         run: cargo llvm-cov --no-report -p hugr-persistent --doctests
       - name: Generate coverage report

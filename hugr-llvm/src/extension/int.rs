@@ -31,7 +31,7 @@ use crate::{
     types::{HugrSumType, TypingSession},
 };
 
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Result, anyhow, bail, ensure};
 
 use super::{DefaultPreludeCodegen, PreludeCodegen, conversions::int_type_bounds};
 
@@ -228,15 +228,20 @@ fn emit_ipow<'c, H: HugrView<Node = Node>>(
         let return_one_bb = ctx.new_basic_block("power_of_zero", Some(pow_body_bb));
         let pow_bb = ctx.new_basic_block("pow", Some(return_one_bb));
 
-        let acc_p = ctx.builder().build_alloca(lhs.get_type(), "acc_ptr")?;
-        let exp_p = ctx.builder().build_alloca(rhs.get_type(), "exp_ptr")?;
+        let result_ty = lhs.get_type();
+        ensure!(
+            result_ty == rhs.get_type(),
+            "Operands to `ipow` must have the same type"
+        );
+        let acc_p = ctx.builder().build_alloca(result_ty, "acc_ptr")?;
+        let exp_p = ctx.builder().build_alloca(result_ty, "exp_ptr")?;
         ctx.builder().build_store(acc_p, lhs)?;
         ctx.builder().build_store(exp_p, rhs)?;
         ctx.builder().build_unconditional_branch(pow_bb)?;
 
-        let zero = rhs.get_type().into_int_type().const_int(0, false);
         // Assumes RHS type is the same as output type (which it should be)
-        let one = rhs.get_type().into_int_type().const_int(1, false);
+        let zero = result_ty.into_int_type().const_int(0, false);
+        let one = result_ty.into_int_type().const_int(1, false);
 
         // Block for just returning one
         ctx.builder().position_at_end(return_one_bb);
@@ -244,8 +249,8 @@ fn emit_ipow<'c, H: HugrView<Node = Node>>(
         ctx.builder().build_unconditional_branch(done_bb)?;
 
         ctx.builder().position_at_end(pow_bb);
-        let acc = ctx.builder().build_load(acc_p, "acc")?;
-        let exp = ctx.builder().build_load(exp_p, "exp")?;
+        let acc = ctx.builder().build_load(result_ty, acc_p, "acc")?;
+        let exp = ctx.builder().build_load(result_ty, exp_p, "exp")?;
 
         // Special case if the exponent is 0 or 1
         ctx.builder().build_switch(
@@ -267,7 +272,7 @@ fn emit_ipow<'c, H: HugrView<Node = Node>>(
         ctx.builder().build_unconditional_branch(pow_bb)?;
 
         ctx.builder().position_at_end(done_bb);
-        let result = ctx.builder().build_load(acc_p, "result")?;
+        let result = ctx.builder().build_load(result_ty, acc_p, "result")?;
         Ok(vec![result.as_basic_value_enum()])
     })
 }
@@ -940,7 +945,9 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
             )?;
 
             ctx.builder().position_at_end(finish);
-            let result = ctx.builder().build_load(result_ptr, "result")?;
+            let result = ctx
+                .builder()
+                .build_load(pair_ty.clone(), result_ptr, "result")?;
             Ok(result)
         } else {
             let quot = ctx
@@ -972,9 +979,7 @@ fn make_divmod<'c, H: HugrView<Node = Node>>(
 
     if panic {
         LLVMSumValue::try_new(
-            val_or_panic(ctx, pcg, lower_bounds_check, &ERR_DIV_0, |ctx| {
-                build_divmod(ctx)
-            })?,
+            val_or_panic(ctx, pcg, lower_bounds_check, &ERR_DIV_0, build_divmod)?,
             pair_ty,
         )
     } else {
@@ -1504,7 +1509,7 @@ mod test {
     }
 
     #[rstest]
-    #[case("inarrow_s", 6, 2, 4)]
+    #[case("inarrow_s", 6, 3, 4)]
     #[case("inarrow_s", 6, 5, (1 << 5) - 1)]
     #[case("inarrow_s", 6, 4, -1)]
     #[case("inarrow_s", 6, 4, -(1 << 4) - 1)]
@@ -1559,7 +1564,7 @@ mod test {
                 Ok(handle.outputs())
             },
         );
-        assert_eq!(int_exec_ctx.exec_hugr_i64(hugr, "main"), arg);
+        int_exec_ctx.check_int_hugr(hugr, "main", to, arg as u64, true);
     }
 
     #[rstest]
@@ -1581,8 +1586,7 @@ mod test {
                     .outputs_arr();
                 hugr_builder.finish_hugr_with_outputs([signed]).unwrap()
             });
-        let act = int_exec_ctx.exec_hugr_i64(hugr, "main");
-        assert_eq!(act, val as i64);
+        int_exec_ctx.check_int_hugr(hugr, "main", log_width, val, true);
     }
 
     #[rstest]
@@ -1608,8 +1612,8 @@ mod test {
                     .outputs_arr();
                 hugr_builder.finish_hugr_with_outputs([res]).unwrap()
             });
-        let act = int_exec_ctx.exec_hugr_u64(hugr, "main");
-        assert_eq!(act, (val as u64) + 42);
+        let expected = (val as u64) + 42;
+        int_exec_ctx.check_int_hugr(hugr, "main", log_width, expected, false);
     }
 
     // Log width fixed at 3 (i.e. divmod : Fn(i8, u8) -> (i8, u8)
@@ -1623,7 +1627,7 @@ mod test {
         int_exec_ctx: TestContext,
         #[case] dividend: i64,
         #[case] divisor: u64,
-        #[case] expected_result: (i64, u64),
+        #[case] expected_result: (i8, u8),
     ) {
         let int_ty = INT_TYPES[3].clone();
         let k_dividend = ConstInt::new_s(3, dividend).unwrap();
@@ -1640,8 +1644,8 @@ mod test {
             Some([k_dividend, k_divisor]),
             int_ty,
         );
-        let quot = int_exec_ctx.exec_hugr_i64(quot_hugr, "main");
-        let rem = int_exec_ctx.exec_hugr_u64(rem_hugr, "main");
+        let quot = int_exec_ctx.exec_hugr::<i8>(quot_hugr, "main");
+        let rem = int_exec_ctx.exec_hugr::<u8>(rem_hugr, "main");
         assert_eq!((quot, rem), expected_result);
     }
 }
