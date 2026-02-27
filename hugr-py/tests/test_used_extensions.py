@@ -7,7 +7,8 @@ from hugr import ext, val
 
 from hugr.build import Dfg
 from hugr.std.collections.list import List
-from hugr.std.int import INT_T, INT_TYPES_EXTENSION
+from hugr.std.float import FLOAT_TYPES_EXTENSION
+from hugr.std.int import CONVERSIONS_EXTENSION, INT_T, INT_TYPES_EXTENSION
 import pytest
 
 from .conftest import H, QUANTUM_EXT, TEST_EXT, TEST_TYPE_OPAQUE, TEST_OP_OPAQUE
@@ -21,10 +22,10 @@ def test_extension_ops() -> None:
     h.set_outputs(h_node.out(0))
 
     op_exts = h.hugr[h_node].op.used_extensions().ids()
-    assert set(op_exts) == {QUANTUM_EXT.name, "prelude"}
+    assert set(op_exts) == {QUANTUM_EXT.name, FLOAT_TYPES_EXTENSION.name, "prelude"}
 
     exts = h.hugr.used_extensions().ids()
-    assert set(exts) == {QUANTUM_EXT.name, "prelude"}
+    assert set(exts) == {QUANTUM_EXT.name, FLOAT_TYPES_EXTENSION.name, "prelude"}
 
 
 def test_core_ops() -> None:
@@ -39,6 +40,13 @@ def test_core_ops() -> None:
 
     exts = h.hugr.used_extensions().ids()
     assert set(exts) == {INT_TYPES_EXTENSION.name, "prelude"}
+
+
+def test_transitive_extension_dependencies() -> None:
+    op = ops.ExtOp(CONVERSIONS_EXTENSION.get_op("itousize"), args=[])
+    exts = op.used_extensions().ids()
+    assert CONVERSIONS_EXTENSION.name in exts
+    assert FLOAT_TYPES_EXTENSION.name in exts
 
 
 def test_func_calls() -> None:

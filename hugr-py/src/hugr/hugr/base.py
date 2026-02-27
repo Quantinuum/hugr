@@ -1307,6 +1307,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             self[node].op = resolved_op
             result.extend(op_result)
 
+        result._extend_with_transitive_ops(resolve_from)
+
         return result
 
     def resolve_extensions(self, registry: ext.ExtensionRegistry) -> Hugr:

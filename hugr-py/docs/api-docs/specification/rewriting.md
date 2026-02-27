@@ -1,0 +1,2 @@
+```{include} ../../../../specification/rewriting.md
+```

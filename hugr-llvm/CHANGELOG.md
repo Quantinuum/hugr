@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.25.6](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.25.5...hugr-llvm-v0.25.6) - 2026-02-20
+
+### New Features
+
+- Add error context when lowering hugrs to LLVM ([#2869](https://github.com/Quantinuum/hugr/pull/2869))
+
 ## [0.25.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.24.3...hugr-llvm-v0.25.0) - 2025-12-22
 
 ### New Features

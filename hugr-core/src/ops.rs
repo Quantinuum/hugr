@@ -412,6 +412,7 @@ impl OpType {
         if let Some(ext) = collect_op_extension(None, self)? {
             reg.register_updated(ext);
         }
+        reg.extend_with_dependencies()?;
         Ok(reg)
     }
 }
