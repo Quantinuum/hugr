@@ -68,7 +68,6 @@ serde_yaml = "0.9.34"
 smallvec = "1.15.1"
 smol_str = "0.3.5"
 static_assertions = "1.1.0"
-strum = "0.27.2"
 tempfile = "3.25"
 thiserror = "2.0.18"
 typetag = "0.2.21"
@@ -101,6 +100,7 @@ petgraph = { version = ">= 0.8.3, < 0.9", default-features = false }
 # There can only be one `pyo3` dependency in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.
 pyo3 = ">= 0.27.2, < 0.29"
+strum = ">= 0.27.2, < 0.29"
 
 [profile.dev.package]
 insta.opt-level = 3
