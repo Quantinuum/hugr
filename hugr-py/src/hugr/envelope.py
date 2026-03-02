@@ -4,7 +4,8 @@ The format is designed to be extensible and backwards-compatible. It
 consists of a header declaring the format used to encode the HUGR, followed
 by the encoded HUGR itself.
 
-## Payload formats
+Payload formats
+---------------
 
 The envelope may encode the HUGR in different formats, listed in
 :class:`hugr.envelope.EnvelopeFormat`. The payload may also be compressed with zstd.
@@ -13,21 +14,24 @@ Some formats can be represented as ASCII, as indicated by the
 :meth:`hugr.envelope.EnvelopeFormat.ascii_printable` method. When this is the case, the
 whole envelope can be stored in a string.
 
-## Envelope header
+Envelope header
+---------------
 
 The binary header format is 10 bytes, with the following fields:
 
-| Field  | Size (bytes) | Description |
-|--------|--------------|-------------|
++--------+--------------+--------------------------------------------------------------------------------+
+| Field  | Size (bytes) | Description                                                                    |
++========+==============+================================================================================+
 | Magic  | 8            | :class:`hugr.envelope.MAGIC_NUMBERS` constant identifying the envelope format. |
-| Format | 1            | :class:`hugr.envelope.EnvelopeFormat` describing the payload format. |
-| Flags  | 1            | Additional configuration flags. |
+| Format | 1            | :class:`hugr.envelope.EnvelopeFormat` describing the payload format.           |
+| Flags  | 1            | Additional configuration flags.                                                |
++--------+--------------+--------------------------------------------------------------------------------+
 
 Flags:
 
 - Bit 0: Whether the payload is compressed with zstd.
 - Bits 1-5: Reserved for future use.
-- Bit 7,6: Constant "01" to make some headers ascii-printable.
+- Bits 7,6: Constant "01" to make some headers ascii-printable.
 """  # noqa: E501
 
 from __future__ import annotations
