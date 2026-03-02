@@ -18,7 +18,7 @@ use itertools::Either;
 /// idempotent (i.e. such that after running a pass, rerunning it immediately has
 /// no further effect). However this is *not* a requirement, e.g. a sequence of
 /// idempotent passes created by [ComposablePass::then] may not be idempotent itself.
-pub trait ComposablePass<H: HugrMut = Hugr>: Sized {
+pub trait ComposablePass<H: HugrMut>: Sized {
     /// Error thrown by this pass.
     type Error: Error;
     /// Result returned by this pass.
