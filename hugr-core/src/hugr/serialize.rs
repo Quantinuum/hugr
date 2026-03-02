@@ -285,7 +285,8 @@ impl TryFrom<SerHugrLatest> for Hugr {
             }
         }
 
-        #[expect(clippy::result_large_err)]
+        // TODO: Change to `expect` if updating the MSRV above 1.94
+        #[allow(clippy::result_large_err)]
         let unwrap_offset = |node: Node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {
             if !hugr.graph.contains_node(node.into_portgraph()) {
                 return Err(HUGRSerializationError::UnknownEdgeNode { node });
