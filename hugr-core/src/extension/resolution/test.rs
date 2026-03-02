@@ -79,7 +79,7 @@ fn make_extension(name: &str, op_name: &str) -> (Arc<Extension>, OpType) {
         ext.add_op(
             op_name.into(),
             String::new(),
-            Signature::new_endo(vec![bool_t()]),
+            Signature::new_endo([bool_t()]),
             extension_ref,
         )
         .unwrap();
@@ -220,7 +220,7 @@ fn resolve_hugr_extensions() {
     let decl = module
         .declare(
             "dummy_declaration",
-            Signature::new_endo(vec![float64_type()]).into(),
+            Signature::new_endo([float64_type()]).into(),
         )
         .unwrap();
 
@@ -238,7 +238,7 @@ fn resolve_hugr_extensions() {
     let loaded_func = func.load_func(&decl, &[]).unwrap();
     func.add_dataflow_op(
         CallIndirect {
-            signature: Signature::new_endo(vec![float64_type()]),
+            signature: Signature::new_endo([float64_type()]),
         },
         vec![loaded_func, func_i0],
     )

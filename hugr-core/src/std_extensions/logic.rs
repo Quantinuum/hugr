@@ -85,7 +85,7 @@ impl MakeOpDef for LogicOp {
             LogicOp::And | LogicOp::Or | LogicOp::Eq | LogicOp::Xor => {
                 Signature::new(vec![bool_t(); 2], vec![bool_t()])
             }
-            LogicOp::Not => Signature::new_endo(vec![bool_t()]),
+            LogicOp::Not => Signature::new_endo([bool_t()]),
         }
         .into()
     }

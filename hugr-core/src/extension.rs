@@ -537,7 +537,7 @@ pub type ExtensionId = IdentList;
 ///         ext.add_op(
 ///             "MyOp".into(),
 ///             "Some operation".into(),
-///             Signature::new_endo(vec![]),
+///             Signature::new_endo([]),
 ///             extension_ref,
 ///         );
 ///     },
