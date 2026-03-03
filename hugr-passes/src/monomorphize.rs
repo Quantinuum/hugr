@@ -288,7 +288,7 @@ mod test {
     use rstest::rstest;
 
     use crate::dead_funcs::remove_dead_funcs_scoped;
-    use crate::{PassScope, monomorphize};
+    use crate::{composable::Preserve, monomorphize};
 
     use super::{is_polymorphic, mangle_name};
 
@@ -399,7 +399,7 @@ mod test {
         assert_eq!(mono2, mono); // Idempotent
 
         let mut nopoly = mono;
-        remove_dead_funcs_scoped(&mut nopoly, &PassScope::PreservePublic)?;
+        remove_dead_funcs_scoped(&mut nopoly, Preserve::Public)?;
         let mut funcs = list_funcs(&nopoly);
 
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
@@ -626,7 +626,7 @@ mod test {
         };
 
         monomorphize(&mut hugr).unwrap();
-        remove_dead_funcs_scoped(&mut hugr, &PassScope::PreservePublic).unwrap();
+        remove_dead_funcs_scoped(&mut hugr, Preserve::Public).unwrap();
 
         let funcs = list_funcs(&hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));

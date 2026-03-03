@@ -11,7 +11,7 @@ use hugr_core::hugr::views::sibling_subgraph::TopoConvexChecker;
 use hugr_core::ops::{OpTrait, OpType};
 use hugr_core::types::Type;
 use hugr_core::{HugrView, Node, PortIndex, SimpleReplacement};
-use itertools::{Either,Itertools};
+use itertools::{Either, Itertools};
 
 use crate::{ComposablePass, PassScope};
 
@@ -229,8 +229,8 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for UntuplePass {
     }
 
     /// Overrides any [Self::set_parent] or [Self::recursive]
-    fn with_scope(mut self, scope: &crate::PassScope) -> Self {
-        self.scope = Either::Left(scope.clone());
+    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = Either::Left(scope.into());
         self
     }
 }

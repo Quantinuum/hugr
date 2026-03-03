@@ -915,8 +915,8 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
     /// neither [PassScope::preserve_interface] nor [PassScope::recursive] as the former
     /// would be contrary to the goals of the pass and non-recursion generally leads to
     /// invalid Hugrs. Hence, really only the [PassScope::root] affects the pass.
-    fn with_scope(mut self, scope: &PassScope) -> Self {
-        self.scope = Either::Left(scope.clone());
+    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = Either::Left(scope.into());
         self
     }
 

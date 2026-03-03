@@ -134,7 +134,7 @@ impl PassScope {
     /// Returns a scope that covers (only) the entrypoint subtree of the specified Hugr.
     ///
     /// Handles module-rooted Hugrs (via [Self::Global]).
-    pub fn from_entrypoint(h: &impl HugrView) -> Self {
+    pub(crate) fn from_entrypoint(h: &impl HugrView) -> Self {
         if h.entrypoint() == h.module_root() {
             // EntrypointXX say not to do anything in this case, so pick a global pass (rather arbitrarily)
             Self::Global(Preserve::All) // ALAN or default?

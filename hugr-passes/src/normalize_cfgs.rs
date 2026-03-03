@@ -170,8 +170,8 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
     }
 
     /// Overrides any previous call to [Self::cfgs]
-    fn with_scope(mut self, scope: &PassScope) -> Self {
-        self.scope = Either::Right(scope.clone());
+    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = Either::Right(scope.into());
         self
     }
 }

@@ -208,8 +208,8 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
         Ok(())
     }
 
-    fn with_scope(mut self, scope: &PassScope) -> Self {
-        self.scope = Some(scope.clone());
+    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = Some(scope.into());
         self
     }
 }

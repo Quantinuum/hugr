@@ -13,7 +13,7 @@ use petgraph::visit::{Dfs, Walker};
 
 use crate::{
     ComposablePass, PassScope,
-    composable::{ValidatePassError, validate_if_test},
+    composable::{Preserve, ValidatePassError, WithScope, validate_if_test},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -93,8 +93,8 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
     type Result = ();
 
     /// Overrides any entrypoints set by a call to [Self::with_module_entry_points].
-    fn with_scope(mut self, scope: &PassScope) -> Self {
-        self.entry_points = Either::Right(scope.clone());
+    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
+        self.entry_points = Either::Right(scope.into());
         self
     }
 
@@ -113,16 +113,20 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
                     entry_points.push(hugr.entrypoint())
                 }
             }
-            Either::Right(PassScope::EntrypointFlat | PassScope::EntrypointRecursive) => {
+            Either::Right(
                 // If the entrypoint is the module root, not allowed to touch anything.
                 // Otherwise, we must keep the entrypoint (and can touch only inside it).
+                PassScope::EntrypointFlat | PassScope::EntrypointRecursive
+                // Optimize whole Hugr but keep all functions
+                | PassScope::Global(Preserve::All)) => {
                 return Ok(());
             }
-            Either::Right(PassScope::PreserveAll) => return Ok(()), // Optimize whole Hugr but keep all functions
-            Either::Right(PassScope::PreservePublic) => {
+            Either::Right(PassScope::Global(Preserve::Entrypoint)) if hugr.entrypoint() != hugr.module_root() => {
+                entry_points.push(hugr.entrypoint());
+            }
+            Either::Right(PassScope::Global(_)) => {
                 for n in hugr.children(hugr.module_root()) {
-                    if let Some(fd) = hugr.get_optype(n).as_func_defn()
-                        && fd.visibility() == &Visibility::Public
+                    if hugr.get_optype(n).as_func_defn().is_some_and(|fd| fd.visibility() == &Visibility::Public)
                     {
                         entry_points.push(n);
                     }
@@ -130,12 +134,6 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
                 if hugr.entrypoint() != hugr.module_root() {
                     entry_points.push(hugr.entrypoint());
                 }
-            }
-            Either::Right(PassScope::PreserveEntrypoint) => {
-                if hugr.entrypoint() == hugr.module_root() {
-                    return Ok(());
-                };
-                entry_points.push(hugr.entrypoint())
             }
         }
 
@@ -196,15 +194,9 @@ pub fn remove_dead_funcs(
 // TODO: after removing the deprecated `remove_dead_funcs`, rename this over it
 pub fn remove_dead_funcs_scoped<H: HugrMut<Node = Node>>(
     h: &mut H,
-    scope: &PassScope,
+    scope: impl Into<PassScope>,
 ) -> Result<(), ValidatePassError<Node, RemoveDeadFuncsError>> {
-    validate_if_test(
-        <RemoveDeadFuncsPass as ComposablePass<H>>::with_scope(
-            RemoveDeadFuncsPass::default(),
-            scope,
-        ),
-        h,
-    )
+    validate_if_test(RemoveDeadFuncsPass::default().with_scope(scope), h)
 }
 
 #[cfg(test)]
@@ -221,6 +213,7 @@ mod test {
     use hugr_core::{HugrView, extension::prelude::usize_t, types::Signature};
 
     use crate::PassScope;
+    use crate::composable::Preserve;
     use crate::dead_funcs::remove_dead_funcs_scoped;
 
     fn hugr(use_entrypoint: bool) -> Hugr {
@@ -309,19 +302,20 @@ mod test {
     }
 
     #[rstest]
-    #[case(PassScope::PreserveAll, false, vec!["from_main", "from_pub", "main", "pubfunc"])]
+    #[case(Preserve::All, false, vec!["from_main", "from_pub", "main", "pubfunc"])]
     #[case(PassScope::EntrypointFlat, true, vec!["from_main", "from_pub", "main", "pubfunc"])]
     #[case(PassScope::EntrypointRecursive, false, vec!["from_main", "from_pub", "main", "pubfunc"])]
-    #[case(PassScope::PreservePublic, true, vec!["from_main", "from_pub", "main", "pubfunc"])]
-    #[case(PassScope::PreservePublic, false, vec!["from_pub", "pubfunc"])]
-    #[case(PassScope::PreserveEntrypoint, true, vec!["from_main", "main"])]
+    #[case(Preserve::Public, true, vec!["from_main", "from_pub", "main", "pubfunc"])]
+    #[case(Preserve::Public, false, vec!["from_pub", "pubfunc"])]
+    #[case(Preserve::Entrypoint, true, vec!["from_main", "main"])]
     fn remove_dead_funcs_scope(
-        #[case] scope: PassScope,
+        #[case] scope: impl Into<PassScope>,
         #[case] use_entrypoint: bool,
         #[case] retained_funcs: Vec<&'static str>,
     ) {
+        let scope = scope.into();
         let mut hugr = hugr(use_entrypoint);
-        remove_dead_funcs_scoped(&mut hugr, &scope).unwrap();
+        remove_dead_funcs_scoped(&mut hugr, scope).unwrap();
 
         let remaining_funcs = hugr
             .nodes()
