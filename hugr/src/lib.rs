@@ -63,9 +63,9 @@
 //! println!("{}", serialized);
 //!
 //! ```
-//! 
+//!
 //! Natively, HUGR does not include any quantum operations, but it is possible to define
-//! a quantum extension and then use it to build a HUGR. 
+//! a quantum extension and then use it to build a HUGR.
 //! See the documentation in the [extension module](extension) for an example of a simple quantum extension.
 
 // These modules are re-exported as-is. If more control is needed, define a new module in this crate with the desired exports.
