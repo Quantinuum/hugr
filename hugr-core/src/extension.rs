@@ -2,11 +2,11 @@
 //!
 //! TODO: YAML declaration and parsing. This should be similar to a plugin
 //! system (outside the `types` module), which also parses nested [`OpDef`]s.
-//! 
-//! 
+//!
+//!
 //! # Example
 //!
-//! By default HUGR does not include any quantum operations, but it is possible to define 
+//! By default HUGR does not include any quantum operations, but it is possible to define
 //! them in an extension and then use them in a HUGR.
 //! Here we show how to define a custom quantum extension, and how to use it to build a HUGR for a simple quantum circuit.
 //! ```
@@ -102,7 +102,7 @@
 //! }
 //!
 //! let h: Hugr = make_dfg_hugr().unwrap();
-//! // We serialize the hugr to obtaina printable representation
+//! // We serialize the hugr to obtain printable representation
 //! let serialized = h.store_str(EnvelopeConfig::text()).unwrap();
 //! println!("{}", serialized);
 //! ```
