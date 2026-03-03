@@ -24,8 +24,7 @@
 //!
 //! # Example
 //!
-//! To build a HUGR for a simple quantum circuit and then serialize it to a buffer, we can define
-//! a simple quantum extension and then use the [[`builder::DFGBuilder`]] as follows:
+//! Here we build a simple HUGR represent a boolean circuit using the [[`builder::DFGBuilder`]] as follows:
 //! ```
 //! use hugr::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr, inout_sig};
 //! use hugr::extension::prelude::{bool_t};
@@ -64,6 +63,10 @@
 //! println!("{}", serialized);
 //!
 //! ```
+//! 
+//! Natively, HUGR does not include any quantum operations, but it is possible to define
+//! a quantum extension and then use it to build a HUGR. 
+//! See the documentation in the [extension module](extension) for an example of a simple quantum extension.
 
 // These modules are re-exported as-is. If more control is needed, define a new module in this crate with the desired exports.
 // The doc inline directive is necessary for renamed modules to appear as if they were defined in this crate.
