@@ -15,18 +15,15 @@
 //! use hugr::extension::prelude::{bool_t, qb_t};
 //! use hugr::envelope::EnvelopeConfig;
 //! use hugr::hugr::Hugr;
-//! use hugr::type_row;
-//! use hugr::types::FuncValueType;
 //!
 //! // By default, no gateset is defined. This module provides Hadamard and CX gates.
 //! mod mini_quantum_extension {
 //!     use hugr::{
 //!         extension::{
 //!             prelude::{bool_t, qb_t},
-//!             ExtensionId, ExtensionRegistry, PRELUDE, Version,
+//!             ExtensionId, Version,
 //!         },
 //!         ops::{ExtensionOp, OpName},
-//!         type_row,
 //!         types::{FuncValueType, PolyFuncTypeRV},
 //!         Extension,
 //!     };
