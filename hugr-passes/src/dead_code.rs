@@ -129,6 +129,8 @@ impl<H: HugrView> DeadCodeElimPass<H> {
             if !needed.insert(n) {
                 continue;
             }
+            // Ensure no orphans. We could remove more from parent, but would require transforming
+            // (e.g. removing individual Output ports) not just deleting, so don't.
             q.extend(h.get_parent(n));
             for (i, ch) in h.children(n).enumerate() {
                 if self.must_preserve(h, &mut must_preserve, ch)
@@ -200,9 +202,10 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
             },
         };
         let needed = self.find_needed_nodes(&*hugr)?;
-        let mut descs = hugr.descendants(root);
-        assert_eq!(descs.next(), Some(root)); // Module Root not strictly "needed"
-        let remove = descs.filter(|n| !needed.contains(n)).collect::<Vec<_>>();
+        let remove = hugr
+            .descendants(root)
+            .filter(|n| !needed.contains(n))
+            .collect::<Vec<_>>();
         for n in remove {
             hugr.remove_node(n);
         }
