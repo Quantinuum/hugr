@@ -6,7 +6,7 @@ use std::{collections::HashMap, sync::Arc};
 use thiserror::Error;
 
 use hugr_core::{
-    HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Visibility, Wire,
+    HugrView, IncomingPort, Node, NodeIndex, OutgoingPort, PortIndex, Wire,
     hugr::hugrmut::HugrMut,
     ops::{
         Const, DataflowOpTrait, ExtensionOp, LoadConstant, OpType, Value, constant::OpaqueValue,
@@ -15,18 +15,12 @@ use hugr_core::{
 };
 use value_handle::ValueHandle;
 
-use crate::{ComposablePass, composable::validate_if_test};
-use crate::{
-    PassScope,
-    dataflow::{
-        ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
-        partial_from_const,
-    },
+use crate::dataflow::{
+    ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
+    partial_from_const,
 };
-use crate::{
-    composable::{Preserve, WithScope},
-    dead_code::{DeadCodeElimError, DeadCodeElimPass, PreserveNode},
-};
+use crate::dead_code::{DeadCodeElimError, DeadCodeElimPass, PreserveNode};
+use crate::{ComposablePass, PassScope, composable::validate_if_test};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
@@ -136,25 +130,11 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             .map_err(|op| ConstFoldError::InvalidEntryPoint { node: n, op })?;
         }
 
-        let scope_entrypoints = match &self.scope {
-            // "Just the entrypoint subtree"
-            None | Some(PassScope::EntrypointFlat | PassScope::EntrypointRecursive) => Vec::new(),
-            Some(PassScope::Global(Preserve::Entrypoint))
-                if (hugr.entrypoint() != hugr.module_root()) =>
-            {
-                Vec::new()
+        for node in self.scope.iter().flat_map(|sc| sc.preserve_interface(hugr)) {
+            if node == hugr.module_root() || self.inputs.contains_key(&node) {
+                // Cannot prepopulate inputs for module-root; do not `join` with inputs explicitly specified.
+                continue;
             }
-            // "All FuncDefns" (public for Preserve::Entrypoint if entrypoint is not module-root)
-            Some(PassScope::Global(preserve)) => hugr
-                .children(hugr.module_root())
-                .filter(|n| {
-                    hugr.get_optype(*n).as_func_defn().is_some_and(|fd| {
-                        preserve == &Preserve::All || fd.visibility() == &Visibility::Public
-                    })
-                })
-                .collect(),
-        };
-        for node in scope_entrypoints {
             const NO_INPUTS: [(IncomingPort, PartialValue<ValueHandle>); 0] = [];
             m.prepopulate_inputs(node, NO_INPUTS)
                 .map_err(|op| ConstFoldError::InvalidEntryPoint { node, op })?;

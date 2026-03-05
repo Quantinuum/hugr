@@ -129,6 +129,7 @@ impl<H: HugrView> DeadCodeElimPass<H> {
             if !needed.insert(n) {
                 continue;
             }
+            q.extend(h.get_parent(n));
             for (i, ch) in h.children(n).enumerate() {
                 if self.must_preserve(h, &mut must_preserve, ch)
                     || match h.get_optype(ch) {
