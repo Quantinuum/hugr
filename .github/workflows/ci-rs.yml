@@ -272,7 +272,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Download the hugr binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: hugr_binary
           path: ${{ github.workspace }}/target/debug
