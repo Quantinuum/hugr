@@ -31,47 +31,47 @@ use smol_str::SmolStr;
 ///     ops::handle::NodeHandle,
 ///     HugrView,
 /// };
-/// 
+///
 /// fn make_module() -> Result<(), BuildError> {
-/// 
-///         // Create a simple DFG (Dataflow Graph) with a signature that takes a bool and returns a bool
-///         let dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()]))?;
-///         
-///         // Get the input wires from the DFG builder
-///         let [i1] = dfg_builder.input_wires_arr();
-///         
-///         // Finish building the DFG, passing through the input wire to the output
-///         let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
-/// 
-///         // Create a module builder to contain our functions
-///         let mut module_builder = ModuleBuilder::new();
-/// 
-///         // Define a function called "main" within the module with a bool endomorphism signature
-///         let mut f_build =
-///                 module_builder.define_function("main", Signature::new_endo(bool_t()))?;
-/// 
-///         // Get the input wires for the function
-///         let [i1] = f_build.input_wires_arr();
-///         
-///         // Add the DFG we created earlier into the function, connecting its input wire
-///         let dfg = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
-///         
-///         // Finish building the function, connecting the DFG's output to the function's output
-///         let f = f_build.finish_with_outputs([dfg.out_wire(0)])?;
-///         
-///         // Store the node handles (not used in this example)
-///         (dfg.node(), f.node());
-/// 
-///         // Finish building the module to get the complete HUGR
-///         let hugr = module_builder.finish_hugr()?;
-/// 
-///         // Validate the HUGR to ensure it's well-formed
-///          hugr.validate().unwrap_or_else(|e| {
-///                 panic!("HUGR validation failed: {e}");
-///         });
-///         Ok(())
+///
+///     // Create a simple DFG (Dataflow Graph) with a signature that takes a bool and returns a bool
+///     let dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()]))?;
+///
+///     // Get the input wires from the DFG builder
+///     let [i1] = dfg_builder.input_wires_arr();
+///
+///     // Finish building the DFG, passing through the input wire to the output
+///     let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
+///
+///     // Create a module builder to contain our functions
+///     let mut module_builder = ModuleBuilder::new();
+///
+///     // Define a function called "main" within the module with a bool endomorphism signature
+///     let mut f_build =
+///             module_builder.define_function("main", Signature::new_endo(bool_t()))?;
+///
+///     // Get the input wires for the function
+///     let [i1] = f_build.input_wires_arr();
+///
+///     // Add the DFG we created earlier into the function, connecting its input wire
+///     let dfg = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
+///
+///     // Finish building the function, connecting the DFG's output to the function's output
+///     let f = f_build.finish_with_outputs([dfg.out_wire(0)])?;
+///
+///     // Store the node handles (not used in this example)
+///     (dfg.node(), f.node());
+///
+///     // Finish building the module to get the complete HUGR
+///     let hugr = module_builder.finish_hugr()?;
+///
+///     // Validate the HUGR to ensure it's well-formed
+///     hugr.validate().unwrap_or_else(|e| {
+///             panic!("HUGR validation failed: {e}");
+///     });
+///     Ok(())
 /// }
-/// 
+///
 /// assert!(make_module().is_ok());
 /// ```
 #[derive(Debug, Default, Clone, PartialEq)]

@@ -3,7 +3,7 @@
 //! The core trait is [`ComposablePass`], which defines a transformation that can
 //! be applied to a HUGR.
 //! See the [`ComposablePass`] trait documentation for more details.
-//! 
+//!
 
 mod scope;
 
