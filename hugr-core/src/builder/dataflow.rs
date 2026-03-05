@@ -5,7 +5,7 @@ use itertools::Itertools;
 use super::build_traits::{HugrBuilder, SubContainer};
 use super::handle::BuildHandle;
 use super::{BuildError, Container, Dataflow, DfgID, FuncID};
-
+ 
 use std::marker::PhantomData;
 
 use crate::hugr::internal::HugrMutInternals;
@@ -16,6 +16,12 @@ use crate::types::{PolyFuncType, Signature, Type};
 use crate::{Direction, Hugr, IncomingPort, Node, OutgoingPort, Visibility, Wire, hugr::HugrMut};
 
 /// Builder for a [`ops::DFG`] node.
+///
+/// See the [crate-level documentation](https://docs.rs/hugr/latest/hugr/#example)
+/// for an example of using [`DFGBuilder`] to construct a boolean circuit or the 
+/// [extension module documentation](extension) for an example of using the builder 
+/// with a quantum extension.
+
 #[derive(Debug, Clone, PartialEq)]
 pub struct DFGBuilder<T> {
     pub(crate) base: T,

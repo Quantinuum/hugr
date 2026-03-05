@@ -22,8 +22,8 @@
 //! # Example
 //!
 //! The following example shows how to build a simple HUGR module with two
-//! dataflow functions, one built using the `DFGBuilder` and the other using the
-//! `CircuitBuilder`.
+//! dataflow functions, one built using the [`DFGBuilder`] and the other using the
+//! [`CircuitBuilder`].
 //!
 //! ```rust
 //! # use hugr::{Hugr, HugrView};
