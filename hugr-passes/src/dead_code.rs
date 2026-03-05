@@ -120,7 +120,7 @@ impl<H: HugrView> DeadCodeElimPass<H> {
 
         match &self.scope {
             None => q.push_back(h.entrypoint()),
-            Some(scope) => q.extend(scope.preserve_interface(h).chain(scope.root(h))),
+            Some(scope) => q.extend(scope.preserve_interface(h)),
         };
         while let Some(n) = q.pop_front() {
             if !h.contains_node(n) {
