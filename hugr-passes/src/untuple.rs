@@ -18,7 +18,7 @@ use crate::{ComposablePass, PassScope};
 /// Configuration enum for the untuple rewrite pass.
 ///
 /// Indicates whether the pattern match should traverse the HUGR recursively.
-#[deprecated(note = "Use PassScope instead")]
+#[deprecated(note = "Use PassScope instead", since="0.25.7")]
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum UntupleRecursive {
     /// Traverse the HUGR recursively, i.e. consider the entire subtree
@@ -94,7 +94,7 @@ impl UntuplePass {
     /// Create a new untuple pass with the given recursiveness and that
     /// will run on the entrypoint region/subtree.
     #[must_use]
-    #[deprecated(note = "Use new_scoped or default instead")]
+    #[deprecated(note = "Use new_scoped or default instead", since="0.25.7")]
     #[expect(deprecated)] // Remove along with UntupleRecursive
     pub fn new(recursive: UntupleRecursive) -> Self {
         Self {
@@ -113,8 +113,8 @@ impl UntuplePass {
     /// Sets the parent node to optimize (overwrites any previous setting)
     ///
     /// If the pass was previously configured by [Self::with_scope] then
-    /// implicitly `[Self::set_recursive]`'s with thee [PassScope::recursive]
-    #[deprecated(note = "Use with_scope instead")]
+    /// implicitly `[Self::set_recursive]`'s with [PassScope::recursive]
+    #[deprecated(note = "Use with_scope instead", since="0.25.7")]
     #[expect(deprecated)] // Remove along with UntupleRecursive
     pub fn set_parent(mut self, parent: impl Into<Option<Node>>) -> Self {
         match &mut self.scope {
@@ -136,7 +136,7 @@ impl UntuplePass {
     /// If the pass was last configured via [Self::with_scope], overrides that,
     /// with `set_parent` of default `None`.
     #[must_use]
-    #[deprecated(note = "Use with_scope")]
+    #[deprecated(note = "Use with_scope", since="0.25.7")]
     #[expect(deprecated)] // Remove along with UntupleRecursive
     pub fn recursive(mut self, recursive: UntupleRecursive) -> Self {
         let parent = self.scope.right().and_then(|(_, p)| p);
@@ -152,7 +152,7 @@ impl UntuplePass {
     /// The returned rewrites are guaranteed to be independent of each other.
     ///
     /// Returns an iterator over the rewrites.
-    #[deprecated(note = "Use all_rewrites")]
+    #[deprecated(note = "Use all_rewrites", since="0.25.7")]
     pub fn find_rewrites<H: HugrView>(
         &self,
         hugr: &H,
