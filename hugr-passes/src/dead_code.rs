@@ -129,7 +129,8 @@ impl<H: HugrView> DeadCodeElimPass<H> {
             if !needed.insert(n) {
                 continue;
             }
-            // Ensure no orphans. We could remove more from parent, but would require transforming
+            // Ensure no orphans, e.g. when preserving an entrypoint deep within a Hugr
+            // being globally optimized. We could remove more from parent, but would require transforming
             // (e.g. removing individual Output ports) not just deleting, so don't.
             q.extend(h.get_parent(n));
             for (i, ch) in h.children(n).enumerate() {
