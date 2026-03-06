@@ -100,6 +100,17 @@ pub trait WithScope {
     ///
     /// Since `hugr >=0.26.0`, passes must implement this to respect the scope configuration.
     fn with_scope(self, scope: impl Into<PassScope>) -> Self;
+
+    /// Return a default instance of the pass with the given scope.
+    ///
+    /// See [`PassScope`] for more details.
+    #[must_use]
+    fn default_scoped(scope: PassScope) -> Self
+    where
+        Self: Default,
+    {
+        Self::default().with_scope(scope)
+    }
 }
 
 /// Trait for combining the error types from two different passes
