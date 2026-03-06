@@ -334,6 +334,7 @@ pub(crate) mod test {
     use hugr_core::types::{Signature, TypeRow};
     use hugr_core::{Hugr, HugrView, IncomingPort, Node, NodeIndex};
 
+    use crate::composable::WithScope;
     use crate::const_fold::{ConstFoldError, ConstantFoldPass};
     use crate::dead_code::DeadCodeElimError;
     use crate::untuple::UntupleResult;
@@ -452,7 +453,7 @@ pub(crate) mod test {
             fb.finish_hugr_with_outputs(untup.outputs()).unwrap()
         };
 
-        let untup = UntuplePass::new_scoped(PassScope::EntrypointRecursive);
+        let untup = UntuplePass::default().with_scope(PassScope::EntrypointRecursive);
         {
             // Change usize_t to INT_TYPES[6], and if that did anything (it will!), then Untuple
             let mut repl = ReplaceTypes::default();

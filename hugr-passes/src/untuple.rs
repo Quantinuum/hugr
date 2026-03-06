@@ -61,9 +61,9 @@ pub struct UntuplePass {
 
 impl Default for UntuplePass {
     fn default() -> Self {
-        // TODO Move to PassScope::Default() when UntupleRecursive is removed
+        #[expect(deprecated)] // Move to PassScope::Default() when UntupleRecursive is removed
         Self {
-            scope: Either::Right((Default::default(), Default::default())),
+            scope: Either::Right((UntupleRecursive::default(), Option::default())),
         }
     }
 }
@@ -94,19 +94,14 @@ impl UntuplePass {
     /// Create a new untuple pass with the given recursiveness and that
     /// will run on the entrypoint region/subtree.
     #[must_use]
-    #[deprecated(note = "Use new_scoped or default instead", since = "0.25.7")]
+    #[deprecated(
+        note = "Use default() instead, followed by with_scope()",
+        since = "0.25.7"
+    )]
     #[expect(deprecated)] // Remove along with UntupleRecursive
     pub fn new(recursive: UntupleRecursive) -> Self {
         Self {
             scope: Either::Right((recursive, None)),
-        }
-    }
-
-    /// Create a new untuple pass with the given configuration
-    #[must_use]
-    pub fn new_scoped(scope: PassScope) -> Self {
-        Self {
-            scope: Either::Left(scope),
         }
     }
 
@@ -377,10 +372,10 @@ fn remove_pack_unpack<'h, T: HugrView>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::composable::WithScope;
+    use hugr_core::Hugr;
     use hugr_core::builder::FunctionBuilder;
     use hugr_core::extension::prelude::{UnpackTuple, bool_t, qb_t};
-
-    use hugr_core::Hugr;
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::std_extensions::arithmetic::float_types::float64_type;
     use hugr_core::types::Signature;
@@ -578,7 +573,7 @@ mod test {
     ) {
         let parent = hugr.entrypoint();
         let pass = if use_scope {
-            UntuplePass::new_scoped(PassScope::EntrypointFlat)
+            UntuplePass::default().with_scope(PassScope::EntrypointFlat)
         } else {
             #[expect(deprecated)] // Remove use_scope==false case along with UntupleRecursive
             UntuplePass::default().set_parent(parent)
