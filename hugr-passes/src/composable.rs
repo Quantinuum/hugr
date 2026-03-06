@@ -339,7 +339,7 @@ pub(crate) mod test {
     use crate::untuple::UntupleResult;
     use crate::{DeadCodeElimPass, PassScope, ReplaceTypes, UntuplePass};
 
-    use super::{ComposablePass, IfThen, ValidatePassError, ValidatingPass, validate_if_test};
+    use super::{ComposablePass, IfThen, ValidatePassError, ValidatingPass};
 
     pub(crate) fn run_validating<P: ComposablePass<H>, H: HugrMut>(
         pass: P,

@@ -289,9 +289,9 @@ mod test {
     use rstest::rstest;
 
     use crate::composable::{Preserve, WithScope};
-    use crate::{ComposablePass, RemoveDeadFuncsPass};
+    use crate::{ComposablePass, MonomorphizePass, RemoveDeadFuncsPass};
 
-    use super::{is_polymorphic, mangle_name, monomorphize};
+    use super::{is_polymorphic, mangle_name};
 
     fn pair_type(ty: Type) -> Type {
         Type::new_tuple(vec![ty.clone(), ty])
@@ -308,7 +308,7 @@ mod test {
         let [i1] = dfg_builder.input_wires_arr();
         let hugr = dfg_builder.finish_hugr_with_outputs([i1]).unwrap();
         let mut hugr2 = hugr.clone();
-        monomorphize(&mut hugr2).unwrap();
+        MonomorphizePass.run(&mut hugr2).unwrap();
         assert_eq!(hugr, hugr2);
     }
 
@@ -374,7 +374,7 @@ mod test {
                 .count(),
             3
         );
-        monomorphize(&mut hugr)?;
+        MonomorphizePass.run(&mut hugr)?;
         let mono = hugr;
         mono.validate()?;
 
@@ -395,7 +395,7 @@ mod test {
             ["double", "main", "triple"]
         );
         let mut mono2 = mono.clone();
-        monomorphize(&mut mono2)?;
+        MonomorphizePass.run(&mut mono2)?;
 
         assert_eq!(mono2, mono); // Idempotent
 
@@ -551,7 +551,7 @@ mod test {
         let mut hugr = outer.finish_hugr_with_outputs([e1, e2]).unwrap();
         hugr.set_entrypoint(hugr.module_root()); // We want to act on everything, not just `main`
 
-        monomorphize(&mut hugr).unwrap();
+        MonomorphizePass.run(&mut hugr).unwrap();
         let mono_hugr = hugr;
         mono_hugr.validate().unwrap();
         let funcs = list_funcs(&mono_hugr);
@@ -629,7 +629,7 @@ mod test {
             module_builder.finish_hugr().unwrap()
         };
 
-        monomorphize(&mut hugr).unwrap();
+        MonomorphizePass.run(&mut hugr).unwrap();
         RemoveDeadFuncsPass::default()
             .with_scope(Preserve::Public)
             .run(&mut hugr)
