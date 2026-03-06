@@ -39,12 +39,9 @@ use crate::{
 
 use super::{ConstFoldContext, ConstantFoldPass, ValueHandle};
 
-/// When (deprecated) [super::constant_fold_pass] is breaking-change'd,
-/// this is what it should look like:
 fn constant_fold_pass(h: &mut (impl HugrMut<Node = Node> + 'static)) {
     // the default ConstantFoldPass has no scope, i.e. preserving legacy behavior
     let c = ConstantFoldPass::default().with_scope(PassScope::default());
-    eprintln!("Folding with {:?}", c.scope);
     ValidatingPass::new(c).run(h).unwrap();
 }
 

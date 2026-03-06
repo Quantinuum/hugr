@@ -220,7 +220,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
 ///
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
 /// [`Module`]: hugr_core::ops::OpType::Module
-#[deprecated(note = "In future will change to assuming only public FuncDefn's are reachable", since="0.25.7")]
+#[deprecated(note = "Use ConstantFoldPass with a PassScope", since = "0.25.7")]
 pub fn constant_fold_pass<H: HugrMut<Node = Node> + 'static>(mut h: impl AsMut<H>) {
     let h = h.as_mut();
     let c = ConstantFoldPass::default();

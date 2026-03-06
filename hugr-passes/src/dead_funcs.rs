@@ -13,7 +13,7 @@ use petgraph::visit::{Dfs, Walker};
 
 use crate::{
     ComposablePass, PassScope,
-    composable::{Preserve, ValidatePassError, WithScope, validate_if_test},
+    composable::{Preserve, ValidatePassError, validate_if_test},
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -186,35 +186,21 @@ pub fn remove_dead_funcs(
     )
 }
 
-/// Deletes from the Hugr any functions that are not used by either [`Call`] or
-/// [`LoadFunction`] nodes in reachable parts, according to the specified [PassScope].
-///
-/// [`Call`]: hugr_core::ops::OpType::Call
-/// [`LoadFunction`]: hugr_core::ops::OpType::LoadFunction
-// TODO: after removing the deprecated `remove_dead_funcs`, rename this over it
-pub fn remove_dead_funcs_scoped<H: HugrMut<Node = Node>>(
-    h: &mut H,
-    scope: impl Into<PassScope>,
-) -> Result<(), ValidatePassError<Node, RemoveDeadFuncsError>> {
-    validate_if_test(RemoveDeadFuncsPass::default().with_scope(scope), h)
-}
-
 #[cfg(test)]
 mod test {
     use std::collections::HashMap;
 
+    use hugr_core::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
+    use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::{Hugr, Visibility};
+    use hugr_core::{HugrView, extension::prelude::usize_t, types::Signature};
     use itertools::Itertools;
     use rstest::rstest;
 
-    use hugr_core::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
-    use hugr_core::hugr::hugrmut::HugrMut;
-    use hugr_core::{HugrView, extension::prelude::usize_t, types::Signature};
-
+    use super::RemoveDeadFuncsPass;
     use crate::PassScope;
-    use crate::composable::Preserve;
-    use crate::dead_funcs::remove_dead_funcs_scoped;
+    use crate::composable::{Preserve, WithScope, validate_if_test};
 
     fn hugr(use_entrypoint: bool) -> Hugr {
         let mut hb = ModuleBuilder::new();
@@ -315,7 +301,7 @@ mod test {
     ) {
         let scope = scope.into();
         let mut hugr = hugr(use_entrypoint);
-        remove_dead_funcs_scoped(&mut hugr, scope).unwrap();
+        validate_if_test(RemoveDeadFuncsPass::default().with_scope(scope), &mut hugr).unwrap();
 
         let remaining_funcs = hugr
             .nodes()

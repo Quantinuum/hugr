@@ -287,10 +287,10 @@ mod test {
     use hugr_core::{Hugr, HugrView, Node, Visibility};
     use rstest::rstest;
 
-    use crate::dead_funcs::remove_dead_funcs_scoped;
-    use crate::{composable::Preserve, monomorphize};
+    use crate::composable::{Preserve, WithScope};
+    use crate::{ComposablePass, RemoveDeadFuncsPass};
 
-    use super::{is_polymorphic, mangle_name};
+    use super::{is_polymorphic, mangle_name, monomorphize};
 
     fn pair_type(ty: Type) -> Type {
         Type::new_tuple(vec![ty.clone(), ty])
@@ -399,7 +399,10 @@ mod test {
         assert_eq!(mono2, mono); // Idempotent
 
         let mut nopoly = mono;
-        remove_dead_funcs_scoped(&mut nopoly, Preserve::Public)?;
+        RemoveDeadFuncsPass::default()
+            .with_scope(Preserve::Public)
+            .run(&mut nopoly)
+            .unwrap();
         let mut funcs = list_funcs(&nopoly);
 
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
@@ -626,7 +629,10 @@ mod test {
         };
 
         monomorphize(&mut hugr).unwrap();
-        remove_dead_funcs_scoped(&mut hugr, Preserve::Public).unwrap();
+        RemoveDeadFuncsPass::default()
+            .with_scope(Preserve::Public)
+            .run(&mut hugr)
+            .unwrap();
 
         let funcs = list_funcs(&hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
