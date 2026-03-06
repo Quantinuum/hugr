@@ -33,26 +33,25 @@ use smol_str::SmolStr;
 /// };
 ///
 /// fn make_module() -> Result<(), BuildError> {
-///
+///     // We define a module and the insert a DFG as a sub-component.
 ///
 ///     // Create a module and define a function within it
 ///     let mut module_builder = ModuleBuilder::new();
 ///     let mut f_build = module_builder.define_function("main", Signature::new_endo(bool_t()))?;
-///     let [i1] = f_build.input_wires_arr();
+///     let [im] = f_build.input_wires_arr();
 ///
-///     // We can build a DFG as a sub-container of the function body, and then link it in.
+///     // We can build a DFG as a sub-component of the function body, and then link it in.
 ///     // Create a simple DFG (Dataflow Graph) that acts as the identity function on a boolean input:
 ///     let dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()]))?;
-///     let [i1] = dfg_builder.input_wires_arr();
-///     let dfg_hugr = dfg_builder.finish_hugr_with_outputs([i1])?;
+///     let [id] = dfg_builder.input_wires_arr();
+///     let dfg_hugr = dfg_builder.finish_hugr_with_outputs([id])?;
 ///
 ///     // Embed the DFG as a sub-component
-///     let dfg = f_build.add_hugr_with_wires(dfg_hugr, [i1])?;
+///     let dfg = f_build.add_hugr_with_wires(dfg_hugr, [im])?;
 ///     let f = f_build.finish_with_outputs([dfg.out_wire(0)])?;
 ///
 ///     // With node() we can get the node handles
 ///     let _ = (dfg.node(), f.node());
-///
 ///
 ///     let hugr = module_builder.finish_hugr()?;
 ///     hugr.validate().unwrap_or_else(|e| {
