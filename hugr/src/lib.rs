@@ -10,7 +10,7 @@
 //! that is not a direct descendent (subject to causality constraints).
 //!
 //! The specification can be found
-//! [here](https://github.com/CQCL/hugr/blob/main/specification/hugr.md).
+//! [here](https://quantinuum.github.io/hugr/specification/index.html).
 //!
 //! This crate provides a Rust implementation of HUGR and the standard extensions defined in the
 //! specification.
@@ -24,107 +24,49 @@
 //!
 //! # Example
 //!
-//! To build a HUGR for a simple quantum circuit and then serialize it to a buffer, we can define
-//! a simple quantum extension and then use the [[`builder::DFGBuilder`]] as follows:
+//! Here we build a simple HUGR representing a boolean circuit using the [[`builder::DFGBuilder`]] as follows:
 //! ```
 //! use hugr::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr, inout_sig};
-//! use hugr::extension::prelude::{bool_t, qb_t};
+//! use hugr::extension::prelude::{bool_t};
 //! use hugr::envelope::EnvelopeConfig;
 //! use hugr::hugr::Hugr;
-//! use hugr::type_row;
-//! use hugr::types::FuncValueType;
+//! use hugr::ops::Value;
+//! use hugr::std_extensions::logic::LogicOp;
 //!
-//! // The type of qubits, `qb_t()` is in the prelude but, by default, no gateset
-//! // is defined. This module provides Hadamard and CX gates.
-//! mod mini_quantum_extension {
-//!     use hugr::{
-//!         extension::{
-//!             prelude::{bool_t, qb_t},
-//!             ExtensionId, ExtensionRegistry, PRELUDE, Version,
-//!         },
-//!         ops::{ExtensionOp, OpName},
-//!         type_row,
-//!         types::{FuncValueType, PolyFuncTypeRV},
-//!         Extension,
-//!     };
 //!
-//!     use std::sync::{Arc, LazyLock};
-//!
-//!     fn one_qb_func() -> PolyFuncTypeRV {
-//!         FuncValueType::new_endo(vec![qb_t()]).into()
-//!     }
-//!
-//!     fn two_qb_func() -> PolyFuncTypeRV {
-//!         FuncValueType::new_endo(vec![qb_t(), qb_t()]).into()
-//!     }
-//!     /// The extension identifier.
-//!     pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("mini.quantum");
-//!     pub const VERSION: Version = Version::new(0, 1, 0);
-//!     fn extension() -> Arc<Extension> {
-//!         Extension::new_arc(EXTENSION_ID, VERSION, |ext, extension_ref| {
-//!             ext.add_op(OpName::new_inline("H"), "Hadamard".into(), one_qb_func(), extension_ref)
-//!                 .unwrap();
-//!
-//!             ext.add_op(OpName::new_inline("CX"), "CX".into(), two_qb_func(), extension_ref)
-//!                 .unwrap();
-//!
-//!             ext.add_op(
-//!                 OpName::new_inline("Measure"),
-//!                 "Measure a qubit, returning the qubit and the measurement result.".into(),
-//!                 FuncValueType::new(vec![qb_t()], vec![qb_t(), bool_t()]),
-//!                 extension_ref,
-//!             )
-//!             .unwrap();
-//!         })
-//!     }
-//!
-//!     /// Quantum extension definition.
-//!     pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(extension);
-//!
-//!     fn get_gate(gate_name: impl Into<OpName>) -> ExtensionOp {
-//!         EXTENSION
-//!             .instantiate_extension_op(&gate_name.into(), [])
-//!             .unwrap()
-//!             .into()
-//!     }
-//!     pub fn h_gate() -> ExtensionOp {
-//!         get_gate("H")
-//!     }
-//!
-//!     pub fn cx_gate() -> ExtensionOp {
-//!         get_gate("CX")
-//!     }
-//!
-//!     pub fn measure() -> ExtensionOp {
-//!         get_gate("Measure")
-//!     }
-//! }
-//!
-//! use mini_quantum_extension::{cx_gate, h_gate, measure};
-//!
-//! //      ┌───┐
-//! // q_0: ┤ H ├──■─────
-//! //      ├───┤┌─┴─┐┌─┐
-//! // q_1: ┤ H ├┤ X ├┤M├
-//! //      └───┘└───┘└╥┘
-//! // c:              ╚═
 //! fn make_dfg_hugr() -> Result<Hugr, BuildError> {
+//!     // pseudocode:
+//!     // input x0
+//!     // x1 == not(true)
+//!     // x2 := not(x0)
+//!     // x3 := or(x0,x2)
+//!     // x4 := and(x1,x3)
+//!     // output x4
 //!     let mut dfg_builder = DFGBuilder::new(inout_sig(
-//!         vec![qb_t(), qb_t()],
-//!         vec![qb_t(), qb_t(), bool_t()],
+//!         vec![bool_t()],
+//!         vec![bool_t()],
 //!     ))?;
-//!     let [wire0, wire1] = dfg_builder.input_wires_arr();
-//!     let h0 = dfg_builder.add_dataflow_op(h_gate(), vec![wire0])?;
-//!     let h1 = dfg_builder.add_dataflow_op(h_gate(), vec![wire1])?;
-//!     let cx = dfg_builder.add_dataflow_op(cx_gate(), h0.outputs().chain(h1.outputs()))?;
-//!     let measure = dfg_builder.add_dataflow_op(measure(), cx.outputs().last())?;
-//!     dfg_builder.finish_hugr_with_outputs(cx.outputs().take(1).chain(measure.outputs()))
+//!
+//!     let [x0] = dfg_builder.input_wires_arr();
+//!     let true_val = dfg_builder.add_load_value(Value::true_val());
+//!     let x1 = dfg_builder.add_dataflow_op(LogicOp::Not, [true_val]).unwrap();
+//!     let x2  = dfg_builder.add_dataflow_op(LogicOp::Not, [x0]).unwrap();
+//!     let x3 = dfg_builder.add_dataflow_op(LogicOp::Or, [x0, x2.out_wire(0)]).unwrap();
+//!     let x4 = dfg_builder.add_dataflow_op(LogicOp::And, x1.outputs().chain(x3.outputs())).unwrap();
+//!
+//!     dfg_builder.finish_hugr_with_outputs(x4.outputs())
 //! }
 //!
-//! let h: Hugr = make_dfg_hugr().unwrap();
-//! let serialized = h.store_str(EnvelopeConfig::text()).unwrap();
+//! let h: Hugr = make_dfg_hugr().expect("build hugr");
+//! // Serialize the hugr to obtain a printable representation
+//! let serialized = h.store_str(EnvelopeConfig::text()).expect("serialize");
 //! println!("{}", serialized);
+//!
 //! ```
+//!
+//! Natively, HUGR does not include any quantum operations, but it is possible to define
+//! a quantum extension and then use it to build a HUGR.
+//! See the documentation in the [extension module](extension) for an example of a simple quantum extension.
 
 // These modules are re-exported as-is. If more control is needed, define a new module in this crate with the desired exports.
 // The doc inline directive is necessary for renamed modules to appear as if they were defined in this crate.

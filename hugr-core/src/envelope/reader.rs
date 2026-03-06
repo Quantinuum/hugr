@@ -322,12 +322,15 @@ pub(crate) enum ModelBinaryReadError {
 mod test {
     use super::*;
 
-    use crate::extension::{ExtensionId, ExtensionRegistry};
-
+    use crate::Hugr;
+    use crate::builder::test::simple_module_hugr;
     use crate::envelope::header::EnvelopeHeader;
+    use crate::envelope::{EnvelopeConfig, EnvelopeFormat, read_envelope};
+    use crate::extension::{ExtensionId, ExtensionRegistry};
+    use crate::hugr::HugrMut;
     use cool_asserts::assert_matches;
-
-    use std::io::{Cursor, Write as _};
+    use rstest::rstest;
+    use std::io::{BufReader, Cursor, Write as _};
 
     #[test]
     fn test_read_invalid_header() {
@@ -502,5 +505,35 @@ mod test {
 
         let package = result.unwrap();
         assert!(package.extensions.contains(&ext_id));
+    }
+
+    /// Returns a Hugr that serializes to approximately 64MB in binary format
+    /// by defining a large metadata payload.
+    #[rstest::fixture]
+    fn big_hugr() -> Hugr {
+        const PAYLOAD_SIZE: usize = 64 * 1024 * 1024;
+        let big_payload: String = "a".repeat(PAYLOAD_SIZE);
+
+        let mut hugr = simple_module_hugr();
+        hugr.set_metadata_any(hugr.entrypoint(), "big", big_payload);
+        hugr
+    }
+
+    /// Test encoding/decoding a very large hugr payload (~64MB)
+    #[rstest]
+    #[case::model_with_extensions(EnvelopeFormat::ModelWithExtensions)]
+    #[case::model_text_with_extensions(EnvelopeFormat::ModelTextWithExtensions)]
+    #[case::package_json(EnvelopeFormat::PackageJson)]
+    #[ignore = "This test takes > 15s due to the large payload size."]
+    fn big_hugr_payload(#[case] format: EnvelopeFormat, big_hugr: Hugr) {
+        let config = EnvelopeConfig { format, zstd: None };
+        let mut buffer = Vec::with_capacity(64 * 1024 * 1024);
+        big_hugr.store(&mut buffer, config).unwrap();
+
+        let (desc, decoded) =
+            read_envelope(BufReader::new(buffer.as_slice()), big_hugr.extensions()).unwrap();
+        assert_eq!(desc.header.config().format, format);
+
+        decoded.validate().unwrap();
     }
 }

@@ -1,5 +1,5 @@
 //! Data structure summarizing static nodes of a Hugr and their uses
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 
 use crate::{HugrView, Node, core::HugrNode, ops::OpType};
 use petgraph::{Graph, visit::EdgeRef};
@@ -51,7 +51,7 @@ pub enum StaticNode<N = Node> {
 /// [`LoadFunction`]: OpType::LoadFunction
 pub struct ModuleGraph<N = Node> {
     g: Graph<StaticNode<N>, StaticEdge<N>>,
-    node_to_g: HashMap<N, petgraph::graph::NodeIndex<u32>>,
+    node_to_g: BTreeMap<N, petgraph::graph::NodeIndex<u32>>,
 }
 
 impl<N: HugrNode> ModuleGraph<N> {
@@ -69,7 +69,7 @@ impl<N: HugrNode> ModuleGraph<N> {
                 };
                 Some((n, g.add_node(weight)))
             })
-            .collect::<HashMap<_, _>>();
+            .collect::<BTreeMap<_, _>>();
         if !hugr.entrypoint_optype().is_module() && !node_to_g.contains_key(&hugr.entrypoint()) {
             node_to_g.insert(hugr.entrypoint(), g.add_node(StaticNode::NonFuncEntrypoint));
         }
@@ -150,6 +150,7 @@ impl<N: HugrNode> ModuleGraph<N> {
 mod test {
     use itertools::Itertools as _;
     use rstest::rstest;
+    use std::collections::HashMap;
 
     use crate::builder::{
         Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
@@ -223,10 +224,8 @@ mod test {
             in_edges.remove(&StaticNode::NonFuncEntrypoint),
             Some(&StaticEdge::Call(call.node()))
         );
-        assert_eq!(
-            in_edges.into_iter().collect_vec(),
-            vec![(&StaticNode::FuncDefn(main), &StaticEdge::Call(call.node()))]
-        );
+        let expected = (&StaticNode::FuncDefn(main), &StaticEdge::Call(call.node()));
+        assert_eq!(in_edges, HashMap::from_iter([expected]));
         for n in [h.entrypoint(), main] {
             assert_eq!(
                 mg.out_edges(n).collect_vec(),

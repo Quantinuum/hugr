@@ -379,6 +379,8 @@ mod test {
     use hugr_core::extension::{
         CustomSignatureFunc, OpDef, SignatureError, SignatureFunc, TypeDefBound, Version,
     };
+    use hugr_core::hugr::ValidationError;
+    use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::ops::{DataflowOpTrait, ExtensionOp, OpName, OpType};
     use hugr_core::std_extensions::arithmetic::int_types::INT_TYPES;
@@ -392,7 +394,7 @@ mod test {
     use itertools::Itertools;
     use rstest::rstest;
 
-    use crate::replace_types::handlers::discard_to_unit_func_name;
+    use crate::replace_types::handlers::{DISCARD_TO_UNIT_PREFIX, MAKE_NONE_PREFIX, UNWRAP_PREFIX};
     use crate::replace_types::{LinearizeError, Linearizer, NodeTemplate, ReplaceTypesError};
     use crate::{ComposablePass, ReplaceTypes};
 
@@ -800,13 +802,12 @@ mod test {
             // Of course this would loop forever at runtime!
             r.unwrap();
             h.validate().unwrap();
-            let disc_func_name = discard_to_unit_func_name(&lin_t);
             let disc = h
                 .children(h.module_root())
                 .find(|n| {
                     h.get_optype(*n)
                         .as_func_defn()
-                        .is_some_and(|fd| fd.func_name() == &disc_func_name)
+                        .is_some_and(|fd| fd.func_name().contains(DISCARD_TO_UNIT_PREFIX))
                 })
                 .unwrap();
             let call = h
@@ -891,5 +892,44 @@ mod test {
             lowerer.run(&mut h).unwrap_err(),
             ReplaceTypesError::LinearizeError(LinearizeError::NeedCopyDiscard(Box::new(qb_t())))
         );
+    }
+
+    #[rstest]
+    #[case([borrow_array_type(2, usize_t())])]
+    #[case([borrow_array_type(2, usize_t()), borrow_array_type(4, usize_t())])]
+    fn test_copy_borrow_array<const N: usize>(#[case] tys: [Type; N]) {
+        // Build invalid Hugr that treats element of `tys` as copyable
+        let (inp, out, mut h) = {
+            let mut dfb = DFGBuilder::new(Signature::new(
+                Vec::from_iter(tys.clone()),
+                tys.clone().into_iter().chain(tys.clone()).collect_vec(),
+            ))
+            .unwrap();
+            (dfb.input(), dfb.output(), std::mem::take(dfb.hugr_mut()))
+        };
+        for (n, _) in tys.iter().enumerate() {
+            h.connect(inp.node(), n, out.node(), n);
+            h.connect(inp.node(), n, out.node(), n + tys.len());
+        }
+        assert!(matches!(
+            h.validate(),
+            Err(ValidationError::TooManyConnections { .. })
+        ));
+        let (_e, lowerer) = ext_lowerer();
+        lowerer.run(&mut h).unwrap();
+        h.validate().unwrap();
+        for prefix in [UNWRAP_PREFIX, MAKE_NONE_PREFIX] {
+            assert_eq!(
+                h.children(h.module_root())
+                    .filter(|n| match h.get_optype(*n) {
+                        OpType::FuncDecl(_) => panic!("Unexpected FuncDecl"),
+                        OpType::FuncDefn(fd) => fd.func_name().contains(prefix),
+                        _ => false,
+                    })
+                    .count(),
+                1,
+                "Found multiple {prefix} funcs"
+            );
+        }
     }
 }

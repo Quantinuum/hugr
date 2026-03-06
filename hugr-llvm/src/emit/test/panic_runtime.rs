@@ -5,7 +5,7 @@
 //! production! See [`crate::emit::test::PanicTestPreludeCodegen`] and
 //! [`crate::emit::test::Emission::exec_panicking`] for the test harness.
 //!
-//! The progam entry point should be invoked via the [`trampoline`] function
+//! The program entry point should be invoked via the [`trampoline`] function
 //! which launches the program. Calls to [`panic_exit`] will exit the program
 //! and make [`trampoline`] return prematurely. Note that the runtime will
 //! perform a direct jump to the exit and no unrolling is performed. This

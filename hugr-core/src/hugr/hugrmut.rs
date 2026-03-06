@@ -641,7 +641,7 @@ impl HugrMut for Hugr {
         mut other: Hugr,
         root_parents: impl IntoIterator<Item = (Node, Self::Node)>,
     ) -> InsertForestResult<Node, Self::Node> {
-        let roots: HashMap<_, _> = root_parents.into_iter().collect();
+        let roots: BTreeMap<_, _> = root_parents.into_iter().collect();
         for &subtree in roots.keys() {
             let mut n = subtree;
             while let Some(parent) = other.get_parent(n) {
