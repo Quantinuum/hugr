@@ -18,7 +18,8 @@ use hugr_core::ops::{
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 
-use crate::ComposablePass;
+use crate::composable::WithScope;
+use crate::{ComposablePass, PassScope};
 
 /// Merge any basic blocks that are direct children of the specified [`CFG`]-entrypoint
 /// Hugr.
@@ -142,6 +143,13 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
             results.insert(cfg, res);
         }
         Ok(results)
+    }
+}
+
+impl<N> WithScope for NormalizeCFGPass<N> {
+    fn with_scope(self, _scope: impl Into<PassScope>) -> Self {
+        // TODO: Set the scope configuration
+        self
     }
 }
 

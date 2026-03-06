@@ -13,7 +13,8 @@ use hugr_core::types::Type;
 use hugr_core::{HugrView, Node, PortIndex, SimpleReplacement};
 use itertools::Itertools;
 
-use crate::ComposablePass;
+use crate::composable::WithScope;
+use crate::{ComposablePass, PassScope};
 
 /// Configuration enum for the untuple rewrite pass.
 ///
@@ -133,6 +134,13 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for UntuplePass {
             hugr.apply_patch(rewrite)?;
         }
         Ok(UntupleResult { rewrites_applied })
+    }
+}
+
+impl WithScope for UntuplePass {
+    fn with_scope(self, _scope: impl Into<PassScope>) -> Self {
+        // TODO: Set the scope configuration
+        self
     }
 }
 

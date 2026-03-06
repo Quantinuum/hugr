@@ -6,7 +6,8 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
-use crate::ComposablePass;
+use crate::composable::WithScope;
+use crate::{ComposablePass, PassScope};
 
 /// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
@@ -192,6 +193,14 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
         Ok(())
     }
 }
+
+impl<H: HugrMut> WithScope for DeadCodeElimPass<H> {
+    fn with_scope(self, _scope: impl Into<PassScope>) -> Self {
+        // TODO: Set the scope configuration
+        self
+    }
+}
+
 #[cfg(test)]
 mod test {
     use std::sync::Arc;

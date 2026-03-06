@@ -28,7 +28,8 @@ use hugr_core::types::{
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Visibility, Wire};
 
-use crate::ComposablePass;
+use crate::composable::WithScope;
+use crate::{ComposablePass, PassScope};
 
 mod linearize;
 pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linearizer};
@@ -922,6 +923,13 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
             changed |= self.change_subtree(hugr, *region_root, false)?;
         }
         Ok(changed)
+    }
+}
+
+impl WithScope for ReplaceTypes {
+    fn with_scope(self, _scope: impl Into<PassScope>) -> Self {
+        // TODO: Set the scope configuration
+        self
     }
 }
 
