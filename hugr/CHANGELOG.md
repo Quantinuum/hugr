@@ -1141,4 +1141,4 @@ This release includes an up-to-date implementation of the spec, including the co
 
 HUGRs can be loaded and stored using the versioned serialization format, or they can be constructed programmatically using the builder utility.
 The modules `hugr::hugr::view` and `hugr::hugr::rewrite` provide an API for querying and mutating the HUGR.
-For more complex operations, some algorithms are provided in the `hugr-passes` crate.
+For more complex operations, some algorithms are provided in `hugr::algorithms`.
