@@ -64,7 +64,7 @@ impl Default for RemoveDeadFuncsPass {
 }
 
 impl RemoveDeadFuncsPass {
-    #[deprecated(note = "Use RemoveDeadFuncsPass::with_scope", since="0.25.7")]
+    #[deprecated(note = "Use RemoveDeadFuncsPass::with_scope", since = "0.25.7")]
     /// Adds new entry points - these must be [`FuncDefn`] nodes
     /// that are children of the [`Module`] at the root of the Hugr.
     ///
@@ -174,7 +174,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 ///
 /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
 /// [`Module`]: hugr_core::ops::OpType::Module
-#[deprecated(note = "Use remove_dead_funcs_scoped", since="0.25.7")]
+#[deprecated(note = "Use RemoveDeadFuncsPass with a PassScope", since = "0.25.7")]
 #[expect(deprecated)]
 pub fn remove_dead_funcs(
     h: &mut impl HugrMut<Node = Node>,

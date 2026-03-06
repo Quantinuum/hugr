@@ -117,7 +117,7 @@ impl<N> NormalizeCFGPass<N> {
     ///
     /// If empty (the default), all (non-strict) descendants of the [HugrView::entrypoint]
     /// will be normalized.
-    #[deprecated(note = "Use with_scope", since="0.25.7")]
+    #[deprecated(note = "Use with_scope", since = "0.25.7")]
     pub fn cfgs(&mut self) -> &mut Vec<N> {
         match &mut self.scope {
             Either::Left(cfgs) => cfgs,
