@@ -6,7 +6,7 @@ use std::hint::black_box;
 use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_group};
 use hugr_passes::hash::HugrHash;
 
-use super::hugr::examples::circuit;
+use crate::benchmarks::examples::circuit;
 
 fn bench_hash_simple(c: &mut Criterion) {
     let mut g = c.benchmark_group("hash a simple circuit");

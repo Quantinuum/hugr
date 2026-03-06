@@ -1334,7 +1334,6 @@ dependencies = [
  "hugr-core",
  "hugr-llvm",
  "hugr-model",
- "hugr-passes",
  "hugr-persistent",
  "serde_json",
 ]
@@ -1458,6 +1457,7 @@ name = "hugr-passes"
 version = "0.25.6"
 dependencies = [
  "ascent",
+ "criterion",
  "derive_more 2.1.1",
  "fxhash",
  "hugr-core",
