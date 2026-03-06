@@ -8,7 +8,8 @@ use hugr_core::{
     types::{EdgeKind, Type},
 };
 
-use crate::ComposablePass;
+use crate::composable::WithScope;
+use crate::{ComposablePass, PassScope};
 
 mod localize;
 use localize::ExtraSourceReqs;
@@ -29,6 +30,13 @@ impl<H: HugrMut> ComposablePass<H> for LocalizeEdges {
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
         remove_nonlocal_edges(hugr)
+    }
+}
+
+impl WithScope for LocalizeEdges {
+    fn with_scope(self, _scope: impl Into<PassScope>) -> Self {
+        // TODO: Set the scope configuration
+        self
     }
 }
 

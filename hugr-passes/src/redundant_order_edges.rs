@@ -10,7 +10,8 @@ use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort};
 use itertools::Itertools;
 use petgraph::visit::Walker;
 
-use crate::ComposablePass;
+use crate::composable::WithScope;
+use crate::{ComposablePass, PassScope};
 
 /// A pass for removing order edges in a Hugr region that are already implied by
 /// other order or dataflow dependencies.
@@ -184,6 +185,13 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RedundantOrderEdgesPass {
         }
 
         Ok(result)
+    }
+}
+
+impl WithScope for RedundantOrderEdgesPass {
+    fn with_scope(self, _scope: impl Into<PassScope>) -> Self {
+        // TODO: Set the scope configuration
+        self
     }
 }
 
