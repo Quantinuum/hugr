@@ -1,6 +1,7 @@
 //! Tests for extension resolution.
 
 use core::{f64, panic};
+use std::io::BufReader;
 use std::sync::Arc;
 
 use itertools::Itertools;
@@ -19,6 +20,7 @@ use crate::extension::{
 use crate::ops::constant::CustomConst;
 use crate::ops::constant::test::CustomTestValue;
 use crate::ops::{CallIndirect, ExtensionOp, Input, OpType, Tag, Value};
+use crate::package::Package;
 use crate::std_extensions::arithmetic::conversions::{self, ConvertOpDef};
 use crate::std_extensions::arithmetic::float_types::{self, ConstF64, float64_type};
 use crate::std_extensions::arithmetic::int_ops;
@@ -389,6 +391,90 @@ fn resolve_transitive_extension_deps() {
     assert!(hugr.extensions().contains(&float_types::EXTENSION_ID));
 
     check_extension_resolution(hugr);
+}
+
+/// Test that extensions in `lower_funcs` are properly resolved when loading a package.
+///
+/// <https://github.com/Quantinuum/hugr/issues/2520>
+#[rstest]
+fn resolve_lower_func_extensions() {
+    // Create an inner extension with a simple op.
+    let (inner_ext, inner_op) = make_extension("inner.extension", "InnerOp");
+
+    // Build a HUGR that uses the inner op as its lowering body.
+    let mut dfg = DFGBuilder::new(Signature::new_endo(vec![bool_t()])).unwrap();
+    let [input] = dfg.input_wires_arr();
+    let inner_result = dfg.add_dataflow_op(inner_op, [input]).unwrap();
+    let lower_hugr = dfg
+        .finish_hugr_with_outputs(inner_result.outputs())
+        .unwrap();
+
+    // The lower func is stored as a Package so its extension definitions travel with it.
+    let mut lower_pkg = Package::from_hugr(lower_hugr);
+    lower_pkg.extensions.register_updated(inner_ext.clone());
+
+    // Create an outer extension whose op has the lower func.
+    let inner_ext_name = inner_ext.name().clone();
+    let outer_ext = Extension::new_test_arc(
+        ExtensionId::new_unchecked("outer.extension"),
+        |ext, ext_ref| {
+            let op_def = ext
+                .add_op(
+                    "OuterOp".into(),
+                    String::new(),
+                    Signature::new_endo(vec![bool_t()]),
+                    ext_ref,
+                )
+                .unwrap();
+            op_def.add_lower_func(crate::extension::op_def::LowerFunc::FixedHugr {
+                extensions: ExtensionSet::singleton(inner_ext_name),
+                pkg: Box::new(lower_pkg),
+            });
+        },
+    );
+
+    // Build a package containing only the outer extension.
+    // The inner extension is embedded inside the lower func's Package.
+    let mut outer_pkg = Package::default();
+    outer_pkg.extensions.register_updated(outer_ext.clone());
+
+    // Serialize and reload using only the standard extensions as the external registry.
+    // The inner extension must be recovered from the embedded lower func package.
+    let mut buffer = Vec::new();
+    outer_pkg
+        .store(&mut buffer, EnvelopeConfig::binary())
+        .expect("serialize outer package");
+    let loaded_pkg =
+        Package::load(BufReader::new(buffer.as_slice()), None).expect("load outer package");
+
+    // The outer extension should be present and its op should have a lower func.
+    let loaded_outer_ext = loaded_pkg
+        .extensions
+        .get(outer_ext.name())
+        .expect("outer extension missing after load");
+    let loaded_op_def = loaded_outer_ext
+        .get_op("OuterOp")
+        .expect("OuterOp missing after load");
+    assert_eq!(
+        loaded_op_def.lower_funcs.len(),
+        1,
+        "expected 1 lower func after load"
+    );
+
+    // Calling try_lower should succeed and return a properly resolved HUGR
+    // (all inner ops must be ExtensionOps, not OpaqueOps).
+    let available = ExtensionSet::singleton(inner_ext.name().clone());
+    let lower_hugr = loaded_op_def
+        .try_lower(&[], &available)
+        .expect("try_lower should succeed when inner extension is available");
+
+    for node in lower_hugr.nodes() {
+        let op = lower_hugr.get_optype(node);
+        assert!(
+            !matches!(op, crate::ops::OpType::OpaqueOp(_)),
+            "Op {op:?} on {node} is an unresolved OpaqueOp after loading"
+        );
+    }
 }
 
 /// Test the [`ExtensionRegistry::new_cyclic`] and [`ExtensionRegistry::new_with_extension_resolution`] methods.
