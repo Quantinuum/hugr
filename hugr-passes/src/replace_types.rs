@@ -335,8 +335,11 @@ impl ReplacementOptions {
     }
 }
 
-/// A configuration of what types, ops, and constants should be replaced with what.
-/// May be applied to a Hugr via [`Self::run`].
+/// A *lowering* [ComposablePass] that replaces types, ops and constants, i.e. changing
+/// node signatures/interfaces.
+///
+/// The struct configures what types, ops, and constants should be replaced with what,
+/// and may be applied to a Hugr via [`Self::run`].
 ///
 /// Parametrized types and ops will be reparameterized taking into account the
 /// replacements, but any ops taking/returning the replaced types *not* as a result of
@@ -911,10 +914,12 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
     type Error = ReplaceTypesError;
     type Result = bool;
 
-    /// Sets the scope within which the pass will operate. Note that this pass respects
-    /// neither [PassScope::preserve_interface] nor [PassScope::recursive] as the former
-    /// would be contrary to the goals of the pass and non-recursion generally leads to
-    /// invalid Hugrs. Hence, really only the [PassScope::root] affects the pass.
+    /// Sets the scope within which the pass will operate. Note that this pass ignores
+    /// * [PassScope::preserve_interface], as this is a lowering pass: its purpose is to
+    ///   change node signatures.
+    /// * [PassScope::recursive], as non-recursion generally leads to invalid Hugrs.
+    ///
+    /// Hence, really only the [PassScope::root] affects the pass.
     fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
         self.scope = Either::Left(scope.into());
         self
