@@ -68,7 +68,7 @@ impl RemoveDeadFuncsPass {
     /// Adds new entry points - these must be [`FuncDefn`] nodes
     /// that are children of the [`Module`] at the root of the Hugr.
     ///
-    /// Overrides any [PassScope] set by a call to [Self::with_scope].
+    /// Overrides any [PassScope] set by a call to [Self::with_scope_internal].
     ///
     /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
     /// [`Module`]: hugr_core::ops::OpType::Module

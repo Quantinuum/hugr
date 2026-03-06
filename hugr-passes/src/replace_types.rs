@@ -709,7 +709,7 @@ impl ReplaceTypes {
     /// Set the regions of the Hugr to which this pass should be applied.
     ///
     /// If not set, the pass is applied to the whole Hugr.
-    /// Each call overwrites any previous calls to `set_regions` and/or [Self::with_scope].
+    /// Each call overwrites any previous calls to `set_regions` and/or [Self::with_scope_internal].
     pub fn set_regions(&mut self, regions: impl IntoIterator<Item = Node>) {
         self.scope = Either::Right(regions.into_iter().collect());
     }

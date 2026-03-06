@@ -113,7 +113,7 @@ impl<N> NormalizeCFGPass<N> {
     /// Allows mutating the set of CFG nodes that will be normalized.
     ///
     /// Note that calling this method (even if the returned mut-ref is not written to) will
-    /// override any previous call to [Self::with_scope].
+    /// override any previous call to [Self::with_scope_internal].
     ///
     /// If empty (the default), all (non-strict) descendants of the [HugrView::entrypoint]
     /// will be normalized.
