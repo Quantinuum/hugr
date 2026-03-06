@@ -307,6 +307,7 @@ impl<
     }
 }
 
+// Note remove when deprecated constant_fold_pass / remove_dead_funcs are removed
 pub(crate) fn validate_if_test<P: ComposablePass<H>, H: HugrMut>(
     pass: P,
     hugr: &mut H,
@@ -319,7 +320,7 @@ pub(crate) fn validate_if_test<P: ComposablePass<H>, H: HugrMut>(
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use hugr_core::ops::Value;
     use itertools::{Either, Itertools};
 
@@ -339,6 +340,13 @@ mod test {
     use crate::{DeadCodeElimPass, PassScope, ReplaceTypes, UntuplePass};
 
     use super::{ComposablePass, IfThen, ValidatePassError, ValidatingPass, validate_if_test};
+
+    pub(crate) fn run_validating<P: ComposablePass<H>, H: HugrMut>(
+        pass: P,
+        hugr: &mut H,
+    ) -> Result<P::Result, ValidatePassError<H::Node, P::Error>> {
+        ValidatingPass::new(pass).run(hugr)
+    }
 
     #[test]
     fn test_then() {
@@ -453,7 +461,7 @@ mod test {
             let ifthen = IfThen::<Either<_, _>, _, _, _>::new(repl, untup.clone());
 
             let mut h = h.clone();
-            let r = validate_if_test(ifthen, &mut h).unwrap();
+            let r = run_validating(ifthen, &mut h).unwrap();
             assert_eq!(
                 r,
                 Some(UntupleResult {
@@ -470,7 +478,7 @@ mod test {
         repl.set_replace_type(i32_custom_t, INT_TYPES[6].clone());
         let ifthen = IfThen::<Either<_, _>, _, _, _>::new(repl, untup);
         let mut h = h;
-        let r = validate_if_test(ifthen, &mut h).unwrap();
+        let r = run_validating(ifthen, &mut h).unwrap();
         assert_eq!(r, None);
         assert_eq!(h.children(h.entrypoint()).count(), 4);
         let mktup = h

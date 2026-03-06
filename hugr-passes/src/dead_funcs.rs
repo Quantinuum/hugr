@@ -200,7 +200,7 @@ mod test {
 
     use super::RemoveDeadFuncsPass;
     use crate::PassScope;
-    use crate::composable::{Preserve, WithScope, validate_if_test};
+    use crate::composable::{Preserve, WithScope, test::run_validating};
 
     fn hugr(use_entrypoint: bool) -> Hugr {
         let mut hb = ModuleBuilder::new();
@@ -301,7 +301,7 @@ mod test {
     ) {
         let scope = scope.into();
         let mut hugr = hugr(use_entrypoint);
-        validate_if_test(RemoveDeadFuncsPass::default().with_scope(scope), &mut hugr).unwrap();
+        run_validating(RemoveDeadFuncsPass::default().with_scope(scope), &mut hugr).unwrap();
 
         let remaining_funcs = hugr
             .nodes()

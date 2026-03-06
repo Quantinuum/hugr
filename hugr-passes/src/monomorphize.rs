@@ -32,6 +32,7 @@ use crate::composable::{ValidatePassError, validate_if_test};
 /// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
+#[deprecated(note = "Use MonomorphizePass instead", since = "0.25.7")]
 pub fn monomorphize(
     hugr: &mut impl HugrMut<Node = Node>,
 ) -> Result<(), ValidatePassError<Node, Infallible>> {
