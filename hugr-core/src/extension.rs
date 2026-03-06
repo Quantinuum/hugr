@@ -1,4 +1,4 @@
-//! Extensions
+//! Extension framework for user-defined operations and types.
 //!
 // TODO: YAML declaration and parsing. This should be similar to a plugin
 // system (outside the `types` module), which also parses nested [`OpDef`]s.
