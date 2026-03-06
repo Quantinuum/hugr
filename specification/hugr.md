@@ -182,7 +182,7 @@ edges. The following operations are *only* valid as immediate children of a
 There may also be other [scoped definitions](#scoped-definitions).
 
 (scoped-definitions)=
-### Scoped Definitions
+### Scoped Definitions and Entry Points
 
 The following operations are valid at the module level as well as in dataflow
 regions and control-flow regions:
@@ -196,8 +196,12 @@ no `FuncDecl/AliasDecl` nodes.
 An **executable HUGR** or **executable module** is a loadable HUGR where the
 root Module node has a `FuncDefn` child node that is the designated entry point. This function must take no arguments as input. Modules that act as libraries need not be executable.
 
-In Hugr, an entry point is just a distinguished node. This node could be a `FuncDefn` and its children would define the body of the function. This `FuncDefn` node, together with its children define a region of the HUGR graph.
-When performing optimizations or rewrites on the HUGR it may be desirable in some cases to optimize certain regions and leave others unchanged.
+In Hugr, an entry point is just a distinguished node. This node could be a `FuncDefn` and its children would define the body of the function. This `FuncDefn` node, together with its children define a region of the HUGR graph. Entry points must be region-container nodes, meaning that they contain children in the hierachy.
+
+Some examples of region container nodes are the following:
+* `FuncDefn` nodes
+* Dataflow nodes
+* Conditional nodes
 
 (dataflow)=
 ### Dataflow
