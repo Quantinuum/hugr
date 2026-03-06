@@ -198,7 +198,7 @@ root Module node has a `FuncDefn` child node that is the designated entry point.
 
 In Hugr, an entry point is just a distinguished node. This node could be a `FuncDefn` and its children would define the body of the function. This `FuncDefn` node, together with its children define a region of the HUGR graph. Entry points must be region-container nodes, meaning that they contain children in the hierachy.
 
-Some examples of region container nodes are the following:
+Some examples of region-container nodes are the following:
 * `FuncDefn` nodes
 * Dataflow nodes
 * Conditional nodes
