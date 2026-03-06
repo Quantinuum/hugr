@@ -11,6 +11,8 @@ use hugr_core::{
 use itertools::Either;
 use petgraph::visit::{Dfs, Walker};
 
+use crate::PassScope;
+use crate::composable::WithScope;
 use crate::{
     ComposablePass, PassScope,
     composable::{Preserve, ValidatePassError, validate_if_test},
@@ -92,12 +94,6 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
     type Error = RemoveDeadFuncsError;
     type Result = ();
 
-    /// Overrides any entrypoints set by a call to [Self::with_module_entry_points].
-    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
-        self.entry_points = Either::Right(scope.into());
-        self
-    }
-
     fn run(&self, hugr: &mut H) -> Result<(), RemoveDeadFuncsError> {
         let mut entry_points = Vec::new();
         match &self.entry_points {
@@ -158,6 +154,13 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
             hugr.remove_subtree(n);
         }
         Ok(())
+    }
+}
+
+impl WithScope for RemoveDeadFuncsPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.entry_points = Either::Right(scope.into());
+        self
     }
 }
 
