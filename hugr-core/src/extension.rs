@@ -1,7 +1,7 @@
 //! Extensions
 //!
-//! TODO: YAML declaration and parsing. This should be similar to a plugin
-//! system (outside the `types` module), which also parses nested [`OpDef`]s.
+// TODO: YAML declaration and parsing. This should be similar to a plugin
+// system (outside the `types` module), which also parses nested [`OpDef`]s.
 //!
 //!
 //! # Example
@@ -102,7 +102,7 @@
 //! }
 //!
 //! let h: Hugr = make_dfg_hugr().unwrap();
-//! // We serialize the hugr to obtain printable representation
+//! // Serialize the hugr to obtain a printable representation
 //! let serialized = h.store_str(EnvelopeConfig::text()).unwrap();
 //! println!("{}", serialized);
 //! ```

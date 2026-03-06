@@ -21,7 +21,6 @@
 //! use hugr::types::{Signature, PolyFuncType};
 //! use hugr::extension::prelude::{bool_t, usize_t};
 //! use hugr::{Direction};
-//! use hugr::builder::BuildError;
 //!
 //! // Create a dataflow graph operation
 //! let sig = Signature::new(vec![usize_t(), bool_t()], vec![bool_t()]);
@@ -60,11 +59,11 @@
 //! assert!(cfg_op.is_container()); // CFG contains basic blocks
 //!
 //! // Create a tail loop operation
-//!let tail_loop = TailLoop {
-//!    just_inputs: vec![usize_t()].into(),
-//!    just_outputs: vec![bool_t()].into(),
-//!    rest: vec![usize_t()].into(),
-//!};
+//! let tail_loop = TailLoop {
+//!     just_inputs: vec![usize_t()].into(),
+//!     just_outputs: vec![bool_t()].into(),
+//!     rest: vec![usize_t()].into(),
+//! };
 //! let loop_op: OpType = tail_loop.into();
 //! assert!(loop_op.is_container()); // Contains loop body
 //!

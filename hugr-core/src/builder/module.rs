@@ -60,7 +60,7 @@ use smol_str::SmolStr;
 ///     let f = f_build.finish_with_outputs([dfg.out_wire(0)])?;
 ///
 ///     // Store the node handles (not used in this example)
-///     (dfg.node(), f.node());
+///     let _ = (dfg.node(), f.node());
 ///
 ///     // Finish building the module to get the complete HUGR
 ///     let hugr = module_builder.finish_hugr()?;

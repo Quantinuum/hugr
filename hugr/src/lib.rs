@@ -24,7 +24,7 @@
 //!
 //! # Example
 //!
-//! Here we build a simple HUGR represent a boolean circuit using the [[`builder::DFGBuilder`]] as follows:
+//! Here we build a simple HUGR representing a boolean circuit using the [[`builder::DFGBuilder`]] as follows:
 //! ```
 //! use hugr::builder::{BuildError, DFGBuilder, Dataflow, DataflowHugr, inout_sig};
 //! use hugr::extension::prelude::{bool_t};
@@ -58,7 +58,7 @@
 //! }
 //!
 //! let h: Hugr = make_dfg_hugr().expect("build hugr");
-//! // We serialize the hugr to obtain printable representation
+//! // Serialize the hugr to obtain a printable representation
 //! let serialized = h.store_str(EnvelopeConfig::text()).expect("serialize");
 //! println!("{}", serialized);
 //!

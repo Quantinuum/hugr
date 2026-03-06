@@ -21,7 +21,6 @@ use crate::{Direction, Hugr, IncomingPort, Node, OutgoingPort, Visibility, Wire,
 /// for an example of using [`DFGBuilder`] to construct a boolean circuit or the
 /// [extension module documentation](crate::extension) for an example of using the builder
 /// with a quantum extension.
-
 #[derive(Debug, Clone, PartialEq)]
 pub struct DFGBuilder<T> {
     pub(crate) base: T,
