@@ -28,15 +28,15 @@ rust: &rust
   - "hugr-core/**"
   - "hugr-passes/**"
   - "hugr-persistent/**"
-  - "specification/schema/**"
+  - "resources/json-schema/**"
 
 std-extensions:
-  - "specification/std_extensions/**"
+  - "resources/std_extensions/**"
 
 python:
   - *rust
   - "hugr-py/**"
   - "pyproject.toml"
   - "uv.lock"
-  - "specification/schema/**"
+  - "resources/json-schema/**"
   - ".github/workflows/ci-py.yml"
