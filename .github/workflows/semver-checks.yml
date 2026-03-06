@@ -23,8 +23,14 @@ jobs:
   rs-semver-checks:
     needs: [changes]
     if: ${{ needs.changes.outputs.rust == 'true' }}
-    uses: quantinuum/hugrverse-actions/.github/workflows/rs-semver-checks.yml@main
-    with:
-      apt-dependencies: llvm-14
-    secrets:
-      GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
+    steps:
+    # once llvm-21 is packaged on apt, we could just download it using 'apt-dependencies'
+    # in the step below
+    - name: Install LLVM
+      uses: KyleMayes/install-llvm-action@v2
+      with:
+        version: "21.1"
+    - name: Run Rust checks
+      uses: quantinuum/hugrverse-actions/.github/workflows/rs-semver-checks.yml@main
+      secrets:
+        GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
