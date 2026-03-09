@@ -166,6 +166,24 @@ impl Hugr {
         }
     }
 
+    /// Read a HUGR from an Envelope, and return the enclosed extensions.
+    ///
+    /// To load a HUGR, all the extensions used in its definition must be
+    /// available. The Envelope may include some of the extensions, but any
+    /// additional extensions must be provided in the `extensions` parameter. If
+    /// `extensions` is `None`, the default [`crate::std_extensions::STD_REG`]
+    /// is used.
+    pub fn load_with_exts(
+        reader: impl io::BufRead,
+        extensions: Option<&ExtensionRegistry>,
+    ) -> Result<(Self, ExtensionRegistry), ReadError> {
+        let pkg = Package::load(reader, extensions)?;
+        match pkg.modules.into_iter().exactly_one() {
+            Ok(hugr) => Ok((hugr, pkg.extensions)),
+            Err(e) => Err(ReadError::ExpectedSingleHugr { count: e.count() }),
+        }
+    }
+
     /// Read a HUGR from an Envelope encoded in a string.
     ///
     /// Note that not all Envelopes are valid strings. In the general case,

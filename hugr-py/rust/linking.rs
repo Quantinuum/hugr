@@ -5,7 +5,7 @@ use pyo3::pymodule;
 #[pymodule(submodule)]
 #[pyo3(module = "hugr._hugr.linking")]
 pub mod linking {
-    use hugr_core;
+    use hugr_core::Hugr;
     use hugr_core::envelope::EnvelopeConfig;
     use hugr_core::hugr::linking::{HugrLinking, NameLinkingPolicy};
     use pyo3::exceptions::{PyRuntimeError, PyValueError};
@@ -24,26 +24,24 @@ pub mod linking {
 
     #[pyfunction]
     fn link_modules(module_into: &[u8], module_from: &[u8]) -> PyResult<Vec<u8>> {
-        let mut pkg_into = hugr_core::package::Package::load(module_into, None).map_err(|err| {
-            PyValueError::new_err(format!("Loading of first envelope failed: {}", err))
-        })?; // TODO need a combination of loading a package, and expecting a single hugr in it.
+        let (mut hugr_into, mut exts_into) =
+            Hugr::load_with_exts(module_into, None).map_err(|err| {
+                PyValueError::new_err(format!("Loading of first envelope failed: {}", err))
+            })?;
 
-        let pkg_from = hugr_core::package::Package::load(module_from, None).map_err(|err| {
+        let (hugr_from, exts_from) = Hugr::load_with_exts(module_from, None).map_err(|err| {
             PyValueError::new_err(format!("Loading of second envelope failed: {}", err))
         })?;
 
-        pkg_into.modules[0]
-            .link_module(
-                pkg_from.modules.into_iter().next().unwrap(),
-                &NameLinkingPolicy::default(),
-            )
+        hugr_into
+            .link_module(hugr_from, &NameLinkingPolicy::default())
             .map_err(|err| PyRuntimeError::new_err(err.to_string()))?; // TODO Add a proper error
 
-        pkg_into.extensions.extend(pkg_from.extensions);
+        exts_into.extend(exts_from);
 
         let mut result = Vec::new();
-        pkg_into
-            .store(&mut result, EnvelopeConfig::binary())
+        hugr_into
+            .store_with_exts(&mut result, EnvelopeConfig::binary(), &exts_into)
             .unwrap();
 
         hugr_core::package::Package::load(&result[..], None)
