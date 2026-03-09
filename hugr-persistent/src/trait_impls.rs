@@ -380,6 +380,7 @@ impl<I: FusedIterator<Item = PatchNode>> Iterator for IterValidNodes<'_, I> {
     type Item = PatchNode;
 
     fn next(&mut self) -> Option<Self::Item> {
+        #[allow(clippy::while_let_loop)]
         loop {
             let Some(node) = self
                 .nodes_iter
