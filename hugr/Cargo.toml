@@ -33,7 +33,6 @@ persistent_unstable = ["hugr-persistent"]
 [dependencies]
 hugr-model = { path = "../hugr-model", version = "0.25.7" }
 hugr-core = { path = "../hugr-core", version = "0.25.7" }
-hugr-passes = { path = "../hugr-passes", version = "0.25.7" }
 hugr-llvm = { path = "../hugr-llvm", version = "0.25.7", optional = true }
 hugr-persistent = { path = "../hugr-persistent", version = "0.4.7", optional = true }
 
