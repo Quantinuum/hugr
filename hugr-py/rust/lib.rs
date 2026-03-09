@@ -1,5 +1,6 @@
 //! Supporting Rust library for the hugr Python bindings.
 
+mod linking;
 mod metadata;
 mod model;
 mod zstd_util;
@@ -8,6 +9,8 @@ use pyo3::pymodule;
 
 #[pymodule]
 mod _hugr {
+    #[pymodule_export]
+    use super::linking::linking;
     #[pymodule_export]
     use super::metadata::metadata;
     #[pymodule_export]
