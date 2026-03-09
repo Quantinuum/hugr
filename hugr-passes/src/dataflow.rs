@@ -10,7 +10,6 @@ pub use results::{AnalysisResults, TailLoopTermination};
 mod partial_value;
 pub use partial_value::{AbstractValue, AsConcrete, LoadedFunction, PartialSum, PartialValue, Sum};
 
-use hugr_core::Hugr;
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::ops::{ExtensionOp, Value};
 
@@ -54,9 +53,8 @@ impl<N> From<N> for ConstLocation<'_, N> {
 
 /// Trait for loading [`PartialValue`]s from constant [Value]s in a Hugr.
 ///
-/// Implementors will likely want to override either/both of [`Self::value_from_opaque`]
-/// and [`Self::value_from_const_hugr`]: the defaults
-/// are "correct" but maximally conservative (minimally informative).
+/// Implementors will likely want to override [`Self::value_from_opaque`]:
+/// the default is "correct" but maximally conservative (minimally informative).
 pub trait ConstLoader<V> {
     /// The type of nodes in the Hugr.
     type Node;
@@ -66,19 +64,12 @@ pub trait ConstLoader<V> {
     fn value_from_opaque(&self, _loc: ConstLocation<Self::Node>, _val: &OpaqueValue) -> Option<V> {
         None
     }
-
-    /// Produces an abstract value from a Hugr in a [`Value::Function`], if possible.
-    /// The default just returns `None`, which will be interpreted as [`PartialValue::Top`].
-    #[deprecated(note = "Remove along with Value::Function", since = "0.25.0")]
-    fn value_from_const_hugr(&self, _loc: ConstLocation<Self::Node>, _h: &Hugr) -> Option<V> {
-        None
-    }
 }
 
 /// Produces a [`PartialValue`] from a constant.
 ///
-/// Traverses [Sum](Value::Sum) constants to their leaves ([`Value::Extension`] and [`Value::Function`]),
-/// converts these using [`ConstLoader::value_from_opaque`] and [`ConstLoader::value_from_const_hugr`],
+/// Traverses [Sum](Value::Sum) constants to their [`Value::Extension`] leaves,
+/// converts these using [`ConstLoader::value_from_opaque`],
 /// and builds nested [`PartialValue::new_variant`] to represent the structure.
 pub fn partial_from_const<'a, V, CL: ConstLoader<V>>(
     cl: &CL,
@@ -99,10 +90,6 @@ where
         }
         Value::Extension { e } => cl
             .value_from_opaque(loc, e)
-            .map_or(PartialValue::Top, PartialValue::from),
-        #[expect(deprecated)] // remove when Value::Function removed
-        Value::Function { hugr } => cl
-            .value_from_const_hugr(loc, hugr)
             .map_or(PartialValue::Top, PartialValue::from),
     }
 }
