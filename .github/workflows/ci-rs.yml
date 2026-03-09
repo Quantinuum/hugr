@@ -154,6 +154,10 @@ jobs:
         run: cargo nextest r --verbose --no-run --all-features
       - name: Tests with all features
         run: cargo nextest r --verbose --all-features
+      - name: Run doctests
+        run: cargo test --doc --workspace --all-features --exclude hugr-py
+        env:
+          RUSTDOCFLAGS: "-Dwarnings"
       - name: Build hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
         run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
