@@ -1,4 +1,4 @@
-use anyhow::{Context, Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow};
 use hugr_core::Node;
 use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::ops::{
@@ -118,12 +118,6 @@ pub fn emit_value<'c, H: HugrView<Node = Node>>(
 ) -> Result<BasicValueEnum<'c>> {
     match v {
         Value::Extension { e } => context.emit_custom_const(e.value()),
-        #[expect(deprecated)] // Yay, will be able to remove this
-        Value::Function { .. } => bail!(
-            "Value::Function Const nodes are not supported. \
-            Ensure you eliminate these from the HUGR before lowering to LLVM. \
-            `hugr_llvm::utils::inline_constant_functions` is provided for this purpose."
-        ),
         Value::Sum(Sum {
             tag,
             values,

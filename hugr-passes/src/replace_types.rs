@@ -883,8 +883,6 @@ impl ReplaceTypes {
                     false
                 }
             }),
-            #[expect(deprecated)] // remove when Value::Function removed
-            Value::Function { hugr } => self.run(&mut **hugr),
         }
     }
 

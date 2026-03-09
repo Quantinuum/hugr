@@ -247,14 +247,6 @@ impl ConstLoader<ValueHandle<Node>> for ConstFoldContext {
     ) -> Option<ValueHandle<Node>> {
         Some(ValueHandle::new_opaque(loc, val.clone()))
     }
-
-    fn value_from_const_hugr(
-        &self,
-        loc: ConstLocation<Node>,
-        h: &hugr_core::Hugr,
-    ) -> Option<ValueHandle<Node>> {
-        Some(ValueHandle::new_const_hugr(loc, Box::new(h.clone())))
-    }
 }
 
 impl DFContext<ValueHandle<Node>> for ConstFoldContext {
