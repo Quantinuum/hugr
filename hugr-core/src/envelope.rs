@@ -93,15 +93,6 @@ pub fn read_envelope(
     }
 }
 
-/// Deprecated alias for [`read_envelope`].
-#[deprecated(since = "0.25.0", note = "Use `read_envelope` instead.")]
-pub fn read_described_envelope(
-    reader: impl BufRead,
-    registry: &ExtensionRegistry,
-) -> Result<(PackageDesc, Package), ReadError> {
-    read_envelope(reader, registry)
-}
-
 /// Errors during reading a HUGR envelope.
 #[derive(Debug, Error)]
 #[non_exhaustive]
