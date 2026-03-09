@@ -48,7 +48,7 @@ in
       enable = true;
       uv = {
         enable = true;
-        sync.enable = true;
+#        sync.enable = true;
       };
       venv.enable = true;
     };
