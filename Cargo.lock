@@ -1327,7 +1327,7 @@ checksum = "6dbf3de79e51f3d586ab4cb9d5c3e2c14aa28ed23d180cf89b4df0454a69cc87"
 
 [[package]]
 name = "hugr"
-version = "0.25.6"
+version = "0.25.7"
 dependencies = [
  "bumpalo",
  "criterion",
@@ -1340,7 +1340,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.25.6"
+version = "0.25.7"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1364,7 +1364,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.25.6"
+version = "0.25.7"
 dependencies = [
  "anyhow",
  "base64",
@@ -1409,7 +1409,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.25.6"
+version = "0.25.7"
 dependencies = [
  "anyhow",
  "cc",
@@ -1429,7 +1429,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.25.6"
+version = "0.25.7"
 dependencies = [
  "base64",
  "bumpalo",
@@ -1454,7 +1454,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-passes"
-version = "0.25.6"
+version = "0.25.7"
 dependencies = [
  "ascent",
  "criterion",
@@ -1475,7 +1475,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-persistent"
-version = "0.4.6"
+version = "0.4.7"
 dependencies = [
  "delegate",
  "derive_more 2.1.1",
@@ -2505,9 +2505,9 @@ dependencies = [
 
 [[package]]
 name = "proptest-derive"
-version = "0.7.0"
+version = "0.8.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fb6dc647500e84a25a85b100e76c85b8ace114c209432dc174f20aac11d4ed6c"
+checksum = "c57924a81864dddafba92e1bf92f9bf82f97096c44489548a60e888e1547549b"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -3256,9 +3256,9 @@ checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
 
 [[package]]
 name = "smol_str"
-version = "0.3.5"
+version = "0.3.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "0f7a918bd2a9951d18ee6e48f076843e8e73a9a5d22cf05bcd4b7a81bdd04e17"
+checksum = "4aaa7368fcf4852a4c2dd92df0cace6a71f2091ca0a23391ce7f3a31833f1523"
 dependencies = [
  "borsh",
  "serde_core",
