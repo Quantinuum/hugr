@@ -596,7 +596,6 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         };
                         let nval = n.value_u();
                         let mval = m.value_u();
-                        #[allow(clippy::manual_checked_ops)]
                         let out_const: Value = if mval == 0 {
                             err_value()
                         } else {
@@ -716,7 +715,6 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         };
                         let nval = n.value_u();
                         let mval = m.value_u();
-                        #[allow(clippy::manual_checked_ops)]
                         let out_const: Value = if mval == 0 {
                             err_value()
                         } else {
