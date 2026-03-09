@@ -126,7 +126,7 @@ pub enum HUGRSerializationError {
         /// The direction of the port without an offset
         dir: Direction,
         /// The operation type of the node.
-        op_type: OpType,
+        op_type: Box<OpType>,
     },
     /// Edges with wrong node indices
     #[error("The edge endpoint {node} is not a node in the graph.")]
@@ -298,7 +298,7 @@ impl TryFrom<SerHugrLatest> for Hugr {
                     .ok_or(HUGRSerializationError::MissingPortOffset {
                         node,
                         dir,
-                        op_type: op_type.clone(),
+                        op_type: Box::new(op_type.clone()),
                     })?
                     .index()
             };

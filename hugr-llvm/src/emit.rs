@@ -310,7 +310,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
                 )
             })?;
             self = new_self;
-            worklist.extend(new_tasks.into_iter());
+            worklist.extend(new_tasks);
         }
         Ok(self)
     }

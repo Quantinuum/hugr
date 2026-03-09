@@ -37,7 +37,7 @@ ot = "ot"
 inports = "inports" # not import
 inport = "inport"
 bimap = "bimap"     # bi-directional map
-edn = "edn"         # hugr model text file format
+edn = "edn"         # hugr S-expression file format
 
 tru = "tru"   # not clashing with keyword true
 fals = "fals" # not clashing with keyword false

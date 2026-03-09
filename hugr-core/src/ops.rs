@@ -1,4 +1,98 @@
 //! The operation types for the HUGR.
+//!
+//! Operations represent the nodes in a HUGR graph. Each operation has a type
+//! ([`OpType`]), which determines its behavior, signature, and what kind of
+//! edges can connect to it. We may have different operations:
+//! - Unified representation: All operations are represented by the [`OpType`] enum
+//! - Dataflow operations: Operations like [`DFG`], [`Call`], and [`Input`]/[`Output`]
+//!   that process data
+//! - Control flow operations: Operations like [`CFG`], [`Conditional`], and [`TailLoop`]
+//!   for program control flow
+//! - Module-level operations: Operations like [`FuncDefn`], [`FuncDecl`], and [`Module`]
+//!   for program structure
+//! - Extension operations: Custom operations via [`ExtensionOp`]
+//!
+//! # Example
+//!
+//! ```
+//! use hugr::ops::{OpType, OpTrait, Input, Output, DFG, Call, FuncDefn, FuncDecl, LoadConstant};
+//! use hugr::ops::{Module, CFG, TailLoop, Conditional};
+//! use hugr::ops::dataflow::IOTrait;
+//! use hugr::types::{Signature, PolyFuncType};
+//! use hugr::extension::prelude::{bool_t, usize_t};
+//! use hugr::{Direction};
+//!
+//! // Create a dataflow graph operation
+//! let sig = Signature::new(vec![usize_t(), bool_t()], vec![bool_t()]);
+//! let dfg_op: OpType = DFG { signature: sig.clone() }.into();
+//!
+//! // Query operation properties
+//! assert_eq!(dfg_op.value_port_count(Direction::Incoming), 2);
+//! assert_eq!(dfg_op.value_port_count(Direction::Outgoing), 1);
+//! assert!(dfg_op.is_container()); // DFG can contain child nodes
+//!
+//! // Create input and output operations for the DFG's children
+//! let input_op: OpType = Input::new(sig.input().clone()).into();
+//! let output_op: OpType = Output::new(sig.output().clone()).into();
+//!
+//! // Check dataflow signatures
+//! if let Some(out_sig) = output_op.dataflow_signature() {
+//!     println!("Output takes {} inputs", out_sig.input_count());
+//! }
+//!
+//! // Create a function call operation
+//! let func_sig = PolyFuncType::from(Signature::new(vec![usize_t()], vec![bool_t()]));
+//! let call_op: OpType = Call::try_new(func_sig.clone(), &[]).unwrap().into();
+//!
+//! // Access the call signature
+//! let call_sig = call_op.dataflow_signature().unwrap();
+//! assert_eq!(call_sig.input_count(), 1);
+//! assert_eq!(call_sig.output_count(), 1);
+//!
+//! // Create a load constant operation
+//! let load_op: OpType = LoadConstant { datatype: bool_t() }.into();
+//! assert!(load_op.static_input_port().is_some()); // Has static input for constant
+//!
+//! // Create a control flow graph operation
+//! let cfg_sig = Signature::new(vec![usize_t()], vec![bool_t()]);
+//! let cfg_op: OpType = CFG { signature: cfg_sig }.into();
+//! assert!(cfg_op.is_container()); // CFG contains basic blocks
+//!
+//! // Create a tail loop operation
+//! let tail_loop = TailLoop {
+//!     just_inputs: vec![usize_t()].into(),
+//!     just_outputs: vec![bool_t()].into(),
+//!     rest: vec![usize_t()].into(),
+//! };
+//! let loop_op: OpType = tail_loop.into();
+//! assert!(loop_op.is_container()); // Contains loop body
+//!
+//! // Create a conditional operation
+//! let conditional = Conditional {
+//!     sum_rows: vec![usize_t().into(), bool_t().into()],
+//!     other_inputs: vec![usize_t().into()].into(),
+//!     outputs: vec![bool_t()].into(),
+//! };
+//! let cond_op: OpType = conditional.into();
+//! assert!(cond_op.is_container()); // Contains case branches
+//! let cond_sig = cond_op.dataflow_signature().unwrap();
+//! assert_eq!(cond_sig.input_count(), 2); // Sum + other inputs
+//!
+//! // Create a module operation (root of HUGR)
+//! let module_op: OpType = Module::new().into();
+//! assert!(module_op.is_container()); // Contains functions and declarations
+//!
+//! // Create a function definition
+//! let func_defn: OpType = FuncDefn::new("my_func", func_sig.clone()).into();
+//! assert!(func_defn.static_output_port().is_some()); // Has static output
+//! assert!(func_defn.is_container()); // Can contain the function body
+//!
+//! // Create a function declaration (forward declaration)
+//! let func_decl: OpType = FuncDecl::new("external_func", func_sig).into();
+//! assert!(func_decl.static_output_port().is_some()); // Also has static output
+//! assert!(!func_decl.is_container()); // Declarations have no body
+//!
+//! ```
 
 pub mod constant;
 pub mod controlflow;

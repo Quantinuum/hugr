@@ -277,14 +277,6 @@ pub(super) fn resolve_value_exts(
                 });
             }
         }
-        #[expect(deprecated)] // remove when Value::Function removed
-        Value::Function { hugr } => {
-            // We don't need to add the nested hugr's extensions to the main one here,
-            // but we run resolution on it independently.
-            if let Ok(exts) = extensions.try_into() {
-                hugr.resolve_extension_defs(&exts)?;
-            }
-        }
         Value::Sum(s) => {
             if let SumType::General { rows } = &mut s.sum_type {
                 for row in rows.iter_mut() {

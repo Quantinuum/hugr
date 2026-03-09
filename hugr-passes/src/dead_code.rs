@@ -6,7 +6,7 @@ use std::collections::{HashMap, HashSet, VecDeque};
 use std::fmt::{Debug, Display, Formatter};
 use std::sync::Arc;
 
-use crate::ComposablePass;
+use crate::{ComposablePass, PassScope};
 
 /// Configuration for Dead Code Elimination pass
 #[derive(Clone)]
@@ -14,6 +14,8 @@ pub struct DeadCodeElimPass<H: HugrView> {
     /// Nodes that are definitely needed - e.g. `FuncDefns`, but could be anything.
     /// Hugr Root is assumed to be an entry point even if not mentioned here.
     entry_points: Vec<H::Node>,
+    /// If None, use entrypoint-subtree (even if module root)
+    scope: Option<PassScope>,
     /// Callback identifying nodes that must be preserved even if their
     /// results are not used. Defaults to [`PreserveNode::default_for`].
     preserve_callback: Arc<PreserveCallback<H>>,
@@ -23,6 +25,8 @@ impl<H: HugrView + 'static> Default for DeadCodeElimPass<H> {
     fn default() -> Self {
         Self {
             entry_points: Default::default(),
+            // Preserve pre-PassScope behaviour of affecting entrypoint subtree only:
+            scope: None,
             preserve_callback: Arc::new(PreserveNode::default_for),
         }
     }
@@ -36,11 +40,13 @@ impl<H: HugrView> Debug for DeadCodeElimPass<H> {
         #[derive(Debug)]
         struct DCEDebug<'a, N> {
             entry_points: &'a Vec<N>,
+            scope: &'a Option<PassScope>,
         }
 
         Debug::fmt(
             &DCEDebug {
                 entry_points: &self.entry_points,
+                scope: &self.scope,
             },
             f,
         )
@@ -97,11 +103,11 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         self
     }
 
-    /// Mark some nodes as entry points to the Hugr, i.e. so we cannot eliminate any code
-    /// used to evaluate these nodes.
-    /// [`HugrView::entrypoint`] is assumed to be an entry point;
-    /// for Module roots the client will want to mark some of the `FuncDefn` children
-    /// as entry points too.
+    /// Mark some nodes as starting points for analysis, i.e. so we cannot eliminate any code
+    /// used to evaluate these nodes. (E.g. nodes at which we may start executing the Hugr.)
+    ///
+    /// Other starting points are added according to the [PassScope].
+    // TODO should we deprecate this? i.e. require use of PreserveCallback / Hugr edges?
     pub fn with_entry_points(mut self, entry_points: impl IntoIterator<Item = H::Node>) -> Self {
         self.entry_points.extend(entry_points);
         self
@@ -111,7 +117,11 @@ impl<H: HugrView> DeadCodeElimPass<H> {
         let mut must_preserve = HashMap::new();
         let mut needed = HashSet::new();
         let mut q = VecDeque::from_iter(self.entry_points.iter().copied());
-        q.push_front(h.entrypoint());
+
+        match &self.scope {
+            None => q.push_back(h.entrypoint()),
+            Some(scope) => q.extend(scope.preserve_interface(h)),
+        };
         while let Some(n) = q.pop_front() {
             if !h.contains_node(n) {
                 return Err(DeadCodeElimError::NodeNotFound(n));
@@ -119,28 +129,38 @@ impl<H: HugrView> DeadCodeElimPass<H> {
             if !needed.insert(n) {
                 continue;
             }
-            for ch in h.children(n) {
+            // Ensure no orphans, e.g. when preserving an entrypoint deep within a Hugr
+            // being globally optimized. We could remove more from parent, but would require transforming
+            // (e.g. removing individual Output ports) not just deleting, so don't.
+            q.extend(h.get_parent(n));
+            for (i, ch) in h.children(n).enumerate() {
                 if self.must_preserve(h, &mut must_preserve, ch)
-                    || matches!(
-                        h.get_optype(ch),
-                        OpType::Case(_) // Include all Cases in Conditionals
-                    | OpType::DataflowBlock(_) // and all Basic Blocks in CFGs
-                    | OpType::ExitBlock(_)
-                    | OpType::AliasDecl(_) // and all Aliases (we do not track their uses in types)
-                    | OpType::AliasDefn(_)
-                    | OpType::Input(_) // Also Dataflow input/output, these are necessary for legality
-                    | OpType::Output(_) // Do not include FuncDecl / FuncDefn / Const unless reachable by static edges
-                                                                // (from Call/LoadConst/LoadFunction):
-                    )
+                    || match h.get_optype(ch) {
+                        OpType::Case(_)  // Include all Cases in Conditionals
+                        | OpType::ExitBlock(_)
+                        | OpType::AliasDecl(_) // and all Aliases (we do not track their uses in types)
+                        | OpType::AliasDefn(_)
+                        | OpType::Input(_) // Also Dataflow input/output, these are necessary for legality
+                        | OpType::Output(_) => true,
+                        // Assumes entry block is always the first child of a CFG.
+                        OpType::DataflowBlock(_) => h.get_optype(n).is_cfg() && i == 0,
+                        // Do not include FuncDecl / FuncDefn / Const,
+                        // unless reachable by static edges (from Call/LoadConst/LoadFunction)
+                        _ => false,
+                    }
                 {
                     q.push_back(ch);
                 }
             }
-            // Finally, follow dataflow demand (including e.g. edges from Call to FuncDefn)
-            for src in h.input_neighbours(n) {
-                // Following ControlFlow edges backwards is harmless, we've already assumed all
-                // BBs are reachable above.
-                q.push_back(src);
+            if matches!(
+                h.get_optype(n),
+                OpType::DataflowBlock(_) | OpType::ExitBlock(_)
+            ) {
+                // Follow control flow forwards to find reachable basic blocks besides entry and exit.
+                q.extend(h.output_neighbours(n))
+            } else {
+                // Follow dataflow demand (including e.g edges from Call to FuncDefn) backwards.
+                q.extend(h.input_neighbours(n));
             }
             // Also keep consumers of any linear outputs
             if let Some(sig) = h.signature(n) {
@@ -175,15 +195,27 @@ impl<H: HugrMut> ComposablePass<H> for DeadCodeElimPass<H> {
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<(), Self::Error> {
+        let root = match &self.scope {
+            None => hugr.entrypoint(),
+            Some(scope) => match scope.root(hugr) {
+                Some(root) => root,
+                None => return Ok(()),
+            },
+        };
         let needed = self.find_needed_nodes(&*hugr)?;
         let remove = hugr
-            .entry_descendants()
+            .descendants(root)
             .filter(|n| !needed.contains(n))
             .collect::<Vec<_>>();
         for n in remove {
             hugr.remove_node(n);
         }
         Ok(())
+    }
+
+    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = Some(scope.into());
+        self
     }
 }
 #[cfg(test)]
@@ -196,7 +228,7 @@ mod test {
     };
     use hugr_core::extension::prelude::{ConstUsize, bool_t, qb_t, usize_t};
     use hugr_core::extension::{ExtensionId, Version};
-    use hugr_core::ops::ExtensionOp;
+    use hugr_core::ops::{ExtensionOp, OpType};
     use hugr_core::ops::{OpTag, OpTrait, handle::NodeHandle};
     use hugr_core::types::Signature;
     use hugr_core::{Extension, Hugr};
@@ -379,5 +411,80 @@ mod test {
             ext_ops.sorted().collect_vec(),
             ["gate", "gate", "measure", "new"]
         );
+    }
+
+    #[test]
+    fn remove_unreachable_bb() {
+        let mut cb = CFGBuilder::new(Signature::new_endo(type_row![])).unwrap();
+
+        let cst_unused = cb.add_constant(Value::from(ConstUsize::new(3)));
+        let b1_pred = cb.add_constant(Value::unary_unit_sum());
+        let b2_pred = cb.add_constant(Value::unit_sum(0, 2).expect("0 < 2"));
+
+        // Entry block
+        let mut entry = cb.entry_builder([type_row![]], type_row![]).unwrap();
+        let pred1 = entry.load_const(&b1_pred);
+        let entry = entry.finish_with_outputs(pred1, []).unwrap();
+
+        // Reachable block
+        let mut block_reachable = cb
+            .simple_block_builder(Signature::new(type_row![], type_row![]), 1)
+            .unwrap();
+        let pred2 = block_reachable.load_const(&b1_pred);
+        let block_reachable = block_reachable.finish_with_outputs(pred2, []).unwrap();
+
+        // Unreachable block
+        let mut block_unreachable = cb
+            .simple_block_builder(Signature::new(type_row![], type_row![]), 2)
+            .unwrap();
+        let _ = block_unreachable.load_const(&cst_unused);
+        let pred3 = block_unreachable.load_const(&b2_pred);
+        let block_unreachable = block_unreachable.finish_with_outputs(pred3, []).unwrap();
+
+        // Exit block
+        let exit = cb.exit_block();
+
+        // Construct CFG
+        cb.branch(&entry, 0, &block_reachable).unwrap();
+        cb.branch(&block_reachable, 0, &exit).unwrap();
+        cb.branch(&block_unreachable, 0, &exit).unwrap();
+        // Addtionally add a loop to check it works with a cycle
+        cb.branch(&block_unreachable, 1, &block_unreachable)
+            .unwrap();
+        let mut h = cb.finish_hugr().unwrap();
+        h.validate().unwrap();
+        let num_nodes_before = h.nodes().count();
+        let cfg_node = h.entrypoint();
+        let num_cfg_children_before: usize = h
+            .children(cfg_node)
+            .filter(|child| matches!(h.get_optype(*child), OpType::DataflowBlock(_)))
+            .count();
+
+        // Run pass and check that unreachable block is removed
+        DeadCodeElimPass::default().run(&mut h).unwrap();
+        h.validate().unwrap();
+
+        // Check we removed the expected number of nodes.
+        // 7 nodes removed:
+        // - 1 block (block_unreachable)
+        // - 2 constants (cst_unused, b2_pred)
+        // - 4 ops in the unreachable block (2 LoadConst, the block's Input and Output)
+        let num_nodes_after = h.nodes().count();
+        assert_eq!(num_nodes_before - num_nodes_after, 7);
+
+        // Check that `block_unreachable` is no longer a valid node.
+        assert!(!h.contains_node(block_unreachable.node()));
+
+        // CFG checks: should still be a CFG and have one less dataflow block child.
+        assert!(h.get_optype(cfg_node).is_cfg());
+        let num_cfg_children_after: usize = h
+            .children(cfg_node)
+            .filter(|child| matches!(h.get_optype(*child), OpType::DataflowBlock(_)))
+            .count();
+        assert_eq!(num_cfg_children_after, num_cfg_children_before - 1);
+
+        // Also the exit block should only have one predecessor now.
+        let exit_preds = h.input_neighbours(exit.node()).collect_vec();
+        assert_eq!(exit_preds.len(), 1);
     }
 }

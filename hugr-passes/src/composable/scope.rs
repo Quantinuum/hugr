@@ -70,6 +70,9 @@ pub enum PassScope {
 /// also name (if public) for linking; and whether the node is a valid dataflow child
 /// or is a [DataflowBlock], [ExitBlock] or [Module]).
 ///
+/// For lowering passes (whose goal is to change the interface!), generally this has no
+/// effect.
+///
 /// [DataflowBlock]: OpType::DataflowBlock
 /// [ExitBlock]: OpType::ExitBlock
 /// [Module]: OpType::Module

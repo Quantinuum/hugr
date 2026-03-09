@@ -127,7 +127,7 @@ impl<R: BufRead> EnvelopeReader<R> {
         let mut package = match self.header().format {
             EnvelopeFormat::PackageJson => self.decode_json()?,
             EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => self.decode_model()?,
-            EnvelopeFormat::ModelText | EnvelopeFormat::ModelTextWithExtensions => {
+            EnvelopeFormat::SExpression | EnvelopeFormat::SExpressionWithExtensions => {
                 self.decode_model_ast()?
             }
         };
@@ -210,12 +210,12 @@ impl<R: BufRead> EnvelopeReader<R> {
             .map_err(Into::into)
     }
 
-    /// Read a HUGR model text payload from a reader.
-    fn decode_model_ast(&mut self) -> Result<Package, ModelTextReadError> {
+    /// Read a HUGR S-expression payload from a reader.
+    fn decode_model_ast(&mut self) -> Result<Package, SExpressionReadError> {
         let format = self.header().format;
         check_model_version(format)?;
 
-        let packaged_extensions = if format == EnvelopeFormat::ModelTextWithExtensions {
+        let packaged_extensions = if format == EnvelopeFormat::SExpressionWithExtensions {
             let deserializer = serde_json::Deserializer::from_reader(&mut self.reader);
             // Deserialize the first json object, leaving the rest of the reader unconsumed.
             let extra_extensions = deserializer
@@ -282,8 +282,8 @@ pub(crate) enum PayloadErrorInner {
     JsonRead(#[from] PackageEncodingError),
     /// Error decoding a binary model format package.
     ModelBinary(#[from] ModelBinaryReadError),
-    /// Error decoding a text model format package.
-    ModelText(#[from] ModelTextReadError),
+    /// Error decoding a S-expression model format package.
+    SExpression(#[from] SExpressionReadError),
     /// Error raised while checking for breaking extension version mismatch.
     ExtensionsBreaking(#[from] ExtensionBreakingError),
     /// Error resolving extensions while decoding the payload.
@@ -298,7 +298,7 @@ impl<T: Into<PayloadErrorInner>> From<T> for PayloadError {
 
 #[derive(Debug, Error)]
 #[error(transparent)]
-pub(crate) enum ModelTextReadError {
+pub(crate) enum SExpressionReadError {
     ParseString(#[from] hugr_model::v0::ast::ParseError),
     Import(#[from] ImportError),
     ExtensionLoad(#[from] crate::extension::ExtensionRegistryLoadError),
@@ -362,7 +362,7 @@ mod test {
     #[test]
     fn test_read_text_format() {
         let header = EnvelopeHeader {
-            format: EnvelopeFormat::ModelTextWithExtensions,
+            format: EnvelopeFormat::SExpressionWithExtensions,
             ..Default::default()
         };
         let mut cursor = Cursor::new(Vec::new());
@@ -373,7 +373,7 @@ mod test {
         let reader = EnvelopeReader::new(cursor, &registry).unwrap();
         let (description, result) = reader.read();
 
-        assert_matches!(result, Err(PayloadError(PayloadErrorInner::ModelText(_))));
+        assert_matches!(result, Err(PayloadError(PayloadErrorInner::SExpression(_))));
         assert_eq!(description.header, header);
     }
 
@@ -483,7 +483,7 @@ mod test {
             .unwrap();
 
         let header = EnvelopeHeader {
-            format: EnvelopeFormat::ModelTextWithExtensions,
+            format: EnvelopeFormat::SExpressionWithExtensions,
             ..Default::default()
         };
 
@@ -522,7 +522,7 @@ mod test {
     /// Test encoding/decoding a very large hugr payload (~64MB)
     #[rstest]
     #[case::model_with_extensions(EnvelopeFormat::ModelWithExtensions)]
-    #[case::model_text_with_extensions(EnvelopeFormat::ModelTextWithExtensions)]
+    #[case::model_text_with_extensions(EnvelopeFormat::SExpressionWithExtensions)]
     #[case::package_json(EnvelopeFormat::PackageJson)]
     #[ignore = "This test takes > 15s due to the large payload size."]
     fn big_hugr_payload(#[case] format: EnvelopeFormat, big_hugr: Hugr) {
