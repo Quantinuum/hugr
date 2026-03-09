@@ -29,7 +29,6 @@ pub mod linking {
             Hugr::load_with_exts(module_into, None).map_err(|err| {
                 PyValueError::new_err(format!("Loading of first envelope failed: {}", err))
             })?;
-
         let (hugr_from, exts_from) = Hugr::load_with_exts(module_from, None).map_err(|err| {
             PyValueError::new_err(format!("Loading of second envelope failed: {}", err))
         })?;
