@@ -1,6 +1,7 @@
 //! Bindings for linking utilities defined in the hugr-core crate
 
-use pyo3::pymodule;
+use pyo3::exceptions::PyException;
+use pyo3::{create_exception, pymodule};
 
 #[pymodule(submodule)]
 #[pyo3(module = "hugr._hugr.linking")]
@@ -8,7 +9,7 @@ pub mod linking {
     use hugr_core::Hugr;
     use hugr_core::envelope::EnvelopeConfig;
     use hugr_core::hugr::linking::{HugrLinking, NameLinkingPolicy};
-    use pyo3::exceptions::{PyRuntimeError, PyValueError};
+    use pyo3::exceptions::PyValueError;
     use pyo3::types::{PyAnyMethods, PyModule};
     use pyo3::{Bound, PyResult, Python, pyfunction};
 
@@ -35,7 +36,7 @@ pub mod linking {
 
         hugr_into
             .link_module(hugr_from, &NameLinkingPolicy::default())
-            .map_err(|err| PyRuntimeError::new_err(err.to_string()))?; // TODO Add a proper error
+            .map_err(|err| super::HugrLinkingError::new_err(err.to_string()))?;
 
         exts_into.extend(exts_from);
 
@@ -50,3 +51,10 @@ pub mod linking {
         Ok(result)
     }
 }
+
+create_exception!(
+    _hugr.linking,
+    HugrLinkingError,
+    PyException,
+    "Base exception for HUGR linking errors."
+);
