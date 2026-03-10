@@ -7,6 +7,7 @@ use anyhow::Result;
 use clap::Parser;
 use clio::Output;
 use hugr::HugrView;
+use hugr::hugr::views::render::NodeLabel;
 use hugr::package::PackageValidationError;
 
 /// Dump the standard extensions.
@@ -26,6 +27,15 @@ pub struct MermaidArgs {
         help = "Validate before rendering, includes extension inference."
     )]
     pub validate: bool,
+
+    /// Print debug metadata.
+    #[arg(
+        short = 'D',
+        long,
+        help = "Print debug info attached to nodes if it exists."
+    )]
+    pub debug_info: bool,
+
     /// Output file '-' for stdout
     #[clap(long, short, value_parser, default_value = "-")]
     output: Output,
@@ -64,10 +74,18 @@ impl MermaidArgs {
         }
 
         for hugr in package.modules {
-            if let Some(ref mut writer) = output_override {
-                writeln!(writer, "{}", hugr.mermaid_string())?;
+            let mmd_fmt = if self.debug_info {
+                // TODO: hardcoded
+                hugr.mermaid_format()
+                    .with_node_labels(NodeLabel::MetadataKey("core.debug_info".to_string()))
             } else {
-                writeln!(self.output, "{}", hugr.mermaid_string())?;
+                hugr.mermaid_format()
+            };
+
+            if let Some(ref mut writer) = output_override {
+                writeln!(writer, "{}", mmd_fmt.finish())?;
+            } else {
+                writeln!(self.output, "{}", mmd_fmt.finish())?;
             }
         }
         Ok(())
