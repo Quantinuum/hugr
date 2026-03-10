@@ -36,6 +36,9 @@ hugr-core = { path = "../hugr-core", version = "0.25.7" }
 hugr-llvm = { path = "../hugr-llvm", version = "0.25.7", optional = true }
 hugr-persistent = { path = "../hugr-persistent", version = "0.4.7", optional = true }
 
+# TODO: Make this always required
+inkwell = { version = ">=0.7.1, <0.9", features = ["llvm21-1"] }
+
 [dev-dependencies]
 serde_json = { workspace = true }
 bumpalo = { workspace = true, features = ["collections"] }

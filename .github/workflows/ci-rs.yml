@@ -144,6 +144,10 @@ jobs:
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: taiki-e/install-action@nextest
+      - name: Install LLVM and Clang
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: ${{ env.LLVM_VERSION }}
       - name: Build with all features
         # NOTE: We have temporarily disabled hugr-llvm building in the required tests
         # since build times went from ~2 mins to ~30 mins after
