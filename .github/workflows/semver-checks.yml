@@ -2,7 +2,7 @@ name: Rust Semver Checks
 on:
   pull_request_target:
     branches:
-      - '**'
+      - "**"
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -21,16 +21,19 @@ jobs:
         id: filter
 
   rs-semver-checks:
+    runs-on: ubuntu-latest
     needs: [changes]
     if: ${{ needs.changes.outputs.rust == 'true' }}
+    env:
+      GITHUB_TOKEN: ${{ secrets.HUGRBOT_PAT }}
     steps:
-    # once llvm-21 is packaged on apt, we could just download it using 'apt-dependencies'
-    # in the step below
-    - name: Install LLVM
-      uses: KyleMayes/install-llvm-action@v2
-      with:
-        version: "21.1"
-    - name: Run Rust checks
-      uses: quantinuum/hugrverse-actions/.github/workflows/rs-semver-checks.yml@main
-      secrets:
-        GITHUB_PAT: ${{ secrets.HUGRBOT_PAT }}
+      # once llvm-21 is packaged on apt, we could just download it using 'apt-dependencies'
+      # in the step below
+      - name: Install LLVM
+        uses: KyleMayes/install-llvm-action@v2
+        with:
+          version: "21.1"
+      - name: Run Rust checks
+        uses: quantinuum/hugrverse-actions/rs-semver-checks@main
+        with:
+          token: ${{ secrets.HUGRBOT_PAT }}
