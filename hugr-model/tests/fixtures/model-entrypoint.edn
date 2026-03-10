@@ -5,14 +5,14 @@
 (define-func public main
   (core.fn [] [])
   (meta core.entrypoint)
-  (dfg [] []
+  (dfg
     (signature (core.fn [] []))))
 
 (mod)
 
 (define-func public wrapper_dfg
   (core.fn [] [])
-  (dfg [] []
+  (dfg
     (signature (core.fn [] []))
     (meta core.entrypoint)))
 
@@ -20,9 +20,9 @@
 
 (define-func public wrapper_cfg
   (core.fn [] [])
-  (dfg [] []
+  (dfg
     (signature (core.fn [] []))
-    (cfg [] []
+    (cfg
       (signature (core.fn [] []))
       (cfg [%entry] [%exit]
         (signature (core.ctrl [[]] [[]]))
