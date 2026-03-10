@@ -296,6 +296,7 @@ impl HugrView for PersistentHugr {
                     .collect();
                 NodeLabel::Custom(labels)
             }
+            NodeLabel::MetadataKey(_) => unimplemented!(),
         };
 
         // Map config accordingly
