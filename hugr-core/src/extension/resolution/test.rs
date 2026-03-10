@@ -19,7 +19,7 @@ use crate::extension::{
 };
 use crate::ops::constant::CustomConst;
 use crate::ops::constant::test::CustomTestValue;
-use crate::ops::{CallIndirect, ExtensionOp, Input, OpType, Tag, Value};
+use crate::ops::{CallIndirect, ExtensionOp, Input, NamedOp, OpType, Tag, Value};
 use crate::package::Package;
 use crate::std_extensions::arithmetic::conversions::{self, ConvertOpDef};
 use crate::std_extensions::arithmetic::float_types::{self, ConstF64, float64_type};
@@ -404,7 +404,7 @@ fn resolve_lower_func_extensions() {
     // Build a HUGR that uses the inner op as its lowering body.
     let mut dfg = DFGBuilder::new(Signature::new_endo(vec![bool_t()])).unwrap();
     let [input] = dfg.input_wires_arr();
-    let inner_result = dfg.add_dataflow_op(inner_op, [input]).unwrap();
+    let inner_result = dfg.add_dataflow_op(inner_op.clone(), [input]).unwrap();
     let lower_hugr = dfg
         .finish_hugr_with_outputs(inner_result.outputs())
         .unwrap();
@@ -468,6 +468,7 @@ fn resolve_lower_func_extensions() {
         .try_lower(&[], &available)
         .expect("try_lower should succeed when inner extension is available");
 
+    // No unresolved OpaqueOps after loading.
     for node in lower_hugr.nodes() {
         let op = lower_hugr.get_optype(node);
         assert!(
@@ -475,6 +476,15 @@ fn resolve_lower_func_extensions() {
             "Op {op:?} on {node} is an unresolved OpaqueOp after loading"
         );
     }
+
+    // There is some inner_ext operation in the lower hugr.
+    lower_hugr.nodes().any(|node| {
+        let op = lower_hugr.get_optype(node);
+        let crate::ops::OpType::ExtensionOp(op) = op else {
+            return false;
+        };
+        op.extension_id() == inner_ext.name() && op.name() == inner_op.name()
+    });
 }
 
 /// Test the [`ExtensionRegistry::new_cyclic`] and [`ExtensionRegistry::new_with_extension_resolution`] methods.
