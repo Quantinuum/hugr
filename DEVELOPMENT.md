@@ -34,8 +34,8 @@ To setup the environment manually you will need:
 - uv `>=0.7`: <https://docs.astral.sh/uv/getting-started/installation>
 - Optional: capnproto `>=1.0`: <https://capnproto.org/install.html>
     Required when modifying the `hugr-model` serialization schema.
-- Optional: llvm `== 14.0`. The "llvm" feature (backed by the sub-crate `hugr-llvm`)
-  requires LLVM installed. We use the rust bindings
+- Optional: llvm `== 21.1`. The "llvm" feature (backed by the sub-crate `hugr-llvm`)
+  requires LLVM 21.0 installed. We use the rust bindings
   [llvm-sys](https://crates.io/crates/llvm-sys) to [llvm](https://llvm.org/).
 
 Once you have these installed, you can install the required python dependencies and setup pre-commit hooks with:
@@ -46,11 +46,11 @@ just setup
 
 #### Note on LLVM
 
-You will need llvm 14.0 installed in order for `just check` to run all its
+You will need llvm 21.1 installed in order for `just check` to run all its
 checks successfully. On Debian-based systems you can install it as the
-`llvm-14` package; you will also need to install `libpolly14-dev`. You should
-set the environment variable `LLVM_SYS_140_PREFIX` to point to its location
-(e.g. `/usr/lib/llvm-14`) when running `just check`.
+`llvm-21` package; you may also need to install `libpolly21-dev`. You should
+set the environment variable `LLVM_SYS_211_PREFIX` to point to its location
+(e.g. `/usr/lib/llvm-21`) when running `just check`.
 
 ## 🏃 Running the tests
 
