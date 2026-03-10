@@ -302,8 +302,8 @@ pub enum LowerFunc {
         /// We store it as a single-module package here to keep any encoded
         /// extensions required to define the Hugr alive.
         ///
-        /// The Package must contain any non-std extension required to define
-        /// the Hugr. Otherwise, we may not be able to resolve the extensions
+        /// The Package should contain any non-std extension required to define
+        /// the Hugr. Otherwise, we will not be able to resolve the extensions
         /// when loading the Hugr.
         ///
         /// [ExtensionOp]: crate::ops::ExtensionOp
