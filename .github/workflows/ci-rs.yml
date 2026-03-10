@@ -144,10 +144,6 @@ jobs:
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: taiki-e/install-action@nextest
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.LLVM_VERSION }}
       - name: Build with all features
         # NOTE: We have temporarily disabled hugr-llvm building in the required tests
         # since build times went from ~2 mins to ~30 mins after
@@ -159,7 +155,7 @@ jobs:
           name: timings-stable-all-features
           path: target/cargo-timings/cargo-timing.html
       - name: Tests with all features
-        run: cargo nextest r --verbose --features "hugr/declarative hugr/persistent_unstable hugr/zstd"
+        run: cargo nextest r --verbose --features "hugr/declarative hugr/persistent_unstable hugr/zstd" --timings
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
@@ -200,7 +196,12 @@ jobs:
       - name: Tests with no features
         run: cargo nextest r --verbose  --no-default-features
       - name: Build with all features
-        run: cargo nextest r --verbose  --all-features --no-run
+        run: cargo nextest r --verbose  --all-features --no-run --timings
+      - name: Upload timings
+        uses: actions/upload-artifact@v7
+        with:
+          name: timings-${{ matrix.rust }}-all-features
+          path: target/cargo-timings/cargo-timing.html
       - name: Tests with all features
         run: cargo nextest r --verbose  --all-features
       - name: Build hugr-llvm
@@ -251,7 +252,12 @@ jobs:
       - name: Tests with no features
         run: cargo minimal-versions --direct test --verbose  --no-default-features
       - name: Build with all features
-        run: cargo minimal-versions --direct test --verbose  --all-features --no-run
+        run: cargo minimal-versions --direct test --verbose  --all-features --no-run --timings
+      - name: Upload timings
+        uses: actions/upload-artifact@v7
+        with:
+          name: timings-msrv-all-features
+          path: target/cargo-timings/cargo-timing.html
       - name: Tests with all features
         run: cargo minimal-versions --direct test --verbose  --all-features
       - name: Build hugr-llvm
