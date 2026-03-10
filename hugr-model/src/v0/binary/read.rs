@@ -50,8 +50,11 @@ pub fn read_from_slice_with_suffix<'a>(
 
 /// Read a hugr package from an impl of [`BufRead`].
 pub fn read_from_reader(reader: impl BufRead, bump: &Bump) -> ReadResult<table::Package<'_>> {
-    let reader =
-        capnp::serialize_packed::read_message(reader, capnp::message::ReaderOptions::new())?;
+    // Disable payload size limits (default is 8M words / 64MB)
+    let mut options = capnp::message::ReaderOptions::default();
+    options.traversal_limit_in_words(None);
+
+    let reader = capnp::serialize_packed::read_message(reader, options)?;
     let root = reader.get_root::<hugr_capnp::package::Reader>()?;
     read_package(bump, root)
 }

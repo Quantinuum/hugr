@@ -6,6 +6,7 @@ from dataclasses import dataclass, field
 from enum import Enum
 
 from semver import Version
+from typing_extensions import deprecated
 
 import hugr._hugr.model as rust
 from hugr.tys import Visibility
@@ -105,6 +106,7 @@ class Literal(Term):
     value: str | float | int | bytes
 
 
+@deprecated("Lift functions to toplevel")
 @dataclass(frozen=True)
 class Func(Term):
     """Function constant."""

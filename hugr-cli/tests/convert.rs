@@ -180,7 +180,7 @@ fn test_convert_model_text_format(test_envelope_file: NamedTempFile, mut convert
     let config = desc.header.config();
 
     // Verify the format is correct
-    assert_eq!(config.format, EnvelopeFormat::ModelText);
+    assert_eq!(config.format, EnvelopeFormat::SExpression);
 }
 
 #[rstest]
@@ -311,5 +311,5 @@ fn test_convert_programmatic_model_text(test_package: Package) {
     let registry = ExtensionRegistry::default();
     let (desc, _) = read_envelope(reader, &registry).expect("Failed to read output envelope");
 
-    assert_eq!(desc.header.config().format, EnvelopeFormat::ModelText);
+    assert_eq!(desc.header.config().format, EnvelopeFormat::SExpression);
 }

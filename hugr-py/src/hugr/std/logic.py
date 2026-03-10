@@ -6,7 +6,7 @@ from dataclasses import dataclass
 from typing import TYPE_CHECKING, ClassVar
 
 from hugr.ops import Command, DataflowOp, RegisteredOp
-from hugr.std import _load_extension
+from hugr.std._util import _load_extension
 
 if TYPE_CHECKING:
     from hugr import ext

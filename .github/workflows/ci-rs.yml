@@ -21,9 +21,9 @@ env:
   RUSTC_WRAPPER: "sccache"
   HUGR_TEST_SCHEMA: "1"
   # different strings for install action and feature name
-  # adapted from https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
-  LLVM_VERSION: "14.0"
-  LLVM_FEATURE_NAME: "14-0"
+  # should match https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
+  LLVM_VERSION: "21.1"
+  LLVM_FEATURE_NAME: "21-1"
 
 jobs:
   # Check if changes were made to the relevant files.
@@ -86,7 +86,9 @@ jobs:
       - name: Install cargo-codspeed
         run: cargo binstall cargo-codspeed --force
       - name: Override criterion with the CodSpeed harness
-        run: cargo add --dev codspeed-criterion-compat --rename criterion --package hugr
+        run: |
+          cargo add --dev codspeed-criterion-compat --rename criterion --package hugr
+          cargo add --dev codspeed-criterion-compat --rename criterion --package hugr-passes
       - name: Build benchmarks
         run: cargo codspeed build --profile bench --features declarative,llvm,llvm-test
       - name: Run benchmarks
@@ -161,7 +163,7 @@ jobs:
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@v7
         with:
           name: hugr_binary
           path: target/debug/hugr
@@ -221,7 +223,7 @@ jobs:
         id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: "1.89"
+          toolchain: "1.91"
       - name: Install nightly toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -258,6 +260,10 @@ jobs:
       - name: Tests hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
         run: cargo minimal-versions --direct test -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
+      - name: List cargo `target` directory size after tests
+        run: |
+          echo "Target directory size:"
+          du -h -d3 target
 
   # Ensure that serialized extensions match rust implementation
   std-extensions:
@@ -268,7 +274,7 @@ jobs:
     steps:
       - uses: actions/checkout@v6
       - name: Download the hugr binary
-        uses: actions/download-artifact@v7
+        uses: actions/download-artifact@v8
         with:
           name: hugr_binary
           path: ${{ github.workspace }}/target/debug
@@ -337,13 +343,21 @@ jobs:
           version: ${{ env.LLVM_VERSION }}
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
-      - name: Run tests with coverage instrumentation
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
+      - name: Run tests with no features
         run: |
-          cargo llvm-cov clean --workspace
-          cargo llvm-cov --no-report  --no-default-features --doctests
-          cargo llvm-cov --no-report  --all-features --doctests
-          cargo llvm-cov --no-report  -p hugr-llvm --features llvm14-0 --doctests
-          cargo llvm-cov --no-report  -p hugr-persistent --doctests
+          cargo nextest r --no-default-features
+          # Avoid filling the github runner disk space
+          cargo clean
+      - name: Clean existing coverage data
+        run: cargo llvm-cov clean --workspace
+      - name: Run tests with all features, with coverage instrumentation
+        run: cargo llvm-cov --no-report --all-features --doctests
+      - name: Run hugr-llvm tests, with coverage instrumentation
+        run: cargo llvm-cov --no-report -p hugr-llvm --features llvm${{ env.LLVM_FEATURE_NAME }} --doctests
+      - name: Run hugr-persistent tests, with coverage instrumentation
+        run: cargo llvm-cov --no-report -p hugr-persistent --doctests
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
@@ -353,6 +367,12 @@ jobs:
           name: rust
           flags: rust
           token: ${{ secrets.CODECOV_TOKEN }}
+      - name: List cargo `target` directory size after tests
+        run: |
+          echo "Disk usage:"
+          df -h
+          echo "Target directory size:"
+          du -h -d3 target
 
   # This is a meta job to mark successful completion of the required checks,
   # even if they are skipped due to no changes in the relevant files.

@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow};
+use anyhow::{Context as _, Result, anyhow};
 use delegate::delegate;
 use hugr_core::{
     HugrView, Node, Visibility,
@@ -10,7 +10,7 @@ use inkwell::{
     context::Context,
     intrinsics::Intrinsic,
     module::{Linkage, Module},
-    types::{AnyType, BasicType, BasicTypeEnum, FunctionType},
+    types::{AnyType, BasicType, BasicTypeEnum, FunctionType, PointerType},
     values::{BasicValueEnum, CallSiteValue, FunctionValue, GlobalValue},
 };
 use std::{collections::HashSet, rc::Rc};
@@ -55,6 +55,8 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
             pub fn llvm_func_type(&self, hugr_type: &HugrFuncType) -> Result<FunctionType<'c>>;
             /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
             pub fn llvm_sum_type(&self, sum_type: HugrSumType) -> Result<LLVMSumType<'c>>;
+            /// Get the global opaque LLVM pointer type
+            pub fn llvm_ptr_type(&self) -> PointerType<'c>;
         }
 
         to self.namer {
@@ -301,9 +303,14 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
                     node.hugr().get_optype(next_node)
                 )
             };
-            let (new_self, new_tasks) = self.emit_func_impl(func)?;
+            let (new_self, new_tasks) = self.emit_func_impl(func).with_context(|| {
+                format!(
+                    "Failed to emit LLVM for function {} at node {next_node}",
+                    func.func_name()
+                )
+            })?;
             self = new_self;
-            worklist.extend(new_tasks.into_iter());
+            worklist.extend(new_tasks);
         }
         Ok(self)
     }

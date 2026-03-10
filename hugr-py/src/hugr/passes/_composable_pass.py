@@ -13,6 +13,7 @@ if TYPE_CHECKING:
     from collections.abc import Callable
 
     from hugr.hugr.base import Hugr
+    from hugr.passes._scope import PassScope
 
 
 # Type alias for a pass name
@@ -32,6 +33,17 @@ class ComposablePass(Protocol):
 
         See :func:`implement_pass_run` for a helper function to implement this method.
         """
+        ...
+
+    def with_scope(self, scope: PassScope) -> ComposablePass:
+        """Set the scope configuration for the pass.
+
+        As of `hugr 0.14.*`, this configuration is only a guidance, and may be
+        ignored by the pass.
+
+        In the future, passes will be required to respect the scope configuration.
+        """
+        # For hugr passes, this is tracked by <https://github.com/Quantinuum/hugr/issues/2771>
         ...
 
     @property
@@ -119,6 +131,12 @@ class ComposedPass(ComposablePass):
             inplace=inplace,
             inplace_call=lambda hugr: apply(True, hugr),
             copy_call=lambda hugr: apply(False, hugr),
+        )
+
+    def with_scope(self, scope: PassScope) -> ComposedPass:
+        """Set the scope configuration for the composed pass."""
+        return ComposedPass(
+            *[composable_pass.with_scope(scope) for composable_pass in self.passes]
         )
 
     @property

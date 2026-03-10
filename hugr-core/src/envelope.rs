@@ -93,15 +93,6 @@ pub fn read_envelope(
     }
 }
 
-/// Deprecated alias for [`read_envelope`].
-#[deprecated(since = "0.25.0", note = "Use `read_envelope` instead.")]
-pub fn read_described_envelope(
-    reader: impl BufRead,
-    registry: &ExtensionRegistry,
-) -> Result<(PackageDesc, Package), ReadError> {
-    read_envelope(reader, registry)
-}
-
 /// Errors during reading a HUGR envelope.
 #[derive(Debug, Error)]
 #[non_exhaustive]
@@ -358,18 +349,18 @@ pub(crate) mod test {
     // Empty packages
     #[case::empty_model(Package::default(), EnvelopeFormat::Model)]
     #[case::empty_model_exts(Package::default(), EnvelopeFormat::ModelWithExtensions)]
-    #[case::empty_text(Package::default(), EnvelopeFormat::ModelText)]
-    #[case::empty_text_exts(Package::default(), EnvelopeFormat::ModelTextWithExtensions)]
+    #[case::empty_text(Package::default(), EnvelopeFormat::SExpression)]
+    #[case::empty_text_exts(Package::default(), EnvelopeFormat::SExpressionWithExtensions)]
     // Single hugrs
     #[case::simple_bin(simple_package(), EnvelopeFormat::Model)]
     #[case::simple_bin_exts(simple_package(), EnvelopeFormat::ModelWithExtensions)]
-    #[case::simple_text(simple_package(), EnvelopeFormat::ModelText)]
-    #[case::simple_text_exts(simple_package(), EnvelopeFormat::ModelTextWithExtensions)]
+    #[case::simple_text(simple_package(), EnvelopeFormat::SExpression)]
+    #[case::simple_text_exts(simple_package(), EnvelopeFormat::SExpressionWithExtensions)]
     // Multiple hugrs
     #[case::multi_bin(multi_module_package(), EnvelopeFormat::Model)]
     #[case::multi_bin_exts(multi_module_package(), EnvelopeFormat::ModelWithExtensions)]
-    #[case::multi_text(multi_module_package(), EnvelopeFormat::ModelText)]
-    #[case::multi_text_exts(multi_module_package(), EnvelopeFormat::ModelTextWithExtensions)]
+    #[case::multi_text(multi_module_package(), EnvelopeFormat::SExpression)]
+    #[case::multi_text_exts(multi_module_package(), EnvelopeFormat::SExpressionWithExtensions)]
     fn model_roundtrip(#[case] package: Package, #[case] format: EnvelopeFormat) {
         let mut buffer = Vec::new();
         let config = EnvelopeConfig { format, zstd: None };

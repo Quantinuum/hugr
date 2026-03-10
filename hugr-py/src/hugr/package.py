@@ -9,10 +9,11 @@ from typing_extensions import deprecated
 
 import hugr._serialization.extension as ext_s
 import hugr.model as model
+from hugr import ext
 from hugr.envelope import (
     EnvelopeConfig,
-    make_envelope,
-    make_envelope_str,
+    _make_envelope,
+    _make_envelope_str,
     read_envelope,
     read_envelope_str,
 )
@@ -20,7 +21,7 @@ from hugr.hugr.base import Hugr
 from hugr.ops import FuncDecl, FuncDefn, Op
 
 if TYPE_CHECKING:
-    from hugr.ext import Extension
+    from hugr.ext import Extension, ExtensionRegistry
     from hugr.hugr.node_port import Node
 
 __all__ = [
@@ -54,21 +55,28 @@ class Package:
         )
 
     @staticmethod
-    def from_bytes(envelope: bytes) -> Package:
+    def from_bytes(
+        envelope: bytes, extensions: ExtensionRegistry | None = None
+    ) -> Package:
         """Deserialize a byte string to a Package object.
 
         Some envelope formats can be read from a string. See :meth:`from_str`.
 
         Args:
             envelope: The byte string representing a Package.
+            extensions: If not None, an extension registry to resolve the custom
+                operations and types.
 
         Returns:
             The deserialized Package object.
         """
-        return read_envelope(envelope)
+        package = read_envelope(envelope)
+        if extensions is not None:
+            package.used_extensions(extensions)
+        return package
 
     @staticmethod
-    def from_str(envelope: str) -> Package:
+    def from_str(envelope: str, extensions: ExtensionRegistry | None = None) -> Package:
         """Deserialize a string to a Package object.
 
         Not all envelope formats can be read from a string.
@@ -76,11 +84,16 @@ class Package:
 
         Args:
             envelope: The string representing a Package.
+            extensions: If not None, an extension registry to resolve the custom
+                operations and types.
 
         Returns:
             The deserialized Package object.
         """
-        return read_envelope_str(envelope)
+        package = read_envelope_str(envelope)
+        if extensions is not None:
+            package.used_extensions(extensions)
+        return package
 
     @staticmethod
     def from_model(package: model.Package, extensions: list[Extension] | None = None):
@@ -94,7 +107,7 @@ class Package:
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
         """
         config = config or EnvelopeConfig.BINARY
-        return make_envelope(self, config)
+        return _make_envelope(self, config)
 
     def to_str(self, config: EnvelopeConfig | None = None) -> str:
         """Serialize the package to a HUGR envelope string.
@@ -103,7 +116,7 @@ class Package:
         See :meth:`to_bytes` for a more general method.
         """
         config = config or EnvelopeConfig.TEXT
-        return make_envelope_str(self, config)
+        return _make_envelope_str(self, config)
 
     @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
     def to_json(self) -> str:
@@ -131,6 +144,49 @@ class Package:
         At the moment this does not yet contain the extensions.
         """
         return model.Package([module.to_model() for module in self.modules])
+
+    def used_extensions(
+        self, resolve_from: ext.ExtensionRegistry | None = None
+    ) -> ext.ExtensionResolutionResult:
+        """Get the extensions used by this Package, optionally resolving unresolved
+        types and operations.
+
+        This method modifies the HUGR modules and packaged extensions in-place when
+        resolve_from is provided, replacing Custom operations with ExtOp operations and
+        opaque types with ExtType when their extensions are found in the registry.
+
+        Args:
+            resolve_from: Optional extension registry to resolve against.
+                If None, opaque types and Custom ops will not be resolved.
+
+        Returns:
+            The result of resolving the extensions, containing the used
+            extensions and a list of referenced but unresolved extensions.
+
+        Example:
+            >>> from hugr.build import Dfg
+            >>> Dfg(tys.Qubit).hugr.used_extensions().ids()
+            {'prelude'}
+        """
+        from hugr.ext import ExtensionResolutionResult
+
+        packaged_extensions = ext.ExtensionRegistry.from_extensions(self.extensions)
+
+        if resolve_from is None:
+            resolve_from = ext.ExtensionRegistry()
+        resolve_from.extend(packaged_extensions)
+
+        # Packaged extensions are always marked as "used".
+        result = ExtensionResolutionResult(
+            used_extensions=packaged_extensions,
+        )
+
+        for module in self.modules:
+            result.extend(module.used_extensions(resolve_from))
+
+        result._extend_with_transitive_ops(resolve_from)
+
+        return result
 
 
 @dataclass(frozen=True)
