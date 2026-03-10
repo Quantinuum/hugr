@@ -137,8 +137,8 @@ impl<R: BufRead> EnvelopeReader<R> {
             let desc = desc.get_or_insert_default();
             desc.load_used_extensions_generator(module)
                 .map_err(ExtensionBreakingError::from)?;
-            if let Some(used_exts) = &mut desc.used_extensions_generator {
-                check_breaking_extensions(module.extensions(), used_exts.drain(..))?;
+            if let Some(used_exts) = &desc.used_extensions_generator {
+                check_breaking_extensions(module.extensions(), used_exts)?;
             }
 
             module
