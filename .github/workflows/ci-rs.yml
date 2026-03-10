@@ -359,14 +359,9 @@ jobs:
       - name: Clean existing coverage data
         run: cargo llvm-cov clean --workspace
       - name: Run tests with all features, with coverage instrumentation
-        run: cargo llvm-cov --no-report --all-features --doctests --timings
+        run: cargo llvm-cov --no-report --all-features --doctests
         env:
           RUSTFLAGS: "-Zmacro-stats --cfg=ci_run"
-      - name: Upload timings
-        uses: actions/upload-artifact@v7
-        with:
-          name: timings-nightly-coverage
-          path: target/cargo-timings/cargo-timing.html
       - name: Run hugr-llvm tests, with coverage instrumentation
         run: cargo llvm-cov --no-report -p hugr-llvm --features llvm${{ env.LLVM_FEATURE_NAME }} --doctests
       - name: Run hugr-persistent tests, with coverage instrumentation
