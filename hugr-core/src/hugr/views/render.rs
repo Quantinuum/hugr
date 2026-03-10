@@ -179,6 +179,8 @@ pub enum NodeLabel<N: HugrNode = Node> {
     /// Display the node index as a number.
     #[default]
     Numeric,
+    /// Display the node index and JSON metadata for a given key.
+    MetadataKey(String),
     /// Display the labels corresponding to the node indices.
     Custom(HashMap<N, String>),
 }
@@ -196,6 +198,14 @@ pub(in crate::hugr) fn node_style<'a>(
         }
     }
 
+    fn numeric_label(h: &Hugr, n: NodeIndex, is_entry: bool) -> String {
+        if is_entry {
+            format!("({}) [**{}**]", n.index(), node_name(h, n))
+        } else {
+            format!("({}) {}", n.index(), node_name(h, n))
+        }
+    }
+
     let mut entrypoint_style = PresentationStyle::default();
     entrypoint_style.stroke = Some("#832561".to_string());
     entrypoint_style.stroke_width = Some("3px".to_string());
@@ -204,18 +214,9 @@ pub(in crate::hugr) fn node_style<'a>(
     match formatter.node_labels {
         NodeLabel::Numeric => Box::new(move |n| {
             if Some(n) == entrypoint {
-                NodeStyle::boxed(format!(
-                    "({ni}) [**{name}**]",
-                    ni = n.index(),
-                    name = node_name(h, n)
-                ))
-                .with_attrs(entrypoint_style.clone())
+                NodeStyle::boxed(numeric_label(h, n, true)).with_attrs(entrypoint_style.clone())
             } else {
-                NodeStyle::boxed(format!(
-                    "({ni}) {name}",
-                    ni = n.index(),
-                    name = node_name(h, n)
-                ))
+                NodeStyle::boxed(numeric_label(h, n, false))
             }
         }),
         NodeLabel::None => Box::new(move |n| {
@@ -224,6 +225,20 @@ pub(in crate::hugr) fn node_style<'a>(
                     .with_attrs(entrypoint_style.clone())
             } else {
                 NodeStyle::boxed(node_name(h, n))
+            }
+        }),
+        NodeLabel::MetadataKey(label) => Box::new(move |n| {
+            let metadata = serde_json::to_string(
+                h.get_metadata_any(Node::from_portgraph(n), label.clone())
+                    .unwrap_or(&serde_json::Value::Null),
+            )
+            .expect("Could not render JSON metadata");
+
+            if Some(n) == entrypoint {
+                NodeStyle::boxed(format!("{} <{}>", numeric_label(h, n, true), metadata))
+                    .with_attrs(entrypoint_style.clone())
+            } else {
+                NodeStyle::boxed(format!("{} <{}>", numeric_label(h, n, false), metadata))
             }
         }),
         NodeLabel::Custom(labels) => Box::new(move |n| {
