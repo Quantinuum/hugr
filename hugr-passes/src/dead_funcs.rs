@@ -11,11 +11,8 @@ use hugr_core::{
 use itertools::Either;
 use petgraph::visit::{Dfs, Walker};
 
-use crate::PassScope;
-use crate::composable::WithScope;
-use crate::{
-    ComposablePass, PassScope,
-    composable::{Preserve, ValidatePassError, validate_if_test},
+use crate::composable::{
+    ComposablePass, PassScope, Preserve, ValidatePassError, WithScope, validate_if_test,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -70,7 +67,7 @@ impl RemoveDeadFuncsPass {
     /// Adds new entry points - these must be [`FuncDefn`] nodes
     /// that are children of the [`Module`] at the root of the Hugr.
     ///
-    /// Overrides any [PassScope] set by a call to [Self::with_scope_internal].
+    /// Overrides any [PassScope] set by a call to [Self::with_scope].
     ///
     /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
     /// [`Module`]: hugr_core::ops::OpType::Module

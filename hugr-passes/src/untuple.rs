@@ -108,7 +108,7 @@ impl UntuplePass {
 
     /// Sets the parent node to optimize (overwrites any previous setting)
     ///
-    /// If the pass was previously configured by [Self::with_scope_internal] then
+    /// If the pass was previously configured by [Self::with_scope] then
     /// implicitly `[Self::set_recursive]`'s with [PassScope::recursive]
     #[deprecated(note = "Use with_scope instead", since = "0.25.7")]
     #[expect(deprecated)] // Remove along with UntupleRecursive
@@ -129,7 +129,7 @@ impl UntuplePass {
 
     /// Sets whether the pass should traverse the HUGR recursively.
     ///
-    /// If the pass was last configured via [Self::with_scope_internal], overrides that,
+    /// If the pass was last configured via [Self::with_scope], overrides that,
     /// with `set_parent` of default `None`.
     #[must_use]
     #[deprecated(note = "Use with_scope", since = "0.25.7")]
@@ -142,7 +142,7 @@ impl UntuplePass {
 
     /// Find tuple pack operations followed by tuple unpack operations
     /// beneath a specified parent and according to this instance's recursiveness
-    /// ([Self::recursive] or [Self::with_scope_internal] + [PassScope::recursive])
+    /// ([Self::recursive] or [Self::with_scope] + [PassScope::recursive])
     /// and generate rewrites to remove them.
     ///
     /// The returned rewrites are guaranteed to be independent of each other.
