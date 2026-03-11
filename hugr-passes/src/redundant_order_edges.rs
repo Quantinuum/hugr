@@ -74,7 +74,7 @@ impl RedundantOrderEdgesPass {
 
             // If the node has children and we are running recursively, add the children to the region candidates.
             if self.scope.recursive() && hugr.first_child(node).is_some() {
-                region_candidates.push_back(node); // ALAN bugfix? hugr.children(node));
+                region_candidates.extend(hugr.children(node));
             }
 
             let predecessor_edges = predecessor_order_edges.remove(&node).unwrap_or_default();
