@@ -5,7 +5,7 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define private { ptr, { i1, i16 } } @_hl.main.1(ptr %0, i64 %1, i16 %2) {
+define internal { ptr, { i1, i16 } } @_hl.main.1(ptr %0, i64 %1, i16 %2) {
 alloca_block:
   %"0" = alloca ptr, align 8
   %"1" = alloca { i1, i16 }, align 8
