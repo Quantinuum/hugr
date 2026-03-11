@@ -1,5 +1,11 @@
 # Serialization
 
+> [!WARNING]
+> This section refers to the legacy JSON serialization format.
+>
+> HUGRs are now formatted using a separate envelope format backed by `capnproto`.
+> Documentation for the new format is not yet available.
+
 ## Goals
 
 - Fast serialization/deserialization in Rust.
