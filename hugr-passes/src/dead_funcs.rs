@@ -59,13 +59,11 @@ impl<H: HugrMut> ComposablePass<H> for RemoveDeadFuncsPass {
     fn run(&self, hugr: &mut H) -> Result<(), RemoveDeadFuncsError> {
         let mut entry_points = Vec::new();
         match &self.entry_points {
-                // If the entrypoint is the module root, not allowed to touch anything.
-                // Otherwise, we must keep the entrypoint (and can touch only inside it).
-                PassScope::EntrypointFlat | PassScope::EntrypointRecursive
-                // Optimize whole Hugr but keep all functions
-                | PassScope::Global(Preserve::All) => 
-                return Ok(()),
-            
+            // If the entrypoint is the module root, not allowed to touch anything.
+            // Otherwise, we must keep the entrypoint (and can touch only inside it).
+            PassScope::EntrypointFlat | PassScope::EntrypointRecursive
+            // Optimize whole Hugr but keep all functions
+            | PassScope::Global(Preserve::All) => return Ok(()),
             PassScope::Global(Preserve::Entrypoint) if hugr.entrypoint() != hugr.module_root() => {
                 entry_points.push(hugr.entrypoint());
             }
@@ -115,7 +113,6 @@ impl WithScope for RemoveDeadFuncsPass {
 
 #[cfg(test)]
 mod test {
-    
 
     use hugr_core::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use hugr_core::hugr::hugrmut::HugrMut;
