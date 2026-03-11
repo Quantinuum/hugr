@@ -202,9 +202,9 @@ pub enum ExtensionBreakingError {
 /// and extension is registered in the given registry, check that the
 /// version of the extension in the metadata matches the registered version.
 /// Version compatibility is defined by [`compatible_versions`].
-fn check_breaking_extensions(
+fn check_breaking_extensions<'e>(
     registry: &ExtensionRegistry,
-    used_exts: impl IntoIterator<Item = description::ExtensionDesc>,
+    used_exts: impl IntoIterator<Item = &'e description::ExtensionDesc>,
 ) -> Result<(), ExtensionBreakingError> {
     for ext in used_exts {
         let Some(registered) = registry.get(ext.name.as_str()) else {
@@ -215,9 +215,9 @@ fn check_breaking_extensions(
 
             return Err(ExtensionBreakingError::ExtensionVersionMismatch(
                 ExtensionVersionMismatch {
-                    name: ext.name,
+                    name: ext.name.clone(),
                     registered: registered.version().clone(),
-                    used: ext.version,
+                    used: ext.version.clone(),
                 },
             ));
         }
@@ -383,7 +383,7 @@ pub(crate) mod test {
         let Some(used_exts) = desc.used_extensions_generator else {
             return Ok(());
         };
-        check_breaking_extensions(registry, used_exts)
+        check_breaking_extensions(registry, &used_exts)
     }
 
     #[rstest]

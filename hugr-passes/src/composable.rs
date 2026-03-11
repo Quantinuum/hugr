@@ -36,21 +36,8 @@ pub trait ComposablePass<H: HugrMut>: Sized {
     ///
     /// See [`PassScope`] for more details.
     ///
-    /// In `hugr 0.25.*`, this configuration is only a guidance, and may be
-    /// ignored by the pass by using the default implementation.
-    ///
-    /// From `hugr >=0.26.0`, passes must respect the scope configuration.
-    //
-    // For hugr passes, this is tracked by <https://github.com/Quantinuum/hugr/issues/2771>
-    fn with_scope_internal(self, scope: impl Into<PassScope>) -> Self {
-        // Currently passes are not required to respect the scope configuration.
-        // <https://github.com/Quantinuum/hugr/issues/2771>
-        //
-        // deprecated: Remove default implementation in hugr 0.26.0,
-        // ensure all passes follow the scope configuration.
-        let _ = scope;
-        self
-    }
+    /// Since `hugr >=0.26.0`, passes must implement this to respect the scope configuration.
+    fn with_scope_internal(self, scope: impl Into<PassScope>) -> Self;
 
     /// Apply a function to the error type of this pass, returning a new
     /// [`ComposablePass`] that has the same result type.

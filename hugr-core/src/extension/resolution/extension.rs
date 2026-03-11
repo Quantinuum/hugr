@@ -181,9 +181,9 @@ pub(super) fn resolve_opdef_exts(
         used_extensions,
     )?;
 
-    // We ignore the lowering functions in the operation definition.
-    // They may contain an unresolved hugr, but it's the responsibility of the
-    // lowering call to resolve it, is it may use a different set of extensions.
+    // We don't process lowering functions here.
+    // Fixed hugrs as lowering functions are independently loaded and resolved.
+    // Other lowering functions cannot be serialized, so they don't need to be resolved.
 
     Ok(())
 }

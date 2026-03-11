@@ -39,7 +39,7 @@ pyo3 = ["dep:pyo3"]
 workspace = true
 
 [dev-dependencies]
-insta = { workspace = true }
+rstest = { workspace = true }
 pretty_assertions = { workspace = true }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }

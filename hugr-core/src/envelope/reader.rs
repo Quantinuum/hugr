@@ -9,7 +9,7 @@ use crate::envelope::description::{ExtensionDesc, ModuleDesc, PackageDesc};
 use crate::envelope::header::{EnvelopeFormat, HeaderError};
 use crate::envelope::{EnvelopeHeader, ExtensionBreakingError, FormatUnsupportedError};
 use crate::extension::resolution::{ExtensionResolutionError, WeakExtensionRegistry};
-use crate::extension::{Extension, ExtensionRegistry};
+use crate::extension::{Extension, ExtensionRegistry, ExtensionRegistryLoadError};
 use crate::import::{ImportError, import_described_hugr};
 use crate::package::Package;
 
@@ -137,8 +137,8 @@ impl<R: BufRead> EnvelopeReader<R> {
             let desc = desc.get_or_insert_default();
             desc.load_used_extensions_generator(module)
                 .map_err(ExtensionBreakingError::from)?;
-            if let Some(used_exts) = &mut desc.used_extensions_generator {
-                check_breaking_extensions(module.extensions(), used_exts.drain(..))?;
+            if let Some(used_exts) = &desc.used_extensions_generator {
+                check_breaking_extensions(module.extensions(), used_exts)?;
             }
 
             module
@@ -222,7 +222,9 @@ impl<R: BufRead> EnvelopeReader<R> {
                 .into_iter::<Vec<Extension>>()
                 .next()
                 .unwrap_or(Ok(vec![]))?;
-            ExtensionRegistry::new(extra_extensions.into_iter().map(std::sync::Arc::new))
+            let weak_registry: WeakExtensionRegistry = (&self.registry).into();
+            ExtensionRegistry::new_with_extension_resolution(extra_extensions, &weak_registry)
+                .map_err(ExtensionRegistryLoadError::from)?
         } else {
             ExtensionRegistry::new([])
         };
