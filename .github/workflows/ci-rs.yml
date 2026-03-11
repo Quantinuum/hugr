@@ -26,6 +26,7 @@ env:
   HUGR_TEST_SCHEMA: "1"
   # different strings for install action and feature name
   # should match https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
+  LLVM_MAIN_VERSION: "21"
   LLVM_VERSION: "21.1"
   LLVM_FEATURE_NAME: "21-1"
 
@@ -60,9 +61,11 @@ jobs:
       - name: Check formatting
         run: cargo fmt -- --check
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.LLVM_VERSION }}
+        run: |
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
+          sudo apt update
+          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - name: Run clippy
         run: cargo clippy --all-targets --all-features --workspace -- -D warnings
       - name: Build docs
@@ -83,9 +86,11 @@ jobs:
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.LLVM_VERSION }}
+        run: |
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
+          sudo apt update
+          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-codspeed
         run: cargo binstall cargo-codspeed --force
@@ -118,10 +123,6 @@ jobs:
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: taiki-e/install-action@nextest
-      - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.LLVM_VERSION }}
       - name: Build with no features
         run: cargo nextest r --verbose  --no-default-features --no-run
       - name: Tests with no features
@@ -145,21 +146,21 @@ jobs:
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: taiki-e/install-action@nextest
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.LLVM_VERSION }}
+        run: |
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
+          sudo apt update
+          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - name: Build with all features
-        # NOTE: We have temporarily disabled hugr-llvm building in the required tests
-        # since build times went from ~2 mins to ~30 mins after
-        # <https://github.com/Quantinuum/hugr/pull/2901>
-        run: cargo nextest r --verbose --no-run --features "hugr/declarative hugr/persistent_unstable hugr/zstd" --timings
-      - name: Upload timings
-        uses: actions/upload-artifact@v7
-        with:
-          name: timings-stable-all-features
-          path: target/cargo-timings/cargo-timing.html
+        run: cargo nextest r --verbose --no-run --all-features
       - name: Tests with all features
-        run: cargo nextest r --verbose --features "hugr/declarative hugr/persistent_unstable hugr/zstd"
+        run: cargo nextest r --verbose --all-features
+      - name: Build hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
+      - name: Tests hugr-llvm
+        if: ${{ needs.changes.outputs.llvm == 'true'}}
+        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
@@ -192,9 +193,11 @@ jobs:
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: taiki-e/install-action@nextest
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.LLVM_VERSION }}
+        run: |
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
+          sudo apt update
+          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - name: Build with no features
         run: cargo nextest r --verbose  --no-default-features --no-run
       - name: Tests with no features
@@ -232,9 +235,11 @@ jobs:
       - name: Configure default rust toolchain
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.LLVM_VERSION }}
+        run: |
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
+          sudo apt update
+          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - uses: cargo-bins/cargo-binstall@main
       - name: Install cargo-minimal-versions
         run: |
@@ -338,9 +343,11 @@ jobs:
           toolchain: "nightly"
           components: llvm-tools-preview
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.LLVM_VERSION }}
+        run: |
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
+          sudo apt update
+          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
       - name: Install nextest

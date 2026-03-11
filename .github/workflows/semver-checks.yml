@@ -4,6 +4,11 @@ on:
     branches:
       - "**"
 
+env:
+  LLVM_MAIN_VERSION: "21"
+  LLVM_VERSION: "21.1"
+  LLVM_FEATURE_NAME: "21-1"
+
 jobs:
   # Check if changes were made to the relevant files.
   # Always returns true if running on the default branch, to ensure all changes are thoroughly checked.
@@ -27,12 +32,12 @@ jobs:
     env:
       GITHUB_TOKEN: ${{ secrets.HUGRBOT_PAT }}
     steps:
-      # once llvm-21 is packaged on apt, we could just download it using 'apt-dependencies'
-      # in the step below
-      - name: Install LLVM
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: "21.1"
+      - name: Install LLVM and Clang
+        run: |
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
+          sudo apt update
+          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - name: Run Rust checks
         uses: quantinuum/hugrverse-actions/rs-semver-checks@main
         with:
