@@ -56,7 +56,7 @@ impl<V: AbstractValue, N: PartialEq + PartialOrd> Lattice for ValueRow<V, N> {
     fn join_mut(&mut self, other: Self) -> bool {
         assert_eq!(self.0.len(), other.0.len());
         let mut changed = false;
-        for (v1, v2) in zip_eq(self.0.iter_mut(), other.0.into_iter()) {
+        for (v1, v2) in zip_eq(self.0.iter_mut(), other.0) {
             changed |= v1.join_mut(v2);
         }
         changed
@@ -65,7 +65,7 @@ impl<V: AbstractValue, N: PartialEq + PartialOrd> Lattice for ValueRow<V, N> {
     fn meet_mut(&mut self, other: Self) -> bool {
         assert_eq!(self.0.len(), other.0.len());
         let mut changed = false;
-        for (v1, v2) in zip_eq(self.0.iter_mut(), other.0.into_iter()) {
+        for (v1, v2) in zip_eq(self.0.iter_mut(), other.0) {
             changed |= v1.meet_mut(v2);
         }
         changed

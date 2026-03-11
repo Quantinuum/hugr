@@ -117,7 +117,7 @@ impl<V: AbstractValue, N: PartialEq + PartialOrd> PartialSum<V, N> {
 
         for (k, v) in other.0 {
             if let Some(row) = self.0.get_mut(&k) {
-                for (lhs, rhs) in zip_eq(row.iter_mut(), v.into_iter()) {
+                for (lhs, rhs) in zip_eq(row.iter_mut(), v) {
                     changed |= lhs.join_mut(rhs);
                 }
             } else {
@@ -153,7 +153,7 @@ impl<V: AbstractValue, N: PartialEq + PartialOrd> PartialSum<V, N> {
         }
         for (k, v) in other.0 {
             if let Some(row) = self.0.get_mut(&k) {
-                for (lhs, rhs) in zip_eq(row.iter_mut(), v.into_iter()) {
+                for (lhs, rhs) in zip_eq(row.iter_mut(), v) {
                     changed |= lhs.meet_mut(rhs);
                 }
             } else {

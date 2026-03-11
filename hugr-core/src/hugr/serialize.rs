@@ -126,7 +126,7 @@ pub enum HUGRSerializationError {
         /// The direction of the port without an offset
         dir: Direction,
         /// The operation type of the node.
-        op_type: OpType,
+        op_type: Box<OpType>,
     },
     /// Edges with wrong node indices
     #[error("The edge endpoint {node} is not a node in the graph.")]
@@ -285,8 +285,6 @@ impl TryFrom<SerHugrLatest> for Hugr {
             }
         }
 
-        // TODO: Change to `expect` if updating the MSRV above 1.94
-        #[allow(clippy::result_large_err)]
         let unwrap_offset = |node: Node, offset, dir, hugr: &Hugr| -> Result<usize, Self::Error> {
             if !hugr.graph.contains_node(node.into_portgraph()) {
                 return Err(HUGRSerializationError::UnknownEdgeNode { node });
@@ -300,7 +298,7 @@ impl TryFrom<SerHugrLatest> for Hugr {
                     .ok_or(HUGRSerializationError::MissingPortOffset {
                         node,
                         dir,
-                        op_type: op_type.clone(),
+                        op_type: Box::new(op_type.clone()),
                     })?
                     .index()
             };

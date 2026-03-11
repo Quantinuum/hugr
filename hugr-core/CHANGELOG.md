@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.25.7](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.6...hugr-core-v0.25.7) - 2026-03-06
+
+### Documentation
+
+- added examples in docs srtring ([#2920](https://github.com/Quantinuum/hugr/pull/2920))
+
 ## [0.25.6](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.5...hugr-core-v0.25.6) - 2026-02-20
 
 ### Bug Fixes

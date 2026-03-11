@@ -1,0 +1,30 @@
+---
+source: hugr-llvm/src/extension/collections/array.rs
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define private { ptr, i64 } @_hl.main.1() {
+alloca_block:
+  %"0" = alloca { ptr, i64 }, align 8
+  %"5_0" = alloca { ptr, i64 }, align 8
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %0 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)
+  %1 = call ptr @malloc(i64 %0)
+  %2 = insertvalue { ptr, i64 } poison, ptr %1, 0
+  %3 = insertvalue { ptr, i64 } %2, i64 0, 1
+  %4 = getelementptr inbounds i64, ptr %1, i32 0
+  store i64 1, ptr %4, align 4
+  %5 = getelementptr inbounds i64, ptr %1, i32 1
+  store i64 2, ptr %5, align 4
+  store { ptr, i64 } %3, ptr %"5_0", align 8
+  %"5_01" = load { ptr, i64 }, ptr %"5_0", align 8
+  store { ptr, i64 } %"5_01", ptr %"0", align 8
+  %"02" = load { ptr, i64 }, ptr %"0", align 8
+  ret { ptr, i64 } %"02"
+}
+
+declare ptr @malloc(i64)

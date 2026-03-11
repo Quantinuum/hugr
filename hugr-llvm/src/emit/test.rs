@@ -11,10 +11,9 @@ use hugr_core::extension::ExtensionRegistry;
 use hugr_core::ops::handle::FuncID;
 use hugr_core::types::TypeRow;
 use hugr_core::{Hugr, HugrView, Node};
-use inkwell::AddressSpace;
 use inkwell::module::{Linkage, Module};
 use inkwell::passes::PassManager;
-use inkwell::values::{BasicValueEnum, GenericValue, GlobalValue, PointerValue};
+use inkwell::values::{BasicValueEnum, GlobalValue, PointerValue};
 
 use super::EmitHugr;
 
@@ -73,29 +72,8 @@ impl<'c> Emission<'c> {
 
     /// JIT and execute the function named `entry` in the inner module.
     ///
-    /// That function must take no arguments and return an `i64`.
-    pub fn exec_u64(&self, entry: impl AsRef<str>) -> Result<u64> {
-        let gv = self.exec_impl(entry)?;
-        Ok(gv.as_int(false))
-    }
-
-    /// JIT and execute the function named `entry` in the inner module.
-    ///
-    /// That function must take no arguments and return an `i64`.
-    pub fn exec_i64(&self, entry: impl AsRef<str>) -> Result<i64> {
-        let gv = self.exec_impl(entry)?;
-        Ok(gv.as_int(true) as i64)
-    }
-
-    /// JIT and execute the function named `entry` in the inner module.
-    ///
-    /// That function must take no arguments and return an `f64`.
-    pub fn exec_f64(&self, entry: impl AsRef<str>) -> Result<f64> {
-        let gv = self.exec_impl(entry)?;
-        Ok(gv.as_float(&self.module.get_context().f64_type()))
-    }
-
-    pub(crate) fn exec_impl(&self, entry: impl AsRef<str>) -> Result<GenericValue<'c>> {
+    /// The function must take no arguments and return FFI-compatible type `T`.
+    pub(crate) fn jit_exec<T>(&self, entry: impl AsRef<str>) -> Result<T> {
         let entry_fv = self
             .module
             .get_function(entry.as_ref())
@@ -107,8 +85,17 @@ impl<'c> Emission<'c> {
             .module
             .create_jit_execution_engine(inkwell::OptimizationLevel::None)
             .map_err(|err| anyhow!("Failed to create execution engine: {err}"))?;
-        let fv = ee.get_function_value(entry.as_ref())?;
-        Ok(unsafe { ee.run_function(fv, &[]) })
+        //let fv = ee.get_function_value(entry.as_ref())?;
+        //Ok(unsafe { ee.run_function(fv, &[]) })
+        //
+        // Above is the old approach to calling the JITed function.  After upgrading to
+        // LLVM 21, a *single function* (remainder of test_divmod_s::bidgiv_negative)
+        // returns an incorrect value (UINT64_MAX instead of 213) using that approach.
+        // Calling via raw fn pointer, as below, works for all cases.
+        unsafe {
+            let func: unsafe extern "C" fn() -> T = ee.get_function(entry.as_ref())?.into_raw();
+            Ok(func())
+        }
     }
 
     /// JIT and execute the function named `entry` in the inner module.
@@ -250,19 +237,14 @@ fn alloc_shared_buffer(name: &str, size: usize, module: &Module, ee: &ExecutionE
     buf
 }
 
-/// Builds an `i8*` [`PointerValue`] to a global buffer with the given name.
+/// Builds a [`PointerValue`] to a global buffer with the given name.
 fn get_buffer_ptr<'c, H: HugrView<Node = Node>>(
     name: &str,
     size: usize,
     ctx: &mut EmitFuncContext<'c, '_, H>,
 ) -> Result<PointerValue<'c>> {
     let global = get_global_buffer(name, size, ctx.get_current_module());
-    let ptr = ctx.builder().build_bit_cast(
-        global.as_pointer_value(),
-        ctx.iw_context().i8_type().ptr_type(AddressSpace::default()),
-        "",
-    )?;
-    Ok(ptr.into_pointer_value())
+    Ok(global.as_pointer_value())
 }
 
 /// Prelude codegen that exits the current thread on panic instead of aborting.
@@ -277,14 +259,9 @@ impl PreludeCodegen for PanicTestPreludeCodegen {
     ) -> Result<()> {
         // Emit a `panic_exit(jmp_buf, msg_buf, msg, msg_buf_len)` runtime call
         let usize_ty = self.usize_type(&ctx.typing_session());
-        let i8_ptr_ty = ctx.iw_context().i8_type().ptr_type(AddressSpace::default());
+        let ptr_ty = ctx.llvm_ptr_type();
         let sig = ctx.iw_context().void_type().fn_type(
-            &[
-                i8_ptr_ty.into(),
-                i8_ptr_ty.into(),
-                i8_ptr_ty.into(),
-                usize_ty.into(),
-            ],
+            &[ptr_ty.into(), ptr_ty.into(), ptr_ty.into(), usize_ty.into()],
             false,
         );
         let panic_exit = ctx.get_extern_func(PANIC_EXIT, sig)?;
@@ -354,11 +331,33 @@ macro_rules! check_emission {
 
         emission.verify().unwrap();
 
-        emission.opt(|| {
-            let pb = $crate::emit::test::inkwell::passes::PassManager::create(());
-            pb.add_promote_memory_to_register_pass();
-            pb
-        });
+        // Initialize LLVM targets
+        use $crate::emit::test::inkwell::targets::*;
+        Target::initialize_native(&InitializationConfig::default())
+            .expect("Failed to initialize native target");
+
+        let triple = TargetMachine::get_default_triple();
+        let target = Target::from_triple(&triple).unwrap();
+        let machine = target
+            .create_target_machine(
+                &triple,
+                &TargetMachine::get_host_cpu_name().to_str().unwrap(),
+                &TargetMachine::get_host_cpu_features().to_str().unwrap(),
+                $crate::emit::test::inkwell::OptimizationLevel::Default,
+                RelocMode::Default,
+                CodeModel::Default,
+            )
+            .unwrap();
+
+        // TODO: use new pass manager when available in inkwell
+        emission
+            .module()
+            .run_passes(
+                "mem2reg",
+                &machine,
+                $crate::emit::test::inkwell::passes::PassBuilderOptions::create(),
+            )
+            .unwrap();
 
         let mod_str = emission.module().to_string();
         if $snapshot_name == "" {

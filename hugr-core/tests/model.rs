@@ -106,7 +106,7 @@ fn simple_dfg_hugr() -> Hugr {
 }
 
 #[rstest]
-#[case(EnvelopeFormat::ModelTextWithExtensions)]
+#[case(EnvelopeFormat::SExpressionWithExtensions)]
 #[case(EnvelopeFormat::ModelWithExtensions)]
 fn import_package_with_extensions(#[case] format: EnvelopeFormat, simple_dfg_hugr: Hugr) {
     let ext = Extension::new_arc(

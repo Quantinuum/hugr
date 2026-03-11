@@ -351,6 +351,10 @@ class Extension:
             _, sig_result = poly_func._resolve_used_extensions(registry)
             result.extend(sig_result)
 
+            for lower_func in op_def.lower_funcs:
+                lower_result = lower_func.hugr.used_extensions(registry)
+                result.extend(lower_result)
+
         return result
 
     @dataclass

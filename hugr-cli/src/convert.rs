@@ -75,9 +75,9 @@ impl ConvertArgs {
                     "json" => EnvelopeFormat::PackageJson,
                     "model" => EnvelopeFormat::Model,
                     "model-exts" => EnvelopeFormat::ModelWithExtensions,
-                    "model-text" | "s-expression" => EnvelopeFormat::ModelText,
+                    "model-text" | "s-expression" => EnvelopeFormat::SExpression,
                     "model-text-exts" | "s-expression-exts" => {
-                        EnvelopeFormat::ModelTextWithExtensions
+                        EnvelopeFormat::SExpressionWithExtensions
                     }
                     _ => Err(CliError::InvalidFormat(fmt.clone()))?,
                 },
