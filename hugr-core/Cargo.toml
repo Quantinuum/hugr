@@ -71,7 +71,9 @@ schemars = { workspace = true, features = ["derive"] }
 rstest = { workspace = true }
 cool_asserts = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
-jsonschema = { workspace = true }
+jsonschema = { workspace = true, default-features = false, features = [
+    "resolve-file",
+] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 

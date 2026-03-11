@@ -11,6 +11,10 @@ on:
     types: [checks_requested]
   workflow_dispatch: {}
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
@@ -145,21 +149,17 @@ jobs:
         with:
           version: ${{ env.LLVM_VERSION }}
       - name: Build with all features
-        run: cargo nextest r --verbose  --all-features --no-run
+        # NOTE: We have temporarily disabled hugr-llvm building in the required tests
+        # since build times went from ~2 mins to ~30 mins after
+        # <https://github.com/Quantinuum/hugr/pull/2901>
+        run: cargo nextest r --verbose --no-run --features "hugr/declarative hugr/persistent_unstable hugr/zstd" --timings
+      - name: Upload timings
+        uses: actions/upload-artifact@v7
+        with:
+          name: timings-stable-all-features
+          path: target/cargo-timings/cargo-timing.html
       - name: Tests with all features
-        run: cargo nextest r --verbose  --all-features
-      - name: Build hugr-llvm
-        if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
-      - name: Tests hugr-llvm
-        if: ${{ needs.changes.outputs.llvm == 'true'}}
-        run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }}
-      - name: Build hugr-persistent
-        if: ${{ needs.changes.outputs.rust == 'true'}}
-        run: cargo nextest r -p hugr-persistent --verbose --no-run
-      - name: Tests hugr-persistent
-        if: ${{ needs.changes.outputs.rust == 'true'}}
-        run: cargo nextest r -p hugr-persistent --verbose
+        run: cargo nextest r --verbose --features "hugr/declarative hugr/persistent_unstable hugr/zstd"
       - name: Build HUGR binary
         run: cargo build -p hugr-cli
       - name: Upload the binary to the artifacts
