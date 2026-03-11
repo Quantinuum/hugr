@@ -85,16 +85,6 @@ impl<H: HugrMut> ComposablePass<H> for LocalizeEdges {
     }
 }
 
-/// Returns an iterator over all non local edges in a Hugr beneath the entrypoint.
-///
-/// All `(node, in_port)` pairs are returned where `in_port` is a value port connected to a
-/// node whose parent is both beneath the entrypoint and different from the parent of `node`.
-pub fn nonlocal_edges<'a, H: HugrView>(
-    hugr: &'a H,
-) -> impl Iterator<Item = (H::Node, IncomingPort)> + 'a {
-    LocalizeEdges::new_for_hugr(hugr).nonlocal_edges(hugr)
-}
-
 /// An error from [ensure_no_nonlocal_edges]
 #[derive(Clone, derive_more::Error, derive_more::Display, Debug, PartialEq, Eq)]
 #[non_exhaustive]
