@@ -27,9 +27,6 @@ pub use composable::{ComposablePass, InScope, PassScope};
 
 // Pass re-exports
 pub use dead_code::DeadCodeElimPass;
-#[deprecated(note = "Use RemoveDeadFuncsPass instead", since = "0.25.7")]
-#[expect(deprecated)] // Remove together
-pub use dead_funcs::remove_dead_funcs;
 pub use dead_funcs::{RemoveDeadFuncsError, RemoveDeadFuncsPass};
 pub use force_order::{force_order, force_order_by_key};
 pub use inline_funcs::inline_acyclic;

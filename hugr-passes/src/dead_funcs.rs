@@ -8,12 +8,10 @@ use hugr_core::{
     module_graph::{ModuleGraph, StaticNode},
     ops::{OpTag, OpTrait},
 };
-use itertools::Either;
 use petgraph::visit::{Dfs, Walker};
 
-use crate::composable::{
-    ComposablePass, PassScope, Preserve, ValidatePassError, WithScope, validate_if_test,
-};
+use crate::composable::{Preserve, WithScope};
+use crate::{ComposablePass, PassScope};
 
 #[derive(Debug, thiserror::Error)]
 #[non_exhaustive]
@@ -48,76 +46,30 @@ fn reachable_funcs<'a, H: HugrView>(
     })
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 /// A configuration for the Dead Function Removal pass.
 pub struct RemoveDeadFuncsPass {
-    entry_points: Either<Vec<Node>, PassScope>,
+    entry_points: PassScope,
 }
 
-impl Default for RemoveDeadFuncsPass {
-    fn default() -> Self {
-        Self {
-            entry_points: Either::Left(Vec::new()),
-        }
-    }
-}
-
-impl RemoveDeadFuncsPass {
-    #[deprecated(note = "Use RemoveDeadFuncsPass::with_scope", since = "0.25.7")]
-    /// Adds new entry points - these must be [`FuncDefn`] nodes
-    /// that are children of the [`Module`] at the root of the Hugr.
-    ///
-    /// Overrides any [PassScope] set by a call to [Self::with_scope].
-    ///
-    /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
-    /// [`Module`]: hugr_core::ops::OpType::Module
-    pub fn with_module_entry_points(
-        mut self,
-        entry_points: impl IntoIterator<Item = Node>,
-    ) -> Self {
-        let v = match self.entry_points {
-            Either::Left(ref mut v) => v,
-            Either::Right(_) => {
-                self.entry_points = Either::Left(Vec::new());
-                self.entry_points.as_mut().unwrap_left()
-            }
-        };
-        v.extend(entry_points);
-        self
-    }
-}
-
-impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
+impl<H: HugrMut> ComposablePass<H> for RemoveDeadFuncsPass {
     type Error = RemoveDeadFuncsError;
     type Result = ();
 
     fn run(&self, hugr: &mut H) -> Result<(), RemoveDeadFuncsError> {
         let mut entry_points = Vec::new();
         match &self.entry_points {
-            Either::Left(ep) => {
-                for &n in ep {
-                    if !hugr.get_optype(n).is_func_defn() {
-                        return Err(RemoveDeadFuncsError::InvalidEntryPoint { node: n });
-                    }
-                    debug_assert_eq!(hugr.get_parent(n), Some(hugr.module_root()));
-                    entry_points.push(n);
-                }
-                if hugr.entrypoint() != hugr.module_root() {
-                    entry_points.push(hugr.entrypoint())
-                }
-            }
-            Either::Right(
                 // If the entrypoint is the module root, not allowed to touch anything.
                 // Otherwise, we must keep the entrypoint (and can touch only inside it).
                 PassScope::EntrypointFlat | PassScope::EntrypointRecursive
                 // Optimize whole Hugr but keep all functions
-                | PassScope::Global(Preserve::All)) => {
-                return Ok(());
-            }
-            Either::Right(PassScope::Global(Preserve::Entrypoint)) if hugr.entrypoint() != hugr.module_root() => {
+                | PassScope::Global(Preserve::All) => 
+                return Ok(()),
+            
+            PassScope::Global(Preserve::Entrypoint) if hugr.entrypoint() != hugr.module_root() => {
                 entry_points.push(hugr.entrypoint());
             }
-            Either::Right(PassScope::Global(_)) => {
+            PassScope::Global(_) => {
                 for n in hugr.children(hugr.module_root()) {
                     if hugr.get_optype(n).as_func_defn().is_some_and(|fd| fd.visibility() == &Visibility::Public)
                     {
@@ -156,39 +108,14 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
 
 impl WithScope for RemoveDeadFuncsPass {
     fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
-        self.entry_points = Either::Right(scope.into());
+        self.entry_points = scope.into();
         self
     }
 }
 
-/// Deletes from the Hugr any functions that are not used by either `Call` or
-/// `LoadFunction` nodes in reachable parts.
-///
-/// `entry_points` may provide a list of entry points, which must be [`FuncDefn`]s (children of the root).
-/// The [HugrView::entrypoint] will also be used unless it is the [HugrView::module_root].
-/// Note that for a [`Module`]-rooted Hugr with no `entry_points` provided, this will remove
-/// all functions from the module.
-///
-/// # Errors
-/// * If any node in `entry_points` is not a [`FuncDefn`]
-///
-/// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
-/// [`Module`]: hugr_core::ops::OpType::Module
-#[deprecated(note = "Use RemoveDeadFuncsPass with a PassScope", since = "0.25.7")]
-#[expect(deprecated)]
-pub fn remove_dead_funcs(
-    h: &mut impl HugrMut<Node = Node>,
-    entry_points: impl IntoIterator<Item = Node>,
-) -> Result<(), ValidatePassError<Node, RemoveDeadFuncsError>> {
-    validate_if_test(
-        RemoveDeadFuncsPass::default().with_module_entry_points(entry_points),
-        h,
-    )
-}
-
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
+    
 
     use hugr_core::builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder};
     use hugr_core::hugr::hugrmut::HugrMut;
@@ -238,53 +165,6 @@ mod test {
             h.set_entrypoint(dfg.node());
         }
         h
-    }
-
-    #[rstest]
-    #[case(false, [], vec![])] // No entry_points removes everything!
-    #[case(true, [], vec!["from_main", "main"])]
-    #[case(false, ["main"], vec!["from_main", "main"])]
-    #[case(false, ["from_main"], vec!["from_main"])]
-    #[case(false, ["pubfunc"], vec!["from_pub", "pubfunc"])]
-    #[case(true, ["from_pub"], vec!["from_main", "from_pub", "main"])]
-    #[case(false, ["from_pub", "pubfunc"], vec!["from_pub", "pubfunc"])]
-    fn remove_dead_funcs_entry_points(
-        #[case] use_hugr_entrypoint: bool,
-        #[case] entry_points: impl IntoIterator<Item = &'static str>,
-        #[case] retained_funcs: Vec<&'static str>,
-    ) -> Result<(), Box<dyn std::error::Error>> {
-        let mut hugr = hugr(use_hugr_entrypoint);
-
-        let avail_funcs = hugr
-            .children(hugr.module_root())
-            .filter_map(|n| {
-                hugr.get_optype(n)
-                    .as_func_defn()
-                    .map(|fd| (fd.func_name().clone(), n))
-            })
-            .collect::<HashMap<_, _>>();
-
-        #[expect(deprecated)]
-        super::remove_dead_funcs(
-            &mut hugr,
-            entry_points
-                .into_iter()
-                .map(|name| *avail_funcs.get(name).unwrap())
-                .collect::<Vec<_>>(),
-        )
-        .unwrap();
-
-        let remaining_funcs = hugr
-            .nodes()
-            .filter_map(|n| {
-                hugr.get_optype(n)
-                    .as_func_defn()
-                    .map(|fd| fd.func_name().as_str())
-            })
-            .sorted()
-            .collect_vec();
-        assert_eq!(remaining_funcs, retained_funcs);
-        Ok(())
     }
 
     #[rstest]
