@@ -716,7 +716,7 @@ mod test {
             .into_owned()
             .try_into()
             .unwrap();
-        let mut h = CFGBuilder::new(inout_sig(qb_t(), res_t.clone()))?;
+        let mut h = CFGBuilder::new(inout_sig([qb_t()], [res_t.clone()]))?;
         let mut bb1 = h.simple_entry_builder(vec![usize_t(), qb_t()].into(), 1)?;
         let [inw] = bb1.input_wires_arr();
         let load_cst = bb1.add_load_value(ConstUsize::new(1));
@@ -735,7 +735,7 @@ mod test {
         let mut bb3 = h.block_builder(
             vec![qb_t(), usize_t()].into(),
             vec![type_row![]],
-            res_t.clone().into(),
+            [res_t.clone()].into(),
         )?;
         let [q, u] = bb3.input_wires_arr();
         let tst = bb3.add_dataflow_op(tst_op, [q, u])?;
@@ -794,7 +794,7 @@ mod test {
         let exit_types: TypeRow = vec![usize_t()].into();
         let e = extension();
         let tst_op = e.instantiate_extension_op("Test", [])?;
-        let mut h = CFGBuilder::new(inout_sig(qb_t(), usize_t()))?;
+        let mut h = CFGBuilder::new(inout_sig([qb_t()], [usize_t()]))?;
         let mut nop_b = h.simple_entry_builder(loop_variants.clone(), 1)?;
         let n = nop_b.add_dataflow_op(Noop::new(qb_t()), nop_b.input_wires())?;
         let br = nop_b.add_load_value(Value::unary_unit_sum());
@@ -930,7 +930,7 @@ mod test {
         let qq = TypeRow::from(vec![qb_t(); 2]);
         let mut outer = CFGBuilder::new(inout_sig(qqu.clone(), vec![usize_t(), qb_t()])).unwrap();
         let mut entry = outer
-            .entry_builder(vec![qq.clone()], usize_t().into())
+            .entry_builder(vec![qq.clone()], [usize_t()].into())
             .unwrap();
         let [q1, q2, u] = entry.input_wires_arr();
         let (inner, inner_pred) = {
@@ -957,7 +957,7 @@ mod test {
         let loop_b = {
             let qu = [qb_t(), usize_t()];
             let mut loop_b = outer
-                .block_builder(qqu, qu.clone().map(TypeRow::from), Vec::from(qu).into())
+                .block_builder(qqu, qu.clone().map(|t| [t].into()), qu.into())
                 .unwrap();
             let [q1, q2, u_local] = loop_b.input_wires_arr();
             // u here is `dom` edge from entry block

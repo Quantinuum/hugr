@@ -182,7 +182,7 @@ mod test {
     #[test]
     fn ensures_no_nonlocal_edges() {
         let hugr = {
-            let mut builder = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
+            let mut builder = DFGBuilder::new(Signature::new_endo([bool_t()])).unwrap();
             let [in_w] = builder.input_wires_arr();
             let [out_w] = builder
                 .add_dataflow_op(Noop::new(bool_t()), [in_w])
@@ -198,11 +198,11 @@ mod test {
     #[test]
     fn find_nonlocal_edges() {
         let (hugr, edge) = {
-            let mut builder = DFGBuilder::new(Signature::new_endo(bool_t())).unwrap();
+            let mut builder = DFGBuilder::new(Signature::new_endo([bool_t()])).unwrap();
             let [in_w] = builder.input_wires_arr();
             let ([out_w], edge) = {
                 let mut dfg_builder = builder
-                    .dfg_builder(Signature::new(type_row![], bool_t()), [])
+                    .dfg_builder(Signature::new(type_row![], [bool_t()]), [])
                     .unwrap();
                 let noop = dfg_builder
                     .add_dataflow_op(Noop::new(bool_t()), [in_w])
@@ -258,12 +258,8 @@ mod test {
     fn localize_tailloop() {
         let (t1, t2, t3) = (Type::UNIT, bool_t(), Type::new_unit_sum(3));
         let mut hugr = {
-            let mut outer = DFGBuilder::new(Signature::new_endo(vec![
-                t1.clone(),
-                t2.clone(),
-                t3.clone(),
-            ]))
-            .unwrap();
+            let mut outer =
+                DFGBuilder::new(Signature::new_endo([t1.clone(), t2.clone(), t3.clone()])).unwrap();
             let [s1, s2, s3] = outer.input_wires_arr();
             let [s2, s3] = {
                 let mut inner = outer
@@ -301,18 +297,18 @@ mod test {
     #[test]
     fn localize_conditional() {
         let (t1, t2, t3) = (Type::UNIT, bool_t(), Type::new_unit_sum(3));
-        let out_variants = vec![t1.clone().into(), t2.clone().into()];
+        let out_variants = vec![[t1.clone()].into(), [t2.clone()].into()];
         let out_type = Type::new_sum(out_variants.clone());
         let mut hugr = {
             let mut outer = DFGBuilder::new(Signature::new(
-                vec![t1.clone(), t2.clone(), t3.clone()],
-                out_type.clone(),
+                [t1.clone(), t2.clone(), t3.clone()],
+                [out_type.clone()],
             ))
             .unwrap();
             let [s1, s2, s3] = outer.input_wires_arr();
             let [out] = {
                 let mut cond = outer
-                    .conditional_builder((vec![type_row![]; 3], s3), [], out_type.into())
+                    .conditional_builder((vec![type_row![]; 3], s3), [], [out_type].into())
                     .unwrap();
 
                 {
@@ -367,7 +363,7 @@ mod test {
         // sums.
         //
         // All branches have an other-output.
-        let branch_sum_type = either_type(Type::UNIT, Type::UNIT);
+        let branch_sum_type = either_type([Type::UNIT], [Type::UNIT]);
         let branch_type = Type::from(branch_sum_type.clone());
         let branch_variants = branch_sum_type
             .variants()
@@ -392,7 +388,7 @@ mod test {
 
         let (entry, src_dom) = {
             let mut entry = cfg
-                .entry_builder(branch_variants.clone(), other_output_type.clone().into())
+                .entry_builder(branch_variants.clone(), [other_output_type.clone()].into())
                 .unwrap();
             let [_, b] = entry.input_wires_arr();
 
@@ -407,7 +403,7 @@ mod test {
                 .block_builder(
                     vec![Type::UNIT, other_output_type.clone()].into(),
                     [type_row![]],
-                    other_output_type.clone().into(),
+                    [other_output_type.clone()].into(),
                 )
                 .unwrap();
             let [unit, oo] = bb.input_wires_arr();
@@ -430,7 +426,7 @@ mod test {
                 .block_builder(
                     vec![Type::UNIT, other_output_type.clone()].into(),
                     [type_row![]],
-                    other_output_type.clone().into(),
+                    [other_output_type.clone()].into(),
                 )
                 .unwrap();
             let [_b, oo] = bb.input_wires_arr();
@@ -441,9 +437,9 @@ mod test {
         let bb_bottom = {
             let bb = cfg
                 .block_builder(
-                    branch_type.clone().into(),
+                    [branch_type.clone()].into(),
                     branch_variants,
-                    other_output_type.clone().into(),
+                    [other_output_type.clone()].into(),
                 )
                 .unwrap();
             let [oo] = bb.input_wires_arr();

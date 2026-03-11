@@ -48,7 +48,7 @@ const FLOAT_EXT_FILE: &str = concat!(
 fn test_package(#[default(bool_t())] id_type: Type) -> Package {
     let mut module = ModuleBuilder::new();
     let df = module
-        .define_function("test", Signature::new_endo(id_type))
+        .define_function("test", Signature::new_endo([id_type]))
         .unwrap();
     let [i] = df.input_wires_arr();
     df.finish_with_outputs([i]).unwrap();
@@ -117,7 +117,7 @@ fn test_mermaid(test_envelope_file: NamedTempFile, mut cmd: Command) {
 
 #[fixture]
 fn bad_hugr_string() -> String {
-    let df = DFGBuilder::new(Signature::new_endo(vec![qb_t()])).unwrap();
+    let df = DFGBuilder::new(Signature::new_endo([qb_t()])).unwrap();
     let bad_hugr = df.hugr().clone();
 
     bad_hugr.store_str(EnvelopeConfig::text()).unwrap()
@@ -214,7 +214,7 @@ fn test_package_validation(package_string: String, mut val_cmd: Command) {
 #[fixture]
 fn invalid_hugr_with_generator() -> Vec<u8> {
     // Create an invalid HUGR (missing outputs in a dataflow)
-    let df = DFGBuilder::new(Signature::new_endo(vec![qb_t()])).unwrap();
+    let df = DFGBuilder::new(Signature::new_endo([qb_t()])).unwrap();
     let mut bad_hugr = df.hugr().clone(); // Missing outputs makes this invalid
     bad_hugr.set_metadata::<metadata::HugrGenerator>(
         bad_hugr.module_root(),

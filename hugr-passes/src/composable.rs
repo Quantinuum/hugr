@@ -330,6 +330,7 @@ pub(crate) fn validate_if_test<P: ComposablePass<H>, H: HugrMut>(
 #[cfg(test)]
 pub(crate) mod test {
     use hugr_core::ops::Value;
+    use hugr_core::ops::dataflow::IOTrait;
     use itertools::{Either, Itertools};
 
     use hugr_core::builder::{
@@ -361,12 +362,12 @@ pub(crate) mod test {
     fn test_then() {
         let mut mb = ModuleBuilder::new();
         let id1 = mb
-            .define_function("id1", Signature::new_endo(usize_t()))
+            .define_function("id1", Signature::new_endo([usize_t()]))
             .unwrap();
         let inps = id1.input_wires();
         let id1 = id1.finish_with_outputs(inps).unwrap();
         let id2 = mb
-            .define_function("id2", Signature::new_endo(usize_t()))
+            .define_function("id2", Signature::new_endo([usize_t()]))
             .unwrap();
         let inps = id2.input_wires();
         let id2 = id2.finish_with_outputs(inps).unwrap();
@@ -416,21 +417,11 @@ pub(crate) mod test {
     #[test]
     fn test_validation() {
         let mut h = Hugr::new_with_entrypoint(DFG {
-            signature: Signature::new(usize_t(), bool_t()),
+            signature: Signature::new([usize_t()], [bool_t()]),
         })
         .unwrap();
-        let inp = h.add_node_with_parent(
-            h.entrypoint(),
-            Input {
-                types: usize_t().into(),
-            },
-        );
-        let outp = h.add_node_with_parent(
-            h.entrypoint(),
-            Output {
-                types: bool_t().into(),
-            },
-        );
+        let inp = h.add_node_with_parent(h.entrypoint(), Input::new([usize_t()]));
+        let outp = h.add_node_with_parent(h.entrypoint(), Output::new([bool_t()]));
         h.connect(inp, 0, outp, 0);
         let backup = h.clone();
         let err = backup.validate().unwrap_err();

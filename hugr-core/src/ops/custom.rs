@@ -406,7 +406,7 @@ mod test {
 
     #[test]
     fn new_opaque_op() {
-        let sig = Signature::new_endo(vec![qb_t()]);
+        let sig = Signature::new_endo([qb_t()]);
         let op = OpaqueOp::new(
             "res".try_into().unwrap(),
             "op",
@@ -436,7 +436,7 @@ mod test {
             conversions::EXTENSION_ID,
             "itobool",
             vec![],
-            Signature::new(i0.clone(), bool_t()),
+            Signature::new([i0.clone()], [bool_t()]),
         );
         let mut resolved = opaque.into();
         resolve_op_extensions(
@@ -452,7 +452,7 @@ mod test {
     fn resolve_missing() {
         let val_name = "missing_val";
         let comp_name = "missing_comp";
-        let endo_sig = Signature::new_endo(bool_t());
+        let endo_sig = Signature::new_endo([bool_t()]);
 
         let ext = Extension::new_test_arc("ext".try_into().unwrap(), |ext, extension_ref| {
             ext.add_op(

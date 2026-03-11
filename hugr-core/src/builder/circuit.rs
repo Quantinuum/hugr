@@ -345,7 +345,7 @@ mod test {
 
     #[test]
     fn ancillae() {
-        let build_res = build_main(Signature::new_endo(qb_t()).into(), |mut f_build| {
+        let build_res = build_main(Signature::new_endo([qb_t()]).into(), |mut f_build| {
             let mut circ = f_build.as_circuit(f_build.input_wires());
             assert_eq!(circ.n_wires(), 1);
 
@@ -379,7 +379,7 @@ mod test {
     #[test]
     fn circuit_builder_errors() {
         let _build_res = build_main(
-            Signature::new_endo(vec![qb_t(), qb_t()]).into(),
+            Signature::new_endo([qb_t(), qb_t()]).into(),
             |mut f_build| {
                 let mut circ = f_build.as_circuit(f_build.input_wires());
                 let [q0, q1] = circ.tracked_units_arr();

@@ -205,14 +205,14 @@ mod test {
     fn hugr(use_entrypoint: bool) -> Hugr {
         let mut hb = ModuleBuilder::new();
         let o2 = hb
-            .define_function("from_pub", Signature::new_endo(usize_t()))
+            .define_function("from_pub", Signature::new_endo([usize_t()]))
             .unwrap();
         let o2inp = o2.input_wires();
         let o2 = o2.finish_with_outputs(o2inp).unwrap();
         let mut o1 = hb
             .define_function_vis(
                 "pubfunc",
-                Signature::new_endo(usize_t()),
+                Signature::new_endo([usize_t()]),
                 Visibility::Public,
             )
             .unwrap();
@@ -221,15 +221,17 @@ mod test {
         o1.finish_with_outputs(o1c.outputs()).unwrap();
 
         let fm = hb
-            .define_function("from_main", Signature::new_endo(usize_t()))
+            .define_function("from_main", Signature::new_endo([usize_t()]))
             .unwrap();
         let f_inp = fm.input_wires();
         let fm = fm.finish_with_outputs(f_inp).unwrap();
         let mut m = hb
-            .define_function("main", Signature::new_endo(usize_t()))
+            .define_function("main", Signature::new_endo([usize_t()]))
             .unwrap();
         let m_in = m.input_wires();
-        let mut dfb = m.dfg_builder(Signature::new_endo(usize_t()), m_in).unwrap();
+        let mut dfb = m
+            .dfg_builder(Signature::new_endo([usize_t()]), m_in)
+            .unwrap();
         let c = dfb.call(fm.handle(), &[], dfb.input_wires()).unwrap();
         let dfg = dfb.finish_with_outputs(c.outputs()).unwrap();
         m.finish_with_outputs(dfg.outputs()).unwrap();
