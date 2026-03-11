@@ -1,13 +1,15 @@
 # ruff: noqa: I001
 
 import hugr
+from hugr.package import Package
 import hugr.ops as ops
 import hugr.tys as tys
 from hugr import ext, val
 
 from hugr.build import Dfg
 from hugr.std.collections.list import List
-from hugr.std.int import INT_T, INT_TYPES_EXTENSION
+from hugr.std.float import FLOAT_TYPES_EXTENSION
+from hugr.std.int import CONVERSIONS_EXTENSION, INT_T, INT_TYPES_EXTENSION
 import pytest
 
 from .conftest import H, QUANTUM_EXT, TEST_EXT, TEST_TYPE_OPAQUE, TEST_OP_OPAQUE
@@ -21,10 +23,10 @@ def test_extension_ops() -> None:
     h.set_outputs(h_node.out(0))
 
     op_exts = h.hugr[h_node].op.used_extensions().ids()
-    assert set(op_exts) == {QUANTUM_EXT.name, "prelude"}
+    assert set(op_exts) == {QUANTUM_EXT.name, FLOAT_TYPES_EXTENSION.name, "prelude"}
 
     exts = h.hugr.used_extensions().ids()
-    assert set(exts) == {QUANTUM_EXT.name, "prelude"}
+    assert set(exts) == {QUANTUM_EXT.name, FLOAT_TYPES_EXTENSION.name, "prelude"}
 
 
 def test_core_ops() -> None:
@@ -39,6 +41,13 @@ def test_core_ops() -> None:
 
     exts = h.hugr.used_extensions().ids()
     assert set(exts) == {INT_TYPES_EXTENSION.name, "prelude"}
+
+
+def test_transitive_extension_dependencies() -> None:
+    op = ops.ExtOp(CONVERSIONS_EXTENSION.get_op("itousize"), args=[])
+    exts = op.used_extensions().ids()
+    assert CONVERSIONS_EXTENSION.name in exts
+    assert FLOAT_TYPES_EXTENSION.name in exts
 
 
 def test_func_calls() -> None:
@@ -335,3 +344,60 @@ def test_hugr_with_opaque_type_resolve() -> None:
     test_ext_registry.add_extension(TEST_EXT)
     exts = h.hugr.used_extensions(resolve_from=test_ext_registry)
     assert TEST_EXT.name in exts.used_extensions.ids()
+
+
+def test_lower_funcs_resolve() -> None:
+    """Test that extensions in `OpDef.lower_func`s are resolved correctly."""
+    # A custom extension used by inside lower function.
+    inner_op_def = ext.OpDef(
+        name="InnerOp",
+        description="inner custom op",
+        signature=ext.OpDefSig(tys.FunctionType.endo([tys.Bool])),
+    )
+    inner_ext = ext.Extension(
+        version=ext.Version(0, 1, 0),
+        name="inner",
+        types={},
+    )
+    inner_ext.add_op_def(inner_op_def)
+
+    # Build a simple identity HUGR to use as a lowering implementation.
+    dfg = Dfg(tys.Bool)
+    [b] = dfg.inputs()
+    b = dfg.add_op(inner_ext.get_op("InnerOp").instantiate(args=[]), b).out(0)
+    dfg.set_outputs(b)
+    lower_hugr = dfg.hugr
+
+    # Wrap it in a FixedHugr lower function.
+    fixed_hugr = ext.FixedHugr(extensions=[inner_ext.name], hugr=lower_hugr)
+
+    # Build an extension whose op carries the lower_func.
+    outer_op_def = ext.OpDef(
+        name="OuterOp",
+        description="outer op with lowering",
+        signature=ext.OpDefSig(tys.FunctionType.endo([tys.Bool])),
+        lower_funcs=[fixed_hugr],
+    )
+    outer_ext = ext.Extension(
+        version=ext.Version(0, 1, 0),
+        name="outer",
+        types={},
+    )
+    outer_ext.add_op_def(outer_op_def)
+
+    # Include the extension in a package and check that the lower func is resolved.
+    package = Package(
+        modules=[],
+        extensions=[outer_ext],
+    )
+    used_exts = package.used_extensions()
+    assert outer_ext.name in used_exts.used_extensions
+    assert inner_ext.name in used_exts.used_extensions
+
+    bytes = package.to_bytes()
+    package = Package.from_bytes(bytes, extensions=used_exts.used_extensions)
+    assert len(package.extensions[0].operations["OuterOp"].lower_funcs) == 1
+
+    used_exts = package.used_extensions()
+    assert outer_ext.name in used_exts.used_extensions.ids()
+    assert inner_ext.name in used_exts.used_extensions.ids()

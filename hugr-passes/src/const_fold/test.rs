@@ -3,8 +3,8 @@ use std::{
     sync::LazyLock,
 };
 
-use hugr_core::ops::Const;
 use hugr_core::ops::handle::NodeHandle;
+use hugr_core::{Visibility, ops::Const};
 use itertools::Itertools;
 use rstest::rstest;
 
@@ -30,10 +30,20 @@ use hugr_core::std_extensions::logic::LogicOp;
 use hugr_core::types::{Signature, SumType, Type, TypeBound, TypeRow, TypeRowRV};
 use hugr_core::{Hugr, HugrView, IncomingPort, Node, type_row};
 
-use crate::ComposablePass as _;
-use crate::dataflow::{DFContext, PartialValue, partial_from_const};
+use crate::{ComposablePass as _, composable::ValidatingPass};
+use crate::{
+    PassScope,
+    composable::WithScope,
+    dataflow::{DFContext, PartialValue, partial_from_const},
+};
 
-use super::{ConstFoldContext, ConstantFoldPass, ValueHandle, constant_fold_pass};
+use super::{ConstFoldContext, ConstantFoldPass, ValueHandle};
+
+fn constant_fold_pass(h: &mut (impl HugrMut<Node = Node> + 'static)) {
+    // the default ConstantFoldPass has no scope, i.e. preserving legacy behavior
+    let c = ConstantFoldPass::default().with_scope(PassScope::default());
+    ValidatingPass::new(c).run(h).unwrap();
+}
 
 #[rstest]
 #[case(ConstInt::new_u(4, 2).unwrap(), true)]
@@ -1594,9 +1604,10 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     let c17 = mb.add_constant(Value::from(ConstInt::new_u(5, 17)?));
     let ad1 = mb.add_alias_declare("unused", TypeBound::Linear)?;
     let ad2 = mb.add_alias_def("unused2", INT_TYPES[3].clone())?;
-    let mut main = mb.define_function(
+    let mut main = mb.define_function_vis(
         "main",
         Signature::new(type_row![], vec![INT_TYPES[5].clone(); 2]),
+        Visibility::Public,
     )?;
     let lc7 = main.load_const(&c7);
     let lc17 = main.load_const(&c17);

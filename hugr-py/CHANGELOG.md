@@ -1,5 +1,35 @@
 # Changelog
 
+## [0.15.4](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.3...hugr-py-v0.15.4) (2026-02-20)
+
+
+### Features
+
+* **hugr-py:** Define typed Metadata protocol ([#2765](https://github.com/Quantinuum/hugr/issues/2765)) ([4390230](https://github.com/Quantinuum/hugr/commit/4390230f0b17b5a5ab12656853c40be195514ef5))
+
+
+### Bug Fixes
+
+* Add truncation options for node and edge labels in rendering ([#2885](https://github.com/Quantinuum/hugr/issues/2885)) ([25c625d](https://github.com/Quantinuum/hugr/commit/25c625d27c7e5a594ad5a0f7e5bc6c044125e590))
+* used_extensions should include transitive requirements ([#2891](https://github.com/Quantinuum/hugr/issues/2891)) ([18e78e4](https://github.com/Quantinuum/hugr/commit/18e78e4f0efa08cb15f6474b875fafa2eee8300a))
+
+## [0.15.3](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.2...hugr-py-v0.15.3) (2026-02-09)
+
+
+### Bug Fixes
+
+* Mark SExp formats as ascii printable ([#2866](https://github.com/Quantinuum/hugr/issues/2866)) ([a4bc253](https://github.com/Quantinuum/hugr/commit/a4bc25313ef5d123f014299315f5ca36f0807983))
+
+## [0.15.2](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.1...hugr-py-v0.15.2) (2026-02-06)
+
+
+### Features
+
+* Add ptr extension and cleanup `hugr.std` module ([#2842](https://github.com/Quantinuum/hugr/issues/2842)) ([0871b82](https://github.com/Quantinuum/hugr/commit/0871b8268e391886df48a9a5a0b3152ef8156aa0))
+* Add s expression format to envelope formats ([#2864](https://github.com/Quantinuum/hugr/issues/2864)) ([2da5e8e](https://github.com/Quantinuum/hugr/commit/2da5e8ef071245b4032a1c2fddf5b16a995f9610))
+* Auto-embed extensions in stored hugrs ([#2843](https://github.com/Quantinuum/hugr/issues/2843)) ([36408d4](https://github.com/Quantinuum/hugr/commit/36408d4bb83a752e8a4ac986e2b0857c8b1df5c1))
+* Replace pyzstd dependency with rust bindings ([#2846](https://github.com/Quantinuum/hugr/issues/2846)) ([5047c81](https://github.com/Quantinuum/hugr/commit/5047c81926eb365be7306631326d74e237dc3aae))
+
 ## [0.15.1](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.0...hugr-py-v0.15.1) (2026-01-28)
 
 

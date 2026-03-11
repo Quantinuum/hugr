@@ -1,6 +1,6 @@
 #! /bin/bash
 
-mkdir build
+mkdir -p build
 
 touch build/.nojekyll  # Disable jekyll to keep files starting with underscores
 # copy redirect file

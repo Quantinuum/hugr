@@ -9,6 +9,7 @@ from typing_extensions import deprecated
 
 import hugr._serialization.extension as ext_s
 import hugr.model as model
+from hugr import ext
 from hugr.envelope import (
     EnvelopeConfig,
     _make_envelope,
@@ -71,9 +72,7 @@ class Package:
         """
         package = read_envelope(envelope)
         if extensions is not None:
-            # TODO: This can be done during deserialization
-            for module in package.modules:
-                module.resolve_extensions(extensions)
+            package.used_extensions(extensions)
         return package
 
     @staticmethod
@@ -93,9 +92,7 @@ class Package:
         """
         package = read_envelope_str(envelope)
         if extensions is not None:
-            # TODO: This can be done during deserialization
-            for module in package.modules:
-                module.resolve_extensions(extensions)
+            package.used_extensions(extensions)
         return package
 
     @staticmethod
@@ -147,6 +144,49 @@ class Package:
         At the moment this does not yet contain the extensions.
         """
         return model.Package([module.to_model() for module in self.modules])
+
+    def used_extensions(
+        self, resolve_from: ext.ExtensionRegistry | None = None
+    ) -> ext.ExtensionResolutionResult:
+        """Get the extensions used by this Package, optionally resolving unresolved
+        types and operations.
+
+        This method modifies the HUGR modules and packaged extensions in-place when
+        resolve_from is provided, replacing Custom operations with ExtOp operations and
+        opaque types with ExtType when their extensions are found in the registry.
+
+        Args:
+            resolve_from: Optional extension registry to resolve against.
+                If None, opaque types and Custom ops will not be resolved.
+
+        Returns:
+            The result of resolving the extensions, containing the used
+            extensions and a list of referenced but unresolved extensions.
+
+        Example:
+            >>> from hugr.build import Dfg
+            >>> Dfg(tys.Qubit).hugr.used_extensions().ids()
+            {'prelude'}
+        """
+        from hugr.ext import ExtensionResolutionResult
+
+        packaged_extensions = ext.ExtensionRegistry.from_extensions(self.extensions)
+
+        if resolve_from is None:
+            resolve_from = ext.ExtensionRegistry()
+        resolve_from.extend(packaged_extensions)
+
+        # Packaged extensions are always marked as "used".
+        result = ExtensionResolutionResult(
+            used_extensions=packaged_extensions,
+        )
+
+        for module in self.modules:
+            result.extend(module.used_extensions(resolve_from))
+
+        result._extend_with_transitive_ops(resolve_from)
+
+        return result
 
 
 @dataclass(frozen=True)

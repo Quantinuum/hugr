@@ -4,7 +4,8 @@ use anyhow::Result;
 use delegate::delegate;
 use hugr_core::extension::ExtensionId;
 use hugr_core::types::{SumType, Type, TypeName};
-use inkwell::types::FunctionType;
+use inkwell::AddressSpace;
+use inkwell::types::{FunctionType, PointerType};
 use inkwell::{context::Context, types::BasicTypeEnum};
 
 use crate::custom::types::{LLVMCustomTypeFn, LLVMTypeMapping};
@@ -54,6 +55,11 @@ impl<'c, 'a> TypingSession<'c, 'a> {
     #[must_use]
     pub fn iw_context(&self) -> &'c Context {
         self.iw_context
+    }
+
+    /// Returns the global opaque LLVM pointer type
+    pub fn llvm_ptr_type(&self) -> PointerType<'c> {
+        self.iw_context.ptr_type(AddressSpace::default())
     }
 }
 

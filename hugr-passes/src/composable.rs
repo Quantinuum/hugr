@@ -1,4 +1,13 @@
-//! Compiler passes and utilities for composing them
+//! Compiler passes and utilities for composing them.
+//!
+//! The core trait is [`ComposablePass`], which defines a transformation that can
+//! be applied to a HUGR.
+//! See the [`ComposablePass`] trait documentation for more details.
+//!
+
+mod scope;
+
+pub use scope::{InScope, PassScope, Preserve};
 
 use std::{error::Error, marker::PhantomData};
 
@@ -7,8 +16,13 @@ use hugr_core::hugr::{ValidationError, hugrmut::HugrMut};
 use itertools::Either;
 
 /// An optimization pass that can be sequenced with another and/or wrapped
-/// e.g. by [`ValidatingPass`]
-pub trait ComposablePass<H: HugrMut>: Sized {
+/// e.g. by [`ValidatingPass`].
+///
+/// Note it is expected that (simple) passes should make reasonable effort to be
+/// idempotent (i.e. such that after running a pass, rerunning it immediately has
+/// no further effect). However this is *not* a requirement, e.g. a sequence of
+/// idempotent passes created by [ComposablePass::then] may not be idempotent itself.
+pub trait ComposablePass<H: HugrMut>: WithScope + Sized {
     /// Error thrown by this pass.
     type Error: Error;
     /// Result returned by this pass.
@@ -28,6 +42,15 @@ pub trait ComposablePass<H: HugrMut>: Sized {
 
     /// Returns a [`ComposablePass`] that does "`self` then `other`", so long as
     /// `other::Err` can be combined with ours.
+    ///
+    /// Composed passes may have different configured [`PassScope`]s. Use
+    /// [`WithScope::with_scope`] after the composition to override all the
+    /// scope configurations if needed.
+    ///
+    /// Note this is not necessarily idempotent even if both `self` and `other` are.
+    /// (Idempotency would require rerunning the sequence of both until no change;
+    /// since there is no general/efficient reporting of whether a pass has changed
+    /// the hugr, no such checking or looping is done here.)
     fn then<P: ComposablePass<H>, E: ErrorCombiner<Self::Error, P::Error>>(
         self,
         other: P,
@@ -49,8 +72,44 @@ pub trait ComposablePass<H: HugrMut>: Sized {
                 Ok((res1, res2))
             }
         }
+        impl<E, P1, P2> WithScope for Sequence<E, P1, P2>
+        where
+            P1: WithScope,
+            P2: WithScope,
+        {
+            fn with_scope(self, scope: impl Into<PassScope>) -> Self {
+                let scope = scope.into();
+                Self(
+                    self.0.with_scope(scope.clone()),
+                    self.1.with_scope(scope),
+                    PhantomData,
+                )
+            }
+        }
 
         Sequence(self, other, PhantomData)
+    }
+}
+
+/// Extension trait for adding a `with_scope` method to a `ComposablePass` that
+/// does not require instantiating the `H` generic parameter.
+pub trait WithScope {
+    /// Set the scope configuration used to run the pass.
+    ///
+    /// See [`PassScope`] for more details.
+    ///
+    /// Since `hugr >=0.26.0`, passes must implement this to respect the scope configuration.
+    fn with_scope(self, scope: impl Into<PassScope>) -> Self;
+
+    /// Return a default instance of the pass with the given scope.
+    ///
+    /// See [`PassScope`] for more details.
+    #[must_use]
+    fn default_with_scope(scope: PassScope) -> Self
+    where
+        Self: Default,
+    {
+        Self::default().with_scope(scope)
     }
 }
 
@@ -109,6 +168,14 @@ impl<P: ComposablePass<H>, H: HugrMut, E: Error, F: Fn(P::Error) -> E> Composabl
 
     fn run(&self, hugr: &mut H) -> Result<P::Result, Self::Error> {
         self.0.run(hugr).map_err(&self.1)
+    }
+}
+
+impl<P: ComposablePass<H>, H: HugrMut, E: Error, F: Fn(P::Error) -> E> WithScope
+    for ErrMapper<P, H, E, F>
+{
+    fn with_scope(self, scope: impl Into<PassScope>) -> Self {
+        Self(self.0.with_scope(scope), self.1, PhantomData)
     }
 }
 
@@ -190,6 +257,12 @@ where
     }
 }
 
+impl<P: ComposablePass<H>, H: HugrMut> WithScope for ValidatingPass<P, H> {
+    fn with_scope(self, scope: impl Into<PassScope>) -> Self {
+        Self(self.0.with_scope(scope), self.1)
+    }
+}
+
 // IfThen ------------------------------
 /// [`ComposablePass`] that executes a first pass that returns a `bool`
 /// result; and then, if-and-only-if that first result was true,
@@ -227,6 +300,22 @@ impl<
     }
 }
 
+impl<E, H, A, B> WithScope for IfThen<E, H, A, B>
+where
+    A: WithScope,
+    B: WithScope,
+{
+    fn with_scope(self, scope: impl Into<PassScope>) -> Self {
+        let scope = scope.into();
+        Self(
+            self.0.with_scope(scope.clone()),
+            self.1.with_scope(scope),
+            PhantomData,
+        )
+    }
+}
+
+// Note remove when deprecated constant_fold_pass / remove_dead_funcs are removed
 pub(crate) fn validate_if_test<P: ComposablePass<H>, H: HugrMut>(
     pass: P,
     hugr: &mut H,
@@ -239,7 +328,7 @@ pub(crate) fn validate_if_test<P: ComposablePass<H>, H: HugrMut>(
 }
 
 #[cfg(test)]
-mod test {
+pub(crate) mod test {
     use hugr_core::ops::Value;
     use hugr_core::ops::dataflow::IOTrait;
     use itertools::{Either, Itertools};
@@ -254,12 +343,20 @@ mod test {
     use hugr_core::types::{Signature, TypeRow};
     use hugr_core::{Hugr, HugrView, IncomingPort, Node, NodeIndex};
 
+    use crate::composable::WithScope;
     use crate::const_fold::{ConstFoldError, ConstantFoldPass};
     use crate::dead_code::DeadCodeElimError;
-    use crate::untuple::{UntupleRecursive, UntupleResult};
-    use crate::{DeadCodeElimPass, ReplaceTypes, UntuplePass};
+    use crate::untuple::UntupleResult;
+    use crate::{DeadCodeElimPass, PassScope, ReplaceTypes, UntuplePass};
 
-    use super::{ComposablePass, IfThen, ValidatePassError, ValidatingPass, validate_if_test};
+    use super::{ComposablePass, IfThen, ValidatePassError, ValidatingPass};
+
+    pub(crate) fn run_validating<P: ComposablePass<H>, H: HugrMut>(
+        pass: P,
+        hugr: &mut H,
+    ) -> Result<P::Result, ValidatePassError<H::Node, P::Error>> {
+        ValidatingPass::new(pass).run(hugr)
+    }
 
     #[test]
     fn test_then() {
@@ -355,7 +452,7 @@ mod test {
             fb.finish_hugr_with_outputs(untup.outputs()).unwrap()
         };
 
-        let untup = UntuplePass::new(UntupleRecursive::Recursive);
+        let untup = UntuplePass::default().with_scope(PassScope::EntrypointRecursive);
         {
             // Change usize_t to INT_TYPES[6], and if that did anything (it will!), then Untuple
             let mut repl = ReplaceTypes::default();
@@ -364,7 +461,7 @@ mod test {
             let ifthen = IfThen::<Either<_, _>, _, _, _>::new(repl, untup.clone());
 
             let mut h = h.clone();
-            let r = validate_if_test(ifthen, &mut h).unwrap();
+            let r = run_validating(ifthen, &mut h).unwrap();
             assert_eq!(
                 r,
                 Some(UntupleResult {
@@ -381,7 +478,7 @@ mod test {
         repl.set_replace_type(i32_custom_t, INT_TYPES[6].clone());
         let ifthen = IfThen::<Either<_, _>, _, _, _>::new(repl, untup);
         let mut h = h;
-        let r = validate_if_test(ifthen, &mut h).unwrap();
+        let r = run_validating(ifthen, &mut h).unwrap();
         assert_eq!(r, None);
         assert_eq!(h.children(h.entrypoint()).count(), 4);
         let mktup = h

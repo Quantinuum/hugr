@@ -1,32 +1,34 @@
 //! Provides [`InlineDFGsPass`], a pass for inlining all DFGs in a Hugr.
 use std::convert::Infallible;
 
-use hugr_core::{
-    Node,
-    hugr::{
-        hugrmut::HugrMut,
-        patch::inline_dfg::{InlineDFG, InlineDFGError},
-    },
+use hugr_core::hugr::{
+    hugrmut::HugrMut,
+    patch::inline_dfg::{InlineDFG, InlineDFGError},
 };
 use itertools::Itertools;
 
-use crate::ComposablePass;
+use crate::composable::WithScope;
+use crate::{ComposablePass, PassScope};
 
 /// Inlines all DFG nodes nested below the entrypoint.
 ///
 /// See [InlineDFG] for a rewrite to inline single DFGs.
-#[derive(Debug, Clone)]
-pub struct InlineDFGsPass;
+#[derive(Debug, Default, Clone)]
+pub struct InlineDFGsPass {
+    scope: PassScope,
+}
 
-impl<H: HugrMut<Node = Node>> ComposablePass<H> for InlineDFGsPass {
+impl<H: HugrMut> ComposablePass<H> for InlineDFGsPass {
     type Error = Infallible;
     type Result = ();
 
     fn run(&self, h: &mut H) -> Result<(), Self::Error> {
+        let Some(r) = self.scope.root(h) else {
+            return Ok(());
+        };
         let dfgs = h
-            .entry_descendants()
-            .skip(1) // Skip the entrypoint itself
-            .filter(|&n| h.get_optype(n).is_dfg())
+            .descendants(r)
+            .filter(|&n| n != h.entrypoint() && h.get_optype(n).is_dfg())
             .collect_vec();
         for dfg in dfgs {
             h.apply_patch(InlineDFG(dfg.into()))
@@ -42,6 +44,13 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for InlineDFGsPass {
                 .unwrap();
         }
         Ok(())
+    }
+}
+
+impl WithScope for InlineDFGsPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
     }
 }
 
@@ -84,7 +93,7 @@ mod test {
 
         let mut h = outer.finish_hugr_with_outputs([a, b])?;
         assert_eq!(h.num_nodes(), 5 * 3 + 4); // 5 DFGs with I/O + 4 nodes for module/func roots
-        InlineDFGsPass.run(&mut h).unwrap();
+        InlineDFGsPass::default().run(&mut h).unwrap();
 
         // Root should be the only remaining DFG
         assert!(h.get_optype(h.entrypoint()).is_dfg());

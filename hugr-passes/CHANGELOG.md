@@ -1,6 +1,30 @@
 # Changelog
 
 
+## [0.25.7](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.6...hugr-passes-v0.25.7) - 2026-03-06
+
+### Documentation
+
+- added examples in docs srtring ([#2920](https://github.com/Quantinuum/hugr/pull/2920))
+
+### New Features
+
+- Define pass application scopes ([#2772](https://github.com/Quantinuum/hugr/pull/2772))
+- Modify dead code elimination pass to remove unreachable basic blocks ([#2884](https://github.com/Quantinuum/hugr/pull/2884))
+- Add non-generic `with_scope` method for composable passes ([#2910](https://github.com/Quantinuum/hugr/pull/2910))
+- update passes to use PassScope where non-breaking ([#2836](https://github.com/Quantinuum/hugr/pull/2836))
+
+## [0.25.6](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.5...hugr-passes-v0.25.6) - 2026-02-20
+
+### Bug Fixes
+
+- Panic on UntuplePass when nodes had order edges ([#2883](https://github.com/Quantinuum/hugr/pull/2883))
+
+### New Features
+
+- added hash.rs, updated imports ([#2840](https://github.com/Quantinuum/hugr/pull/2840))
+- Add a `NodeTemplate::call_to_function` helper ([#2878](https://github.com/Quantinuum/hugr/pull/2878))
+
 ## [0.25.4](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.3...hugr-passes-v0.25.4) - 2026-01-14
 
 ### Bug Fixes
