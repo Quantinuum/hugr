@@ -29,6 +29,8 @@ env:
   LLVM_MAIN_VERSION: "21"
   LLVM_VERSION: "21.1"
   LLVM_FEATURE_NAME: "21-1"
+  # TODO: Test
+  SCCACHE_RECACHE: "true"
 
 jobs:
   # Check if changes were made to the relevant files.
