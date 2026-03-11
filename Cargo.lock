@@ -1151,7 +1151,6 @@ dependencies = [
  "hugr-llvm",
  "hugr-model",
  "hugr-persistent",
- "inkwell",
  "serde_json",
 ]
 
