@@ -192,9 +192,14 @@ jobs:
         run: rustup override set ${{steps.toolchain.outputs.name}}
       - uses: taiki-e/install-action@nextest
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.LLVM_VERSION }}
+        #uses: KyleMayes/install-llvm-action@v2
+        #with:
+        #  version: ${{ env.LLVM_VERSION }}
+        run: |
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-21  main'
+          sudo apt update
+          sudo apt install llvm-21 libpolly-21-dev
       - name: Build with no features
         run: cargo nextest r --verbose  --no-default-features --no-run
       - name: Tests with no features
