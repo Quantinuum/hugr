@@ -5,7 +5,7 @@ compliant with the [JSON Schema](https://json-schema.org/draft/2020-12/release-n
 specification.
 
 **Note:** This schema is deprecated and will be removed in the future.
-See the [envelope encoding specification](https://quantinuum.github.io/hugr/specification/serialization.html) for the current serialization format.
+See the [serialization specification](https://quantinuum.github.io/hugr/specification/serialization.html) for the current serialization format.
 
 The model is generated from the pydantic model in the `hugr` python
 package, and is used to validate the serialization format of the Rust
