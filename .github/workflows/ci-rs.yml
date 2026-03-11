@@ -150,7 +150,7 @@ jobs:
           version: ${{ env.LLVM_VERSION }}
       - name: Build with all features
         # NOTE: We have temporarily disabled hugr-llvm building in the required tests
-        # since build times when from ~2 mins to ~30 mins after
+        # since build times went from ~2 mins to ~30 mins after
         # <https://github.com/Quantinuum/hugr/pull/2901>
         run: cargo nextest r --verbose --no-run --features "hugr/declarative hugr/persistent_unstable hugr/zstd" --timings
       - name: Upload timings
