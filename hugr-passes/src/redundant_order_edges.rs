@@ -68,23 +68,23 @@ impl RedundantOrderEdgesPass {
         // Traverse the region in topological order.
         let (region, node_map) = hugr.region_portgraph(parent);
         let postorder = petgraph::visit::Topo::new(&region);
-        for pg_node in postorder.iter(&region) {
-            let node = node_map.from_portgraph(pg_node);
-            let op = hugr.get_optype(node);
+        for pg_child in postorder.iter(&region) {
+            let child = node_map.from_portgraph(pg_child);
+            let op = hugr.get_optype(child);
 
-            // If the node has children and we are running recursively, add the children to the region candidates.
-            if self.scope.recursive() && hugr.first_child(node).is_some() {
-                region_candidates.extend(hugr.children(node));
+            // If the child itself is a region (parent) and we are running recursively, add the child to the region candidates.
+            if self.scope.recursive() && hugr.first_child(child).is_some() {
+                region_candidates.push_back(child);
             }
 
-            let predecessor_edges = predecessor_order_edges.remove(&node).unwrap_or_default();
+            let predecessor_edges = predecessor_order_edges.remove(&child).unwrap_or_default();
 
             // If we have reached the target of an order edge by exploring
             // connected nodes from the source, then mark the order edge for
             // removal.
             let removable_edges: HashSet<PredecessorOrderEdges<H::Node>> = predecessor_edges
                 .iter()
-                .filter(|edge| edge.to_node == node)
+                .filter(|edge| edge.to_node == child)
                 .copied()
                 .collect();
 
@@ -99,13 +99,13 @@ impl RedundantOrderEdgesPass {
             // The latter may be necessary for keeping external edges valid.
             let new_edges = match op.other_output_port() {
                 Some(out_order_port) => hugr
-                    .linked_inputs(node, out_order_port)
+                    .linked_inputs(child, out_order_port)
                     .filter(|(to_node, _)| {
                         hugr.get_parent(*to_node) == Some(parent)
                             && hugr.first_child(*to_node).is_none()
                     })
                     .map(|(to_node, to_port)| PredecessorOrderEdges {
-                        from_node: node,
+                        from_node: child,
                         from_port: out_order_port,
                         to_node,
                         to_port,
@@ -116,7 +116,7 @@ impl RedundantOrderEdgesPass {
 
             // Add the order edges to the `predecessor_order_edges` of the forward neighbors of the node.
             for out_port in op.value_output_ports().chain(op.static_output_port()) {
-                for (to_node, _) in hugr.linked_inputs(node, out_port) {
+                for (to_node, _) in hugr.linked_inputs(child, out_port) {
                     if hugr.get_parent(to_node) != Some(parent) {
                         continue;
                     }
@@ -128,7 +128,7 @@ impl RedundantOrderEdgesPass {
             }
             // Do not propagate new order edges through themselves (otherwise we'd always remove them).
             if let Some(out_port) = op.other_output_port() {
-                for (to_node, _) in hugr.linked_inputs(node, out_port) {
+                for (to_node, _) in hugr.linked_inputs(child, out_port) {
                     if hugr.get_parent(to_node) != Some(parent) {
                         continue;
                     }
