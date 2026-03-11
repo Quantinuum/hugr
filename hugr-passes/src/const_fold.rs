@@ -186,7 +186,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             .scope
             .as_ref()
             .map_or(DeadCodeElimPass::<H>::default(), |scope| {
-                DeadCodeElimPass::<H>::default_scoped(scope.clone())
+                DeadCodeElimPass::<H>::default_with_scope(scope.clone())
             });
         dce.with_entry_points(self.inputs.keys().copied())
             .set_preserve_callback(if self.allow_increase_termination {

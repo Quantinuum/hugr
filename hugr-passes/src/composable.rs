@@ -105,7 +105,7 @@ pub trait WithScope {
     ///
     /// See [`PassScope`] for more details.
     #[must_use]
-    fn default_scoped(scope: PassScope) -> Self
+    fn default_with_scope(scope: PassScope) -> Self
     where
         Self: Default,
     {
