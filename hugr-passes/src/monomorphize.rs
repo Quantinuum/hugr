@@ -13,8 +13,8 @@ use hugr_core::{
 use hugr_core::hugr::{HugrView, OpType, hugrmut::HugrMut};
 use itertools::Itertools as _;
 
-use crate::ComposablePass;
 use crate::composable::{ValidatePassError, validate_if_test};
+use crate::{ComposablePass, PassScope};
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
@@ -36,7 +36,7 @@ use crate::composable::{ValidatePassError, validate_if_test};
 pub fn monomorphize(
     hugr: &mut impl HugrMut<Node = Node>,
 ) -> Result<(), ValidatePassError<Node, Infallible>> {
-    validate_if_test(MonomorphizePass, hugr)
+    validate_if_test(MonomorphizePass::default(), hugr)
 }
 
 fn is_polymorphic(fd: &FuncDefn) -> bool {
@@ -197,20 +197,36 @@ fn instantiate(
 /// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
-#[derive(Debug, Clone)]
-pub struct MonomorphizePass;
+#[derive(Debug, Default, Clone)]
+pub struct MonomorphizePass {
+    scope: PassScope,
+}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for MonomorphizePass {
     type Error = Infallible;
     type Result = ();
 
     fn run(&self, h: &mut H) -> Result<(), Self::Error> {
-        let root = h.entrypoint();
-        // If the root is a polymorphic function, then there are no external calls, so nothing to do
-        if !is_polymorphic_funcdefn(h.get_optype(root)) {
-            mono_scan(h, root, None, &mut HashMap::new());
-        }
+        match self.scope {
+            PassScope::EntrypointFlat | PassScope::EntrypointRecursive => {
+                // for module-entrypoint, PassScope says to do nothing. (Monomorphization could.)
+                // for non-module-entrypoint, PassScope says not to touch Hugr outside entrypoint,
+                //     so monomorphization cannot add any new functions --> do nothing.
+                // NOTE we could look to see if there are any existing instantations that
+                //   we could use (!), but not atm.
+            }
+            PassScope::Global(_) =>
+            // only generates new nodes, never changes signature of any existing node.
+            {
+                mono_scan(h, h.module_root(), None, &mut HashMap::new())
+            }
+        };
         Ok(())
+    }
+
+    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
     }
 }
 
@@ -308,7 +324,7 @@ mod test {
         let [i1] = dfg_builder.input_wires_arr();
         let hugr = dfg_builder.finish_hugr_with_outputs([i1]).unwrap();
         let mut hugr2 = hugr.clone();
-        MonomorphizePass.run(&mut hugr2).unwrap();
+        MonomorphizePass::default().run(&mut hugr2).unwrap();
         assert_eq!(hugr, hugr2);
     }
 
@@ -374,7 +390,7 @@ mod test {
                 .count(),
             3
         );
-        MonomorphizePass.run(&mut hugr)?;
+        MonomorphizePass::default().run(&mut hugr)?;
         let mono = hugr;
         mono.validate()?;
 
@@ -395,7 +411,7 @@ mod test {
             ["double", "main", "triple"]
         );
         let mut mono2 = mono.clone();
-        MonomorphizePass.run(&mut mono2)?;
+        MonomorphizePass::default().run(&mut mono2)?;
 
         assert_eq!(mono2, mono); // Idempotent
 
@@ -551,7 +567,7 @@ mod test {
         let mut hugr = outer.finish_hugr_with_outputs([e1, e2]).unwrap();
         hugr.set_entrypoint(hugr.module_root()); // We want to act on everything, not just `main`
 
-        MonomorphizePass.run(&mut hugr).unwrap();
+        MonomorphizePass::default().run(&mut hugr).unwrap();
         let mono_hugr = hugr;
         mono_hugr.validate().unwrap();
         let funcs = list_funcs(&mono_hugr);
@@ -629,7 +645,7 @@ mod test {
             module_builder.finish_hugr().unwrap()
         };
 
-        MonomorphizePass.run(&mut hugr).unwrap();
+        MonomorphizePass::default().run(&mut hugr).unwrap();
         RemoveDeadFuncsPass::default()
             .with_scope(Preserve::Public)
             .run(&mut hugr)
