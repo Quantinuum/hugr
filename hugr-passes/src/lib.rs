@@ -38,7 +38,10 @@ pub use lower::{lower_ops, replace_many_ops};
 #[expect(deprecated)] // Remove together
 pub use monomorphize::monomorphize;
 pub use monomorphize::{MonomorphizePass, mangle_name};
-#[deprecated(note = "Use LocalizeEdgesPass::check_no_nonlocal_edges")]
+#[deprecated(
+    note = "Use LocalizeEdgesPass::check_no_nonlocal_edges",
+    since = "0.26.0"
+)]
 #[expect(deprecated)] // Remove at same time
 pub use non_local::ensure_no_nonlocal_edges;
 pub use replace_types::ReplaceTypes;

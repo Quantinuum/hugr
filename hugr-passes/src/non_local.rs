@@ -96,7 +96,7 @@ pub enum FindNonLocalEdgesError<N> {
 }
 
 /// Verifies that there are no non local value edges in the Hugr beneath the entrypoint.
-#[deprecated(note = "Use LocalizeEdges::check_no_nonlocal_edges")]
+#[deprecated(note = "Use LocalizeEdges::check_no_nonlocal_edges", since = "0.26.0")]
 pub fn ensure_no_nonlocal_edges<H: HugrView>(
     hugr: &H,
 ) -> Result<(), FindNonLocalEdgesError<H::Node>> {
