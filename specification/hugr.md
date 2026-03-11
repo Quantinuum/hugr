@@ -193,10 +193,10 @@ regions and control-flow regions:
 A **loadable HUGR** is a module HUGR where all input ports are connected and there are
 no `FuncDecl/AliasDecl` nodes.
 
+In Hugr, an entry point is just a distinguished node. This node could be a `FuncDefn` and its children would define the body of the function. This `FuncDefn` node, together with its children define a region of the HUGR graph. Entry points must be region-container nodes, meaning that they contain children in the hierachy.
+
 An **executable HUGR** or **executable module** is a loadable HUGR where the
 root Module node has a `FuncDefn` child node that is the designated entry point. This function must take no arguments as input. Modules that act as libraries need not be executable.
-
-In Hugr, an entry point is just a distinguished node. This node could be a `FuncDefn` and its children would define the body of the function. This `FuncDefn` node, together with its children define a region of the HUGR graph. Entry points must be region-container nodes, meaning that they contain children in the hierachy.
 
 Some examples of region-container nodes are the following:
 * `FuncDefn` nodes
