@@ -32,6 +32,7 @@ use crate::composable::{ValidatePassError, validate_if_test};
 /// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
+#[deprecated(note = "Use MonomorphizePass instead", since = "0.25.7")]
 pub fn monomorphize(
     hugr: &mut impl HugrMut<Node = Node>,
 ) -> Result<(), ValidatePassError<Node, Infallible>> {
@@ -281,13 +282,14 @@ mod test {
         HugrBuilder, ModuleBuilder,
     };
     use hugr_core::extension::prelude::{ConstUsize, UnpackTuple, UnwrapBuilder, usize_t};
-    use hugr_core::ops::handle::{FuncID, NodeHandle};
+    use hugr_core::ops::handle::FuncID;
     use hugr_core::ops::{CallIndirect, DataflowOpTrait as _, FuncDefn, Tag};
     use hugr_core::types::{PolyFuncType, Signature, Type, TypeArg, TypeBound, TypeEnum};
-    use hugr_core::{Hugr, HugrView, Node};
+    use hugr_core::{Hugr, HugrView, Node, Visibility};
     use rstest::rstest;
 
-    use crate::{monomorphize, remove_dead_funcs};
+    use crate::composable::{Preserve, WithScope};
+    use crate::{ComposablePass, MonomorphizePass, RemoveDeadFuncsPass};
 
     use super::{is_polymorphic, mangle_name};
 
@@ -306,7 +308,7 @@ mod test {
         let [i1] = dfg_builder.input_wires_arr();
         let hugr = dfg_builder.finish_hugr_with_outputs([i1]).unwrap();
         let mut hugr2 = hugr.clone();
-        monomorphize(&mut hugr2).unwrap();
+        MonomorphizePass.run(&mut hugr2).unwrap();
         assert_eq!(hugr, hugr2);
     }
 
@@ -349,9 +351,13 @@ mod test {
             let trip = fb.add_dataflow_op(tag, [elem1, elem2, elem])?;
             fb.finish_with_outputs(trip.outputs())?
         };
-        let mn = {
+        {
             let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
-            let mut fb = mb.define_function("main", Signature::new(usize_t(), outs))?;
+            let mut fb = mb.define_function_vis(
+                "main",
+                Signature::new(usize_t(), outs),
+                Visibility::Public,
+            )?;
             let [elem] = fb.input_wires_arr();
             let [res1] = fb
                 .call(tr.handle(), &[usize_t().into()], [elem])?
@@ -359,7 +365,7 @@ mod test {
             let pair = fb.call(db.handle(), &[usize_t().into()], [elem])?;
             let pty = pair_type(usize_t()).into();
             let [res2] = fb.call(tr.handle(), &[pty], pair.outputs())?.outputs_arr();
-            fb.finish_with_outputs([res1, res2])?
+            fb.finish_with_outputs([res1, res2])?;
         };
         let mut hugr = mb.finish_hugr()?;
         assert_eq!(
@@ -368,7 +374,7 @@ mod test {
                 .count(),
             3
         );
-        monomorphize(&mut hugr)?;
+        MonomorphizePass.run(&mut hugr)?;
         let mono = hugr;
         mono.validate()?;
 
@@ -389,12 +395,15 @@ mod test {
             ["double", "main", "triple"]
         );
         let mut mono2 = mono.clone();
-        monomorphize(&mut mono2)?;
+        MonomorphizePass.run(&mut mono2)?;
 
         assert_eq!(mono2, mono); // Idempotent
 
         let mut nopoly = mono;
-        remove_dead_funcs(&mut nopoly, [mn.node()])?;
+        RemoveDeadFuncsPass::default()
+            .with_scope(Preserve::Public)
+            .run(&mut nopoly)
+            .unwrap();
         let mut funcs = list_funcs(&nopoly);
 
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));
@@ -542,7 +551,7 @@ mod test {
         let mut hugr = outer.finish_hugr_with_outputs([e1, e2]).unwrap();
         hugr.set_entrypoint(hugr.module_root()); // We want to act on everything, not just `main`
 
-        monomorphize(&mut hugr).unwrap();
+        MonomorphizePass.run(&mut hugr).unwrap();
         let mono_hugr = hugr;
         mono_hugr.validate().unwrap();
         let funcs = list_funcs(&mono_hugr);
@@ -620,8 +629,11 @@ mod test {
             module_builder.finish_hugr().unwrap()
         };
 
-        monomorphize(&mut hugr).unwrap();
-        remove_dead_funcs(&mut hugr, []).unwrap();
+        MonomorphizePass.run(&mut hugr).unwrap();
+        RemoveDeadFuncsPass::default()
+            .with_scope(Preserve::Public)
+            .run(&mut hugr)
+            .unwrap();
 
         let funcs = list_funcs(&hugr);
         assert!(funcs.values().all(|(_, fd)| !is_polymorphic(fd)));

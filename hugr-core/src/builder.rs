@@ -22,8 +22,8 @@
 //! # Example
 //!
 //! The following example shows how to build a simple HUGR module with two
-//! dataflow functions, one built using the `DFGBuilder` and the other using the
-//! `CircuitBuilder`.
+//! dataflow functions, one built using the [`DFGBuilder`] and the other using the
+//! [`CircuitBuilder`].
 //!
 //! ```rust
 //! # use hugr::{Hugr, HugrView};
@@ -176,14 +176,6 @@ pub enum BuildError {
         /// Missing node
         node: Node,
     },
-
-    /// Deprecated: [Self::HugrNodeLinkingError] is emitted instead
-    #[deprecated(
-        note = "No longer emitted; HugrNodeLinkingError used instead",
-        since = "0.25.0"
-    )]
-    #[error{"In inserting Hugr: {0}"}]
-    HugrInsertionError(NodeLinkingError<Node, Node>),
 
     /// From [Dataflow::add_link_hugr_by_node_with_wires]
     #[error("In inserting Hugr: {0}")]

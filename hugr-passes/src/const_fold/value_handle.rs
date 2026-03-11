@@ -5,12 +5,11 @@ use std::convert::Infallible;
 use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 
+use hugr_core::Node;
 use hugr_core::core::HugrNode;
 use hugr_core::ops::Value;
 use hugr_core::ops::constant::OpaqueValue;
 use hugr_core::types::ConstTypeError;
-use hugr_core::{Hugr, Node};
-use itertools::Either;
 
 use crate::dataflow::{AbstractValue, AsConcrete, ConstLocation, LoadedFunction, Sum};
 
@@ -50,14 +49,14 @@ impl Hash for HashedConst {
 pub enum ValueHandle<N = Node> {
     /// A [`Value::Extension`] that has been hashed
     Hashable(HashedConst),
-    /// Either a [`Value::Extension`] that can't be hashed, or a [`Value::Function`].
+    /// A [`Value::Extension`] that can't be hashed.
     Unhashable {
         /// The node (i.e. a [Const](hugr_core::ops::Const)) containing the constant
         node: N,
         /// Indices within [`Value::Sum`]s containing the unhashable [`Self::Unhashable::leaf`]
         fields: Vec<usize>,
-        /// The unhashable [`Value::Extension`] or [`Value::Function`]
-        leaf: Either<Arc<OpaqueValue>, Arc<Hugr>>,
+        /// The unhashable [`Value::Extension`]
+        leaf: Arc<OpaqueValue>,
     },
 }
 
@@ -85,23 +84,10 @@ impl<N: HugrNode> ValueHandle<N> {
             Self::Unhashable {
                 node,
                 fields,
-                leaf: Either::Left(arc),
+                leaf: arc,
             },
             Self::Hashable,
         )
-    }
-
-    /// New instance for a [`Value::Function`] found within a node
-    pub fn new_const_hugr<'a>(loc: impl Into<ConstLocation<'a, N>>, val: Box<Hugr>) -> Self
-    where
-        N: 'a,
-    {
-        let (node, fields) = node_and_fields(&loc.into());
-        Self::Unhashable {
-            node,
-            fields,
-            leaf: Either::Right(Arc::from(val)),
-        }
     }
 }
 
@@ -162,20 +148,9 @@ impl<N: HugrNode> AsConcrete<ValueHandle<N>, N> for Value {
     fn from_value(value: ValueHandle<N>) -> Result<Self, Infallible> {
         Ok(match value {
             ValueHandle::Hashable(HashedConst { val, .. })
-            | ValueHandle::Unhashable {
-                leaf: Either::Left(val),
-                ..
-            } => Value::Extension {
+            | ValueHandle::Unhashable { leaf: val, .. } => Value::Extension {
                 e: Arc::try_unwrap(val).unwrap_or_else(|a| a.as_ref().clone()),
             },
-            #[expect(deprecated)]
-            // When we remove Value::Function, have to change `leaf` to be OpaqueValue only
-            ValueHandle::Unhashable {
-                leaf: Either::Right(hugr),
-                ..
-            } => Value::function(Arc::try_unwrap(hugr).unwrap_or_else(|a| a.as_ref().clone()))
-                .map_err(|e| e.to_string())
-                .unwrap(),
         })
     }
 
@@ -191,8 +166,7 @@ impl<N: HugrNode> AsConcrete<ValueHandle<N>, N> for Value {
 #[cfg(test)]
 mod test {
     use hugr_core::{
-        builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig},
-        extension::prelude::{ConstString, usize_t},
+        extension::prelude::ConstString,
         std_extensions::{
             arithmetic::{
                 float_types::{ConstF64, float64_type},
@@ -228,17 +202,6 @@ mod test {
             h4,
             ValueHandle::new_opaque(ConstLocation::Field(5, &n.into()), f2.into())
         );
-
-        let h = Box::new(make_hugr(1));
-        let h5 = ValueHandle::new_const_hugr(n, h.clone());
-        assert_eq!(h5, ValueHandle::new_const_hugr(n, Box::new(make_hugr(2))));
-        assert_ne!(h5, ValueHandle::new_const_hugr(n2, h));
-    }
-
-    fn make_hugr(num_wires: usize) -> Hugr {
-        let d = DFGBuilder::new(endo_sig(vec![usize_t(); num_wires])).unwrap();
-        let inputs = d.input_wires();
-        d.finish_hugr_with_outputs(inputs).unwrap()
     }
 
     #[test]

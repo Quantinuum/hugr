@@ -1,0 +1,2 @@
+```{include} ../../../../specification/extensions.md
+```

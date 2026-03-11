@@ -14,6 +14,7 @@ use super::{
 use crate::Hugr;
 use crate::envelope::serde_with::AsBinaryEnvelope;
 use crate::ops::{OpName, OpNameRef};
+use crate::package::Package;
 use crate::types::type_param::{TypeArg, TypeParam, check_term_types};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
 mod serialize_signature_func;
@@ -295,12 +296,20 @@ pub enum LowerFunc {
     FixedHugr {
         /// The extensions required by the [`Hugr`]
         extensions: ExtensionSet,
-        /// The [`Hugr`] to be used to replace [ExtensionOp]s matching the parent
-        /// [OpDef]
+        /// The [`Hugr`] to be used to replace [ExtensionOp]s matching the
+        /// parent [OpDef]
+        ///
+        /// We store it as a single-module package here to keep any encoded
+        /// extensions required to define the Hugr alive.
+        ///
+        /// The Package should contain any non-std extension required to define
+        /// the Hugr. Otherwise, we will not be able to resolve the extensions
+        /// when loading the Hugr.
         ///
         /// [ExtensionOp]: crate::ops::ExtensionOp
         #[serde_as(as = "Box<AsBinaryEnvelope>")]
-        hugr: Box<Hugr>,
+        #[serde(rename = "hugr")]
+        pkg: Box<Package>,
     },
     /// Custom binary function that can (fallibly) compute a Hugr
     /// for the particular instance and set of available extensions.
@@ -323,7 +332,7 @@ where
     struct FixedHugrDeserializer {
         pub extensions: ExtensionSet,
         #[serde_as(as = "Box<AsBinaryEnvelope>")]
-        pub hugr: Box<Hugr>,
+        pub hugr: Box<Package>,
     }
 
     let funcs: Vec<FixedHugrDeserializer> = serde::Deserialize::deserialize(deserializer)?;
@@ -331,7 +340,7 @@ where
         .into_iter()
         .map(|f| LowerFunc::FixedHugr {
             extensions: f.extensions,
-            hugr: f.hugr,
+            pkg: f.hugr,
         })
         .collect())
 }
@@ -425,9 +434,9 @@ impl OpDef {
         self.lower_funcs
             .iter()
             .filter_map(|f| match f {
-                LowerFunc::FixedHugr { extensions, hugr } => {
+                LowerFunc::FixedHugr { extensions, pkg } => {
                     if available_extensions.is_superset(extensions) {
-                        Some(hugr.as_ref().clone())
+                        pkg.modules.first().cloned()
                     } else {
                         None
                     }
@@ -602,6 +611,7 @@ pub(super) mod test {
     use crate::extension::prelude::usize_t;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
     use crate::ops::OpName;
+    use crate::package::Package;
     use crate::std_extensions::collections::list;
     use crate::types::type_param::{TermTypeError, TypeParam};
     use crate::types::{PolyFuncTypeRV, Signature, Type, TypeArg, TypeBound, TypeRV};
@@ -682,8 +692,8 @@ pub(super) mod test {
                     .map(|lf| match lf {
                         // as with get_sig above, this should break if the hierarchy
                         // is changed, update similarly.
-                        LowerFunc::FixedHugr { extensions, hugr } => {
-                            Some((extensions.clone(), hugr.clone()))
+                        LowerFunc::FixedHugr { extensions, pkg } => {
+                            Some((extensions.clone(), pkg.clone()))
                         }
                         // This is ruled out by `new()` but leave it here for later.
                         LowerFunc::CustomFunc(_) => None,
@@ -714,7 +724,7 @@ pub(super) mod test {
             let def = ext.add_op(OP_NAME, "desc".into(), type_scheme, extension_ref)?;
             def.add_lower_func(LowerFunc::FixedHugr {
                 extensions: ExtensionSet::new(),
-                hugr: Box::new(crate::builder::test::simple_dfg_hugr()), // this is nonsense, but we are not testing the actual lowering here
+                pkg: Box::new(Package::from_hugr(crate::builder::test::simple_dfg_hugr())), // this is nonsense, but we are not testing the actual lowering here
             });
             def.add_misc("key", Default::default());
             assert_eq!(def.description(), "desc");
@@ -873,6 +883,7 @@ pub(super) mod test {
         use super::SimpleOpDef;
         use ::proptest::prelude::*;
 
+        use crate::package::Package;
         use crate::{
             builder::test::simple_dfg_hugr,
             extension::{ExtensionId, ExtensionSet, OpDef, SignatureFunc, op_def::LowerFunc},
@@ -901,7 +912,7 @@ pub(super) mod test {
                 any::<ExtensionSet>()
                     .prop_map(|extensions| LowerFunc::FixedHugr {
                         extensions,
-                        hugr: Box::new(simple_dfg_hugr()),
+                        pkg: Box::new(Package::from_hugr(simple_dfg_hugr())),
                     })
                     .boxed()
             }

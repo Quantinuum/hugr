@@ -9,6 +9,7 @@ use handlers::list_const;
 use hugr_core::hugr::linking::{HugrLinking, NameLinkingPolicy, OnMultiDefn};
 use hugr_core::std_extensions::collections::array::array_type_def;
 use hugr_core::std_extensions::collections::list::list_type_def;
+use itertools::Either;
 use thiserror::Error;
 
 use hugr_core::builder::{
@@ -28,7 +29,7 @@ use hugr_core::types::{
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Visibility, Wire};
 
-use crate::ComposablePass;
+use crate::{ComposablePass, PassScope};
 
 mod linearize;
 pub use linearize::{CallbackHandler, DelegatingLinearizer, LinearizeError, Linearizer};
@@ -334,8 +335,11 @@ impl ReplacementOptions {
     }
 }
 
-/// A configuration of what types, ops, and constants should be replaced with what.
-/// May be applied to a Hugr via [`Self::run`].
+/// A *lowering* [ComposablePass] that replaces types, ops and constants, i.e. changing
+/// node signatures/interfaces.
+///
+/// The struct configures what types, ops, and constants should be replaced with what,
+/// and may be applied to a Hugr via [`Self::run`].
 ///
 /// Parametrized types and ops will be reparameterized taking into account the
 /// replacements, but any ops taking/returning the replaced types *not* as a result of
@@ -388,7 +392,7 @@ pub struct ReplaceTypes {
         ParametricType,
         Arc<dyn Fn(&OpaqueValue, &ReplaceTypes) -> Result<Option<Value>, ReplaceTypesError>>,
     >,
-    regions: Option<Vec<Node>>,
+    scope: Either<PassScope, Vec<Node>>,
 }
 
 impl Default for ReplaceTypes {
@@ -455,7 +459,9 @@ impl ReplaceTypes {
             param_ops: Default::default(),
             consts: Default::default(),
             param_consts: Default::default(),
-            regions: None,
+            // Not really clear what "preserve" means for a pass that changes signatures,
+            // but default to running on whole hugr not just entrypoint.
+            scope: Either::Left(PassScope::default()),
         }
     }
 
@@ -703,9 +709,9 @@ impl ReplaceTypes {
     /// Set the regions of the Hugr to which this pass should be applied.
     ///
     /// If not set, the pass is applied to the whole Hugr.
-    /// Each call to overwrites any previous calls to `set_regions`.
+    /// Each call overwrites any previous calls to `set_regions` and/or [Self::with_scope_internal].
     pub fn set_regions(&mut self, regions: impl IntoIterator<Item = Node>) {
-        self.regions = Some(regions.into_iter().collect());
+        self.scope = Either::Right(regions.into_iter().collect());
     }
 
     fn process_subtree_opts(
@@ -877,8 +883,6 @@ impl ReplaceTypes {
                     false
                 }
             }),
-            #[expect(deprecated)] // remove when Value::Function removed
-            Value::Function { hugr } => self.run(&mut **hugr),
         }
     }
 
@@ -908,14 +912,25 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
     type Error = ReplaceTypesError;
     type Result = bool;
 
+    /// Sets the scope within which the pass will operate. Note that this pass ignores
+    /// * [PassScope::preserve_interface], as this is a lowering pass: its purpose is to
+    ///   change node signatures.
+    /// * [PassScope::recursive], as non-recursion generally leads to invalid Hugrs.
+    ///
+    /// Hence, really only the [PassScope::root] affects the pass.
+    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = Either::Left(scope.into());
+        self
+    }
+
     fn run(&self, hugr: &mut H) -> Result<bool, ReplaceTypesError> {
         let temp: Vec<Node>; // keep alive
-        let regions = match self.regions {
-            Some(ref regs) => regs,
-            None => {
-                temp = vec![hugr.module_root()];
+        let regions = match &self.scope {
+            Either::Left(scope) => {
+                temp = Vec::from_iter(scope.root(hugr));
                 &temp
             }
+            Either::Right(regs) => regs,
         };
         let mut changed = false;
         for region_root in regions {
