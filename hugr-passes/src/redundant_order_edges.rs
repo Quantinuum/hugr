@@ -10,6 +10,7 @@ use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort};
 use itertools::Itertools;
 use petgraph::visit::Walker;
 
+use crate::composable::WithScope;
 use crate::{ComposablePass, PassScope};
 
 /// A pass for removing order edges in a Hugr region that are already implied by
@@ -156,11 +157,6 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RedundantOrderEdgesPass {
     type Error = HugrError;
     type Result = RedundantOrderEdgesResult;
 
-    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
-        self.scope = scope.into();
-        self
-    }
-
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
         // Nodes to explore in the hugr.
         let mut region_candidates = VecDeque::from_iter(self.scope.root(hugr));
@@ -177,6 +173,13 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RedundantOrderEdgesPass {
         }
 
         Ok(result)
+    }
+}
+
+impl WithScope for RedundantOrderEdgesPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
     }
 }
 

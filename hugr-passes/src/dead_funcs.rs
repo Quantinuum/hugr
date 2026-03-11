@@ -11,9 +11,8 @@ use hugr_core::{
 use itertools::Either;
 use petgraph::visit::{Dfs, Walker};
 
-use crate::{
-    ComposablePass, PassScope,
-    composable::{Preserve, ValidatePassError, validate_if_test},
+use crate::composable::{
+    ComposablePass, PassScope, Preserve, ValidatePassError, WithScope, validate_if_test,
 };
 
 #[derive(Debug, thiserror::Error)]
@@ -68,7 +67,7 @@ impl RemoveDeadFuncsPass {
     /// Adds new entry points - these must be [`FuncDefn`] nodes
     /// that are children of the [`Module`] at the root of the Hugr.
     ///
-    /// Overrides any [PassScope] set by a call to [Self::with_scope_internal].
+    /// Overrides any [PassScope] set by a call to [Self::with_scope].
     ///
     /// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
     /// [`Module`]: hugr_core::ops::OpType::Module
@@ -91,12 +90,6 @@ impl RemoveDeadFuncsPass {
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
     type Error = RemoveDeadFuncsError;
     type Result = ();
-
-    /// Overrides any entrypoints set by a call to [Self::with_module_entry_points].
-    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
-        self.entry_points = Either::Right(scope.into());
-        self
-    }
 
     fn run(&self, hugr: &mut H) -> Result<(), RemoveDeadFuncsError> {
         let mut entry_points = Vec::new();
@@ -158,6 +151,13 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RemoveDeadFuncsPass {
             hugr.remove_subtree(n);
         }
         Ok(())
+    }
+}
+
+impl WithScope for RemoveDeadFuncsPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.entry_points = Either::Right(scope.into());
+        self
     }
 }
 

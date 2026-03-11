@@ -15,12 +15,12 @@ use hugr_core::{
 };
 use value_handle::ValueHandle;
 
+use crate::composable::{ComposablePass, PassScope, WithScope, validate_if_test};
 use crate::dataflow::{
     ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
     partial_from_const,
 };
 use crate::dead_code::{DeadCodeElimError, DeadCodeElimPass, PreserveNode};
-use crate::{ComposablePass, PassScope, composable::validate_if_test};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
@@ -186,7 +186,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             .scope
             .as_ref()
             .map_or(DeadCodeElimPass::<H>::default(), |scope| {
-                DeadCodeElimPass::<H>::default().with_scope_internal(scope.clone())
+                DeadCodeElimPass::<H>::default_with_scope(scope.clone())
             });
         dce.with_entry_points(self.inputs.keys().copied())
             .set_preserve_callback(if self.allow_increase_termination {
@@ -208,8 +208,10 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             })?;
         Ok(())
     }
+}
 
-    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
+impl WithScope for ConstantFoldPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
         self.scope = Some(scope.into());
         self
     }

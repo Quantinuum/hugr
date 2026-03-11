@@ -13,7 +13,7 @@ use hugr_core::{
 use hugr_core::hugr::{HugrView, OpType, hugrmut::HugrMut};
 use itertools::Itertools as _;
 
-use crate::composable::{ValidatePassError, validate_if_test};
+use crate::composable::{ValidatePassError, WithScope, validate_if_test};
 use crate::{ComposablePass, PassScope};
 
 /// Replaces calls to polymorphic functions with calls to new monomorphic
@@ -223,8 +223,10 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for MonomorphizePass {
         };
         Ok(())
     }
+}
 
-    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
+impl WithScope for MonomorphizePass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
         self.scope = scope.into();
         self
     }

@@ -7,6 +7,7 @@ use hugr_core::hugr::{
 };
 use itertools::Itertools;
 
+use crate::composable::WithScope;
 use crate::{ComposablePass, PassScope};
 
 /// Inlines all DFG nodes nested below the entrypoint.
@@ -44,8 +45,10 @@ impl<H: HugrMut> ComposablePass<H> for InlineDFGsPass {
         }
         Ok(())
     }
+}
 
-    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
+impl WithScope for InlineDFGsPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
         self.scope = scope.into();
         self
     }

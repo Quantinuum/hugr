@@ -29,6 +29,7 @@ use hugr_core::types::{
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Visibility, Wire};
 
+use crate::composable::WithScope;
 use crate::{ComposablePass, PassScope};
 
 mod linearize;
@@ -709,7 +710,7 @@ impl ReplaceTypes {
     /// Set the regions of the Hugr to which this pass should be applied.
     ///
     /// If not set, the pass is applied to the whole Hugr.
-    /// Each call overwrites any previous calls to `set_regions` and/or [Self::with_scope_internal].
+    /// Each call overwrites any previous calls to `set_regions` and/or [Self::with_scope].
     pub fn set_regions(&mut self, regions: impl IntoIterator<Item = Node>) {
         self.scope = Either::Right(regions.into_iter().collect());
     }
@@ -912,17 +913,6 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
     type Error = ReplaceTypesError;
     type Result = bool;
 
-    /// Sets the scope within which the pass will operate. Note that this pass ignores
-    /// * [PassScope::preserve_interface], as this is a lowering pass: its purpose is to
-    ///   change node signatures.
-    /// * [PassScope::recursive], as non-recursion generally leads to invalid Hugrs.
-    ///
-    /// Hence, really only the [PassScope::root] affects the pass.
-    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
-        self.scope = Either::Left(scope.into());
-        self
-    }
-
     fn run(&self, hugr: &mut H) -> Result<bool, ReplaceTypesError> {
         let temp: Vec<Node>; // keep alive
         let regions = match &self.scope {
@@ -937,6 +927,19 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
             changed |= self.change_subtree(hugr, *region_root, false)?;
         }
         Ok(changed)
+    }
+}
+
+impl WithScope for ReplaceTypes {
+    /// Sets the scope within which the pass will operate. Note that this pass ignores
+    /// * [PassScope::preserve_interface], as this is a lowering pass: its purpose is to
+    ///   change node signatures.
+    /// * [PassScope::recursive], as non-recursion generally leads to invalid Hugrs.
+    ///
+    /// Hence, really only the [PassScope::root] affects the pass.
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = Either::Left(scope.into());
+        self
     }
 }
 

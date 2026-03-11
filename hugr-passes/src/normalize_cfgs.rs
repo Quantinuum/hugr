@@ -18,6 +18,7 @@ use hugr_core::ops::{
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 
+use crate::composable::WithScope;
 use crate::{ComposablePass, PassScope};
 
 /// Merge any basic blocks that are direct children of the specified [`CFG`]-entrypoint
@@ -113,7 +114,7 @@ impl<N> NormalizeCFGPass<N> {
     /// Allows mutating the set of CFG nodes that will be normalized.
     ///
     /// Note that calling this method (even if the returned mut-ref is not written to) will
-    /// override any previous call to [Self::with_scope_internal].
+    /// override any previous call to [Self::with_scope].
     ///
     /// If empty (the default), all (non-strict) descendants of the [HugrView::entrypoint]
     /// will be normalized.
@@ -168,9 +169,10 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
         }
         Ok(results)
     }
+}
 
-    /// Overrides any previous call to [Self::cfgs]
-    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
+impl<N> WithScope for NormalizeCFGPass<N> {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
         self.scope = Either::Right(scope.into());
         self
     }
