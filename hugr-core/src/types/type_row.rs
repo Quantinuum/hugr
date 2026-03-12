@@ -179,6 +179,12 @@ impl PartialEq<Term> for TypeRow {
     }
 }
 
+impl PartialEq<TypeRowRV> for TypeRow {
+    fn eq(&self, other: &TypeRowRV) -> bool {
+        self == &other.0
+    }
+}
+
 /// Fallibly convert a [Term] to a [TypeRow].
 ///
 /// This will fail if `arg` is not a [Term::List] or any of the elements are not [Type]s
