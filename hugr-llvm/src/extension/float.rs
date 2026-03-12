@@ -103,6 +103,17 @@ fn emit_float_op<'c, H: HugrView<Node = Node>>(
                     .as_basic_value_enum(),
             ])
         }),
+        FloatOps::fround => emit_custom_unary_op(context, args, |ctx, v, _| {
+            let float_ty = ctx.iw_context().f64_type().as_basic_type_enum();
+            let func = get_intrinsic(ctx.get_current_module(), "llvm.round.f64", [float_ty])?;
+            Ok(vec![
+                ctx.builder()
+                    .build_call(func, &[v.into()], "")?
+                    .try_as_basic_value()
+                    .unwrap_basic()
+                    .as_basic_value_enum(),
+            ])
+        }),
         // Missing ops, not supported by inkwell
         FloatOps::fmax
         | FloatOps::fmin
