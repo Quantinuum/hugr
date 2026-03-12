@@ -37,7 +37,7 @@ use smol_str::SmolStr;
 ///
 ///     // Create a module and define a function within it
 ///     let mut module_builder = ModuleBuilder::new();
-///     let mut f_build = module_builder.define_function("main", Signature::new_endo(bool_t()))?;
+///     let mut f_build = module_builder.define_function("main", Signature::new_endo([bool_t()]))?;
 ///     let [im] = f_build.input_wires_arr();
 ///
 ///     // We can build a DFG as a sub-component of the function body, and then link it in.
