@@ -19,6 +19,7 @@ use crate::ops::validate::{
 };
 use crate::ops::{NamedOp, OpName, OpTag, OpTrait, OpType, ValidateOp};
 use crate::types::EdgeKind;
+use crate::types::Substitutable;
 use crate::types::type_param::TypeParam;
 use crate::{Direction, Port, Visibility};
 

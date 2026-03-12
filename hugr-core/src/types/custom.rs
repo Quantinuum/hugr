@@ -8,7 +8,7 @@ use crate::Extension;
 use crate::extension::{ExtensionId, SignatureError, TypeDef};
 
 use super::{
-    Substitution, TypeBound,
+    Substitutable, Substitution, TypeBound,
     type_param::{TypeArg, TypeParam},
 };
 use super::{Type, TypeName};

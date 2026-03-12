@@ -15,7 +15,7 @@ use crate::Hugr;
 use crate::envelope::serde_with::AsBinaryEnvelope;
 use crate::ops::{OpName, OpNameRef};
 use crate::types::type_param::{TypeArg, TypeParam, check_term_types};
-use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
+use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Substitutable};
 mod serialize_signature_func;
 
 /// Trait necessary for binary computations of `OpDef` signature

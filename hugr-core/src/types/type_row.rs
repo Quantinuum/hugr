@@ -7,7 +7,9 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{Substitution, Term, Transformable, Type, TypeTransformer, type_param::TypeParam};
+use super::{
+    Substitutable, Substitution, Term, Transformable, Type, TypeTransformer, type_param::TypeParam,
+};
 use crate::{
     extension::SignatureError,
     types::{
@@ -61,14 +63,6 @@ impl TypeRow {
         &self.types
     }
 
-    /// Applies a substitution to the row.
-    pub(crate) fn substitute(&self, s: &Substitution) -> Self {
-        self.iter()
-            .map(|ty| ty.substitute(s))
-            .collect::<Vec<_>>()
-            .into()
-    }
-
     delegate! {
         to self.types {
             /// Iterator over the types in the row.
@@ -84,9 +78,19 @@ impl TypeRow {
             #[must_use] pub fn is_empty(&self) -> bool;
         }
     }
+}
 
-    pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
+impl Substitutable for TypeRow {
+    fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.iter().try_for_each(|t| t.validate(var_decls))
+    }
+
+    /// Applies a substitution to the row.
+    fn substitute(&self, s: &Substitution) -> Self {
+        self.iter()
+            .map(|ty| ty.substitute(s))
+            .collect::<Vec<_>>()
+            .into()
     }
 }
 
@@ -263,16 +267,18 @@ impl TypeRowRV {
     pub fn concat(self, other: impl Into<Self>) -> Self {
         Self(Term::concat_lists([self.0, other.into().0]))
     }
+}
 
+impl Substitutable for TypeRowRV {
     /// Checks that this is indeed a list of runtime types;
     /// and that all variables are as declared in the supplied list of params.
-    pub fn validate(&self, vars: &[Term]) -> Result<(), SignatureError> {
+    fn validate(&self, vars: &[TypeParam]) -> Result<(), SignatureError> {
         check_term_type(&self.0, &Term::new_list_type(TypeBound::Linear))?;
         self.0.validate(vars)
     }
 
     /// Makes a new instance by substituting values for variables
-    pub fn substitute(&self, s: &Substitution) -> Self {
+    fn substitute(&self, s: &Substitution) -> Self {
         // Substitution cannot make this invalid if it was valid previously
         Self::new_unchecked(self.0.substitute(s))
     }

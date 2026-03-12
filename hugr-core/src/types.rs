@@ -453,39 +453,6 @@ impl Type {
         TypeBound::Copyable.contains(self.least_upper_bound())
     }
 
-    /// Checks all variables used in the type are in the provided list
-    /// of bound variables, and that for each [`CustomType`] the type arguments
-    /// [validate] and fit into the declared parameters of the [`TypeDef`]
-    ///
-    /// [validate]: crate::types::type_param::TypeArg::validate
-    /// [TypeDef]: crate::extension::TypeDef
-    pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
-        self.0.validate(var_decls)?;
-        // ALAN even this should be only a debug-assert really:
-        // we have no unchecked access from outside crate::types
-        // so it must be a bug in our caching logic if this is wrong:
-        check_term_type(&self.0, &self.1.into())?;
-        debug_assert!(
-            self.1 == TypeBound::Copyable
-                || check_term_type(&self.0, &TypeBound::Copyable.into()).is_err()
-        );
-        Ok(())
-    }
-
-    /// Applies a substitution to a type.
-    /// This may result in a row of types, if this [Type] is not really a single type but actually a row variable
-    /// Invariants may be confirmed by validation:
-    /// * If [`Type::validate`]`(false)` returns successfully, this method will return a Vec containing exactly one type
-    /// * If [`Type::validate`]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
-    ///   return a Vec containing any number of [Type]s. These may (or not) pass [`Type::validate`]
-    fn substitute(&self, s: &Substitution) -> Self {
-        let t = self.0.substitute(s);
-        // Must succeed and produce a type assuming substitution valid (RHSes
-        // fit within LHS). However, may *narrow* the bound, so recompute.
-        let b = t.least_upper_bound().unwrap();
-        Self(t, b)
-    }
-
     /// Returns a registry with the concrete extensions used by this type.
     ///
     /// This includes the extensions of custom types that may be nested
@@ -615,6 +582,63 @@ impl<E: Transformable> Transformable for [E] {
             any_change |= item.transform(tr)?;
         }
         Ok(any_change)
+    }
+}
+
+/// Sub-trait of [`Transformable`] for types that support substitution of type
+/// variables and validation of type-variable scopes.
+pub(crate) trait Substitutable: Transformable {
+    /// Checks all variables used in `self` are in the provided list
+    /// of bound variables, and that for each [`CustomType`] the type arguments
+    /// fit into the declared parameters of the [`TypeDef`].
+    ///
+    /// [`TypeDef`]: crate::extension::TypeDef
+    fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError>;
+
+    /// Applies a [`Substitution`] to this instance, returning a new value.
+    ///
+    /// Infallible (assuming the `subst` covers all variables) and will not
+    /// invalidate the instance (assuming all values substituted in are valid
+    /// instances of the variables they replace).
+    ///
+    /// # Panics
+    ///
+    /// If the substitution does not cover all type variables in `self`.
+    fn substitute(&self, s: &Substitution) -> Self;
+}
+
+impl Substitutable for Type {
+    /// Checks all variables used in the type are in the provided list
+    /// of bound variables, and that for each [`CustomType`] the type arguments
+    /// [validate] and fit into the declared parameters of the [`TypeDef`]
+    ///
+    /// [validate]: crate::types::type_param::TypeArg::validate
+    /// [TypeDef]: crate::extension::TypeDef
+    fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
+        self.0.validate(var_decls)?;
+        // ALAN even this should be only a debug-assert really:
+        // we have no unchecked access from outside crate::types
+        // so it must be a bug in our caching logic if this is wrong:
+        check_term_type(&self.0, &self.1.into())?;
+        debug_assert!(
+            self.1 == TypeBound::Copyable
+                || check_term_type(&self.0, &TypeBound::Copyable.into()).is_err()
+        );
+        Ok(())
+    }
+
+    /// Applies a substitution to a type.
+    /// This may result in a row of types, if this [Type] is not really a single type but actually a row variable
+    /// Invariants may be confirmed by validation:
+    /// * If [`Type::validate`]`(false)` returns successfully, this method will return a Vec containing exactly one type
+    /// * If [`Type::validate`]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
+    ///   return a Vec containing any number of [Type]s. These may (or not) pass [`Type::validate`]
+    fn substitute(&self, s: &Substitution) -> Self {
+        let t = self.0.substitute(s);
+        // Must succeed and produce a type assuming substitution valid (RHSes
+        // fit within LHS). However, may *narrow* the bound, so recompute.
+        let b = t.least_upper_bound().unwrap();
+        Self(t, b)
     }
 }
 

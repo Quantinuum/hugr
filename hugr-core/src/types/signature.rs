@@ -5,7 +5,7 @@ use itertools::{Either, Itertools as _};
 use std::fmt::{self, Display};
 
 use super::type_param::TypeParam;
-use super::{Substitution, Transformable, Type, TypeRow, TypeTransformer};
+use super::{Substitutable, Substitution, Transformable, Type, TypeRow, TypeTransformer};
 
 use crate::core::PortIndex;
 use crate::extension::resolution::{
