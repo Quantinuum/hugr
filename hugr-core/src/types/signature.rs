@@ -9,7 +9,7 @@ use super::{Substitution, Transformable, Type, TypeRow, TypeTransformer};
 
 use crate::core::PortIndex;
 use crate::extension::resolution::{
-    ExtensionCollectionError, WeakExtensionRegistry, collect_signature_exts, collect_term_exts,
+    ExtensionCollectionError, WeakExtensionRegistry, collect_signature_exts,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::types::{Substitutable, TypeRowRV};
@@ -118,20 +118,6 @@ impl Signature {
 }
 
 impl FuncValueType {
-    pub fn used_extensions(&self) -> Result<ExtensionRegistry, ExtensionCollectionError> {
-        let mut used = WeakExtensionRegistry::default();
-        let mut missing = ExtensionSet::new();
-
-        collect_term_exts(&self.input, &mut used, &mut missing);
-        collect_term_exts(&self.output, &mut used, &mut missing);
-
-        if missing.is_empty() {
-            Ok(used.try_into().expect("all extensions are present"))
-        } else {
-            Err(ExtensionCollectionError::dropped_signature(self, missing))
-        }
-    }
-
     /// True if both inputs and outputs are necessarily empty
     /// (even after any possible substitution of row variables)
     #[inline(always)]
@@ -329,7 +315,7 @@ impl PartialEq<FuncValueType> for Signature {
 mod test {
     use crate::extension::prelude::{bool_t, qb_t, usize_t};
     use crate::type_row;
-    use crate::types::{CustomType, TypeEnum, test::FnTransformer};
+    use crate::types::{CustomType, Term, test::FnTransformer};
 
     use super::*;
     #[test]
