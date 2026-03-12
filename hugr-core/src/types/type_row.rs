@@ -345,7 +345,7 @@ mod test {
     use crate::{extension::prelude::bool_t, types::Type};
 
     mod proptest {
-        use super::super::TypeRow;
+        use super::{TypeRow, TypeRowRV};
         use crate::{proptest::RecursionDepth, types::Type};
         use ::proptest::prelude::*;
 
@@ -357,6 +357,22 @@ mod test {
                 if depth.leaf() {
                     Just(TypeRow::new()).boxed()
                 } else {
+                    vec(any_with::<Type>(depth.descend()), 0..4)
+                        .prop_map(|ts| ts.clone().into())
+                        .boxed()
+                }
+            }
+        }
+
+        impl Arbitrary for TypeRowRV {
+            type Parameters = RecursionDepth;
+            type Strategy = BoxedStrategy<Self>;
+            fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
+                use proptest::collection::vec;
+                if depth.leaf() {
+                    Just(TypeRowRV::default()).boxed()
+                } else {
+                    // TODO ALAN include row variables here too!
                     vec(any_with::<Type>(depth.descend()), 0..4)
                         .prop_map(|ts| ts.clone().into())
                         .boxed()

@@ -4,18 +4,14 @@ use std::borrow::Cow;
 
 use itertools::Itertools;
 
-use crate::{extension::SignatureError, types::{Substitutable, TypeRow, TypeRowRV}};
-#[cfg(test)]
-use {
-    super::proptest_utils::any_serde_type_param,
-    crate::proptest::RecursionDepth,
-    ::proptest::{collection::vec, prelude::*},
-    proptest_derive::Arbitrary,
+use crate::{
+    extension::SignatureError,
+    types::{Substitutable, TypeRow, TypeRowRV},
 };
 
 use super::Substitution;
+use super::signature::FuncTypeBase;
 use super::type_param::{TypeArg, TypeParam, check_term_types};
-use super::{signature::FuncTypeBase};
 
 /// A polymorphic type scheme, i.e. of a [`FuncDecl`], [`FuncDefn`] or [`OpDef`].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -24,18 +20,23 @@ use super::{signature::FuncTypeBase};
 /// [`FuncDefn`]: crate::ops::module::FuncDefn
 /// [`OpDef`]: crate::extension::OpDef
 #[derive(
-    Clone, PartialEq, Debug, Default, Eq, Hash, derive_more::Display, serde::Serialize, serde::Deserialize,
+    Clone,
+    PartialEq,
+    Debug,
+    Default,
+    Eq,
+    Hash,
+    derive_more::Display,
+    serde::Serialize,
+    serde::Deserialize,
 )]
-#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 #[display("{}{body}", self.display_params())]
 pub struct PolyFuncTypeBase<T> {
     /// The declared type parameters, i.e., these must be instantiated with
     /// the same number of [`TypeArg`]s before the function can be called. This
     /// defines the indices used by variables inside the body.
-    #[cfg_attr(test, proptest(strategy = "vec(any_serde_type_param(params), 0..3)"))]
     params: Vec<TypeParam>,
     /// Template for the function. May contain variables up to length of [`Self::params`]
-    #[cfg_attr(test, proptest(strategy = "any_with::<FuncTypeBase<T>>(params)"))]
     body: FuncTypeBase<T>,
 }
 
@@ -126,7 +127,7 @@ impl<T> PolyFuncTypeBase<T> {
 
 // Do not implement Substitutable: we never need to substitute into a PolyFuncType
 // (i.e. under a binder).
-impl <T:Substitutable> PolyFuncTypeBase<T> {
+impl<T: Substitutable> PolyFuncTypeBase<T> {
     /// Instantiates an outer [`PolyFuncTypeBase`], i.e. with no free variables
     /// (as ensured by [`Self::validate`]), into a monomorphic type.
     ///
@@ -157,16 +158,43 @@ pub(crate) mod test {
     use crate::Extension;
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound};
+
     use crate::std_extensions::collections::array::{self, array_type_parametric};
     use crate::std_extensions::collections::list;
+
     use crate::types::signature::FuncTypeBase;
     use crate::types::type_param::{TermTypeError, TypeArg, TypeParam};
     use crate::types::{
-        CustomType, FuncValueType, Signature, Substitutable, Term, Type, TypeBound, TypeName, TypeRV, TypeRowRV
+        CustomType, FuncValueType, Signature, Substitutable, Term, Type, TypeBound, TypeName,
+        TypeRowRV,
     };
 
     use super::PolyFuncTypeBase;
+    mod proptest {
+        use proptest::collection::vec;
+        use proptest::prelude::{Arbitrary, BoxedStrategy, Strategy, any_with};
 
+        use super::PolyFuncTypeBase;
+        use crate::proptest::RecursionDepth;
+        use crate::types::proptest_utils::any_serde_type_param;
+        use crate::types::signature::FuncTypeBase;
+
+        impl<T: Arbitrary<Parameters = RecursionDepth> + 'static> Arbitrary for PolyFuncTypeBase<T> {
+            type Parameters = RecursionDepth;
+            type Strategy = BoxedStrategy<Self>;
+
+            fn arbitrary_with(params: Self::Parameters) -> Self::Strategy {
+                // We want to generate a random number of type parameters, and then generate a body that can refer to those parameters.
+                // To do this, we first generate the type parameters, and then pass them as parameters to the body strategy.
+                (
+                    vec(any_serde_type_param(params), 0..3),
+                    any_with::<FuncTypeBase<T>>(params),
+                )
+                    .prop_map(|(params, body)| Self::new(params, body))
+                    .boxed()
+            }
+        }
+    }
     impl<T: Substitutable> PolyFuncTypeBase<T> {
         fn new_validated(
             params: impl Into<Vec<TypeParam>>,
@@ -414,7 +442,8 @@ pub(crate) mod test {
             Signature::new(
                 vec![usize_t(), usize_t(), bool_t()],
                 vec![Type::new_tuple(vec![usize_t(), bool_t()])]
-            ), t2
+            ),
+            t2
         );
     }
 

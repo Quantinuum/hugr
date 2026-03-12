@@ -15,11 +15,7 @@ use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::types::{Substitutable, TypeRowRV};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
-#[cfg(test)]
-use {crate::proptest::RecursionDepth, proptest::prelude::*, proptest_derive::Arbitrary};
-
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
-#[cfg_attr(test, derive(Arbitrary), proptest(params = "RecursionDepth"))]
 /// Base type for listing inputs and output types.
 ///
 /// The exact semantics depend on the use case:
@@ -31,10 +27,8 @@ use {crate::proptest::RecursionDepth, proptest::prelude::*, proptest_derive::Arb
 /// [`FuncDefn`]: crate::ops::FuncDefn
 pub struct FuncTypeBase<T> {
     /// Value inputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<T>(params)"))]
     pub input: T,
     /// Value outputs of the function.
-    #[cfg_attr(test, proptest(strategy = "any_with::<T>(params)"))]
     pub output: T,
 }
 
@@ -318,6 +312,27 @@ mod test {
     use crate::types::{CustomType, Term, test::FnTransformer};
 
     use super::*;
+
+    mod proptest {
+        use proptest::prelude::{Arbitrary, BoxedStrategy, Strategy, any_with};
+
+        use super::FuncTypeBase;
+        use crate::proptest::RecursionDepth;
+
+        impl<T: Arbitrary<Parameters = RecursionDepth> + 'static> Arbitrary for FuncTypeBase<T> {
+            type Parameters = RecursionDepth;
+            type Strategy = BoxedStrategy<Self>;
+
+            fn arbitrary_with(params: Self::Parameters) -> Self::Strategy {
+                // We want to generate a random number of type parameters, and then generate a body that can refer to those parameters.
+                // To do this, we first generate the type parameters, and then pass them as parameters to the body strategy.
+                (any_with::<T>(params), any_with::<T>(params))
+                    .prop_map(|(input, output)| Self::new(input, output))
+                    .boxed()
+            }
+        }
+    }
+
     #[test]
     fn test_function_type() {
         let mut f_type = Signature::new(type_row![Type::UNIT], type_row![Type::UNIT]);
