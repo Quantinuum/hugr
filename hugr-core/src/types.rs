@@ -585,27 +585,36 @@ impl<E: Transformable> Transformable for [E] {
     }
 }
 
-/// Sub-trait of [`Transformable`] for types that support substitution of type
-/// variables and validation of type-variable scopes.
-pub(crate) trait Substitutable: Transformable {
-    /// Checks all variables used in `self` are in the provided list
-    /// of bound variables, and that for each [`CustomType`] the type arguments
-    /// fit into the declared parameters of the [`TypeDef`].
-    ///
-    /// [`TypeDef`]: crate::extension::TypeDef
-    fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError>;
+/// Compared to just `pub(crate) trait Substitutable: Transformable`, this avoids a
+/// private_bounds warning when the trait is used as a type bound on a public struct.
+mod internal {
+    use super::{SignatureError, Substitution, Transformable, TypeParam};
 
-    /// Applies a [`Substitution`] to this instance, returning a new value.
-    ///
-    /// Infallible (assuming the `subst` covers all variables) and will not
-    /// invalidate the instance (assuming all values substituted in are valid
-    /// instances of the variables they replace).
-    ///
-    /// # Panics
-    ///
-    /// If the substitution does not cover all type variables in `self`.
-    fn substitute(&self, s: &Substitution) -> Self;
+    /// Sub-trait of [`Transformable`] for types that support substitution of
+    /// type variables and validation of type-variable scopes.
+    pub trait Substitutable: Transformable {
+        /// Checks all variables used in `self` are in the provided list
+        /// of bound variables, and that for each [`CustomType`] the type
+        /// arguments fit into the declared parameters of the [`TypeDef`].
+        ///
+        /// [`TypeDef`]: crate::extension::TypeDef
+        fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError>;
+
+        /// Applies a [`Substitution`] to this instance, returning a new value.
+        ///
+        /// Infallible (assuming the `subst` covers all variables) and will
+        /// not invalidate the instance (assuming all values substituted in are
+        /// valid instances of the variables they replace).
+        ///
+        /// # Panics
+        ///
+        /// If the substitution does not cover all type variables in `self`.
+        fn substitute(&self, s: &Substitution) -> Self;
+    }
+
 }
+
+pub(crate) use internal::Substitutable;
 
 impl Substitutable for Type {
     /// Checks all variables used in the type are in the provided list
