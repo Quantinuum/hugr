@@ -15,6 +15,8 @@ use serde::de::Deserialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+#[deprecated(since = "0.26.0")]
+#[expect(deprecated)] // Remove at same time
 pub use self::petgraph::PetgraphWrapper;
 use self::render::MermaidFormatter;
 pub use nodes_iter::NodesIter;
