@@ -164,10 +164,10 @@ fn instantiate(
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
 ///
-/// The original polymorphic [`FuncDefn`]s are left untouched (including Calls inside them).
-/// Call [`crate::remove_dead_funcs`] to remove them.
+/// The original polymorphic [`FuncDefn`]s are left untouched (including Calls inside
+/// them); they can be removed by e.g. [`crate::RemoveDeadFuncsPass`].
 ///
-/// If the Hugr is [`FuncDefn`](OpType::FuncDefn)-rooted with polymorphic
+/// If the Hugr's entrypoint is a [`FuncDefn`](OpType::FuncDefn) with polymorphic
 /// signature then the HUGR will not be modified.
 ///
 /// Monomorphic copies of polymorphic functions will be added to the HUGR as

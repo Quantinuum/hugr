@@ -28,7 +28,7 @@ use super::{NodeTemplate, ParametricType};
 /// would be a specific instantiation of the function for the
 /// type-that-becomes-linear, into which copy/discard can be inserted.
 ///
-/// [monomorphization]: crate::monomorphize()
+/// [monomorphization]: crate::MonomorphizePass
 /// [Copyable]: hugr_core::types::TypeBound::Copyable
 pub trait Linearizer {
     /// Insert copy or discard operations (as appropriate) enough to wire `src`

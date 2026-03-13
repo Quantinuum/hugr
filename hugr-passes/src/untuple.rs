@@ -111,7 +111,6 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for UntuplePass {
 }
 
 impl WithScope for UntuplePass {
-    /// Overrides any [Self::set_parent] or [Self::recursive]
     fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
         self.scope = scope.into();
         self

@@ -49,7 +49,7 @@ fn reachable_funcs<'a, H: HugrView>(
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Dead Function Removal pass.
 pub struct RemoveDeadFuncsPass {
-    entry_points: PassScope,
+    scope: PassScope,
 }
 
 impl<H: HugrMut> ComposablePass<H> for RemoveDeadFuncsPass {
@@ -58,7 +58,7 @@ impl<H: HugrMut> ComposablePass<H> for RemoveDeadFuncsPass {
 
     fn run(&self, hugr: &mut H) -> Result<(), RemoveDeadFuncsError> {
         let mut entry_points = Vec::new();
-        match &self.entry_points {
+        match &self.scope {
             // If the entrypoint is the module root, not allowed to touch anything.
             // Otherwise, we must keep the entrypoint (and can touch only inside it).
             PassScope::EntrypointFlat | PassScope::EntrypointRecursive
@@ -106,7 +106,7 @@ impl<H: HugrMut> ComposablePass<H> for RemoveDeadFuncsPass {
 
 impl WithScope for RemoveDeadFuncsPass {
     fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
-        self.entry_points = scope.into();
+        self.scope = scope.into();
         self
     }
 }
