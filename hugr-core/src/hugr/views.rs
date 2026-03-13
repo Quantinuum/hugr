@@ -389,6 +389,10 @@ pub trait HugrView: HugrInternals {
 
     /// Return a wrapper over the view that can be used in petgraph algorithms.
     #[inline]
+    #[deprecated(
+        since = "0.26.0",
+        note = "Use hugr_core::internal::HugrInternals::region_portgraph instead."
+    )]
     fn as_petgraph(&self) -> PetgraphWrapper<'_, Self>
     where
         Self: Sized,

@@ -208,6 +208,7 @@ mod test {
 
     use super::*;
     use hugr_core::builder::{BuildHandle, Dataflow, DataflowHugr, endo_sig};
+    use hugr_core::hugr::internal::HugrInternals;
     use hugr_core::ops::handle::{DataflowOpID, NodeHandle};
 
     use hugr_core::ops::{self, Value};
@@ -277,9 +278,12 @@ mod test {
         })
         .unwrap();
 
-        let topo_sorted = Topo::new(&hugr.as_petgraph())
-            .iter(&hugr.as_petgraph())
-            .filter(|n| rank_map.contains_key(n))
+        let (graph, node_map) = hugr.region_portgraph(hugr.entrypoint());
+
+        let topo_sorted = Topo::new(&graph)
+            .iter(&graph)
+            .map(|n| node_map.from_portgraph(n))
+            .filter(|n| rank_map.contains_key(&n))
             .collect_vec();
         hugr.validate().unwrap();
 
