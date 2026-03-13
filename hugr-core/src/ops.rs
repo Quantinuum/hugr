@@ -69,7 +69,7 @@
 //!
 //! // Create a conditional operation
 //! let conditional = Conditional {
-//!     sum_rows: vec![usize_t().into(), bool_t().into()],
+//!     sum_rows: vec![[usize_t()].into(), [bool_t()].into()],
 //!     other_inputs: vec![usize_t().into()].into(),
 //!     outputs: vec![bool_t()].into(),
 //! };

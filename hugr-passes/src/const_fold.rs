@@ -15,18 +15,18 @@ use hugr_core::{
 };
 use value_handle::ValueHandle;
 
+use crate::composable::{ComposablePass, PassScope, WithScope};
 use crate::dataflow::{
     ConstLoader, ConstLocation, DFContext, Machine, PartialValue, TailLoopTermination,
     partial_from_const,
 };
 use crate::dead_code::{DeadCodeElimError, DeadCodeElimPass, PreserveNode};
-use crate::{ComposablePass, PassScope, composable::validate_if_test};
 
 #[derive(Debug, Clone, Default)]
 /// A configuration for the Constant Folding pass.
 pub struct ConstantFoldPass {
     allow_increase_termination: bool,
-    scope: Option<PassScope>,
+    scope: PassScope,
     /// Each outer key Node must be either:
     ///   - a `FuncDefn` child of the root, if the root is a module; or
     ///   - the entrypoint, if the entrypoint is not a Module
@@ -101,11 +101,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
     /// [`ConstFoldError::InvalidEntryPoint`] if an entry-point added by [`Self::with_inputs`]
     /// was of an invalid [`OpType`]
     fn run(&self, hugr: &mut H) -> Result<(), ConstFoldError> {
-        let Some(root) = self
-            .scope
-            .as_ref()
-            .map_or(Some(hugr.entrypoint()), |sc| sc.root(hugr))
-        else {
+        let Some(root) = self.scope.root(hugr) else {
             return Ok(()); // Scope says do nothing
         };
         let fresh_node = Node::from(portgraph::NodeIndex::new(
@@ -130,7 +126,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             .map_err(|op| ConstFoldError::InvalidEntryPoint { node: n, op })?;
         }
 
-        for node in self.scope.iter().flat_map(|sc| sc.preserve_interface(hugr)) {
+        for node in self.scope.preserve_interface(hugr) {
             if node == hugr.module_root() || self.inputs.contains_key(&node) {
                 // Cannot prepopulate inputs for module-root; do not `join` with inputs explicitly specified.
                 continue;
@@ -182,12 +178,7 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             hugr.connect(lcst, OutgoingPort::from(0), n, inport);
         }
         // Eliminate dead code not required for the same entry points.
-        let dce = self
-            .scope
-            .as_ref()
-            .map_or(DeadCodeElimPass::<H>::default(), |scope| {
-                DeadCodeElimPass::<H>::default().with_scope_internal(scope.clone())
-            });
+        let dce = DeadCodeElimPass::<H>::default_with_scope(self.scope.clone());
         dce.with_entry_points(self.inputs.keys().copied())
             .set_preserve_callback(if self.allow_increase_termination {
                 Arc::new(|_, _| PreserveNode::CanRemoveIgnoringChildren)
@@ -208,31 +199,13 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
             })?;
         Ok(())
     }
-
-    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
-        self.scope = Some(scope.into());
-        self
-    }
 }
 
-/// Exhaustively apply constant folding to a HUGR.
-/// If the Hugr's entrypoint is its [`Module`], assumes all [`FuncDefn`] children are reachable.
-///
-/// [`FuncDefn`]: hugr_core::ops::OpType::FuncDefn
-/// [`Module`]: hugr_core::ops::OpType::Module
-#[deprecated(note = "Use ConstantFoldPass with a PassScope", since = "0.25.7")]
-pub fn constant_fold_pass<H: HugrMut<Node = Node> + 'static>(mut h: impl AsMut<H>) {
-    let h = h.as_mut();
-    let c = ConstantFoldPass::default();
-    let c = if h.get_optype(h.entrypoint()).is_module() {
-        let no_inputs: [(IncomingPort, _); 0] = [];
-        h.children(h.entrypoint())
-            .filter(|n| h.get_optype(*n).is_func_defn())
-            .fold(c, |c, n| c.with_inputs(n, no_inputs.iter().cloned()))
-    } else {
-        c
-    };
-    validate_if_test(c, h).unwrap();
+impl WithScope for ConstantFoldPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
+    }
 }
 
 struct ConstFoldContext;

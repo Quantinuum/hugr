@@ -1093,7 +1093,7 @@ mod test {
         // - Gets the element at the given index
         // - Returns the element if the index is in bounds, otherwise 0
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(exec_registry())
             .finish(|mut builder| {
                 let us0 = builder.add_load_value(ConstUsize::new(0));
@@ -1104,12 +1104,12 @@ mod test {
                 let (get_r, arr) = builder.add_array_get(usize_t(), 2, arr, i).unwrap();
                 builder.add_array_discard(usize_t(), 2, arr).unwrap();
                 let r = {
-                    let ot = option_type(usize_t());
+                    let ot = option_type([usize_t()]);
                     let variants = (0..ot.num_variants())
                         .map(|i| ot.get_variant(i).cloned().unwrap().try_into().unwrap())
                         .collect_vec();
                     let mut builder = builder
-                        .conditional_builder((variants, get_r), [], usize_t().into())
+                        .conditional_builder((variants, get_r), [], [usize_t()].into())
                         .unwrap();
                     {
                         let failure_case = builder.case_builder(0).unwrap();
@@ -1153,7 +1153,7 @@ mod test {
         use hugr_core::extension::prelude::either_type;
         let int_ty = int_type(3);
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(exec_registry())
             .finish(|mut builder| {
                 let us0 = builder.add_load_value(ConstUsize::new(0));
@@ -1182,7 +1182,7 @@ mod test {
                         })
                         .collect_vec();
                     let mut builder = builder
-                        .conditional_builder((variants, get_r), [], bool_t().into())
+                        .conditional_builder((variants, get_r), [], [bool_t()].into())
                         .unwrap();
                     for i in 0..2 {
                         let mut builder = builder.case_builder(i).unwrap();
@@ -1195,11 +1195,11 @@ mod test {
                             builder.add_load_value(ConstInt::new_u(3, expected_arr[1]).unwrap());
                         let (r, arr) = builder.add_array_get(int_ty.clone(), 2, arr, us0).unwrap();
                         let [arr_0] = builder
-                            .build_unwrap_sum(1, option_type(int_ty.clone()), r)
+                            .build_unwrap_sum(1, option_type([int_ty.clone()]), r)
                             .unwrap();
                         let (r, arr) = builder.add_array_get(int_ty.clone(), 2, arr, us1).unwrap();
                         let [arr_1] = builder
-                            .build_unwrap_sum(1, option_type(int_ty.clone()), r)
+                            .build_unwrap_sum(1, option_type([int_ty.clone()]), r)
                             .unwrap();
                         let elem_eq = builder.add_ieq(3, elem, expected_elem).unwrap();
                         let arr_0_eq = builder.add_ieq(3, arr_0, expected_arr_0).unwrap();
@@ -1213,7 +1213,11 @@ mod test {
                 };
                 let r = {
                     let mut conditional = builder
-                        .conditional_builder(([type_row![], type_row![]], r), [], usize_t().into())
+                        .conditional_builder(
+                            ([type_row![], type_row![]], r),
+                            [],
+                            [usize_t()].into(),
+                        )
                         .unwrap();
                     conditional
                         .case_builder(0)
@@ -1262,7 +1266,7 @@ mod test {
         let int_ty = int_type(3);
         let arr_ty = array_type(2, int_ty.clone());
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(exec_registry())
             .finish(|mut builder| {
                 let us0 = builder.add_load_value(ConstUsize::new(0));
@@ -1279,12 +1283,9 @@ mod test {
                 let [arr, was_expected_success] = {
                     let mut conditional = builder
                         .conditional_builder(
-                            (
-                                [vec![arr_ty.clone()].into(), vec![arr_ty.clone()].into()],
-                                r,
-                            ),
+                            ([[arr_ty.clone()].into(), vec![arr_ty.clone()].into()], r),
                             [],
-                            vec![arr_ty, bool_t()].into(),
+                            [arr_ty, bool_t()].into(),
                         )
                         .unwrap();
                     for i in 0..2 {
@@ -1303,11 +1304,11 @@ mod test {
                 };
                 let (r, arr) = builder.add_array_get(int_ty.clone(), 2, arr, us0).unwrap();
                 let elem_0 = builder
-                    .build_unwrap_sum::<1>(1, option_type(int_ty.clone()), r)
+                    .build_unwrap_sum::<1>(1, option_type([int_ty.clone()]), r)
                     .unwrap()[0];
                 let (r, arr) = builder.add_array_get(int_ty.clone(), 2, arr, us1).unwrap();
                 let elem_1 = builder
-                    .build_unwrap_sum::<1>(1, option_type(int_ty.clone()), r)
+                    .build_unwrap_sum::<1>(1, option_type([int_ty.clone()]), r)
                     .unwrap()[0];
                 let expected_elem_0 =
                     builder.add_load_value(ConstInt::new_u(3, expected_arr[0]).unwrap());
@@ -1319,7 +1320,11 @@ mod test {
                 let r = builder.add_and(r, elem_1_ok).unwrap();
                 let r = {
                     let mut conditional = builder
-                        .conditional_builder(([type_row![], type_row![]], r), [], usize_t().into())
+                        .conditional_builder(
+                            ([type_row![], type_row![]], r),
+                            [],
+                            [usize_t()].into(),
+                        )
                         .unwrap();
                     conditional
                         .case_builder(0)
@@ -1358,7 +1363,7 @@ mod test {
         let int_ty = int_type(3);
         let arr_ty = array_type(2, int_ty.clone());
         let hugr = SimpleHugrConfig::new()
-            .with_outs(int_ty.clone())
+            .with_outs([int_ty.clone()])
             .with_extensions(exec_registry())
             .finish(|mut builder| {
                 let idx = builder.add_load_value(ConstUsize::new(index));
@@ -1385,7 +1390,7 @@ mod test {
                     .add_array_get(int_ty.clone(), 2, arr_clone, idx)
                     .unwrap();
                 let [elem] = builder
-                    .build_unwrap_sum(1, option_type(int_ty.clone()), r)
+                    .build_unwrap_sum(1, option_type([int_ty.clone()]), r)
                     .unwrap();
                 builder.add_array_discard(int_ty.clone(), 2, arr).unwrap();
                 builder
@@ -1419,7 +1424,7 @@ mod test {
         let array_contents = [1, 2, 4];
         let int_ty = int_type(6);
         let hugr = SimpleHugrConfig::new()
-            .with_outs(int_ty.clone())
+            .with_outs([int_ty.clone()])
             .with_extensions(exec_registry())
             .finish(|mut builder| {
                 let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
@@ -1487,7 +1492,7 @@ mod test {
 
         let int_ty = int_type(6);
         let hugr = SimpleHugrConfig::new()
-            .with_outs(int_ty.clone())
+            .with_outs([int_ty.clone()])
             .with_extensions(exec_registry())
             .finish(|mut builder| {
                 let array = array::ArrayValue::new(
@@ -1535,7 +1540,7 @@ mod test {
 
         let int_ty = int_type(6);
         let hugr = SimpleHugrConfig::new()
-            .with_outs(int_ty.clone())
+            .with_outs([int_ty.clone()])
             .with_extensions(exec_registry())
             .finish(|mut builder| {
                 let mut mb = builder.module_root_builder();
@@ -1582,7 +1587,7 @@ mod test {
 
         let int_ty = int_type(6);
         let hugr = SimpleHugrConfig::new()
-            .with_outs(int_ty.clone())
+            .with_outs([int_ty.clone()])
             .with_extensions(exec_registry())
             .finish(|mut builder| {
                 let mut r = builder.add_load_value(ConstInt::new_u(6, 0).unwrap());
@@ -1654,7 +1659,7 @@ mod test {
 
         let int_ty = int_type(6);
         let hugr = SimpleHugrConfig::new()
-            .with_outs(int_ty.clone())
+            .with_outs([int_ty.clone()])
             .with_extensions(exec_registry())
             .finish(|mut builder| {
                 let new_array_args = (0..size)

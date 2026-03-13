@@ -401,7 +401,7 @@ mod test_fns {
     #[rstest]
     fn emit_hugr_tag(llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(Type::new_unit_sum(3))
+            .with_outs([Type::new_unit_sum(3)])
             .finish(|mut builder: DFGW| {
                 let tag = builder
                     .add_dataflow_op(
@@ -417,12 +417,12 @@ mod test_fns {
     #[rstest]
     fn emit_hugr_dfg(llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_ins(Type::UNIT)
-            .with_outs(Type::UNIT)
+            .with_ins([Type::UNIT])
+            .with_outs([Type::UNIT])
             .finish(|mut builder: DFGW| {
                 let dfg = {
                     let b = builder
-                        .dfg_builder(HugrFuncType::new_endo(Type::UNIT), builder.input_wires())
+                        .dfg_builder(HugrFuncType::new_endo([Type::UNIT]), builder.input_wires())
                         .unwrap();
                     let w = b.input_wires();
                     b.finish_with_outputs(w).unwrap()
@@ -436,7 +436,7 @@ mod test_fns {
     fn emit_hugr_conditional(llvm_ctx: TestContext) {
         let hugr = {
             let input_v_rows: Vec<TypeRow> =
-                (1..4).map(Type::new_unit_sum).map_into().collect_vec();
+                (1..4).map(|n| [Type::new_unit_sum(n)].into()).collect_vec();
             let output_v_rows = {
                 let mut r = input_v_rows.clone();
                 r.reverse();
@@ -488,7 +488,7 @@ mod test_fns {
         ]);
 
         let hugr = SimpleHugrConfig::new()
-            .with_outs(v.get_type())
+            .with_outs([v.get_type()])
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder: DFGW| {
                 let konst = builder.add_load_value(v);
@@ -545,7 +545,7 @@ mod test_fns {
         let v2 = ConstInt::new_s(4, 24).unwrap();
 
         let hugr = SimpleHugrConfig::new()
-            .with_outs(v1.get_type())
+            .with_outs([v1.get_type()])
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder: DFGW| {
                 let k1 = builder.add_load_value(v1);
@@ -599,7 +599,7 @@ mod test_fns {
     #[rstest]
     fn diverse_cfg_children(llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(bool_t())
+            .with_outs([bool_t()])
             .finish(|mut builder: DFGW| {
                 let [r] = {
                     let mut builder = builder.cfg_builder([], vec![bool_t()].into()).unwrap();
@@ -633,7 +633,7 @@ mod test_fns {
                 let mut builder = builder
                     .define_function(
                         "main",
-                        Signature::new(type_row![], Type::new_function(target_sig)),
+                        Signature::new(type_row![], [Type::new_function(target_sig)]),
                     )
                     .unwrap();
                 let r = builder.load_func(&target_func, &[]).unwrap();
@@ -713,7 +713,7 @@ mod test_fns {
 
         SimpleHugrConfig::new()
             .with_extensions(registry)
-            .with_outs(int_ty.clone())
+            .with_outs([int_ty.clone()])
             .finish(|mut builder: DFGW| {
                 let just_in_w = builder.add_load_value(ConstInt::new_u(6, iters).unwrap());
                 let other_w = builder.add_load_value(ConstInt::new_u(6, input).unwrap());
@@ -832,7 +832,7 @@ mod test_fns {
     #[rstest]
     fn test_exec(mut exec_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder: DFGW| {
                 let konst = builder.add_load_value(ConstUsize::new(42));

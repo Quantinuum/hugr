@@ -13,31 +13,8 @@ use hugr_core::{
 use hugr_core::hugr::{HugrView, OpType, hugrmut::HugrMut};
 use itertools::Itertools as _;
 
-use crate::ComposablePass;
-use crate::composable::{ValidatePassError, validate_if_test};
-
-/// Replaces calls to polymorphic functions with calls to new monomorphic
-/// instantiations of the polymorphic ones.
-///
-/// If the Hugr is [Module](OpType::Module)-rooted,
-/// * then the original polymorphic [`FuncDefn`]s are left untouched (including Calls inside them)
-///     - [`crate::remove_dead_funcs`] can be used when no other Hugr will be linked in that might instantiate these
-/// * else, the originals are removed (they are invisible from outside the Hugr); however, note
-///   that this behaviour is expected to change in a future release to match Module-rooted Hugrs.
-///
-/// If the Hugr is [`FuncDefn`](OpType::FuncDefn)-rooted with polymorphic
-/// signature then the HUGR will not be modified.
-///
-/// Monomorphic copies of polymorphic functions will be added to the HUGR as
-/// children of the root node.  We make best effort to ensure that names (derived
-/// from parent function names and concrete type args) of new functions are unique
-/// whenever the names of their parents are unique, but this is not guaranteed.
-#[deprecated(note = "Use MonomorphizePass instead", since = "0.25.7")]
-pub fn monomorphize(
-    hugr: &mut impl HugrMut<Node = Node>,
-) -> Result<(), ValidatePassError<Node, Infallible>> {
-    validate_if_test(MonomorphizePass, hugr)
-}
+use crate::composable::WithScope;
+use crate::{ComposablePass, PassScope};
 
 fn is_polymorphic(fd: &FuncDefn) -> bool {
     !fd.signature().params().is_empty()
@@ -187,30 +164,48 @@ fn instantiate(
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
 ///
-/// The original polymorphic [`FuncDefn`]s are left untouched (including Calls inside them).
-/// Call [`crate::remove_dead_funcs`] to remove them.
+/// The original polymorphic [`FuncDefn`]s are left untouched (including Calls inside
+/// them); they can be removed by e.g. [`crate::RemoveDeadFuncsPass`].
 ///
-/// If the Hugr is [`FuncDefn`](OpType::FuncDefn)-rooted with polymorphic
+/// If the Hugr's entrypoint is a [`FuncDefn`](OpType::FuncDefn) with polymorphic
 /// signature then the HUGR will not be modified.
 ///
 /// Monomorphic copies of polymorphic functions will be added to the HUGR as
 /// children of the root node.  We make best effort to ensure that names (derived
 /// from parent function names and concrete type args) of new functions are unique
 /// whenever the names of their parents are unique, but this is not guaranteed.
-#[derive(Debug, Clone)]
-pub struct MonomorphizePass;
+#[derive(Debug, Default, Clone)]
+pub struct MonomorphizePass {
+    scope: PassScope,
+}
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for MonomorphizePass {
     type Error = Infallible;
     type Result = ();
 
     fn run(&self, h: &mut H) -> Result<(), Self::Error> {
-        let root = h.entrypoint();
-        // If the root is a polymorphic function, then there are no external calls, so nothing to do
-        if !is_polymorphic_funcdefn(h.get_optype(root)) {
-            mono_scan(h, root, None, &mut HashMap::new());
-        }
+        match self.scope {
+            PassScope::EntrypointFlat | PassScope::EntrypointRecursive => {
+                // for module-entrypoint, PassScope says to do nothing. (Monomorphization could.)
+                // for non-module-entrypoint, PassScope says not to touch Hugr outside entrypoint,
+                //     so monomorphization cannot add any new functions --> do nothing.
+                // NOTE we could look to see if there are any existing instantations that
+                //   we could use (!), but not atm.
+            }
+            PassScope::Global(_) =>
+            // only generates new nodes, never changes signature of any existing node.
+            {
+                mono_scan(h, h.module_root(), None, &mut HashMap::new())
+            }
+        };
         Ok(())
+    }
+}
+
+impl WithScope for MonomorphizePass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
     }
 }
 
@@ -308,7 +303,7 @@ mod test {
         let [i1] = dfg_builder.input_wires_arr();
         let hugr = dfg_builder.finish_hugr_with_outputs([i1]).unwrap();
         let mut hugr2 = hugr.clone();
-        MonomorphizePass.run(&mut hugr2).unwrap();
+        MonomorphizePass::default().run(&mut hugr2).unwrap();
         assert_eq!(hugr, hugr2);
     }
 
@@ -319,7 +314,7 @@ mod test {
         let db = {
             let pfty = PolyFuncType::new(
                 [TypeBound::Copyable.into()],
-                Signature::new(tv0(), pair_type(tv0())),
+                Signature::new([tv0()], [pair_type(tv0())]),
             );
             let mut fb = mb.define_function("double", pfty)?;
             let [elem] = fb.input_wires_arr();
@@ -336,7 +331,7 @@ mod test {
         };
 
         let tr = {
-            let sig = Signature::new(tv0(), Type::new_tuple(vec![tv0(); 3]));
+            let sig = Signature::new([tv0()], [Type::new_tuple(vec![tv0(); 3])]);
             let mut fb = mb.define_function(
                 "triple",
                 PolyFuncType::new([TypeBound::Copyable.into()], sig),
@@ -355,7 +350,7 @@ mod test {
             let outs = vec![triple_type(usize_t()), triple_type(pair_type(usize_t()))];
             let mut fb = mb.define_function_vis(
                 "main",
-                Signature::new(usize_t(), outs),
+                Signature::new([usize_t()], outs),
                 Visibility::Public,
             )?;
             let [elem] = fb.input_wires_arr();
@@ -374,7 +369,7 @@ mod test {
                 .count(),
             3
         );
-        MonomorphizePass.run(&mut hugr)?;
+        MonomorphizePass::default().run(&mut hugr)?;
         let mono = hugr;
         mono.validate()?;
 
@@ -395,7 +390,7 @@ mod test {
             ["double", "main", "triple"]
         );
         let mut mono2 = mono.clone();
-        MonomorphizePass.run(&mut mono2)?;
+        MonomorphizePass::default().run(&mut mono2)?;
 
         assert_eq!(mono2, mono); // Idempotent
 
@@ -442,7 +437,7 @@ mod test {
         // mono_func returns constant 1 usize
         let mono_func = {
             let mut fb = mb
-                .define_function("get_usz", Signature::new(vec![], usize_t()))
+                .define_function("get_usz", Signature::new([], [usize_t()]))
                 .unwrap();
             let cst0 = fb.add_load_value(ConstUsize::new(1));
             fb.finish_with_outputs([cst0]).unwrap()
@@ -453,8 +448,8 @@ mod test {
             let pf2t = PolyFuncType::new(
                 [TypeParam::max_nat_type(), TypeBound::Linear.into()],
                 Signature::new(
-                    BorrowArray::ty_parametric(sv(0), tv(1)).unwrap(),
-                    vec![tv(1), BorrowArray::ty_parametric(sv(0), tv(1)).unwrap()],
+                    [BorrowArray::ty_parametric(sv(0), tv(1)).unwrap()],
+                    [tv(1), BorrowArray::ty_parametric(sv(0), tv(1)).unwrap()],
                 ),
             );
             let mut pf2 = mb.define_function("pf2", pf2t).unwrap();
@@ -475,8 +470,8 @@ mod test {
         let pf1t = PolyFuncType::new(
             [TypeParam::max_nat_type()],
             Signature::new(
-                BorrowArray::ty_parametric(sv(0), arr2u()).unwrap(),
-                usize_t(),
+                [BorrowArray::ty_parametric(sv(0), arr2u()).unwrap()],
+                [usize_t()],
             ),
         );
         let mut pf1 = mb.define_function("pf1", pf1t).unwrap();
@@ -551,7 +546,7 @@ mod test {
         let mut hugr = outer.finish_hugr_with_outputs([e1, e2]).unwrap();
         hugr.set_entrypoint(hugr.module_root()); // We want to act on everything, not just `main`
 
-        MonomorphizePass.run(&mut hugr).unwrap();
+        MonomorphizePass::default().run(&mut hugr).unwrap();
         let mono_hugr = hugr;
         mono_hugr.validate().unwrap();
         let funcs = list_funcs(&mono_hugr);
@@ -598,7 +593,7 @@ mod test {
                         "foo",
                         PolyFuncType::new(
                             [TypeBound::Linear.into()],
-                            Signature::new_endo(Type::new_var_use(0, TypeBound::Linear)),
+                            Signature::new_endo([Type::new_var_use(0, TypeBound::Linear)]),
                         ),
                     )
                     .unwrap();
@@ -608,13 +603,13 @@ mod test {
 
             let _main = {
                 let mut builder = module_builder
-                    .define_function("main", Signature::new_endo(Type::UNIT))
+                    .define_function("main", Signature::new_endo([Type::UNIT]))
                     .unwrap();
                 let func_ptr = builder
                     .load_func(foo.handle(), &[Type::UNIT.into()])
                     .unwrap();
                 let [r] = {
-                    let signature = Signature::new_endo(Type::UNIT);
+                    let signature = Signature::new_endo([Type::UNIT]);
                     builder
                         .add_dataflow_op(
                             CallIndirect { signature },
@@ -629,7 +624,7 @@ mod test {
             module_builder.finish_hugr().unwrap()
         };
 
-        MonomorphizePass.run(&mut hugr).unwrap();
+        MonomorphizePass::default().run(&mut hugr).unwrap();
         RemoveDeadFuncsPass::default()
             .with_scope(Preserve::Public)
             .run(&mut hugr)

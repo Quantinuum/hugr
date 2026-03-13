@@ -7,7 +7,6 @@
 
 mod scope;
 
-use hugr_core::Hugr;
 pub use scope::{InScope, PassScope, Preserve};
 
 use std::{error::Error, marker::PhantomData};
@@ -23,7 +22,7 @@ use itertools::Either;
 /// idempotent (i.e. such that after running a pass, rerunning it immediately has
 /// no further effect). However this is *not* a requirement, e.g. a sequence of
 /// idempotent passes created by [ComposablePass::then] may not be idempotent itself.
-pub trait ComposablePass<H: HugrMut>: Sized {
+pub trait ComposablePass<H: HugrMut>: WithScope + Sized {
     /// Error thrown by this pass.
     type Error: Error;
     /// Result returned by this pass.
@@ -31,26 +30,6 @@ pub trait ComposablePass<H: HugrMut>: Sized {
 
     /// Run the pass on the given HUGR.
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error>;
-
-    /// Set the scope configuration used to run the pass.
-    ///
-    /// See [`PassScope`] for more details.
-    ///
-    /// In `hugr 0.25.*`, this configuration is only a guidance, and may be
-    /// ignored by the pass by using the default implementation.
-    ///
-    /// From `hugr >=0.26.0`, passes must respect the scope configuration.
-    //
-    // For hugr passes, this is tracked by <https://github.com/Quantinuum/hugr/issues/2771>
-    fn with_scope_internal(self, scope: impl Into<PassScope>) -> Self {
-        // Currently passes are not required to respect the scope configuration.
-        // <https://github.com/Quantinuum/hugr/issues/2771>
-        //
-        // deprecated: Remove default implementation in hugr 0.26.0,
-        // ensure all passes follow the scope configuration.
-        let _ = scope;
-        self
-    }
 
     /// Apply a function to the error type of this pass, returning a new
     /// [`ComposablePass`] that has the same result type.
@@ -92,12 +71,17 @@ pub trait ComposablePass<H: HugrMut>: Sized {
                 let res2 = self.1.run(hugr).map_err(E::from_second)?;
                 Ok((res1, res2))
             }
-
-            fn with_scope_internal(self, scope: impl Into<PassScope>) -> Self {
+        }
+        impl<E, P1, P2> WithScope for Sequence<E, P1, P2>
+        where
+            P1: WithScope,
+            P2: WithScope,
+        {
+            fn with_scope(self, scope: impl Into<PassScope>) -> Self {
                 let scope = scope.into();
                 Self(
-                    self.0.with_scope_internal(scope.clone()),
-                    self.1.with_scope_internal(scope),
+                    self.0.with_scope(scope.clone()),
+                    self.1.with_scope(scope),
                     PhantomData,
                 )
             }
@@ -113,12 +97,19 @@ pub trait WithScope {
     /// Set the scope configuration used to run the pass.
     ///
     /// See [`PassScope`] for more details.
+    ///
+    /// Since `hugr >=0.26.0`, passes must implement this to respect the scope configuration.
     fn with_scope(self, scope: impl Into<PassScope>) -> Self;
-}
 
-impl<P: ComposablePass<Hugr>> WithScope for P {
-    fn with_scope(self, scope: impl Into<PassScope>) -> Self {
-        self.with_scope_internal(scope)
+    /// Return a default instance of the pass with the given scope.
+    ///
+    /// See [`PassScope`] for more details.
+    #[must_use]
+    fn default_with_scope(scope: PassScope) -> Self
+    where
+        Self: Default,
+    {
+        Self::default().with_scope(scope)
     }
 }
 
@@ -178,9 +169,13 @@ impl<P: ComposablePass<H>, H: HugrMut, E: Error, F: Fn(P::Error) -> E> Composabl
     fn run(&self, hugr: &mut H) -> Result<P::Result, Self::Error> {
         self.0.run(hugr).map_err(&self.1)
     }
+}
 
-    fn with_scope_internal(self, scope: impl Into<PassScope>) -> Self {
-        Self(self.0.with_scope_internal(scope), self.1, PhantomData)
+impl<P: ComposablePass<H>, H: HugrMut, E: Error, F: Fn(P::Error) -> E> WithScope
+    for ErrMapper<P, H, E, F>
+{
+    fn with_scope(self, scope: impl Into<PassScope>) -> Self {
+        Self(self.0.with_scope(scope), self.1, PhantomData)
     }
 }
 
@@ -260,9 +255,11 @@ where
         })?;
         Ok(res)
     }
+}
 
-    fn with_scope_internal(self, scope: impl Into<PassScope>) -> Self {
-        Self(self.0.with_scope_internal(scope), self.1)
+impl<P: ComposablePass<H>, H: HugrMut> WithScope for ValidatingPass<P, H> {
+    fn with_scope(self, scope: impl Into<PassScope>) -> Self {
+        Self(self.0.with_scope(scope), self.1)
     }
 }
 
@@ -301,32 +298,27 @@ impl<
         res.then(|| self.1.run(hugr).map_err(ErrorCombiner::from_second))
             .transpose()
     }
-
-    fn with_scope_internal(self, scope: impl Into<PassScope>) -> Self {
-        let scope = scope.into();
-        Self(
-            self.0.with_scope_internal(scope.clone()),
-            self.1.with_scope_internal(scope),
-            PhantomData,
-        )
-    }
 }
 
-// Note remove when deprecated constant_fold_pass / remove_dead_funcs are removed
-pub(crate) fn validate_if_test<P: ComposablePass<H>, H: HugrMut>(
-    pass: P,
-    hugr: &mut H,
-) -> Result<P::Result, ValidatePassError<H::Node, P::Error>> {
-    if cfg!(test) {
-        ValidatingPass::new(pass).run(hugr)
-    } else {
-        Ok(pass.run(hugr)?)
+impl<E, H, A, B> WithScope for IfThen<E, H, A, B>
+where
+    A: WithScope,
+    B: WithScope,
+{
+    fn with_scope(self, scope: impl Into<PassScope>) -> Self {
+        let scope = scope.into();
+        Self(
+            self.0.with_scope(scope.clone()),
+            self.1.with_scope(scope),
+            PhantomData,
+        )
     }
 }
 
 #[cfg(test)]
 pub(crate) mod test {
     use hugr_core::ops::Value;
+    use hugr_core::ops::dataflow::IOTrait;
     use itertools::{Either, Itertools};
 
     use hugr_core::builder::{
@@ -358,12 +350,12 @@ pub(crate) mod test {
     fn test_then() {
         let mut mb = ModuleBuilder::new();
         let id1 = mb
-            .define_function("id1", Signature::new_endo(usize_t()))
+            .define_function("id1", Signature::new_endo([usize_t()]))
             .unwrap();
         let inps = id1.input_wires();
         let id1 = id1.finish_with_outputs(inps).unwrap();
         let id2 = mb
-            .define_function("id2", Signature::new_endo(usize_t()))
+            .define_function("id2", Signature::new_endo([usize_t()]))
             .unwrap();
         let inps = id2.input_wires();
         let id2 = id2.finish_with_outputs(inps).unwrap();
@@ -413,21 +405,11 @@ pub(crate) mod test {
     #[test]
     fn test_validation() {
         let mut h = Hugr::new_with_entrypoint(DFG {
-            signature: Signature::new(usize_t(), bool_t()),
+            signature: Signature::new([usize_t()], [bool_t()]),
         })
         .unwrap();
-        let inp = h.add_node_with_parent(
-            h.entrypoint(),
-            Input {
-                types: usize_t().into(),
-            },
-        );
-        let outp = h.add_node_with_parent(
-            h.entrypoint(),
-            Output {
-                types: bool_t().into(),
-            },
-        );
+        let inp = h.add_node_with_parent(h.entrypoint(), Input::new([usize_t()]));
+        let outp = h.add_node_with_parent(h.entrypoint(), Output::new([bool_t()]));
         h.connect(inp, 0, outp, 0);
         let backup = h.clone();
         let err = backup.validate().unwrap_err();
