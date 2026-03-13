@@ -423,6 +423,13 @@ impl Term {
         }
     }
 
+    /// Repot if this is a runtime type, i.e. an instance of [Self::RuntimeType] for some bound.
+    ///
+    /// If so, [Type::try_from(Type)] will succeed and can be followed by [Type::least_upper_bound] to get the bound.
+    pub fn is_runtime_type(&self) -> bool {
+        self.least_upper_bound().is_some()
+    }
+
     /// Returns a string if the [`Term`] is a string literal.
     #[must_use]
     pub fn as_string(&self) -> Option<String> {

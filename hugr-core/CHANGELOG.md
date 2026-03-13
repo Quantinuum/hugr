@@ -1,6 +1,33 @@
 # Changelog
 
 
+## [0.25.7](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.6...hugr-core-v0.25.7) - 2026-03-06
+
+### Documentation
+
+- added examples in docs srtring ([#2920](https://github.com/Quantinuum/hugr/pull/2920))
+
+## [0.25.6](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.5...hugr-core-v0.25.6) - 2026-02-20
+
+### Bug Fixes
+
+- Canonicalize more ([#2839](https://github.com/Quantinuum/hugr/pull/2839))
+- used_extensions should include transitive requirements ([#2891](https://github.com/Quantinuum/hugr/pull/2891))
+
+### New Features
+
+- Add s expression format to envelope formats ([#2864](https://github.com/Quantinuum/hugr/pull/2864))
+- added hash.rs, updated imports ([#2840](https://github.com/Quantinuum/hugr/pull/2840))
+- *(hugr-py)* Define typed Metadata protocol ([#2765](https://github.com/Quantinuum/hugr/pull/2765))
+- Add a `NodeTemplate::call_to_function` helper ([#2878](https://github.com/Quantinuum/hugr/pull/2878))
+- Remove size limitation for binary envelopes ([#2880](https://github.com/Quantinuum/hugr/pull/2880))
+
+## [0.25.5](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.4...hugr-core-v0.25.5) - 2026-02-03
+
+### Refactor
+
+- make EnvelopeFormat::ModelWithExtensions the default ([#2816](https://github.com/Quantinuum/hugr/pull/2816))
+
 ## [0.25.3](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.2...hugr-core-v0.25.3) - 2026-01-09
 
 ### Bug Fixes

@@ -5,6 +5,8 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import TYPE_CHECKING, Any, Protocol, cast, runtime_checkable
 
+from typing_extensions import deprecated
+
 import hugr._serialization.ops as sops
 import hugr._serialization.tys as stys
 import hugr.model as model
@@ -344,6 +346,7 @@ class Right(Sum):
 
 
 @dataclass
+@deprecated("Lift constants to top-level functions + LoadFunction")
 class Function(Value):
     """Higher order function value, defined by a :class:`Hugr <hugr.hugr.HUGR>`."""
 

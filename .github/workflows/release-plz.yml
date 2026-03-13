@@ -6,9 +6,10 @@ on:
     branches:
       - main
 
-
 env:
-  LLVM_VERSION: "14.0"
+  LLVM_MAIN_VERSION: "21"
+  LLVM_VERSION: "21.1"
+  LLVM_FEATURE_NAME: "21-1"
 
 jobs:
   release-plz-pr:
@@ -49,7 +50,7 @@ jobs:
     runs-on: ubuntu-latest
     environment: crate-release
     permissions:
-      id-token: write     # Required for OIDC token exchange
+      id-token: write # Required for OIDC token exchange
     steps:
       - name: Checkout repository
         uses: actions/checkout@v6
@@ -62,12 +63,11 @@ jobs:
       # These are needed when doing a crate release, since `cargo release`
       # checks that the crate can be compiled before publishing it.
       - name: Install LLVM and Clang
-        uses: KyleMayes/install-llvm-action@v2
-        with:
-          version: ${{ env.LLVM_VERSION }}
-          # Use a temporary directory to avoid polluting the workspace,
-          # otherwise release-plz fails due to uncommitted changes.
-          directory: ${{ runner.temp }}/llvm
+        run: |
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
+          sudo apt update
+          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
 
       - uses: rust-lang/crates-io-auth-action@v1
         id: auth

@@ -56,7 +56,7 @@ pub enum EnvelopeFormat {
     /// be avoided.
     //
     // TODO: Update comment once extension encoding is supported.
-    ModelText = 40, // '(' in ascii
+    SExpression = 40, // '(' in ascii
     /// Human-readable S-expression encoding using [`hugr_model::v0`].
     ///
     /// Uses a printable ascii value as the discriminant so the envelope can be
@@ -64,7 +64,7 @@ pub enum EnvelopeFormat {
     ///
     /// This is a temporary format required until the model adds support for
     /// extensions.
-    ModelTextWithExtensions = 41, // ')' in ascii
+    SExpressionWithExtensions = 41, // ')' in ascii
     /// Json-encoded [`crate::package::Package`]
     ///
     /// Uses a printable ascii value as the discriminant so the envelope can be
@@ -83,8 +83,8 @@ impl EnvelopeFormat {
         match self {
             Self::Model
             | Self::ModelWithExtensions
-            | Self::ModelText
-            | Self::ModelTextWithExtensions => Some(0),
+            | Self::SExpression
+            | Self::SExpressionWithExtensions => Some(0),
             _ => None,
         }
     }
@@ -96,7 +96,7 @@ impl EnvelopeFormat {
     pub fn ascii_printable(self) -> bool {
         matches!(
             self,
-            Self::PackageJson | Self::ModelText | Self::ModelTextWithExtensions
+            Self::PackageJson | Self::SExpression | Self::SExpressionWithExtensions
         )
     }
 }
@@ -348,8 +348,8 @@ mod tests {
     #[rstest]
     #[case(EnvelopeFormat::Model)]
     #[case(EnvelopeFormat::ModelWithExtensions)]
-    #[case(EnvelopeFormat::ModelText)]
-    #[case(EnvelopeFormat::ModelTextWithExtensions)]
+    #[case(EnvelopeFormat::SExpression)]
+    #[case(EnvelopeFormat::SExpressionWithExtensions)]
     #[case(EnvelopeFormat::PackageJson)]
     fn header_round_trip(#[case] format: EnvelopeFormat) {
         // With zstd compression

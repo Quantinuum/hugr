@@ -41,8 +41,8 @@ pub trait TypeMapping {
     /// The target type when mapping from [`HugrSumType`]s. This type must be
     /// convertible to `OutV` via `sum_into_out`.
     type SumOutV<'c>;
-    /// The target type when mapping from [`HugrFuncType`]s. This type must be
-    /// convertible to `OutV` via `func_into_out`.
+    /// The target type when mapping from [`HugrFuncType`]s. It is not convertible to
+    /// `OutV`.
     type FuncOutV<'c>;
 
     /// Returns the result of the mapping on `sum_type`, with auxiliary data
@@ -70,8 +70,8 @@ pub trait TypeMapping {
     /// the mapping.
     fn sum_into_out<'c>(&self, sum: Self::SumOutV<'c>) -> Self::OutV<'c>;
 
-    /// Infallibly convert from the result of `map_functype` to the result of
-    /// the mapping.
+    /// Infallibly convert from the result of `map_function_type` to the result of the
+    /// mapping.
     fn func_into_out<'c>(&self, sum: Self::FuncOutV<'c>) -> Self::OutV<'c>;
 
     /// Construct an appropriate result of the mapping when `hugr_type` is not a

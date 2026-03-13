@@ -1,3 +1,5 @@
+//! Builder for a HUGR module.
+
 use super::{
     BuildError, Container,
     build_traits::HugrBuilder,
@@ -16,6 +18,50 @@ use crate::{Hugr, Node, Visibility, ops::FuncDefn};
 use smol_str::SmolStr;
 
 /// Builder for a HUGR module.
+///
+/// A module is the top-level container for functions, declarations, and type aliases.
+///
+/// # Example
+///
+/// ```
+/// use hugr::{
+///     builder::{BuildError, Dataflow, HugrBuilder, DFGBuilder, DataflowHugr, ModuleBuilder, DataflowSubContainer},
+///     types::{Signature},
+///     extension::prelude::{bool_t},
+///     ops::handle::NodeHandle,
+///     HugrView,
+/// };
+///
+/// fn make_module() -> Result<(), BuildError> {
+///     // We define a module and the insert a DFG as a sub-component.
+///
+///     // Create a module and define a function within it
+///     let mut module_builder = ModuleBuilder::new();
+///     let mut f_build = module_builder.define_function("main", Signature::new_endo(bool_t()))?;
+///     let [im] = f_build.input_wires_arr();
+///
+///     // We can build a DFG as a sub-component of the function body, and then link it in.
+///     // Create a simple DFG (Dataflow Graph) that acts as the identity function on a boolean input:
+///     let dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()]))?;
+///     let [id] = dfg_builder.input_wires_arr();
+///     let dfg_hugr = dfg_builder.finish_hugr_with_outputs([id])?;
+///
+///     // Embed the DFG as a sub-component
+///     let dfg = f_build.add_hugr_with_wires(dfg_hugr, [im])?;
+///     let f = f_build.finish_with_outputs([dfg.out_wire(0)])?;
+///
+///     // With node() we can get the node handles
+///     let _ = (dfg.node(), f.node());
+///
+///     let hugr = module_builder.finish_hugr()?;
+///     hugr.validate().unwrap_or_else(|e| {
+///             panic!("HUGR validation failed: {e}");
+///     });
+///     Ok(())
+/// }
+///
+/// assert!(make_module().is_ok());
+/// ```
 #[derive(Debug, Default, Clone, PartialEq)]
 pub struct ModuleBuilder<T>(pub(super) T);
 
@@ -286,9 +332,9 @@ mod test {
     }
 
     #[test]
-    #[should_panic(expected = "not implemented: Type aliases")]
-    fn simple_alias() {
-        fn build() -> Result<Hugr, BuildError> {
+    #[ignore] // https://github.com/Quantinuum/hugr/issues/2828
+    fn simple_alias() -> Result<(), BuildError> {
+        let build_result = {
             let mut module_builder = ModuleBuilder::new();
 
             let qubit_state_type =
@@ -302,9 +348,10 @@ mod test {
                 ),
             )?;
             n_identity(f_build)?;
-            Ok(module_builder.finish_hugr()?)
-        }
-        assert_matches!(build(), Ok(_));
+            module_builder.finish_hugr()
+        };
+        assert_matches!(build_result, Ok(_));
+        Ok(())
     }
 
     #[test]

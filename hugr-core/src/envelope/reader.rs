@@ -9,7 +9,7 @@ use crate::envelope::description::{ExtensionDesc, ModuleDesc, PackageDesc};
 use crate::envelope::header::{EnvelopeFormat, HeaderError};
 use crate::envelope::{EnvelopeHeader, ExtensionBreakingError, FormatUnsupportedError};
 use crate::extension::resolution::{ExtensionResolutionError, WeakExtensionRegistry};
-use crate::extension::{Extension, ExtensionRegistry};
+use crate::extension::{Extension, ExtensionRegistry, ExtensionRegistryLoadError};
 use crate::import::{ImportError, import_described_hugr};
 use crate::package::Package;
 
@@ -127,7 +127,7 @@ impl<R: BufRead> EnvelopeReader<R> {
         let mut package = match self.header().format {
             EnvelopeFormat::PackageJson => self.decode_json()?,
             EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => self.decode_model()?,
-            EnvelopeFormat::ModelText | EnvelopeFormat::ModelTextWithExtensions => {
+            EnvelopeFormat::SExpression | EnvelopeFormat::SExpressionWithExtensions => {
                 self.decode_model_ast()?
             }
         };
@@ -137,8 +137,8 @@ impl<R: BufRead> EnvelopeReader<R> {
             let desc = desc.get_or_insert_default();
             desc.load_used_extensions_generator(module)
                 .map_err(ExtensionBreakingError::from)?;
-            if let Some(used_exts) = &mut desc.used_extensions_generator {
-                check_breaking_extensions(module.extensions(), used_exts.drain(..))?;
+            if let Some(used_exts) = &desc.used_extensions_generator {
+                check_breaking_extensions(module.extensions(), used_exts)?;
             }
 
             module
@@ -210,19 +210,21 @@ impl<R: BufRead> EnvelopeReader<R> {
             .map_err(Into::into)
     }
 
-    /// Read a HUGR model text payload from a reader.
-    fn decode_model_ast(&mut self) -> Result<Package, ModelTextReadError> {
+    /// Read a HUGR S-expression payload from a reader.
+    fn decode_model_ast(&mut self) -> Result<Package, SExpressionReadError> {
         let format = self.header().format;
         check_model_version(format)?;
 
-        let packaged_extensions = if format == EnvelopeFormat::ModelTextWithExtensions {
+        let packaged_extensions = if format == EnvelopeFormat::SExpressionWithExtensions {
             let deserializer = serde_json::Deserializer::from_reader(&mut self.reader);
             // Deserialize the first json object, leaving the rest of the reader unconsumed.
             let extra_extensions = deserializer
                 .into_iter::<Vec<Extension>>()
                 .next()
                 .unwrap_or(Ok(vec![]))?;
-            ExtensionRegistry::new(extra_extensions.into_iter().map(std::sync::Arc::new))
+            let weak_registry: WeakExtensionRegistry = (&self.registry).into();
+            ExtensionRegistry::new_with_extension_resolution(extra_extensions, &weak_registry)
+                .map_err(ExtensionRegistryLoadError::from)?
         } else {
             ExtensionRegistry::new([])
         };
@@ -282,8 +284,8 @@ pub(crate) enum PayloadErrorInner {
     JsonRead(#[from] PackageEncodingError),
     /// Error decoding a binary model format package.
     ModelBinary(#[from] ModelBinaryReadError),
-    /// Error decoding a text model format package.
-    ModelText(#[from] ModelTextReadError),
+    /// Error decoding a S-expression model format package.
+    SExpression(#[from] SExpressionReadError),
     /// Error raised while checking for breaking extension version mismatch.
     ExtensionsBreaking(#[from] ExtensionBreakingError),
     /// Error resolving extensions while decoding the payload.
@@ -298,7 +300,7 @@ impl<T: Into<PayloadErrorInner>> From<T> for PayloadError {
 
 #[derive(Debug, Error)]
 #[error(transparent)]
-pub(crate) enum ModelTextReadError {
+pub(crate) enum SExpressionReadError {
     ParseString(#[from] hugr_model::v0::ast::ParseError),
     Import(#[from] ImportError),
     ExtensionLoad(#[from] crate::extension::ExtensionRegistryLoadError),
@@ -322,12 +324,15 @@ pub(crate) enum ModelBinaryReadError {
 mod test {
     use super::*;
 
-    use crate::extension::{ExtensionId, ExtensionRegistry};
-
+    use crate::Hugr;
+    use crate::builder::test::simple_module_hugr;
     use crate::envelope::header::EnvelopeHeader;
+    use crate::envelope::{EnvelopeConfig, EnvelopeFormat, read_envelope};
+    use crate::extension::{ExtensionId, ExtensionRegistry};
+    use crate::hugr::HugrMut;
     use cool_asserts::assert_matches;
-
-    use std::io::{Cursor, Write as _};
+    use rstest::rstest;
+    use std::io::{BufReader, Cursor, Write as _};
 
     #[test]
     fn test_read_invalid_header() {
@@ -359,7 +364,7 @@ mod test {
     #[test]
     fn test_read_text_format() {
         let header = EnvelopeHeader {
-            format: EnvelopeFormat::ModelTextWithExtensions,
+            format: EnvelopeFormat::SExpressionWithExtensions,
             ..Default::default()
         };
         let mut cursor = Cursor::new(Vec::new());
@@ -370,7 +375,7 @@ mod test {
         let reader = EnvelopeReader::new(cursor, &registry).unwrap();
         let (description, result) = reader.read();
 
-        assert_matches!(result, Err(PayloadError(PayloadErrorInner::ModelText(_))));
+        assert_matches!(result, Err(PayloadError(PayloadErrorInner::SExpression(_))));
         assert_eq!(description.header, header);
     }
 
@@ -480,7 +485,7 @@ mod test {
             .unwrap();
 
         let header = EnvelopeHeader {
-            format: EnvelopeFormat::ModelTextWithExtensions,
+            format: EnvelopeFormat::SExpressionWithExtensions,
             ..Default::default()
         };
 
@@ -502,5 +507,35 @@ mod test {
 
         let package = result.unwrap();
         assert!(package.extensions.contains(&ext_id));
+    }
+
+    /// Returns a Hugr that serializes to approximately 64MB in binary format
+    /// by defining a large metadata payload.
+    #[rstest::fixture]
+    fn big_hugr() -> Hugr {
+        const PAYLOAD_SIZE: usize = 64 * 1024 * 1024;
+        let big_payload: String = "a".repeat(PAYLOAD_SIZE);
+
+        let mut hugr = simple_module_hugr();
+        hugr.set_metadata_any(hugr.entrypoint(), "big", big_payload);
+        hugr
+    }
+
+    /// Test encoding/decoding a very large hugr payload (~64MB)
+    #[rstest]
+    #[case::model_with_extensions(EnvelopeFormat::ModelWithExtensions)]
+    #[case::model_text_with_extensions(EnvelopeFormat::SExpressionWithExtensions)]
+    #[case::package_json(EnvelopeFormat::PackageJson)]
+    #[ignore = "This test takes > 15s due to the large payload size."]
+    fn big_hugr_payload(#[case] format: EnvelopeFormat, big_hugr: Hugr) {
+        let config = EnvelopeConfig { format, zstd: None };
+        let mut buffer = Vec::with_capacity(64 * 1024 * 1024);
+        big_hugr.store(&mut buffer, config).unwrap();
+
+        let (desc, decoded) =
+            read_envelope(BufReader::new(buffer.as_slice()), big_hugr.extensions()).unwrap();
+        assert_eq!(desc.header.config().format, format);
+
+        decoded.validate().unwrap();
     }
 }

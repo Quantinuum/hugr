@@ -1059,23 +1059,6 @@ impl<'a> Context<'a> {
                 let symbol = self.resolve_symbol(model::COMPAT_CONST_JSON);
                 self.make_term(table::Term::Apply(symbol, args))
             }
-            #[expect(deprecated)] // Remove when Value::Function removed
-            Value::Function { hugr } => {
-                let outer_hugr = std::mem::replace(&mut self.hugr, hugr);
-                let outer_node_to_id = std::mem::take(&mut self.node_to_id);
-
-                let region = match hugr.entrypoint_optype() {
-                    OpType::DFG(_) => {
-                        self.export_dfg(hugr.entrypoint(), model::ScopeClosure::Closed, true, true)
-                    }
-                    _ => panic!("Value::Function root must be a DFG"),
-                };
-
-                self.node_to_id = outer_node_to_id;
-                self.hugr = outer_hugr;
-
-                self.make_term(table::Term::Func(region))
-            }
 
             Value::Sum(sum) => {
                 let variants = self.export_sum_variants(&sum.sum_type);

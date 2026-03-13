@@ -10,7 +10,7 @@ use super::{ExtensionCollectionError, WeakExtensionRegistry};
 use crate::Node;
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{DataflowOpTrait, OpType, Value};
-use crate::types::{Signature, SumType, Term, TypeRow};
+use crate::types::{FuncValueType, Signature, SumType, Term, TypeRow};
 
 /// Collects every extension used to define the types in an operation.
 ///
@@ -137,6 +137,23 @@ pub(crate) fn collect_signature_exts(
     collect_type_row_exts(&signature.output, used_extensions, missing_extensions);
 }
 
+/// Collect the Extension pointers in the [`CustomType`]s inside a [FuncValueType].
+///
+/// # Attributes
+///
+/// - `func_ty`: The function type to collect the extensions from.
+/// - `used_extensions`: A The registry where to store the used extensions.
+/// - `missing_extensions`: A set of `ExtensionId`s of which the
+///   `Weak<Extension>` pointer has been invalidated.
+pub(crate) fn collect_func_type_exts(
+    func_ty: &FuncValueType,
+    used_extensions: &mut WeakExtensionRegistry,
+    missing_extensions: &mut ExtensionSet,
+) {
+    collect_term_exts(&func_ty.input, used_extensions, missing_extensions);
+    collect_term_exts(&func_ty.output, used_extensions, missing_extensions);
+}
+
 /// Collect the Extension pointers in the [`CustomType`]s inside a type row.
 ///
 /// # Attributes
@@ -252,10 +269,6 @@ fn collect_value_exts(
         Value::Extension { e } => {
             let typ = e.get_type();
             collect_term_exts(&typ, used_extensions, missing_extensions);
-        }
-        #[expect(deprecated)] // remove when Value::Function removed
-        Value::Function { hugr: _ } => {
-            // The extensions used by nested hugrs do not need to be counted for the root hugr.
         }
         Value::Sum(s) => {
             if matches!(s.sum_type, SumType::General { .. }) {

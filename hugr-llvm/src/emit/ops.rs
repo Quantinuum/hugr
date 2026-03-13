@@ -1,4 +1,4 @@
-use anyhow::{Result, anyhow, bail};
+use anyhow::{Context, Result, anyhow};
 use hugr_core::Node;
 use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::ops::{
@@ -10,7 +10,7 @@ use hugr_core::{
     types::{SumType, Type},
 };
 use inkwell::types::BasicTypeEnum;
-use inkwell::values::{BasicValueEnum, CallableValue};
+use inkwell::values::BasicValueEnum;
 use itertools::{Itertools, zip_eq};
 use petgraph::visit::Walker;
 
@@ -118,12 +118,6 @@ pub fn emit_value<'c, H: HugrView<Node = Node>>(
 ) -> Result<BasicValueEnum<'c>> {
     match v {
         Value::Extension { e } => context.emit_custom_const(e.value()),
-        #[expect(deprecated)] // Yay, will be able to remove this
-        Value::Function { .. } => bail!(
-            "Value::Function Const nodes are not supported. \
-            Ensure you eliminate these from the HUGR before lowering to LLVM. \
-            `hugr_llvm::utils::inline_constant_functions` is provided for this purpose."
-        ),
         Value::Sum(Sum {
             tag,
             values,
@@ -266,11 +260,10 @@ fn emit_call_indirect<'c, H: HugrView<Node = Node>>(
         BasicValueEnum::PointerValue(v) => Ok(v),
         _ => Err(anyhow!("emit_call_indirect: Not a pointer")),
     }?;
-    let func =
-        CallableValue::try_from(func_ptr).expect("emit_call_indirect: Not a function pointer");
+    let func_ty = context.llvm_func_type(&args.node().signature)?;
     let inputs = args.inputs.into_iter().skip(1).map_into().collect_vec();
     let builder = context.builder();
-    let call = builder.build_call(func, inputs.as_slice(), "")?;
+    let call = builder.build_indirect_call(func_ty, func_ptr, inputs.as_slice(), "")?;
     let call_results = deaggregate_call_result(builder, call, args.outputs.len())?;
     args.outputs.finish(builder, call_results)
 }
@@ -385,6 +378,12 @@ fn emit_optype<'c, H: HugrView<Node = Node>>(
         OpType::TailLoop(x) => emit_tail_loop(context, args.into_ot(x)),
         _ => Err(anyhow!("Invalid child for Dataflow Parent: {node}")),
     }
+    .with_context(|| {
+        format!(
+            "Failed to emit LLVM for node {node} with optype {}",
+            node.as_ref()
+        )
+    })
 }
 
 /// Emit a custom operation with a single input.
