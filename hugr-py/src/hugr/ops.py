@@ -816,8 +816,18 @@ class Tag(DataflowOp):
     def __str__(self) -> str:
         if len(self.sum_ty.variant_rows) == 2:
             left, right = self.sum_ty.variant_rows
-            if len(left) == 0 and self.tag == 1:
-                return "Some"
+            if not left and not right:
+                # Boolean
+                if self.tag == 1:
+                    return "True"
+                else:
+                    return "False"
+            elif not left:
+                # Option
+                if self.tag == 1:
+                    return "Some"
+                else:
+                    return "None"
             elif self.tag == 0:
                 return "Left"
             else:
