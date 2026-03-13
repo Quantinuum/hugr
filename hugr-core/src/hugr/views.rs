@@ -395,11 +395,11 @@ pub trait HugrView: HugrInternals {
         since = "0.26.0",
         note = "Use hugr_core::internal::HugrInternals::region_portgraph instead."
     )]
+    #[expect(deprecated)] // Remove at same time as PetgraphWrapper
     fn as_petgraph(&self) -> PetgraphWrapper<'_, Self>
     where
         Self: Sized,
     {
-        #[expect(deprecated)] // Remove at same time as PetgraphWrapper
         PetgraphWrapper { hugr: self }
     }
 
