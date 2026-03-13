@@ -1,6 +1,22 @@
 # Changelog
 
 
+## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.7...hugr-passes-v0.26.0) - 2026-03-13
+
+### New Features
+
+- [**breaking**] `hugr-passes` is no longer reexported from `hugr::algorithms` ([#2922](https://github.com/Quantinuum/hugr/pull/2922))
+- *(llvm)* [**breaking**] Upgrade to LLVM 21 ([#2901](https://github.com/Quantinuum/hugr/pull/2901))
+- [**breaking**] Update remainder of passes to use PassScope, drop default with_scope ([#2871](https://github.com/Quantinuum/hugr/pull/2871))
+- [**breaking**] Make `WithScope` a supertrait of `ComposablePass` ([#2921](https://github.com/Quantinuum/hugr/pull/2921))
+- [**breaking**] TypeRow: add impl From array of Type, remove From<Type> ([#2784](https://github.com/Quantinuum/hugr/pull/2784))
+- Deprecate HugrView::as_petgraph ([#2944](https://github.com/Quantinuum/hugr/pull/2944))
+
+### Refactor
+
+- [**breaking**] Remove deprecated Value::Function ([#2928](https://github.com/Quantinuum/hugr/pull/2928))
+- [**breaking**] Remove deprecated pass configuration ([#2938](https://github.com/Quantinuum/hugr/pull/2938))
+
 ## [0.25.7](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.6...hugr-passes-v0.25.7) - 2026-03-06
 
 ### Documentation
