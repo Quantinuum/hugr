@@ -243,18 +243,12 @@ impl DerefMut for TypeRow {
 pub struct TypeRowRV(pub(super) Term);
 
 impl TypeRowRV {
-    pub(super) const EMPTY: TypeRowRV = Self(Term::List(vec![]));
+    const EMPTY: TypeRowRV = Self(Term::List(vec![]));
     pub(super) const EMPTY_REF: &TypeRowRV = &Self::EMPTY;
 
-    /// Wraps the given Term, or panics.
-    ///
-    /// Succeeds if the Term has type [Term::ListType]`(`[Term::RuntimeType]`)`
-    ///
-    /// # Panics
-    ///
-    /// If the given Term is not a list of runtime types
-    pub fn new(t: impl Into<Term>) -> Self {
-        Self::try_from(t.into()).unwrap()
+    /// Create a new empty row.
+    pub const fn new() -> Self {
+        Self::EMPTY
     }
 
     /// Wraps the given Term, without checking its type.

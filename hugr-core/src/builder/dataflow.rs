@@ -935,7 +935,7 @@ pub(crate) mod test {
                 Signature::new(
                     [Type::new_function(FuncValueType::new(
                         [usize_t()],
-                        TypeRowRV::new(rv.clone()),
+                        TypeRowRV::try_from(rv.clone()).unwrap(),
                     ))],
                     [],
                 ),

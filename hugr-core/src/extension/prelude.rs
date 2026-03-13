@@ -113,7 +113,7 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
                 TypeParam::new_list_type(TypeBound::Linear),
             ],
             FuncValueType::new(
-                TypeRowRV::new([Type::new_extension(error_type.clone())])
+                TypeRowRV::from([Type::new_extension(error_type.clone())])
                     .concat(TypeRowRV::just_row_var(0, TypeBound::Linear)),
                 TypeRowRV::just_row_var(1, TypeBound::Linear),
             ),

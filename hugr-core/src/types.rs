@@ -739,7 +739,7 @@ pub(crate) mod test {
         let t = SumType::new(variants.clone());
         assert_eq!(variants, t.variants().cloned().collect_vec());
 
-        let empty_rows = vec![TypeRowRV::EMPTY; 3];
+        let empty_rows = vec![TypeRowRV::new(); 3];
         let sum_unary = SumType::new_unary(3);
         assert_eq!(empty_rows, sum_unary.variants().cloned().collect_vec());
         let sum_general = SumType::General { rows: empty_rows };
