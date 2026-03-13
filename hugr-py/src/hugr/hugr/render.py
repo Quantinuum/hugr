@@ -9,7 +9,7 @@ from graphviz import Digraph
 from typing_extensions import assert_never
 
 from hugr.hugr import Hugr
-from hugr.ops import AsExtOp
+from hugr.ops import AsExtOp, Case
 from hugr.tys import CFKind, ConstKind, FunctionKind, Kind, OrderKind, ValueKind
 
 from .node_port import InPort, Node, OutPort
@@ -243,8 +243,22 @@ class DotRenderer:
     def _out_order_name(self, n: Node) -> str:
         return f"{n.idx}:{self._OUTPUT_PREFIX}None"
 
-    def _viz_node(self, node: Node, hugr: Hugr, graph: Digraph) -> None:
-        """Render a (possibly nested) node to a graphviz graph."""
+    def _viz_node(
+        self,
+        node: Node,
+        hugr: Hugr,
+        graph: Digraph,
+        *,
+        sibling_order: int | None = None,
+    ) -> None:
+        """Render a (possibly nested) node to a graphviz graph.
+
+        Args:
+            node: The node to render.
+            hugr: The HUGR to render.
+            graph: The graphviz graph to render the node to.
+            sibling_order: The order of the node in the region's sibling list.
+        """
         meta = hugr[node].metadata
         if len(meta) > 0 and self.config.display_metadata:
             if self.config.max_metadata_length is not None:
@@ -278,6 +292,9 @@ class DotRenderer:
         op = hugr[node].op
         if isinstance(op, AsExtOp) and not self.config.qualify_op_name:
             op_name = op.op_def().name
+        elif isinstance(op, Case) and sibling_order is not None:
+            # Indicate the case number
+            op_name = f"{op.name()}[{sibling_order}]"
         else:
             op_name = op.name()
 
@@ -311,8 +328,8 @@ class DotRenderer:
 
         if hugr.children(node):
             with graph.subgraph(name=f"cluster{node.idx}") as sub:
-                for child in hugr.children(node):
-                    self._viz_node(child, hugr, sub)
+                for sibling_order, child in enumerate(hugr.children(node)):
+                    self._viz_node(child, hugr, sub, sibling_order=sibling_order)
                 html_label = self._format_html_label(**label_config)
                 sub.node(f"{node.idx}", shape="plain", label=f"<{html_label}>")
                 sub.attr(
