@@ -49,7 +49,7 @@ pub struct PolyFuncTypeBase<T> {
 pub type PolyFuncType = PolyFuncTypeBase<TypeRow>;
 
 /// The polymorphic type of an [`OpDef`], whose number of input and outputs
-/// may vary according to how [`RowVariable`]s therein are instantiated.
+/// may vary according to how row variables therein are instantiated.
 ///
 /// [`OpDef`]: crate::extension::OpDef
 pub type PolyFuncTypeRV = PolyFuncTypeBase<TypeRowRV>;

@@ -637,13 +637,6 @@ impl Transformable for Term {
 }
 
 impl Substitutable for Term {
-    /// Checks all variables used in the type are in the provided list
-    /// of bound variables, and that for each [`CustomType`] the corresponding
-    /// [`TypeDef`] is in the [`ExtensionRegistry`] and the type arguments
-    /// [validate] and fit into the def's declared parameters.
-    ///
-    /// [validate]: crate::types::type_param::TypeArg::validate
-    /// [TypeDef]: crate::extension::TypeDef
     fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
             Term::RuntimeSum(SumType::General { rows }) => {
@@ -683,19 +676,6 @@ impl Substitutable for Term {
         }
     }
 
-    /// Applies a substitution to this instance. Infallible (assuming the `subst` covers all
-    /// variables) and will not invalidate the instance (assuming all values substituted in,
-    /// are valid instances of the variables they replace).
-    ///
-    /// May change the structure of `self` significantly, e.g. if variables that stand for
-    /// rows of types are replaced by fixed-length lists of types.
-    ///
-    /// May change the [TypeBound] of the resulting type, e.g. if a variable whose bound
-    /// is [TypeBound::Linear] is replaced by a concrete type that is [TypeBound::Copyable].
-    ///
-    /// # Panics
-    ///
-    /// If the substitution does not cover all type variables in `self`.
     fn substitute(&self, t: &Substitution) -> Self {
         match self {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),

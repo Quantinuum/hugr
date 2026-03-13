@@ -16,8 +16,8 @@ use crate::types::type_param::{TermTypeError, check_term_type};
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
-pub use poly_func::{PolyFuncType, PolyFuncTypeRV};
-pub use signature::{FuncValueType, Signature};
+pub use poly_func::{PolyFuncType, PolyFuncTypeBase, PolyFuncTypeRV};
+pub use signature::{FuncTypeBase, FuncValueType, Signature};
 use smol_str::SmolStr;
 pub use type_param::{Term, TypeArg};
 pub use type_row::{TypeRow, TypeRowRV};
@@ -593,9 +593,10 @@ mod internal {
     /// Sub-trait of [`Transformable`] for types that support substitution of
     /// type variables and validation of type-variable scopes.
     pub trait Substitutable: Transformable {
-        /// Checks all variables used in `self` are in the provided list
-        /// of bound variables, and that for each [`CustomType`] the type
-        /// arguments fit into the declared parameters of the [`TypeDef`].
+        /// Checks all variables used in `self` are in the provided list of bound
+        /// variables, and that for each [`CustomType`]  the corresponding [`TypeDef`]
+        ///  is in the [`ExtensionRegistry`] and the type arguments validate (recursively)
+        /// and fit into the declared parameters of the [`TypeDef`].
         ///
         /// [`TypeDef`]: crate::extension::TypeDef
         fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError>;
@@ -611,18 +612,11 @@ mod internal {
         /// If the substitution does not cover all type variables in `self`.
         fn substitute(&self, s: &Substitution) -> Self;
     }
-
 }
 
 pub(crate) use internal::Substitutable;
 
 impl Substitutable for Type {
-    /// Checks all variables used in the type are in the provided list
-    /// of bound variables, and that for each [`CustomType`] the type arguments
-    /// [validate] and fit into the declared parameters of the [`TypeDef`]
-    ///
-    /// [validate]: crate::types::type_param::TypeArg::validate
-    /// [TypeDef]: crate::extension::TypeDef
     fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.0.validate(var_decls)?;
         // ALAN even this should be only a debug-assert really:
@@ -636,12 +630,8 @@ impl Substitutable for Type {
         Ok(())
     }
 
-    /// Applies a substitution to a type.
-    /// This may result in a row of types, if this [Type] is not really a single type but actually a row variable
-    /// Invariants may be confirmed by validation:
-    /// * If [`Type::validate`]`(false)` returns successfully, this method will return a Vec containing exactly one type
-    /// * If [`Type::validate`]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
-    ///   return a Vec containing any number of [Type]s. These may (or not) pass [`Type::validate`]
+    /// Always produces exactly one type, but may narrow the bound (from
+    /// [TypeBound::Linear] to [TypeBound::Copyable]).
     fn substitute(&self, s: &Substitution) -> Self {
         let t = self.0.substitute(s);
         // Must succeed and produce a type assuming substitution valid (RHSes

@@ -85,7 +85,6 @@ impl Substitutable for TypeRow {
         self.iter().try_for_each(|t| t.validate(var_decls))
     }
 
-    /// Applies a substitution to the row.
     fn substitute(&self, s: &Substitution) -> Self {
         self.iter()
             .map(|ty| ty.substitute(s))
@@ -283,7 +282,6 @@ impl Substitutable for TypeRowRV {
         self.0.validate(vars)
     }
 
-    /// Makes a new instance by substituting values for variables
     fn substitute(&self, s: &Substitution) -> Self {
         // Substitution cannot make this invalid if it was valid previously
         Self::new_unchecked(self.0.substitute(s))

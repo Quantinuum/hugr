@@ -18,13 +18,8 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 /// Base type for listing inputs and output types.
 ///
-/// The exact semantics depend on the use case:
-/// - If `ROWVARS=`[`NoRV`], describes the edges required to/from a node or inside a [`FuncDefn`].
-/// - If `ROWVARS=`[`RowVariable`], describes the type of the inputs/outputs from an `OpDef`.
-///
-/// `ROWVARS` specifies whether the type lists may contain [`RowVariable`]s or not.
-///
-/// [`FuncDefn`]: crate::ops::FuncDefn
+/// Parametrized by the type used to list the inputs and outputs. Exactly two
+/// instantiations are used: [Signature] and [FuncValueType].
 pub struct FuncTypeBase<T> {
     /// Value inputs of the function.
     pub input: T,
@@ -35,10 +30,12 @@ pub struct FuncTypeBase<T> {
 /// The concept of "signature" in the spec - the edges required to/from a node
 /// or within a [`FuncDefn`], also the target (value) of a call (static).
 ///
+/// Thus, contains a statically-known number of types.
+///
 /// [`FuncDefn`]: crate::ops::FuncDefn
 pub type Signature = FuncTypeBase<TypeRow>;
 
-/// A function that may contain [`RowVariable`]s and thus has potentially-unknown arity;
+/// A function that may contain row variables and thus has potentially-unknown arity;
 /// used for [`OpDef`]'s and passable as a value round a Hugr (see [`Type::new_function`])
 /// but not a valid node type.
 ///
