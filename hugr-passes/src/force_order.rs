@@ -271,6 +271,7 @@ mod test {
 
     type RankMap = HashMap<Node, i64>;
 
+    #[expect(deprecated)] // Will have to rewrite somehow when PetgraphWrapper is removed
     fn force_order_test_impl(hugr: &mut Hugr, rank_map: RankMap) -> Vec<Node> {
         force_order(hugr, hugr.entrypoint(), |_, n| {
             *rank_map.get(&n).unwrap_or(&0)
