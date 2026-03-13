@@ -13,31 +13,8 @@ use hugr_core::{
 use hugr_core::hugr::{HugrView, OpType, hugrmut::HugrMut};
 use itertools::Itertools as _;
 
-use crate::composable::{ValidatePassError, WithScope, validate_if_test};
+use crate::composable::WithScope;
 use crate::{ComposablePass, PassScope};
-
-/// Replaces calls to polymorphic functions with calls to new monomorphic
-/// instantiations of the polymorphic ones.
-///
-/// If the Hugr is [Module](OpType::Module)-rooted,
-/// * then the original polymorphic [`FuncDefn`]s are left untouched (including Calls inside them)
-///     - [`crate::remove_dead_funcs`] can be used when no other Hugr will be linked in that might instantiate these
-/// * else, the originals are removed (they are invisible from outside the Hugr); however, note
-///   that this behaviour is expected to change in a future release to match Module-rooted Hugrs.
-///
-/// If the Hugr is [`FuncDefn`](OpType::FuncDefn)-rooted with polymorphic
-/// signature then the HUGR will not be modified.
-///
-/// Monomorphic copies of polymorphic functions will be added to the HUGR as
-/// children of the root node.  We make best effort to ensure that names (derived
-/// from parent function names and concrete type args) of new functions are unique
-/// whenever the names of their parents are unique, but this is not guaranteed.
-#[deprecated(note = "Use MonomorphizePass instead", since = "0.25.7")]
-pub fn monomorphize(
-    hugr: &mut impl HugrMut<Node = Node>,
-) -> Result<(), ValidatePassError<Node, Infallible>> {
-    validate_if_test(MonomorphizePass::default(), hugr)
-}
 
 fn is_polymorphic(fd: &FuncDefn) -> bool {
     !fd.signature().params().is_empty()
@@ -187,10 +164,10 @@ fn instantiate(
 /// Replaces calls to polymorphic functions with calls to new monomorphic
 /// instantiations of the polymorphic ones.
 ///
-/// The original polymorphic [`FuncDefn`]s are left untouched (including Calls inside them).
-/// Call [`crate::remove_dead_funcs`] to remove them.
+/// The original polymorphic [`FuncDefn`]s are left untouched (including Calls inside
+/// them); they can be removed by e.g. [`crate::RemoveDeadFuncsPass`].
 ///
-/// If the Hugr is [`FuncDefn`](OpType::FuncDefn)-rooted with polymorphic
+/// If the Hugr's entrypoint is a [`FuncDefn`](OpType::FuncDefn) with polymorphic
 /// signature then the HUGR will not be modified.
 ///
 /// Monomorphic copies of polymorphic functions will be added to the HUGR as

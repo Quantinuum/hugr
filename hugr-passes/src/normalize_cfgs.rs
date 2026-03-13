@@ -97,70 +97,33 @@ pub enum NormalizeCFGResult<N = Node> {
 }
 
 /// A [ComposablePass] that normalizes CFGs (i.e. [normalize_cfg]) in a Hugr.
-#[derive(Clone, Debug)]
-pub struct NormalizeCFGPass<N> {
-    scope: Either<Vec<N>, PassScope>,
+#[derive(Clone, Debug, Default)]
+pub struct NormalizeCFGPass {
+    scope: PassScope,
 }
 
-impl<N> Default for NormalizeCFGPass<N> {
-    fn default() -> Self {
-        Self {
-            scope: Either::Left(vec![]),
-        }
-    }
-}
-
-impl<N> NormalizeCFGPass<N> {
-    /// Allows mutating the set of CFG nodes that will be normalized.
-    ///
-    /// Note that calling this method (even if the returned mut-ref is not written to) will
-    /// override any previous call to [Self::with_scope].
-    ///
-    /// If empty (the default), all (non-strict) descendants of the [HugrView::entrypoint]
-    /// will be normalized.
-    #[deprecated(note = "Use with_scope", since = "0.25.7")]
-    pub fn cfgs(&mut self) -> &mut Vec<N> {
-        match &mut self.scope {
-            Either::Left(cfgs) => cfgs,
-            r => {
-                *r = Either::Left(Vec::new());
-                r.as_mut().unwrap_left()
-            }
-        }
-    }
-}
-
-impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
+impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass {
     type Error = NormalizeCFGError;
 
     /// For each CFG node that was normalized, the [NormalizeCFGResult] for that CFG
     type Result = HashMap<H::Node, NormalizeCFGResult<H::Node>>;
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
-        let cfgs = match &self.scope {
-            Either::Left(cfgs) if !cfgs.is_empty() => cfgs.clone(),
-            _ => {
-                let ctrs = match &self.scope {
-                    Either::Left(v) => {
-                        assert!(v.is_empty());
-                        Either::Right(hugr.descendants(hugr.entrypoint()))
-                    }
-                    Either::Right(scope) => {
-                        let r = scope.root(hugr);
-                        if let Some(r) = r.filter(|_| scope.recursive()) {
-                            Either::Right(hugr.descendants(r))
-                        } else {
-                            Either::Left(r.into_iter())
-                        }
-                    }
-                };
-                let mut cfgs: Vec<H::Node> =
-                    ctrs.filter(|n| hugr.get_optype(*n).is_cfg()).collect();
-                // Process inner CFGs first, in case they are removed (if they are in a completely
-                // disconnected block when the Entry node has only the Exit as successor).
-                cfgs.reverse();
-                cfgs
+        let ctrs = {
+            let r = self.scope.root(hugr);
+            if let Some(r) = r.filter(|_| self.scope.recursive()) {
+                Either::Right(hugr.descendants(r))
+            } else {
+                Either::Left(r.into_iter())
             }
+        };
+
+        let cfgs = {
+            let mut cfgs: Vec<H::Node> = ctrs.filter(|n| hugr.get_optype(*n).is_cfg()).collect();
+            // Process inner CFGs first, in case they are removed (if they are in a completely
+            // disconnected block when the Entry node has only the Exit as successor).
+            cfgs.reverse();
+            cfgs
         };
         let mut results = HashMap::new();
         for cfg in cfgs {
@@ -171,9 +134,9 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
     }
 }
 
-impl<N> WithScope for NormalizeCFGPass<N> {
+impl WithScope for NormalizeCFGPass {
     fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
-        self.scope = Either::Right(scope.into());
+        self.scope = scope.into();
         self
     }
 }

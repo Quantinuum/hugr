@@ -57,7 +57,7 @@ pub enum NodeTemplate {
     ///
     /// It is **recommended** to use [Self::LinkedHugr] instead.
     ///
-    /// [monomorphization]: super::monomorphize
+    /// [monomorphization]: crate::MonomorphizePass
     CompoundOp(Box<Hugr>),
     /// Defines a sub-Hugr to insert, whose entrypoint becomes (or replaces) the desired Node.
     /// Other children of the Hugr reachable from the entrypoint will also be inserted
@@ -365,7 +365,7 @@ impl ReplacementOptions {
 ///   would use `SpecialListOfXs`.)
 /// * See also limitations noted for [Linearizer].
 ///
-/// [monomorphization]: super::monomorphize()
+/// [monomorphization]: crate::MonomorphizePass
 #[derive(Clone)]
 pub struct ReplaceTypes {
     type_map: HashMap<CustomType, (Type, ReplacementOptions)>,
@@ -482,7 +482,7 @@ impl ReplaceTypes {
     ///
     /// Note that if `src` is an instance of a *parametrized* [`TypeDef`], this takes
     /// precedence over [`Self::replace_parametrized_type`] where the `src`s overlap. Thus, this
-    /// should only be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as
+    /// should only be used on already-*[monomorphize](crate::MonomorphizePass)d* Hugrs, as
     /// substitution (parametric polymorphism) happening later will not respect this replacement.
     ///
     /// If there are any [`LoadConstant`]s of this type, callers should also call [`Self::replace_consts`]
@@ -611,7 +611,7 @@ impl ReplaceTypes {
     ///
     /// Note that if `src` is an instance of a *parametrized* [`OpDef`], this takes
     /// precedence over [`Self::set_replace_parametrized_op`] where the `src`s overlap.
-    /// Thus, this method should only be used for already-*[monomorphize](super::monomorphize())d*
+    /// Thus, this method should only be used for already-*[monomorphize](crate::MonomorphizePass)d*
     /// Hugrs, as substitution (parametric polymorphism) happening later will not respect
     /// this replacement.
     pub fn set_replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {

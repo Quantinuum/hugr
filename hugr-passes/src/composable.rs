@@ -315,18 +315,6 @@ where
     }
 }
 
-// Note remove when deprecated constant_fold_pass / remove_dead_funcs are removed
-pub(crate) fn validate_if_test<P: ComposablePass<H>, H: HugrMut>(
-    pass: P,
-    hugr: &mut H,
-) -> Result<P::Result, ValidatePassError<H::Node, P::Error>> {
-    if cfg!(test) {
-        ValidatingPass::new(pass).run(hugr)
-    } else {
-        Ok(pass.run(hugr)?)
-    }
-}
-
 #[cfg(test)]
 pub(crate) mod test {
     use hugr_core::ops::Value;
