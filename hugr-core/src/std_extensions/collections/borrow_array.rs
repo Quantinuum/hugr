@@ -280,7 +280,10 @@ impl HasConcrete for BArrayUnsafeOpDef {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [Term::BoundedNat(n), Term::Runtime(ty)] => Ok(self.to_concrete(ty.clone(), *n)),
+            [Term::BoundedNat(n), ty] => {
+                let ty = Type::try_from(ty.clone()).map_err(SignatureError::from)?;
+                Ok(self.to_concrete(ty, *n))
+            }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }
     }

@@ -8,7 +8,7 @@ use hugr_core::{
     },
     ops::{DataflowOpTrait as _, constant::Value, custom::ExtensionOp},
     std_extensions::arithmetic::{conversions::ConvertOpDef, int_types::INT_TYPES},
-    types::{TypeEnum, TypeRow},
+    types::TypeRow,
 };
 
 use inkwell::{FloatPredicate, IntPredicate, types::IntType, values::BasicValue};
@@ -189,12 +189,12 @@ fn emit_conversion_op<'c, H: HugrView<Node = Node>>(
                 .typing_session()
                 .llvm_type(&INT_TYPES[0])?
                 .into_int_type();
-            let sum_ty = context
-                .typing_session()
-                .llvm_sum_type(match bool_t().as_type_enum() {
-                    TypeEnum::Sum(st) => st.clone(),
-                    _ => panic!("Hugr prelude bool_t() not a Sum"),
-                })?;
+            let sum_ty = context.typing_session().llvm_sum_type(
+                bool_t()
+                    .as_sum()
+                    .expect("Hugr prelude bool_t() not a Sum")
+                    .clone(),
+            )?;
 
             emit_custom_unary_op(context, args, |ctx, arg, _| {
                 let res = if conversion_op == ConvertOpDef::itobool {

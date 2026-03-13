@@ -7,12 +7,12 @@
 use std::mem;
 use std::sync::Arc;
 
+use crate::extension::resolution::types::collect_func_type_exts;
 use crate::extension::{
     Extension, ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureFunc, TypeDef,
 };
 
-use super::types::collect_signature_exts;
-use super::types_mut::resolve_signature_exts;
+use super::types_mut::resolve_func_type_exts;
 use super::{ExtensionCollectionError, ExtensionResolutionError, WeakExtensionRegistry};
 
 impl ExtensionRegistry {
@@ -76,7 +76,7 @@ fn collect_extension_deps(
     for (_, op_def) in extension.operations() {
         if let Some(signature) = op_def.signature_func().poly_func_type() {
             let mut local_missing = ExtensionSet::new();
-            collect_signature_exts(signature.body(), &mut used, &mut local_missing);
+            collect_func_type_exts(signature.body(), &mut used, &mut local_missing);
             for ext in local_missing {
                 missing.insert(ext);
             }
@@ -207,5 +207,5 @@ pub(super) fn resolve_signature_func_exts(
             return Ok(());
         }
     };
-    resolve_signature_exts(None, signature_body, extensions, used_extensions)
+    resolve_func_type_exts(None, signature_body, extensions, used_extensions)
 }
