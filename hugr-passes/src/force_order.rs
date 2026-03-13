@@ -283,7 +283,7 @@ mod test {
         let topo_sorted = Topo::new(&graph)
             .iter(&graph)
             .map(|n| node_map.from_portgraph(n))
-            .filter(|n| rank_map.contains_key(&n))
+            .filter(|n| rank_map.contains_key(n))
             .collect_vec();
         hugr.validate().unwrap();
 
