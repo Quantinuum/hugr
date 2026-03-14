@@ -25,23 +25,21 @@ pub use rerooted::Rerooted;
 pub use root_checked::{InvalidSignature, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use portgraph::render::{DotFormat, MermaidFormat};
 use portgraph::{LinkView, PortView};
+
+use crate::core::HugrNode;
+use crate::extension::ExtensionRegistry;
+use crate::hugr::views::petgraph2::SynEdgeWrapper;
+use crate::metadata::{Metadata, RawMetadataValue};
+use crate::ops::{OpParent, OpTag, OpTrait, OpType, handle::NodeHandle};
+use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
+use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 use super::internal::{HugrInternals, HugrMutInternals};
 use super::validate::ValidationContext;
 use super::{Hugr, HugrMut, Node, ValidationError};
-use crate::core::HugrNode;
-use crate::extension::ExtensionRegistry;
-use crate::metadata::{Metadata, RawMetadataValue};
-use crate::ops::handle::NodeHandle;
-use crate::ops::{OpParent, OpTag, OpTrait, OpType};
-
-use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
-use crate::{Direction, IncomingPort, OutgoingPort, Port};
-
-use itertools::Either;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
@@ -402,6 +400,26 @@ pub trait HugrView: HugrInternals {
         Self: Sized,
     {
         PetgraphWrapper { hugr: self }
+    }
+
+    /// A view of a flat region, including ordering constraints from nonlocal edges,
+    /// suitable for use with petgraph algorithms.
+    fn order_graph(
+        &self,
+        parent: Self::Node,
+    ) -> (
+        SynEdgeWrapper<portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>>,
+        Self::RegionPortgraphNodes,
+    ) {
+        let (region_view, region_nodes) = self.region_portgraph(parent);
+
+        (
+            SynEdgeWrapper {
+                region_view,
+                syn_edges: Vec::new(),
+            },
+            region_nodes,
+        )
     }
 
     /// Return the mermaid representation of the underlying hierarchical graph.
