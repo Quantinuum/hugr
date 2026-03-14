@@ -7,6 +7,7 @@ pub mod render;
 mod rerooted;
 mod root_checked;
 pub mod sibling_subgraph;
+mod syn_edge;
 
 #[cfg(test)]
 mod tests;
