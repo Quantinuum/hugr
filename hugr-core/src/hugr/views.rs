@@ -2,7 +2,8 @@
 
 mod impls;
 mod nodes_iter;
-pub mod petgraph;
+mod petgraph;
+pub mod petgraph2;
 pub mod render;
 mod rerooted;
 mod root_checked;
