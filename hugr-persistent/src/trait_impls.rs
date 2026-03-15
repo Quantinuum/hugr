@@ -570,7 +570,7 @@ mod tests {
         assert_eq!(hugr.num_nodes(), extracted_hugr.num_nodes());
         assert_eq!(hugr.num_edges(), extracted_hugr.num_edges());
 
-        let (pg, _) = hugr.region_portgraph(hugr.entrypoint());
+        let (pg, _) = hugr.order_graph(hugr.entrypoint());
 
         assert_eq!(pg.node_count(), hugr.children(hugr.entrypoint()).count());
 

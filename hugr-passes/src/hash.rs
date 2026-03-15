@@ -56,7 +56,7 @@ fn dfg_hash<H: HugrView>(dfg_hugr: &H, node: H::Node) -> Result<u64, HashError> 
 
     let [_, output_node] = dfg_hugr.get_io(node).expect("DFG region missing I/O nodes");
 
-    let (region, node_map) = dfg_hugr.region_portgraph(node);
+    let (region, node_map) = dfg_hugr.order_graph(node);
     for pg_node in pg::Topo::new(&region).iter(&region) {
         let child = node_map.from_portgraph(pg_node);
         let hash = dfg_hash_node(dfg_hugr, child, &mut node_hashes)?;

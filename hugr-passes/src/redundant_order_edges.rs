@@ -67,7 +67,7 @@ impl RedundantOrderEdgesPass {
         let mut to_remove = Vec::new();
 
         // Traverse the region in topological order.
-        let (region, node_map) = hugr.region_portgraph(parent);
+        let (region, node_map) = hugr.order_graph(parent);
         let postorder = petgraph::visit::Topo::new(&region);
         for pg_child in postorder.iter(&region) {
             let child = node_map.from_portgraph(pg_child);

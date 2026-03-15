@@ -411,6 +411,7 @@ pub trait HugrView: HugrInternals {
         SynEdgeWrapper<portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>>,
         Self::RegionPortgraphNodes,
     ) {
+        #[expect(deprecated)] // inline region_portgraph here
         let (region_view, region_nodes) = self.region_portgraph(parent);
 
         (

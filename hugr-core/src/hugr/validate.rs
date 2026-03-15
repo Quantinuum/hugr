@@ -128,7 +128,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         &self,
         parent: H::Node,
     ) -> (Dominators<portgraph::NodeIndex>, H::RegionPortgraphNodes) {
-        let (region, node_map) = self.hugr.region_portgraph(parent);
+        let (region, node_map) = self.hugr.order_graph(parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
         let doms = dominators::simple_fast(&region, node_map.to_portgraph(entry_node));
         (doms, node_map)
@@ -422,7 +422,7 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             return Ok(());
         }
 
-        let (region, node_map) = self.hugr.region_portgraph(parent);
+        let (region, node_map) = self.hugr.order_graph(parent);
         let postorder = Topo::new(&region);
         let nodes_visited = postorder
             .iter(&region)
