@@ -229,3 +229,26 @@ where
         matrix.contains(&(a, b))
     }
 }*/
+
+#[cfg(test)]
+mod test {
+    use petgraph::visit as pv;
+    use petgraph::visit::Walker as _;
+    use rstest::rstest;
+
+    use crate::builder::test::simple_dfg_hugr;
+    use crate::{Hugr, HugrView};
+
+    #[rstest]
+    fn test(simple_dfg_hugr: Hugr) {
+        fn check_into_edges(_x: impl pv::IntoEdgeReferences) {}
+
+        let (region, _node_map) = simple_dfg_hugr.order_graph(simple_dfg_hugr.module_root());
+        let n = pv::NodeFiltered::from_fn(&region, |n| n.index() % 2 == 0);
+        check_into_edges(&region);
+        check_into_edges(&n);
+        pv::Topo::new(&region)
+            .iter(&region)
+            .for_each(|n| println!("Node: {:?}", n));
+    }
+}
