@@ -194,6 +194,7 @@ fn df_children_restrictions() {
 
 #[test]
 fn test_ext_edge() {
+    use petgraph::visit::IntoNeighbors as _;
     let mut h = closed_dfg_root_hugr(Signature::new(vec![bool_t(), bool_t()], vec![bool_t()]));
     let [input, output] = h.get_io(h.entrypoint()).unwrap();
 
@@ -220,15 +221,15 @@ fn test_ext_edge() {
     assert_matches!(h.validate(), Err(ValidationError::UnconnectedPort { .. }));
 
     h.connect(input, 1, sub_op, 1);
-    assert_matches!(
-        h.validate(),
-        Err(ValidationError::InterGraphEdgeError(
-            InterGraphEdgeError::MissingOrderEdge { .. }
-        ))
-    );
-    //Order edge. This will need metadata indicating its purpose.
-    h.add_other_edge(input, sub_dfg);
     h.validate().unwrap();
+    // ALAN this part really belongs in views::test or somewhere
+    let (region, node_map) = h.order_graph(h.entrypoint());
+    let input = node_map.to_portgraph(input);
+    assert!(
+        region
+            .neighbors(input)
+            .contains(&node_map.to_portgraph(sub_dfg))
+    );
 }
 
 #[test]

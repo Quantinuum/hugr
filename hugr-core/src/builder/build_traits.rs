@@ -856,7 +856,7 @@ fn wire_up<T: Dataflow + ?Sized>(
                 .any(|(_ancestor, ancestor_parent)| {
                     ancestor_parent == src_parent ||
                         // Dom edge - in CFGs
-                        Some(ancestor_parent) == src_parent_parent 
+                        Some(ancestor_parent) == src_parent_parent
                 })
             {
                 return Err(BuilderWiringError::NoRelationIntergraph {
