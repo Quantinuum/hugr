@@ -31,6 +31,7 @@ use portgraph::{LinkView, PortView};
 
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
+use crate::hugr::internal::PortgraphNodeMap;
 use crate::hugr::views::petgraph2::SynEdgeWrapper;
 use crate::metadata::{Metadata, RawMetadataValue};
 use crate::ops::{OpParent, OpTag, OpTrait, OpType, handle::NodeHandle};
@@ -413,11 +414,52 @@ pub trait HugrView: HugrInternals {
     ) {
         #[expect(deprecated)] // inline region_portgraph here
         let (region_view, region_nodes) = self.region_portgraph(parent);
+        let mut syn_edges = Vec::new();
+        if OpTag::DataflowParent.is_superset(self.get_optype(parent).tag()) {
+            let mut cache: HashMap<Self::Node, Self::Node> = HashMap::new();
+            fn find_sib_anc<N: HugrNode>(
+                n: N,
+                hugr: &(impl HugrView<Node = N> + ?Sized),
+                cache: &mut HashMap<N, N>,
+                parent: N,
+            ) -> Option<N> {
+                // If we don't hit parent, it's a Dom edge, so ignore.
+                let p = hugr.get_parent(n)?;
+                if p == parent {
+                    return Some(n);
+                }
+                match cache.get(&p) {
+                    Some(&cached) => Some(cached),
+                    None => {
+                        // can't be borrowing cache during recursive call
+                        let anc = find_sib_anc(p, hugr, cache, parent);
+                        if let Some(anc) = anc {
+                            cache.insert(p, anc);
+                        }
+                        anc
+                    }
+                }
+            }
+            for child in self.children(parent) {
+                for (p, _) in self.out_value_types(child) {
+                    for (tgt, _) in self.linked_inputs(child, p) {
+                        if let Some(tgt_anc) = find_sib_anc(tgt, self, &mut cache, parent)
+                            && tgt_anc != tgt
+                        {
+                            syn_edges.push((
+                                region_nodes.to_portgraph(child),
+                                region_nodes.to_portgraph(tgt_anc),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
 
         (
             SynEdgeWrapper {
                 region_view,
-                syn_edges: Vec::new(),
+                syn_edges,
             },
             region_nodes,
         )
