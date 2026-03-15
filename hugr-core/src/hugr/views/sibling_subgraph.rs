@@ -1034,7 +1034,7 @@ where
     /// Returns the portgraph convexity checker, initializing it if necessary.
     fn init_checker(&self) -> &(Checker, Base::RegionPortgraphNodes) {
         self.checker.get_or_init(|| {
-            let (region, node_map) = self.base.region_portgraph(self.region_parent);
+            let (region, node_map) = self.base.region_petgraph(self.region_parent);
             let checker = Checker::new_convex_checker(region);
             (checker, node_map)
         })
