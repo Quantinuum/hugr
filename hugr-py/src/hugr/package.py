@@ -204,7 +204,9 @@ class Package:
         extensions = self.extensions[:]
         for pkg in other:
             modules.extend(pkg.modules)
-            extensions.extend(pkg.extensions)
+            for new_ext in pkg.extensions:
+                if new_ext not in extensions:
+                    extensions.append(new_ext)
 
         if len(modules) == 0:
             return Package([], extensions)
