@@ -1,5 +1,5 @@
 //! Implementations of petgraph's traits for Hugr Region views.
-
+#![allow(deprecated)] // Remove whole file when PetgraphWrapper is removed
 use crate::core::HugrNode;
 use crate::hugr::HugrView;
 use crate::ops::OpType;
@@ -11,6 +11,7 @@ use petgraph::visit as pv;
 /// Wrapper for a `HugrView` that implements petgraph's traits.
 ///
 /// It can be used to apply petgraph's algorithms to a Hugr.
+#[deprecated(since = "0.26.0")]
 #[derive(Debug)]
 pub struct PetgraphWrapper<'a, T> {
     pub(crate) hugr: &'a T,

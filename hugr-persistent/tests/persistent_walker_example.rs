@@ -36,7 +36,7 @@ mod walker_example_extension {
     use super::*;
 
     fn two_qb_func() -> PolyFuncTypeRV {
-        FuncValueType::new_endo(vec![qb_t(), qb_t()]).into()
+        FuncValueType::new_endo([qb_t(), qb_t()]).into()
     }
 
     /// The extension identifier.

@@ -1,6 +1,6 @@
 [package]
 name = "hugr-core"
-version = "0.25.7"
+version = "0.26.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 
@@ -28,7 +28,7 @@ bench = false
 name = "model"
 
 [dependencies]
-hugr-model = { version = "0.25.7", path = "../hugr-model" }
+hugr-model = { version = "0.26.0", path = "../hugr-model" }
 
 cgmath = { workspace = true, features = ["serde"] }
 delegate = { workspace = true }
@@ -71,7 +71,9 @@ schemars = { workspace = true, features = ["derive"] }
 rstest = { workspace = true }
 cool_asserts = { workspace = true }
 insta = { workspace = true, features = ["yaml"] }
-jsonschema = { workspace = true }
+jsonschema = { workspace = true, default-features = false, features = [
+    "resolve-file",
+] }
 proptest = { workspace = true }
 proptest-derive = { workspace = true }
 

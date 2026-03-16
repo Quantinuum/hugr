@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.5.0](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.4.7...hugr-persistent-v0.5.0) - 2026-03-16
+
+### New Features
+
+- *(llvm)* [**breaking**] Upgrade to LLVM 21 ([#2901](https://github.com/Quantinuum/hugr/pull/2901))
+- [**breaking**] TypeRow: add impl From array of Type, remove From<Type> ([#2784](https://github.com/Quantinuum/hugr/pull/2784))
+
 ## [0.4.0](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.3.4...hugr-persistent-v0.4.0) - 2025-12-22
 
 ### New Features

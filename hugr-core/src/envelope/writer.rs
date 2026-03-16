@@ -55,7 +55,7 @@ fn write_impl<'h>(
             check_model_version(config.format)?;
             encode_model_binary(writer, hugrs, extensions, config.format)?;
         }
-        EnvelopeFormat::ModelText | EnvelopeFormat::ModelTextWithExtensions => {
+        EnvelopeFormat::SExpression | EnvelopeFormat::SExpressionWithExtensions => {
             check_model_version(config.format)?;
             encode_model_text(writer, hugrs, extensions, config.format)?;
         }
@@ -93,13 +93,13 @@ fn encode_model_text<'h>(
     hugrs: impl IntoIterator<Item = &'h Hugr>,
     extensions: &ExtensionRegistry,
     format: EnvelopeFormat,
-) -> Result<(), ModelTextWriteError> {
+) -> Result<(), SExpressionWriteError> {
     use hugr_model::v0::bumpalo::Bump;
 
     use crate::export::export_package;
 
     // Prepend extensions for text model.
-    if format == EnvelopeFormat::ModelTextWithExtensions {
+    if format == EnvelopeFormat::SExpressionWithExtensions {
         serde_json::to_writer(&mut writer, &extensions.iter().collect_vec())?;
     }
 
@@ -135,7 +135,7 @@ pub(crate) enum WriteErrorInner {
     /// Error encoding a binary model format package.
     ModelBinary(#[from] ModelBinaryWriteError),
     /// Error encoding a text model format package.
-    ModelText(#[from] ModelTextWriteError),
+    SExpression(#[from] SExpressionWriteError),
     /// Error writing the envelope header.
     Header(#[from] HeaderError),
     /// The specified payload format is not supported.
@@ -165,7 +165,7 @@ impl<T: Into<WriteErrorInner>> From<T> for WriteError {
 
 #[derive(Debug, Error)]
 #[error(transparent)]
-pub(crate) enum ModelTextWriteError {
+pub(crate) enum SExpressionWriteError {
     JsonSerialize(#[from] serde_json::Error),
     StringWrite(#[from] std::io::Error),
 }

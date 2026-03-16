@@ -10,7 +10,7 @@ use inkwell::{
     context::Context,
     intrinsics::Intrinsic,
     module::{Linkage, Module},
-    types::{AnyType, BasicType, BasicTypeEnum, FunctionType},
+    types::{AnyType, BasicType, BasicTypeEnum, FunctionType, PointerType},
     values::{BasicValueEnum, CallSiteValue, FunctionValue, GlobalValue},
 };
 use std::{collections::HashSet, rc::Rc};
@@ -55,6 +55,8 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
             pub fn llvm_func_type(&self, hugr_type: &HugrFuncType) -> Result<FunctionType<'c>>;
             /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
             pub fn llvm_sum_type(&self, sum_type: HugrSumType) -> Result<LLVMSumType<'c>>;
+            /// Get the global opaque LLVM pointer type
+            pub fn llvm_ptr_type(&self) -> PointerType<'c>;
         }
 
         to self.namer {
@@ -137,7 +139,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         let name = self.name_func(name, node);
         match visibility {
             Visibility::Public => self.get_func_impl(name, llvm_func_ty, Some(Linkage::External)),
-            Visibility::Private => self.get_func_impl(name, llvm_func_ty, Some(Linkage::Private)),
+            Visibility::Private => self.get_func_impl(name, llvm_func_ty, Some(Linkage::Internal)),
             _ => self.get_func_impl(name, llvm_func_ty, None),
         }
     }
@@ -308,7 +310,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
                 )
             })?;
             self = new_self;
-            worklist.extend(new_tasks.into_iter());
+            worklist.extend(new_tasks);
         }
         Ok(self)
     }

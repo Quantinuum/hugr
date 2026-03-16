@@ -1,6 +1,6 @@
 [package]
 name = "hugr-passes"
-version = "0.25.7"
+version = "0.26.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -19,7 +19,7 @@ workspace = true
 bench = false
 
 [dependencies]
-hugr-core = { path = "../hugr-core", version = "0.25.7" }
+hugr-core = { path = "../hugr-core", version = "0.26.0" }
 portgraph = { workspace = true }
 ascent = { version = "0.8.0" }
 derive_more = { workspace = true, features = [
@@ -41,3 +41,11 @@ hugr-core = { path = "../hugr-core", features = ["zstd"] }
 rstest = { workspace = true }
 proptest = { workspace = true }
 proptest-recurse = { version = "0.5.0" }
+
+# Defined here so it can be overridden by the codspeed CI job
+# using `cargo add`.
+criterion = { version = "0.8.2", features = ["html_reports"] }
+
+[[bench]]
+name = "bench_main"
+harness = false

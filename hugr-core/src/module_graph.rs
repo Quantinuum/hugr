@@ -166,11 +166,11 @@ mod test {
     fn edges() {
         let mut mb = ModuleBuilder::new();
         let cst = mb.add_constant(Value::from(ConstUsize::new(42)));
-        let callee = mb.define_function("callee", endo_sig(usize_t())).unwrap();
+        let callee = mb.define_function("callee", endo_sig([usize_t()])).unwrap();
         let ins = callee.input_wires();
         let callee = callee.finish_with_outputs(ins).unwrap();
         let mut caller = mb
-            .define_function("caller", inout_sig(vec![], usize_t()))
+            .define_function("caller", inout_sig(vec![], [usize_t()]))
             .unwrap();
         let val = caller.load_const(&cst);
         let call = caller.call(callee.handle(), &[], vec![val]).unwrap();
@@ -205,10 +205,10 @@ mod test {
 
     #[rstest]
     fn entrypoint(#[values(true, false)] single_node: bool) {
-        let mut dfb = DFGBuilder::new(endo_sig(usize_t())).unwrap();
+        let mut dfb = DFGBuilder::new(endo_sig([usize_t()])).unwrap();
         let called = dfb
             .module_root_builder()
-            .declare("called", endo_sig(usize_t()).into())
+            .declare("called", endo_sig([usize_t()]).into())
             .unwrap();
         let ins = dfb.input_wires();
         let call = dfb.call(&called, &[], ins).unwrap();

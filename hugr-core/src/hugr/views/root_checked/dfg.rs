@@ -367,7 +367,7 @@ mod test {
     #[test]
     fn test_map_io() {
         // Create a DFG with 2 inputs and 2 outputs
-        let sig = Signature::new_endo(vec![qb_t(), qb_t()]);
+        let sig = Signature::new_endo([qb_t(), qb_t()]);
         let mut hugr = new_empty_dfg(sig);
 
         // Wrap in RootChecked
@@ -412,7 +412,7 @@ mod test {
     #[test]
     fn test_map_io_dfg_id() {
         // Create a DFG with 2 inputs and 2 outputs
-        let sig = Signature::new_endo(vec![qb_t(), qb_t()]);
+        let sig = Signature::new_endo([qb_t(), qb_t()]);
         let mut hugr = new_empty_dfg(sig);
 
         // Wrap in RootChecked
@@ -458,7 +458,7 @@ mod test {
     #[test]
     fn test_map_io_duplicate_output() {
         // Create a DFG with 1 input and 1 output
-        let sig = Signature::new_endo(vec![bool_t()]);
+        let sig = Signature::new_endo([bool_t()]);
         let mut hugr = new_empty_dfg(sig);
 
         // Wrap in RootChecked
@@ -619,7 +619,7 @@ mod test {
         // Define function "foo" with nested DFGs
         let dfg_roots = {
             let mut foo_builder = module_builder
-                .define_function("foo", Signature::new_endo(vec![qb_t(), bool_t()]))
+                .define_function("foo", Signature::new_endo([qb_t(), bool_t()]))
                 .unwrap();
 
             let [qb, b] = foo_builder.input_wires_arr();

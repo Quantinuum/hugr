@@ -73,8 +73,6 @@
 pub use hugr_core::{
     builder, core, envelope, extension, metadata, ops, package, std_extensions, types, utils,
 };
-#[doc(inline)]
-pub use hugr_passes as algorithms;
 
 #[cfg(feature = "llvm")]
 #[doc(inline)]

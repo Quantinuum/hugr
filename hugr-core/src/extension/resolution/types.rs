@@ -276,10 +276,6 @@ fn collect_value_exts(
             let typ = e.get_type();
             collect_type_exts(&typ, used_extensions, missing_extensions);
         }
-        #[expect(deprecated)] // remove when Value::Function removed
-        Value::Function { hugr: _ } => {
-            // The extensions used by nested hugrs do not need to be counted for the root hugr.
-        }
         Value::Sum(s) => {
             if let SumType::General { rows } = &s.sum_type {
                 for row in rows {
