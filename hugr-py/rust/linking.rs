@@ -6,9 +6,10 @@ use pyo3::{create_exception, pymodule};
 #[pymodule(submodule)]
 #[pyo3(module = "hugr._hugr.linking")]
 pub mod linking {
-    use hugr_core::Hugr;
     use hugr_core::envelope::EnvelopeConfig;
+    use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::hugr::linking::{HugrLinking, NameLinkingPolicy};
+    use hugr_core::{Hugr, HugrView};
     use pyo3::exceptions::PyValueError;
     use pyo3::types::{PyAnyMethods, PyModule};
     use pyo3::{Bound, PyResult, Python, pyfunction};
@@ -32,11 +33,24 @@ pub mod linking {
         let (hugr_from, exts_from) = Hugr::load_with_exts(module_from, None).map_err(|err| {
             PyValueError::new_err(format!("Loading of second envelope failed: {}", err))
         })?;
+        let into_executable = hugr_into.entrypoint() != hugr_into.module_root();
+        let from_executable = hugr_from.entrypoint() != hugr_from.module_root();
+        let replacement_entrypoint = if into_executable && from_executable {
+            return Err(PyValueError::new_err(
+                "Cannot link two executable modules together.",
+            ));
+        } else if !into_executable && from_executable {
+            Some(hugr_from.entrypoint())
+        } else {
+            None
+        };
 
-        hugr_into
+        let forest = hugr_into
             .link_module(hugr_from, &NameLinkingPolicy::default())
             .map_err(|err| super::HugrLinkingError::new_err(err.to_string()))?;
-
+        if let Some(new_entrypoint) = replacement_entrypoint {
+            hugr_into.set_entrypoint(*forest.node_map.get(&new_entrypoint).unwrap());
+        }
         exts_into.extend(exts_from);
 
         let mut result = Vec::new();
