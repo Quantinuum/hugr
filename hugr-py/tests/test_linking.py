@@ -58,6 +58,15 @@ def test_link_modules_multiple_entrypoints():
         link_modules(hugr1.to_bytes(), hugr2.to_bytes())
 
 
+def test_link_packages_no_modules():
+    pkg1 = Package(modules=[])
+    pkg2 = Package(modules=[])
+
+    result_pkg = pkg1.link(pkg2)
+
+    assert result_pkg.modules == []
+
+
 def test_link_packages_extensions():
     pkg1 = Package(
         modules=[build_module(entrypoint=False)],
