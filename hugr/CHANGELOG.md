@@ -2,9 +2,34 @@
 
 ## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.7...hugr-v0.26.0) - 2026-03-16
 
+This release includes a restructuration of the optimisation pass API, a major
+upgrade to LLVM 21, and bumps the MSRV to Rust 1.91.
+
+Composable passes can now be configured with a scope to indicate which parts of the
+Hugr they should be applied to, and which parts they are allowed to modify.
+Implementations of the trait should adhere to this configuration.
+
+The `hugr-passes` crate is no longer reexported from `hugr::algorithms`. It will
+be integrated into `tket` in the future, but it should be used directly
+as `hugr_passes` for now.
+
+Building the crate with the `llvm` feature will now require LLVM 21.1 to be installed.
+See the [DEVELOPMENT.md](https://github.com/Quantinuum/hugr/blob/main/DEVELOPMENT.md) file for updated instructions on setting up the development environment.
+
+### New Features
+
+- [**breaking**] Update remainder of passes to use PassScope, drop default with_scope ([#2871](https://github.com/Quantinuum/hugr/pull/2871))
+- [**breaking**] Make `WithScope` a supertrait of `ComposablePass` ([#2921](https://github.com/Quantinuum/hugr/pull/2921))
+- [**breaking**] Rename ModelText envelope format to SExpression ([#2927](https://github.com/Quantinuum/hugr/pull/2927))
+- Deprecate HugrView::as_petgraph ([#2944](https://github.com/Quantinuum/hugr/pull/2944))
+- [**breaking**] `hugr-passes` is no longer reexported from `hugr::algorithms` ([#2922](https://github.com/Quantinuum/hugr/pull/2922))
+- *(llvm)* [**breaking**] Upgrade to LLVM 21 ([#2901](https://github.com/Quantinuum/hugr/pull/2901))
+- [**breaking**] TypeRow: add impl From array of Type, remove From<Type> ([#2784](https://github.com/Quantinuum/hugr/pull/2784))
+
 ### Bug Fixes
 
-- Keep declared used_extensions in envelope description ([#2932](https://github.com/Quantinuum/hugr/pull/2932))
+- *(hugr-cli)* Keep declared used_extensions in envelope description ([#2932](https://github.com/Quantinuum/hugr/pull/2932))
+- [**breaking**] Fix lower_funcs with custom extensions failing to load ([#2925](https://github.com/Quantinuum/hugr/pull/2925))
 
 ### Documentation
 
@@ -13,17 +38,6 @@
 ### Miscellaneous Tasks
 
 - [**breaking**] Fix new clippy warning on rust 1.94 ([#2912](https://github.com/Quantinuum/hugr/pull/2912))
-
-### New Features
-
-- [**breaking**] Update remainder of passes to use PassScope, drop default with_scope ([#2871](https://github.com/Quantinuum/hugr/pull/2871))
-- [**breaking**] Make `WithScope` a supertrait of `ComposablePass` ([#2921](https://github.com/Quantinuum/hugr/pull/2921))
-- [**breaking**] Rename ModelText envelope format to SExpression ([#2927](https://github.com/Quantinuum/hugr/pull/2927))
-- [**breaking**] Fix lower_funcs with custom extensions failing to load ([#2925](https://github.com/Quantinuum/hugr/pull/2925))
-- Deprecate HugrView::as_petgraph ([#2944](https://github.com/Quantinuum/hugr/pull/2944))
-- [**breaking**] `hugr-passes` is no longer reexported from `hugr::algorithms` ([#2922](https://github.com/Quantinuum/hugr/pull/2922))
-- *(llvm)* [**breaking**] Upgrade to LLVM 21 ([#2901](https://github.com/Quantinuum/hugr/pull/2901))
-- [**breaking**] TypeRow: add impl From array of Type, remove From<Type> ([#2784](https://github.com/Quantinuum/hugr/pull/2784))
 
 ### Refactor
 
