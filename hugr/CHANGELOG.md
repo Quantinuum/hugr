@@ -2,7 +2,7 @@
 
 ## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.7...hugr-v0.26.0) - 2026-03-16
 
-This release includes a restructuration of the optimisation pass API, a major
+This release includes a restructuring of the optimization pass API and a major
 upgrade to LLVM 21, and bumps the MSRV to Rust 1.91.
 
 Composable passes can now be configured with a scope to indicate which parts of the
