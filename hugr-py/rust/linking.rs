@@ -49,7 +49,10 @@ pub mod linking {
             .link_module(hugr_from, &NameLinkingPolicy::default())
             .map_err(|err| super::HugrLinkingError::new_err(err.to_string()))?;
         if let Some(new_entrypoint) = replacement_entrypoint {
-            hugr_into.set_entrypoint(*forest.node_map.get(&new_entrypoint).unwrap());
+            let Some(node) = forest.node_map.get(&new_entrypoint) else {
+                panic!("Entrypoint is to be replaced but was not found after linking");
+            };
+            hugr_into.set_entrypoint(*node);
         }
         exts_into.extend(exts_from);
 
