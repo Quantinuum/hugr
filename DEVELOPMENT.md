@@ -34,9 +34,9 @@ To setup the environment manually you will need:
 - uv `>=0.7`: <https://docs.astral.sh/uv/getting-started/installation>
 - Optional: capnproto `>=1.0`: <https://capnproto.org/install.html>
     Required when modifying the `hugr-model` serialization schema.
-- Optional: llvm `== 21.1`. The "llvm" feature (backed by the sub-crate `hugr-llvm`)
-  requires LLVM 21.0 installed. We use the rust bindings
-  [llvm-sys](https://crates.io/crates/llvm-sys) to [llvm](https://llvm.org/).
+- Optional: [llvm](https://llvm.org/) `== 21.1`. The "llvm" feature (backed by the sub-crate `hugr-llvm`)
+  requires LLVM 21.1 installed. We use the rust bindings from
+  [llvm-sys](https://crates.io/crates/llvm-sys).
 
 Once you have these installed, you can install the required python dependencies and setup pre-commit hooks with:
 
