@@ -4,7 +4,8 @@ use anyhow::Result;
 use delegate::delegate;
 use hugr_core::extension::ExtensionId;
 use hugr_core::types::{SumType, Type, TypeName};
-use inkwell::types::FunctionType;
+use inkwell::AddressSpace;
+use inkwell::types::{FunctionType, PointerType};
 use inkwell::{context::Context, types::BasicTypeEnum};
 
 use crate::custom::types::{LLVMCustomTypeFn, LLVMTypeMapping};
@@ -54,6 +55,11 @@ impl<'c, 'a> TypingSession<'c, 'a> {
     #[must_use]
     pub fn iw_context(&self) -> &'c Context {
         self.iw_context
+    }
+
+    /// Returns the global opaque LLVM pointer type
+    pub fn llvm_ptr_type(&self) -> PointerType<'c> {
+        self.iw_context.ptr_type(AddressSpace::default())
     }
 }
 
@@ -116,7 +122,7 @@ pub mod test {
 
     #[rstest]
     #[case(0,HugrFuncType::new(type_row!(Type::new_unit_sum(2)), type_row!()))]
-    #[case(1, HugrFuncType::new(Type::new_unit_sum(1), Type::new_unit_sum(3)))]
+    #[case(1, HugrFuncType::new([Type::new_unit_sum(1)], [Type::new_unit_sum(3)]))]
     #[case(2,HugrFuncType::new(vec![], vec![Type::new_unit_sum(1), Type::new_unit_sum(1)]))]
     fn func_types(#[case] _id: i32, #[with(_id)] llvm_ctx: TestContext, #[case] ft: HugrFuncType) {
         assert_snapshot!(
@@ -150,7 +156,7 @@ pub mod test {
     #[case(4, INT_TYPES[6].clone())]
     #[case(5, Type::new_sum([vec![INT_TYPES[2].clone()]]))]
     #[case(6, Type::new_sum([vec![INT_TYPES[6].clone(),Type::new_unit_sum(1)], vec![Type::new_unit_sum(2), INT_TYPES[2].clone()]]))]
-    #[case(7, Type::new_function(HugrFuncType::new(type_row!(Type::new_unit_sum(2)), Type::new_unit_sum(3))))]
+    #[case(7, Type::new_function(HugrFuncType::new(type_row!(Type::new_unit_sum(2)), [Type::new_unit_sum(3)])))]
     fn ext_types(#[case] _id: i32, #[with(_id)] mut llvm_ctx: TestContext, #[case] t: Type) {
         use crate::CodegenExtsBuilder;
 

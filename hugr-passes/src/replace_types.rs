@@ -29,6 +29,7 @@ use hugr_core::types::{
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, PortIndex, Visibility, Wire};
 
+use crate::composable::WithScope;
 use crate::{ComposablePass, PassScope};
 
 mod linearize;
@@ -56,7 +57,7 @@ pub enum NodeTemplate {
     ///
     /// It is **recommended** to use [Self::LinkedHugr] instead.
     ///
-    /// [monomorphization]: super::monomorphize
+    /// [monomorphization]: crate::MonomorphizePass
     CompoundOp(Box<Hugr>),
     /// Defines a sub-Hugr to insert, whose entrypoint becomes (or replaces) the desired Node.
     /// Other children of the Hugr reachable from the entrypoint will also be inserted
@@ -364,7 +365,7 @@ impl ReplacementOptions {
 ///   would use `SpecialListOfXs`.)
 /// * See also limitations noted for [Linearizer].
 ///
-/// [monomorphization]: super::monomorphize()
+/// [monomorphization]: crate::MonomorphizePass
 #[derive(Clone)]
 pub struct ReplaceTypes {
     type_map: HashMap<CustomType, (Type, ReplacementOptions)>,
@@ -481,7 +482,7 @@ impl ReplaceTypes {
     ///
     /// Note that if `src` is an instance of a *parametrized* [`TypeDef`], this takes
     /// precedence over [`Self::replace_parametrized_type`] where the `src`s overlap. Thus, this
-    /// should only be used on already-*[monomorphize](super::monomorphize())d* Hugrs, as
+    /// should only be used on already-*[monomorphize](crate::MonomorphizePass)d* Hugrs, as
     /// substitution (parametric polymorphism) happening later will not respect this replacement.
     ///
     /// If there are any [`LoadConstant`]s of this type, callers should also call [`Self::replace_consts`]
@@ -610,7 +611,7 @@ impl ReplaceTypes {
     ///
     /// Note that if `src` is an instance of a *parametrized* [`OpDef`], this takes
     /// precedence over [`Self::set_replace_parametrized_op`] where the `src`s overlap.
-    /// Thus, this method should only be used for already-*[monomorphize](super::monomorphize())d*
+    /// Thus, this method should only be used for already-*[monomorphize](crate::MonomorphizePass)d*
     /// Hugrs, as substitution (parametric polymorphism) happening later will not respect
     /// this replacement.
     pub fn set_replace_op(&mut self, src: &ExtensionOp, dest: NodeTemplate) {
@@ -709,7 +710,7 @@ impl ReplaceTypes {
     /// Set the regions of the Hugr to which this pass should be applied.
     ///
     /// If not set, the pass is applied to the whole Hugr.
-    /// Each call overwrites any previous calls to `set_regions` and/or [Self::with_scope_internal].
+    /// Each call overwrites any previous calls to `set_regions` and/or [Self::with_scope].
     pub fn set_regions(&mut self, regions: impl IntoIterator<Item = Node>) {
         self.scope = Either::Right(regions.into_iter().collect());
     }
@@ -883,8 +884,6 @@ impl ReplaceTypes {
                     false
                 }
             }),
-            #[expect(deprecated)] // remove when Value::Function removed
-            Value::Function { hugr } => self.run(&mut **hugr),
         }
     }
 
@@ -914,17 +913,6 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
     type Error = ReplaceTypesError;
     type Result = bool;
 
-    /// Sets the scope within which the pass will operate. Note that this pass ignores
-    /// * [PassScope::preserve_interface], as this is a lowering pass: its purpose is to
-    ///   change node signatures.
-    /// * [PassScope::recursive], as non-recursion generally leads to invalid Hugrs.
-    ///
-    /// Hence, really only the [PassScope::root] affects the pass.
-    fn with_scope_internal(mut self, scope: impl Into<PassScope>) -> Self {
-        self.scope = Either::Left(scope.into());
-        self
-    }
-
     fn run(&self, hugr: &mut H) -> Result<bool, ReplaceTypesError> {
         let temp: Vec<Node>; // keep alive
         let regions = match &self.scope {
@@ -939,6 +927,19 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for ReplaceTypes {
             changed |= self.change_subtree(hugr, *region_root, false)?;
         }
         Ok(changed)
+    }
+}
+
+impl WithScope for ReplaceTypes {
+    /// Sets the scope within which the pass will operate. Note that this pass ignores
+    /// * [PassScope::preserve_interface], as this is a lowering pass: its purpose is to
+    ///   change node signatures.
+    /// * [PassScope::recursive], as non-recursion generally leads to invalid Hugrs.
+    ///
+    /// Hence, really only the [PassScope::root] affects the pass.
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = Either::Left(scope.into());
+        self
     }
 }
 
@@ -1066,7 +1067,7 @@ mod test {
                         vec![TypeBound::Copyable.into()],
                         Signature::new(
                             vec![pv_of_var.into(), i64_t()],
-                            Type::new_var_use(0, TypeBound::Linear),
+                            [Type::new_var_use(0, TypeBound::Linear)],
                         ),
                     ),
                     w,
@@ -1075,7 +1076,7 @@ mod test {
                 ext.add_op(
                     "lowered_read_bool".into(),
                     String::new(),
-                    Signature::new(vec![i64_t(); 2], bool_t()),
+                    Signature::new(vec![i64_t(); 2], [bool_t()]),
                     w,
                 )
                 .unwrap();
@@ -1088,8 +1089,8 @@ mod test {
         new: impl Fn(Signature) -> Result<T, BuildError>,
     ) -> T {
         let mut dfb = new(Signature::new(
-            vec![list_type(elem_ty.clone()), i64_t()],
-            elem_ty.clone(),
+            [list_type(elem_ty.clone()), i64_t()],
+            [elem_ty.clone()],
         ))
         .unwrap();
         let [val, idx] = dfb.input_wires_arr();
@@ -1108,7 +1109,7 @@ mod test {
             .unwrap()
             .outputs_arr();
         let [res] = dfb
-            .build_unwrap_sum(1, option_type(Type::from(elem_ty)), opt)
+            .build_unwrap_sum(1, option_type([Type::from(elem_ty)]), opt)
             .unwrap();
         dfb.set_outputs([res]).unwrap();
         dfb
@@ -1147,14 +1148,14 @@ mod test {
         let c_int = Type::from(coln.instantiate([i64_t().into()]).unwrap());
         let c_bool = Type::from(coln.instantiate([bool_t().into()]).unwrap());
         let mut mb = ModuleBuilder::new();
-        let sig = Signature::new_endo(Type::new_var_use(0, TypeBound::Linear));
+        let sig = Signature::new_endo([Type::new_var_use(0, TypeBound::Linear)]);
         let fb = mb
             .define_function("id", PolyFuncType::new([TypeBound::Linear.into()], sig))
             .unwrap();
         let inps = fb.input_wires();
         let id = fb.finish_with_outputs(inps).unwrap();
 
-        let sig = Signature::new(vec![i64_t(), c_int.clone(), c_bool.clone()], bool_t());
+        let sig = Signature::new([i64_t(), c_int.clone(), c_bool.clone()], [bool_t()]);
         let mut fb = mb.define_function("main", sig).unwrap();
         let [idx, indices, bools] = fb.input_wires_arr();
         let [indices] = fb
@@ -1166,9 +1167,12 @@ mod test {
             .unwrap()
             .outputs_arr();
         let mut cfg = fb
-            .cfg_builder([(i64_t(), idx2), (c_bool.clone(), bools)], bool_t().into())
+            .cfg_builder(
+                [(i64_t(), idx2), (c_bool.clone(), bools)],
+                [bool_t()].into(),
+            )
             .unwrap();
-        let mut entry = cfg.entry_builder([bool_t().into()], type_row![]).unwrap();
+        let mut entry = cfg.entry_builder([[bool_t()].into()], type_row![]).unwrap();
         let [idx2, bools] = entry.input_wires_arr();
         let [bools] = entry
             .call(id.handle(), &[c_bool.into()], [bools])
@@ -1179,7 +1183,7 @@ mod test {
             .unwrap();
         let [tagged] = entry
             .add_dataflow_op(
-                OpType::Tag(Tag::new(0, vec![bool_t().into()])),
+                OpType::Tag(Tag::new(0, vec![[bool_t()].into()])),
                 bool_read_op.outputs(),
             )
             .unwrap()
@@ -1209,7 +1213,7 @@ mod test {
         let ext = ext();
         let coln = ext.get_type(PACKED_VEC).unwrap();
         let pv = |t: Type| Type::new_extension(coln.instantiate([t.into()]).unwrap());
-        let sum_rows = [vec![pv(pv(bool_t())), i64_t()].into(), pv(i64_t()).into()];
+        let sum_rows = [[pv(pv(bool_t())), i64_t()].into(), [pv(i64_t())].into()];
         let mut dfb = DFGBuilder::new(inout_sig(
             vec![Type::new_sum(sum_rows.clone()), pv(bool_t()), pv(i64_t())],
             vec![pv(bool_t()), pv(i64_t())],
@@ -1263,13 +1267,13 @@ mod test {
     fn loop_const() {
         let cu = |u| ConstUsize::new(u).into();
         let mut tl = TailLoopBuilder::new(
-            list_type(usize_t()),
-            list_type(bool_t()),
-            list_type(usize_t()),
+            [list_type(usize_t())],
+            [list_type(bool_t())],
+            [list_type(usize_t())],
         )
         .unwrap();
         let [_, bools] = tl.input_wires_arr();
-        let st = SumType::new(vec![list_type(usize_t()); 2]);
+        let st = SumType::new(vec![[list_type(usize_t())]; 2]);
         let pred = tl.add_load_value(
             Value::sum(
                 0,
@@ -1326,7 +1330,7 @@ mod test {
                 .exactly_one()
                 .ok()
                 .unwrap();
-            assert_eq!(cst.get_type(), Type::new_sum(vec![list_type(i64_t()); 2]));
+            assert_eq!(cst.get_type(), Type::new_sum(vec![[list_type(i64_t())]; 2]));
         }
 
         // 3. Lower all List<T> to BArray<4,T>
@@ -1353,10 +1357,10 @@ mod test {
                 .as_load_constant()
                 .map(hugr_core::ops::LoadConstant::constant_type),
             Some(&Type::new_sum(vec![
-                Type::from(borrow_array_type(
+                [Type::from(borrow_array_type(
                     4,
                     i64_t()
-                ));
+                ))];
                 2
             ]))
         );
@@ -1374,7 +1378,7 @@ mod test {
                 e.add_op(
                     READ.into(),
                     "Like List::get but without the option".to_string(),
-                    PolyFuncType::new(params, Signature::new(vec![list_of_var, usize_t()], tv)),
+                    PolyFuncType::new(params, Signature::new([list_of_var, usize_t()], [tv])),
                     w,
                 )
                 .unwrap();
@@ -1386,7 +1390,7 @@ mod test {
             Some(elem.try_into_type().unwrap())
         }
         let i32_t = || INT_TYPES[5].clone();
-        let opt_i32 = Type::from(option_type(i32_t()));
+        let opt_i32 = Type::from(option_type([i32_t()]));
         let i32_custom_t = i32_t().as_extension().unwrap().clone();
         let mut dfb = DFGBuilder::new(inout_sig(
             vec![list_type(i32_t()), list_type(opt_i32.clone())],
@@ -1430,7 +1434,7 @@ mod test {
             h.entrypoint_optype().dataflow_signature().unwrap().io(),
             (
                 &vec![list_type(qb_t()); 2].into(),
-                &vec![qb_t(), option_type(qb_t()).into()].into()
+                &vec![qb_t(), option_type([qb_t()]).into()].into()
             )
         );
         assert_eq!(
@@ -1452,7 +1456,7 @@ mod test {
         GenericArrayValue<AK>: CustomConst,
     {
         let mut dfb =
-            DFGBuilder::new(inout_sig(type_row![], AK::ty(vals.len() as _, usize_t()))).unwrap();
+            DFGBuilder::new(inout_sig(type_row![], [AK::ty(vals.len() as _, usize_t())])).unwrap();
         let c = dfb.add_load_value(GenericArrayValue::<AK>::new(
             usize_t(),
             vals.iter().map(|u| ConstUsize::new(*u).into()),
@@ -1490,7 +1494,7 @@ mod test {
         let outer = pv
             .instantiate([Type::new_extension(inner.clone()).into()])
             .unwrap();
-        let mut dfb = DFGBuilder::new(inout_sig(vec![outer.into(), i64_t()], usize_t())).unwrap();
+        let mut dfb = DFGBuilder::new(inout_sig([outer.into(), i64_t()], [usize_t()])).unwrap();
         let read_func = dfb
             .module_root_builder()
             .add_hugr(
@@ -1639,7 +1643,7 @@ mod test {
         let coln = ext.get_type(PACKED_VEC).unwrap();
         let c_u = Type::new_extension(coln.instantiate(&[usize_t().into()]).unwrap());
         let mut h = {
-            let db = DFGBuilder::new(endo_sig(c_u.clone())).unwrap();
+            let db = DFGBuilder::new(endo_sig([c_u.clone()])).unwrap();
             let inps = db.input_wires();
             db.finish_hugr_with_outputs(inps)
         }
@@ -1657,7 +1661,7 @@ mod test {
         lowerer.set_regions(vec![h.entrypoint()]);
         assert!(lowerer.run(&mut h).unwrap());
         let v_u = list_type(usize_t());
-        assert_eq!(h.signature(ep).unwrap().as_ref(), &endo_sig(v_u.clone()));
+        assert_eq!(h.signature(ep).unwrap().as_ref(), &endo_sig([v_u.clone()]));
         assert_eq!(h.num_nodes(), h.num_nodes());
         let [f_in, _] = h.get_io(h.get_parent(ep).unwrap()).unwrap();
         assert_eq!(
@@ -1714,7 +1718,7 @@ mod test {
 
                 let mut dfb = DFGBuilder::new(Signature::new(
                     vec![pv.clone().into(), usize_t()],
-                    vec![option_type(ty.clone()).into(), pv.into()],
+                    vec![option_type([ty.clone()]).into(), pv.into()],
                 ))
                 .unwrap();
                 let [pvec, idx] = dfb.input_wires_arr();
@@ -1728,7 +1732,7 @@ mod test {
                     .outputs_arr();
                 let [wrapped_elem] = dfb
                     .add_dataflow_op(
-                        ops::Tag::new(1, vec![type_row![], ty.clone().into()]),
+                        ops::Tag::new(1, vec![type_row![], [ty.clone()].into()]),
                         [elem],
                     )
                     .unwrap()
@@ -1742,7 +1746,7 @@ mod test {
         // Arrays of 64 bools should thus be transformed into PackedVec<bool> and then to int64s
         // Arrays of 64 non-bools should thus become PackedVec<T> and thus List<T>
         let a64 = |t| array_type(64, t);
-        let opt = |t| Type::from(option_type(t));
+        let opt = |t| Type::from(option_type([t]));
         let mut dfb = DFGBuilder::new(Signature::new(
             vec![a64(bool_t()), a64(usize_t())],
             vec![opt(bool_t()), a64(bool_t()), opt(usize_t()), a64(usize_t())],

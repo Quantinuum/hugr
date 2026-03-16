@@ -15,6 +15,8 @@ use serde::de::Deserialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
+#[deprecated(since = "0.26.0")]
+#[expect(deprecated)] // Remove at same time
 pub use self::petgraph::PetgraphWrapper;
 use self::render::MermaidFormatter;
 pub use nodes_iter::NodesIter;
@@ -389,6 +391,11 @@ pub trait HugrView: HugrInternals {
 
     /// Return a wrapper over the view that can be used in petgraph algorithms.
     #[inline]
+    #[deprecated(
+        since = "0.26.0",
+        note = "Use hugr_core::internal::HugrInternals::region_portgraph instead."
+    )]
+    #[expect(deprecated)] // Remove at same time as PetgraphWrapper
     fn as_petgraph(&self) -> PetgraphWrapper<'_, Self>
     where
         Self: Sized,

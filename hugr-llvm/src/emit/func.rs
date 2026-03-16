@@ -12,7 +12,7 @@ use inkwell::{
     builder::Builder,
     context::Context,
     module::{Linkage, Module},
-    types::{BasicType, BasicTypeEnum, FunctionType},
+    types::{BasicType, BasicTypeEnum, FunctionType, PointerType},
     values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue, IntValue},
 };
 use itertools::{Itertools, zip_eq};
@@ -72,6 +72,8 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
             pub fn llvm_func_type(&self, hugr_type: &HugrFuncType) -> Result<FunctionType<'c> >;
             /// Convert a hugr [HugrSumType] into an LLVM [LLVMSumType].
             pub fn llvm_sum_type(&self, sum_type: HugrSumType) -> Result<LLVMSumType<'c>>;
+            /// Get the global opaque LLVM pointer type
+            pub fn llvm_ptr_type(&self) -> PointerType<'c>;
             /// Adds or gets the [FunctionValue] in the [inkwell::module::Module] corresponding to the given [FuncDefn].
             ///
             /// The name of the result may have been mangled.
@@ -332,7 +334,7 @@ pub fn build_option<'c, H: HugrView<Node = Node>>(
     some_value: BasicValueEnum<'c>,
     hugr_ty: HugrType,
 ) -> Result<BasicValueEnum<'c>> {
-    let option_ty = ctx.llvm_sum_type(option_type(hugr_ty))?;
+    let option_ty = ctx.llvm_sum_type(option_type([hugr_ty]))?;
     let builder = ctx.builder();
     let some = option_ty.build_tag(builder, 1, vec![some_value])?;
     let none = option_ty.build_tag(builder, 0, vec![])?;
@@ -350,7 +352,7 @@ pub fn build_ok_or_else<'c, H: HugrView<Node = Node>>(
     else_value: BasicValueEnum<'c>,
     else_hugr_ty: HugrType,
 ) -> Result<BasicValueEnum<'c>> {
-    let either_ty = ctx.llvm_sum_type(either_type(else_hugr_ty, ok_hugr_ty))?;
+    let either_ty = ctx.llvm_sum_type(either_type([else_hugr_ty], [ok_hugr_ty]))?;
     let builder = ctx.builder();
     let left = either_ty.build_tag(builder, 0, vec![else_value])?;
     let right = either_ty.build_tag(builder, 1, vec![ok_value])?;

@@ -60,7 +60,7 @@ pub trait PreludeCodegen: Clone {
         Ok(session.iw_context().struct_type(
             &[
                 ctx.i32_type().into(),
-                ctx.i8_type().ptr_type(AddressSpace::default()).into(),
+                ctx.ptr_type(AddressSpace::default()).into(),
             ],
             false,
         ))
@@ -73,10 +73,7 @@ pub trait PreludeCodegen: Clone {
     ///
     /// The default implementation is i8*.
     fn string_type<'c>(&self, session: &TypingSession<'c, '_>) -> Result<impl BasicType<'c>> {
-        Ok(session
-            .iw_context()
-            .i8_type()
-            .ptr_type(AddressSpace::default()))
+        Ok(session.iw_context().ptr_type(AddressSpace::default()))
     }
 
     /// Emit a [`hugr_core::extension::prelude::PRINT_OP_ID`] node.
@@ -207,11 +204,7 @@ pub trait PreludeCodegen: Clone {
         ctx: &mut EmitFuncContext<'c, '_, H>,
         str: &ConstString,
     ) -> Result<BasicValueEnum<'c>> {
-        let default_str_type = ctx
-            .iw_context()
-            .i8_type()
-            .ptr_type(AddressSpace::default())
-            .as_basic_type_enum();
+        let default_str_type = ctx.llvm_ptr_type().as_basic_type_enum();
         let str_type = ctx.llvm_type(&str.get_type())?.as_basic_type_enum();
         ensure!(
             str_type == default_str_type,
@@ -316,7 +309,7 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
         let global = context.get_global(&k.symbol, llvm_type, k.constant)?;
         Ok(context
             .builder()
-            .build_load(global.as_pointer_value(), &k.symbol)?)
+            .build_load(llvm_type, global.as_pointer_value(), &k.symbol)?)
     })
     .custom_const::<ConstString>({
         let pcg = pcg.clone();
@@ -522,7 +515,7 @@ mod test {
     #[rstest]
     fn prelude_const_usize(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let k = builder.add_load_value(ConstUsize::new(17));
@@ -557,8 +550,8 @@ mod test {
     #[rstest]
     fn prelude_noop(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_ins(usize_t())
-            .with_outs(usize_t())
+            .with_ins([usize_t()])
+            .with_outs([usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let in_wires = builder.input_wires();
@@ -575,7 +568,7 @@ mod test {
     fn prelude_make_tuple(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
             .with_ins(vec![bool_t(), bool_t()])
-            .with_outs(Type::new_tuple(vec![bool_t(), bool_t()]))
+            .with_outs([Type::new_tuple(vec![bool_t(); 2])])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let in_wires = builder.input_wires();
@@ -588,7 +581,7 @@ mod test {
     #[rstest]
     fn prelude_unpack_tuple(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_ins(Type::new_tuple(vec![bool_t(), bool_t()]))
+            .with_ins([Type::new_tuple(vec![bool_t(); 2])])
             .with_outs(vec![bool_t(), bool_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
@@ -682,7 +675,7 @@ mod test {
 
         let hugr = SimpleHugrConfig::new()
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
-            .with_outs(error_type())
+            .with_outs([error_type()])
             .finish(|mut builder| {
                 let sig_out = builder.add_load_value(sig);
                 let msg_out = builder.add_load_value(msg);
@@ -728,7 +721,7 @@ mod test {
     #[rstest]
     fn prelude_load_nat(prelude_llvm_ctx: TestContext) {
         let hugr = SimpleHugrConfig::new()
-            .with_outs(usize_t())
+            .with_outs([usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let v = builder

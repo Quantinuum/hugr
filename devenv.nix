@@ -1,13 +1,12 @@
 { pkgs, lib, inputs, config, ... }:
 let
-  pkgs-stable = import inputs.nixpkgs-2505 { system = pkgs.stdenv.system; };
   cfg = config.hugr;
 in
 {
   options.hugr = {
     llvmVersion = lib.mkOption {
       type = lib.types.str;
-      default = "14";
+      default = "21";
     };
   };
 
@@ -31,8 +30,13 @@ in
       pkgs.xz
     ];
 
-    env = {
-      "LLVM_SYS_${cfg.llvmVersion}0_PREFIX" = "${pkgs-stable."llvmPackages_${cfg.llvmVersion}".libllvm.dev}";
+    env = let
+      llvmPackage = pkgs."llvmPackages_${cfg.llvmVersion}";
+      versionInfo = builtins.splitVersion llvmPackage.release_version;
+      llvmVersionMajor = builtins.elemAt versionInfo 0;
+      llvmVersionMinor = builtins.elemAt versionInfo 1;
+    in {
+      "LLVM_SYS_${llvmVersionMajor}${llvmVersionMinor}_PREFIX" = "${llvmPackage.libllvm.dev}";
     };
 
 

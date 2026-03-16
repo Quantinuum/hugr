@@ -208,6 +208,7 @@ mod test {
 
     use super::*;
     use hugr_core::builder::{BuildHandle, Dataflow, DataflowHugr, endo_sig};
+    use hugr_core::hugr::internal::HugrInternals;
     use hugr_core::ops::handle::{DataflowOpID, NodeHandle};
 
     use hugr_core::ops::{self, Value};
@@ -277,8 +278,11 @@ mod test {
         })
         .unwrap();
 
-        let topo_sorted = Topo::new(&hugr.as_petgraph())
-            .iter(&hugr.as_petgraph())
+        let (graph, node_map) = hugr.region_portgraph(hugr.entrypoint());
+
+        let topo_sorted = Topo::new(&graph)
+            .iter(&graph)
+            .map(|n| node_map.from_portgraph(n))
             .filter(|n| rank_map.contains_key(n))
             .collect_vec();
         hugr.validate().unwrap();
@@ -325,7 +329,7 @@ mod test {
     fn test_force_order_const() {
         let mut hugr = {
             let mut builder =
-                DFGBuilder::new(Signature::new(Type::EMPTY_TYPEROW, Type::UNIT)).unwrap();
+                DFGBuilder::new(Signature::new(Type::EMPTY_TYPEROW, [Type::UNIT])).unwrap();
             let unit = builder.add_load_value(Value::unary_unit_sum());
             builder.finish_hugr_with_outputs([unit]).unwrap()
         };
@@ -336,7 +340,7 @@ mod test {
     #[test]
     /// test for <https://github.com/CQCL/hugr/issues/2005>
     fn call_indirect_bug() {
-        let fn_type = Signature::new(Type::UNIT, vec![Type::UNIT]);
+        let fn_type = Signature::new_endo([Type::UNIT]);
         let mut hugr = {
             let mut builder = DFGBuilder::new(Signature::new(
                 vec![Type::new_function(fn_type.clone()), Type::UNIT],
