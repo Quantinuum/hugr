@@ -226,6 +226,7 @@ mod test {
     #[case::fmul(FloatOps::fmul)]
     #[case::fdiv(FloatOps::fdiv)]
     #[case::fpow(FloatOps::fpow)]
+    #[case::fround(FloatOps::fround)]
     fn float_operations(mut llvm_ctx: TestContext, #[case] op: FloatOps) {
         let name: &str = op.into();
         let hugr = test_float_op(op);
