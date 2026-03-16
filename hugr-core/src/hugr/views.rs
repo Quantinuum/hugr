@@ -2,7 +2,8 @@
 
 mod impls;
 mod nodes_iter;
-pub mod petgraph;
+mod petgraph;
+pub mod petgraph2;
 pub mod render;
 mod rerooted;
 mod root_checked;
@@ -24,23 +25,22 @@ pub use rerooted::Rerooted;
 pub use root_checked::{InvalidSignature, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use portgraph::render::{DotFormat, MermaidFormat};
 use portgraph::{LinkView, PortView};
+
+use crate::core::HugrNode;
+use crate::extension::ExtensionRegistry;
+use crate::hugr::internal::PortgraphNodeMap;
+use crate::hugr::views::petgraph2::SynEdgeWrapper;
+use crate::metadata::{Metadata, RawMetadataValue};
+use crate::ops::{OpParent, OpTag, OpTrait, OpType, handle::NodeHandle};
+use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
+use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 use super::internal::{HugrInternals, HugrMutInternals};
 use super::validate::ValidationContext;
 use super::{Hugr, HugrMut, Node, ValidationError};
-use crate::core::HugrNode;
-use crate::extension::ExtensionRegistry;
-use crate::metadata::{Metadata, RawMetadataValue};
-use crate::ops::handle::NodeHandle;
-use crate::ops::{OpParent, OpTag, OpTrait, OpType};
-
-use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
-use crate::{Direction, IncomingPort, OutgoingPort, Port};
-
-use itertools::Either;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
@@ -401,6 +401,68 @@ pub trait HugrView: HugrInternals {
         Self: Sized,
     {
         PetgraphWrapper { hugr: self }
+    }
+
+    /// A view of a flat region, including ordering constraints from nonlocal edges,
+    /// suitable for use with petgraph algorithms.
+    fn order_graph(
+        &self,
+        parent: Self::Node,
+    ) -> (
+        SynEdgeWrapper<portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>>,
+        Self::RegionPortgraphNodes,
+    ) {
+        #[expect(deprecated)] // inline region_portgraph here
+        let (region_view, region_nodes) = self.region_portgraph(parent);
+        let mut syn_edges = Vec::new();
+        if OpTag::DataflowParent.is_superset(self.get_optype(parent).tag()) {
+            let mut cache: HashMap<Self::Node, Self::Node> = HashMap::new();
+            fn find_sib_anc<N: HugrNode>(
+                n: N,
+                hugr: &(impl HugrView<Node = N> + ?Sized),
+                cache: &mut HashMap<N, N>,
+                parent: N,
+            ) -> Option<N> {
+                // If we don't hit parent, it's a Dom edge, so ignore.
+                let p = hugr.get_parent(n)?;
+                if p == parent {
+                    return Some(n);
+                }
+                match cache.get(&p) {
+                    Some(&cached) => Some(cached),
+                    None => {
+                        // can't be borrowing cache during recursive call
+                        let anc = find_sib_anc(p, hugr, cache, parent);
+                        if let Some(anc) = anc {
+                            cache.insert(p, anc);
+                        }
+                        anc
+                    }
+                }
+            }
+            for child in self.children(parent) {
+                for (p, _) in self.out_value_types(child) {
+                    for (tgt, _) in self.linked_inputs(child, p) {
+                        if let Some(tgt_anc) = find_sib_anc(tgt, self, &mut cache, parent)
+                            && tgt_anc != tgt
+                        {
+                            syn_edges.push((
+                                region_nodes.to_portgraph(child),
+                                region_nodes.to_portgraph(tgt_anc),
+                            ));
+                        }
+                    }
+                }
+            }
+        }
+
+        (
+            SynEdgeWrapper {
+                region_view,
+                syn_edges,
+            },
+            region_nodes,
+        )
     }
 
     /// Return the mermaid representation of the underlying hierarchical graph.

@@ -70,7 +70,7 @@ where
         debug_assert!(i.out_value_types().count() == self.inputs.as_ref().unwrap().len());
         debug_assert!(o.in_value_types().count() == self.outputs.as_ref().unwrap().len());
 
-        let (region_graph, node_map) = node.hugr().region_portgraph(node.node());
+        let (region_graph, node_map) = node.hugr().order_graph(node.node());
         let topo = Topo::new(&region_graph);
         for n in topo.iter(&region_graph) {
             let node = node.hugr().fat_optype(node_map.from_portgraph(n));

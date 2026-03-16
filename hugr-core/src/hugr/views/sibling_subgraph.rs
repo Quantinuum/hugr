@@ -3,7 +3,7 @@
 //! Views into convex subgraphs of HUGRs within a single level of the
 //! hierarchy, i.e. within a sibling graph. Convex subgraph are always
 //! induced subgraphs, i.e. they are defined by a subset of the sibling nodes.
-
+#![expect(deprecated)] // ALAN TODO use order_graph instead of region_portgraph
 use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::mem;
@@ -1034,7 +1034,7 @@ where
     /// Returns the portgraph convexity checker, initializing it if necessary.
     fn init_checker(&self) -> &(Checker, Base::RegionPortgraphNodes) {
         self.checker.get_or_init(|| {
-            let (region, node_map) = self.base.region_portgraph(self.region_parent);
+            let (region, node_map) = self.base.region_petgraph(self.region_parent);
             let checker = Checker::new_convex_checker(region);
             (checker, node_map)
         })

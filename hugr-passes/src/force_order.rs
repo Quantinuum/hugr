@@ -56,7 +56,7 @@ pub fn force_order_by_key<H: HugrMut<Node = Node>, K: Ord>(
         // we filter out the input and output nodes from the topological sort
         let [i, o] = hugr.get_io(dp).unwrap();
         let ordered_nodes = {
-            let (region, node_map) = hugr.region_portgraph(dp);
+            let (region, node_map) = hugr.order_graph(dp);
             let rank = |n| rank(hugr, node_map.from_portgraph(n));
             let i_pg = node_map.to_portgraph(i);
             let o_pg = node_map.to_portgraph(o);
@@ -208,7 +208,6 @@ mod test {
 
     use super::*;
     use hugr_core::builder::{BuildHandle, Dataflow, DataflowHugr, endo_sig};
-    use hugr_core::hugr::internal::HugrInternals;
     use hugr_core::ops::handle::{DataflowOpID, NodeHandle};
 
     use hugr_core::ops::{self, Value};
@@ -278,7 +277,7 @@ mod test {
         })
         .unwrap();
 
-        let (graph, node_map) = hugr.region_portgraph(hugr.entrypoint());
+        let (graph, node_map) = hugr.order_graph(hugr.entrypoint());
 
         let topo_sorted = Topo::new(&graph)
             .iter(&graph)
