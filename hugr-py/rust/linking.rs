@@ -25,15 +25,14 @@ pub mod linking {
     }
 
     #[pyfunction]
-    fn link_modules(module_into: Vec<u8>, module_from: Vec<u8>) -> PyResult<Vec<u8>> {
-        let (mut hugr_into, mut exts_into) = Hugr::load_with_exts(module_into.as_slice(), None)
-            .map_err(|err| {
+    fn link_modules(module_into: &[u8], module_from: &[u8]) -> PyResult<Vec<u8>> {
+        let (mut hugr_into, mut exts_into) =
+            Hugr::load_with_exts(module_into, None).map_err(|err| {
                 PyValueError::new_err(format!("Loading of first envelope failed: {}", err))
             })?;
-        let (hugr_from, exts_from) =
-            Hugr::load_with_exts(module_from.as_slice(), None).map_err(|err| {
-                PyValueError::new_err(format!("Loading of second envelope failed: {}", err))
-            })?;
+        let (hugr_from, exts_from) = Hugr::load_with_exts(module_from, None).map_err(|err| {
+            PyValueError::new_err(format!("Loading of second envelope failed: {}", err))
+        })?;
         let into_executable = hugr_into.entrypoint() != hugr_into.module_root();
         let from_executable = hugr_from.entrypoint() != hugr_from.module_root();
         let replacement_entrypoint = if into_executable && from_executable {
