@@ -62,6 +62,7 @@ pub mod linking {
             .store_with_exts(&mut result, EnvelopeConfig::binary(), &exts_into)
             .unwrap();
 
+        // Sanity check roundtrip
         debug_assert!(hugr_core::package::Package::load(&result[..], None).is_ok());
 
         Ok(result)
