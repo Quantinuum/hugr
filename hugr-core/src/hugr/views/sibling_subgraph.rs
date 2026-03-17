@@ -228,7 +228,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
 
     /// Create a new convex sibling subgraph from input and output boundaries.
     ///
-    /// Provide a [`ConvexChecker`] instance to avoid constructing one for
+    /// Provide a [`TopoConvexChecker`] instance to avoid constructing one for
     /// faster convexity check. If you do not have one, use
     /// [`SiblingSubgraph::try_new`].
     ///
@@ -296,7 +296,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
 
     /// Create a subgraph from a set of nodes.
     ///
-    /// Provide a [`ConvexChecker`] instance to avoid constructing one for
+    /// Provide a [`TopoConvexChecker`] instance to avoid constructing one for
     /// faster convexity check. If you do not have one, use
     /// [`SiblingSubgraph::try_from_nodes`].
     ///
@@ -494,7 +494,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         let checker_ref = match mode {
             ValidationMode::WithChecker(c) => Some(c),
             ValidationMode::CheckConvexity => {
-                checker = ConvexChecker::new(hugr, self.get_parent(hugr));
+                checker = TopoConvexChecker::new(hugr, self.get_parent(hugr));
                 Some(&checker)
             }
             ValidationMode::SkipConvexity => None,
