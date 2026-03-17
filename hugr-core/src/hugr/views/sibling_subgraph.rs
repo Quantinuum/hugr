@@ -983,6 +983,7 @@ pub type LineConvexChecker<'g, Base> =
 /// This type is generic over the convexity checker used. If checking convexity
 /// for circuit-like graphs, use [`LineConvexChecker`], otherwise use
 /// [`TopoConvexChecker`].
+#[derive(Clone)]
 pub struct ConvexChecker<'g, Base: HugrView, Checker> {
     /// The base HUGR to check convexity on.
     base: &'g Base,
@@ -991,16 +992,6 @@ pub struct ConvexChecker<'g, Base: HugrView, Checker> {
     /// A lazily initialized convexity checker, along with a map from nodes in
     /// the region to `Base` nodes.
     checker: OnceCell<(Checker, Base::RegionPortgraphNodes)>,
-}
-
-impl<'g, Base: HugrView, Checker: Clone> Clone for ConvexChecker<'g, Base, Checker> {
-    fn clone(&self) -> Self {
-        Self {
-            base: self.base,
-            region_parent: self.region_parent,
-            checker: self.checker.clone(),
-        }
-    }
 }
 
 impl<'g, Base: HugrView, Checker> ConvexChecker<'g, Base, Checker> {
