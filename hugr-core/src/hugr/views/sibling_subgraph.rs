@@ -4,7 +4,6 @@
 //! hierarchy, i.e. within a sibling graph. Convex subgraph are always
 //! induced subgraphs, i.e. they are defined by a subset of the sibling nodes.
 
-use std::cell::OnceCell;
 use std::collections::HashSet;
 use std::mem;
 
@@ -357,7 +356,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         intervals: &LineIntervals,
         line_checker: &LineConvexChecker<impl HugrView<Node = N>>,
     ) -> Result<Self, InvalidSubgraph<N>> {
-        if !line_checker.get_checker().is_convex_by_intervals(intervals) {
+        if !line_checker.checker.is_convex_by_intervals(intervals) {
             return Err(InvalidSubgraph::NotConvex);
         }
 
@@ -501,7 +500,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         };
         if let Some(checker) = checker_ref {
             let (subpg, _) = make_pg_subgraph(hugr, &self.inputs, &self.outputs);
-            if !subpg.is_convex_with_checker(&checker.init_checker().0) {
+            if !subpg.is_convex_with_checker(&checker.checker) {
                 return Err(InvalidSubgraph::NotConvex);
             }
         }
@@ -988,19 +987,28 @@ pub struct ConvexChecker<'g, Base: HugrView, Checker> {
     /// The base HUGR to check convexity on.
     base: &'g Base,
     /// The parent of the region where we are checking convexity.
+    #[allow(unused)] // Useful for debugging
     region_parent: Base::Node,
-    /// A lazily initialized convexity checker, along with a map from nodes in
-    /// the region to `Base` nodes.
-    checker: OnceCell<(Checker, Base::RegionPortgraphNodes)>,
+    /// A convexity checker initialized for the nodes in that region
+    checker: Checker,
+    /// a map from nodes in the region to `Base` nodes.
+    node_map: Base::RegionPortgraphNodes,
 }
 
-impl<'g, Base: HugrView, Checker> ConvexChecker<'g, Base, Checker> {
+impl<'g, Base, Checker> ConvexChecker<'g, Base, Checker>
+where
+    Base: HugrView,
+    Checker: CreateConvexChecker<CheckerRegion<'g, Base>>,
+{
     /// Create a new convexity checker.
     pub fn new(base: &'g Base, region_parent: Base::Node) -> Self {
+        let (region, node_map) = base.region_portgraph(region_parent);
+        let checker = Checker::new_convex_checker(region);
         Self {
             base,
             region_parent,
-            checker: OnceCell::new(),
+            checker,
+            node_map,
         }
     }
 
@@ -1014,32 +1022,6 @@ impl<'g, Base: HugrView, Checker> ConvexChecker<'g, Base, Checker> {
     /// The base HUGR to check convexity on.
     pub fn hugr(&self) -> &'g Base {
         self.base
-    }
-}
-
-impl<'g, Base, Checker> ConvexChecker<'g, Base, Checker>
-where
-    Base: HugrView,
-    Checker: CreateConvexChecker<CheckerRegion<'g, Base>>,
-{
-    /// Returns the portgraph convexity checker, initializing it if necessary.
-    fn init_checker(&self) -> &(Checker, Base::RegionPortgraphNodes) {
-        self.checker.get_or_init(|| {
-            let (region, node_map) = self.base.region_portgraph(self.region_parent);
-            let checker = Checker::new_convex_checker(region);
-            (checker, node_map)
-        })
-    }
-
-    /// Returns the node map from the region to the base HUGR.
-    #[expect(dead_code)]
-    fn get_node_map(&self) -> &Base::RegionPortgraphNodes {
-        &self.init_checker().1
-    }
-
-    /// Returns the portgraph convexity checker, initializing it if necessary.
-    fn get_checker(&self) -> &Checker {
-        &self.init_checker().0
     }
 }
 
@@ -1060,7 +1042,7 @@ where
         if nodes.peek().is_none() || nodes.peek().is_none() {
             return true;
         }
-        self.get_checker().is_convex(nodes, inputs, outputs)
+        self.checker.is_convex(nodes, inputs, outputs)
     }
 }
 
@@ -1070,12 +1052,11 @@ impl<'g, Base: HugrView> LineConvexChecker<'g, Base> {
         &self,
         nodes: impl IntoIterator<Item = Base::Node>,
     ) -> Option<LineIntervals> {
-        let (checker, node_map) = self.init_checker();
         let nodes = nodes
             .into_iter()
-            .map(|n| node_map.to_portgraph(n))
+            .map(|n| self.node_map.to_portgraph(n))
             .collect_vec();
-        checker.get_intervals_from_nodes(nodes)
+        self.checker.get_intervals_from_nodes(nodes)
     }
 
     /// Return the line intervals defined by the given boundary ports in the
@@ -1087,18 +1068,17 @@ impl<'g, Base: HugrView> LineConvexChecker<'g, Base> {
         &self,
         ports: impl IntoIterator<Item = (Base::Node, Port)>,
     ) -> Option<LineIntervals> {
-        let (checker, node_map) = self.init_checker();
         let ports = ports
             .into_iter()
             .map(|(n, p)| {
-                let node = node_map.to_portgraph(n);
-                checker
+                let node = self.node_map.to_portgraph(n);
+                self.checker
                     .graph()
                     .port_index(node, p.pg_offset())
                     .expect("valid port")
             })
             .collect_vec();
-        checker.get_intervals_from_boundary_ports(ports)
+        self.checker.get_intervals_from_boundary_ports(ports)
     }
 
     /// Return the nodes that are within the given line intervals.
@@ -1106,20 +1086,19 @@ impl<'g, Base: HugrView> LineConvexChecker<'g, Base> {
         &'a self,
         intervals: &'a LineIntervals,
     ) -> impl Iterator<Item = Base::Node> + 'a {
-        let (checker, node_map) = self.init_checker();
-        checker
+        self.checker
             .nodes_in_intervals(intervals)
-            .map(|pg_node| node_map.from_portgraph(pg_node))
+            .map(|pg_node| self.node_map.from_portgraph(pg_node))
     }
 
     /// Get the lines passing through the given port.
     pub fn lines_at_port(&self, node: Base::Node, port: impl Into<Port>) -> &[LineIndex] {
-        let (checker, node_map) = self.init_checker();
-        let port = checker
+        let port = self
+            .checker
             .graph()
-            .port_index(node_map.to_portgraph(node), port.into().pg_offset())
+            .port_index(self.node_map.to_portgraph(node), port.into().pg_offset())
             .expect("valid port");
-        checker.lines_at_port(port)
+        self.checker.lines_at_port(port)
     }
 
     /// Extend the given intervals to include the given node.
@@ -1130,16 +1109,14 @@ impl<'g, Base: HugrView> LineConvexChecker<'g, Base> {
     ///
     /// If `false` is returned, the `intervals` are left unchanged.
     pub fn try_extend_intervals(&self, intervals: &mut LineIntervals, node: Base::Node) -> bool {
-        let (checker, node_map) = self.init_checker();
-        let node = node_map.to_portgraph(node);
-        checker.try_extend_intervals(intervals, node)
+        let node = self.node_map.to_portgraph(node);
+        self.checker.try_extend_intervals(intervals, node)
     }
 
     /// Get the position of a node on its lines.
     pub fn get_position(&self, node: Base::Node) -> Position {
-        let (checker, node_map) = self.init_checker();
-        let node = node_map.to_portgraph(node);
-        checker.get_position(node)
+        let node = self.node_map.to_portgraph(node);
+        self.checker.get_position(node)
     }
 }
 
