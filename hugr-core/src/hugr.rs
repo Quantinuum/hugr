@@ -159,11 +159,8 @@ impl Hugr {
         reader: impl io::BufRead,
         extensions: Option<&ExtensionRegistry>,
     ) -> Result<Self, ReadError> {
-        let pkg = Package::load(reader, extensions)?;
-        match pkg.modules.into_iter().exactly_one() {
-            Ok(hugr) => Ok(hugr),
-            Err(e) => Err(ReadError::ExpectedSingleHugr { count: e.count() }),
-        }
+        let (hugr, _) = Self::load_with_exts(reader, extensions)?;
+        Ok(hugr)
     }
 
     /// Read a HUGR from an Envelope, and return the enclosed extensions.
