@@ -1,6 +1,14 @@
 { pkgs, lib, inputs, config, ... }:
 let
   cfg = config.hugr;
+  darwinRuntimeLibraries = with pkgs; [
+    libiconv
+    xz
+    libffi
+    libxml2
+    ncurses
+  ];
+  darwinRuntimeLibraryPath = lib.makeLibraryPath darwinRuntimeLibraries;
 in
 {
   options.hugr = {
@@ -26,9 +34,7 @@ in
       pkgs.libffi
       pkgs.libxml2
       pkgs.ncurses
-    ] ++ lib.optionals pkgs.stdenv.isDarwin [
-      pkgs.xz
-    ];
+    ] ++ lib.optionals pkgs.stdenv.isDarwin darwinRuntimeLibraries;
 
     env = let
       llvmPackage = pkgs."llvmPackages_${cfg.llvmVersion}";
@@ -37,6 +43,12 @@ in
       llvmVersionMinor = builtins.elemAt versionInfo 1;
     in {
       "LLVM_SYS_${llvmVersionMajor}${llvmVersionMinor}_PREFIX" = "${llvmPackage.libllvm.dev}";
+    } // lib.optionalAttrs pkgs.stdenv.isDarwin {
+      # `uv` and other prebuilt binaries on macOS can link against `libiconv.2`
+      # without carrying an absolute runtime path to the Nix-provided library.
+      # Make the fallback loader path explicit so `uv sync` stays stable across
+      # devenv/nixpkgs updates instead of depending on incidental shell state.
+      DYLD_FALLBACK_LIBRARY_PATH = darwinRuntimeLibraryPath;
     };
 
 
