@@ -131,6 +131,9 @@ impl<H: HugrMut<Node = Node> + 'static> ComposablePass<H> for ConstantFoldPass {
                 // Cannot prepopulate inputs for module-root; do not `join` with inputs explicitly specified.
                 continue;
             }
+            if hugr.children(node).next().is_none() {
+                continue;
+            }
             const NO_INPUTS: [(IncomingPort, PartialValue<ValueHandle>); 0] = [];
             m.prepopulate_inputs(node, NO_INPUTS)
                 .map_err(|op| ConstFoldError::InvalidEntryPoint { node, op })?;

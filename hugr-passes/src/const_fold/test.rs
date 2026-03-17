@@ -1604,6 +1604,11 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
     let c17 = mb.add_constant(Value::from(ConstInt::new_u(5, 17)?));
     let ad1 = mb.add_alias_declare("unused", TypeBound::Linear)?;
     let ad2 = mb.add_alias_def("unused2", INT_TYPES[3].clone())?;
+    let func_decl = mb.declare_vis(
+        "unused3",
+        Signature::new(type_row![], vec![INT_TYPES[5].clone(); 2]).into(),
+        Visibility::Public,
+    )?;
     let mut main = mb.define_function_vis(
         "main",
         Signature::new(type_row![], vec![INT_TYPES[5].clone(); 2]),
@@ -1616,12 +1621,21 @@ fn test_module() -> Result<(), Box<dyn std::error::Error>> {
         .outputs_arr();
     let main = main.finish_with_outputs([lc7, add])?;
     let mut hugr = mb.finish_hugr()?;
+
     constant_fold_pass(&mut hugr);
+
     assert!(hugr.get_optype(hugr.entrypoint()).is_module());
     assert_eq!(
         hugr.children(hugr.entrypoint()).collect_vec(),
-        [c7.node(), ad1.node(), ad2.node(), main.node()]
+        [
+            c7.node(),
+            ad1.node(),
+            ad2.node(),
+            func_decl.node(),
+            main.node()
+        ]
     );
+
     let tags = hugr
         .children(main.node())
         .map(|n| hugr.get_optype(n).tag())
