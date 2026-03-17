@@ -662,11 +662,16 @@ fn make_module_hugr(root_op: OpType, nodes: usize, ports: usize) -> Option<Hugr>
 
 #[cfg(test)]
 pub(crate) mod test {
+    use crate::Extension;
+    use crate::extension::prelude::qb_t;
+    use crate::extension::prelude::usize_t;
     use std::{fs::File, io::BufReader};
 
     use super::*;
 
+    use crate::builder::test::simple_package;
     use crate::builder::{Container, Dataflow, DataflowSubContainer, ModuleBuilder};
+    use crate::extension::ExtensionId;
     use crate::extension::prelude::bool_t;
     use crate::ops::OpaqueOp;
     use crate::ops::handle::NodeHandle;
@@ -853,5 +858,32 @@ pub(crate) mod test {
                 assert_eq!(hugr.get_optype(n), h2.entrypoint_optype());
             }
         }
+    }
+
+    #[rstest]
+    fn load_extensions() {
+        let my_ext_id = ExtensionId::new("test.ext").unwrap();
+        let my_ext = Extension::new_test_arc(my_ext_id, |ext, extension_ref| {
+            ext.add_op(
+                "MyOp".into(),
+                String::new(),
+                Signature::new(vec![qb_t(), usize_t()], vec![qb_t()]),
+                extension_ref,
+            )
+            .unwrap();
+        });
+
+        let mut package = simple_package();
+        package.extensions.register(my_ext).unwrap();
+        let mut hugr_str = Vec::new();
+        package
+            .store(&mut hugr_str, EnvelopeConfig::default())
+            .unwrap();
+
+        let (_, exts) = Hugr::load_with_exts(hugr_str.as_slice(), None).unwrap();
+        assert_eq!(exts.len(), 1);
+        assert_matches!(exts.get("test.ext"), Some(ext) => {
+            assert!(ext.get_op("MyOp").is_some());
+        });
     }
 }
