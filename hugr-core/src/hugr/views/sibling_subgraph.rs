@@ -1379,14 +1379,6 @@ fn is_non_value_edge<H: HugrView>(hugr: &H, node: H::Node, port: Port) -> bool {
     is_other || is_static
 }
 
-impl<'a, 'c, G: HugrView, Checker: Clone> From<&'a ConvexChecker<'c, G, Checker>>
-    for std::borrow::Cow<'a, ConvexChecker<'c, G, Checker>>
-{
-    fn from(value: &'a ConvexChecker<'c, G, Checker>) -> Self {
-        Self::Borrowed(value)
-    }
-}
-
 /// Errors that can occur while constructing a [`SimpleReplacement`].
 #[derive(Debug, Clone, PartialEq, Error)]
 #[non_exhaustive]
