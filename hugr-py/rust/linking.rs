@@ -62,8 +62,7 @@ pub mod linking {
             .store_with_exts(&mut result, EnvelopeConfig::binary(), &exts_into)
             .unwrap();
 
-        hugr_core::package::Package::load(&result[..], None)
-            .map_err(|err| PyValueError::new_err(format!("Roundtrip failed: {:?}", err)))?;
+        debug_assert!(hugr_core::package::Package::load(&result[..], None).is_ok());
 
         Ok(result)
     }
