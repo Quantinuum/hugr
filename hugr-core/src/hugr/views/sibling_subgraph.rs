@@ -227,18 +227,17 @@ impl<N: HugrNode> SiblingSubgraph<N> {
 
     /// Create a new convex sibling subgraph from input and output boundaries.
     ///
-    /// Provide a [`TopoConvexChecker`] instance to avoid constructing one for
+    /// Provide a [`ConvexChecker`] instance to avoid constructing one for
     /// faster convexity check. If you do not have one, use
     /// [`SiblingSubgraph::try_new`].
     ///
     /// Refer to [`SiblingSubgraph::try_new`] for the full
     /// documentation.
-    // TODO(breaking): generalize to any convex checker
     pub fn try_new_with_checker<'a, H: HugrView<Node = N>>(
         mut inputs: IncomingPorts<N>,
         outputs: OutgoingPorts<N>,
         hugr: &'a H,
-        checker: &TopoConvexChecker<'a, H>,
+        checker: &ConvexChecker<'a, H, impl CreateConvexChecker<CheckerRegion<'a, H>>>,
     ) -> Result<Self, InvalidSubgraph<N>> {
         let subpg = make_pg_subgraph::<H>(
             checker.region().clone(),
@@ -300,17 +299,16 @@ impl<N: HugrNode> SiblingSubgraph<N> {
 
     /// Create a subgraph from a set of nodes.
     ///
-    /// Provide a [`TopoConvexChecker`] instance to avoid constructing one for
+    /// Provide a [`ConvexChecker`] instance to avoid constructing one for
     /// faster convexity check. If you do not have one, use
     /// [`SiblingSubgraph::try_from_nodes`].
     ///
     /// Refer to [`SiblingSubgraph::try_from_nodes`] for the full
     /// documentation.
-    // TODO(breaking): generalize to any convex checker
     pub fn try_from_nodes_with_checker<'a, H: HugrView<Node = N>>(
         nodes: impl Into<Vec<N>>,
         hugr: &'a H,
-        checker: &TopoConvexChecker<'a, H>,
+        checker: &ConvexChecker<'a, H, impl CreateConvexChecker<CheckerRegion<'a, H>>>,
     ) -> Result<Self, InvalidSubgraph<N>> {
         let mut nodes: Vec<N> = nodes.into();
         let num_nodes = nodes.len();
