@@ -239,6 +239,13 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         hugr: &'a H,
         checker: &ConvexChecker<'a, H, impl CreateConvexChecker<CheckerRegion<'a, H>>>,
     ) -> Result<Self, InvalidSubgraph<N>> {
+        let parent = pick_parent(hugr, &inputs, &outputs)?;
+        if parent != checker.region_parent {
+            return Err(InvalidSubgraph::BadCheckerParent {
+                checker_parent: checker.region_parent,
+                subgraph_parent: parent,
+            });
+        }
         let subpg = make_pg_subgraph::<H>(
             checker.region().clone(),
             &inputs,
@@ -900,31 +907,33 @@ fn iter_io<'a, N: HugrNode>(
 
 /// Pick a parent node from the set of incoming and outgoing ports.
 ///
-/// This *does not* validate that all nodes have the same parent, but just picks
-/// the first one found.
-///
-/// # Errors
-///
-/// If there are no nodes in the subgraph, or if the first node does not have a
-/// parent, this will return an error.
+/// This checks that all nodes have the same parent.
 fn pick_parent<'a, N: HugrNode>(
     hugr: &impl HugrView<Node = N>,
     inputs: &'a IncomingPorts<N>,
     outputs: &'a OutgoingPorts<N>,
 ) -> Result<N, InvalidSubgraph<N>> {
-    // Pick an arbitrary node so we know the shared parent.
-    let Some(node) = iter_incoming(inputs)
+    let mut nodes = iter_incoming(inputs)
         .map(|(n, _)| n)
-        .chain(iter_outgoing(outputs).map(|(n, _)| n))
-        .next()
-    else {
-        return Err(InvalidSubgraph::EmptySubgraph);
-    };
-    let Some(parent) = hugr.get_parent(node) else {
-        return Err(InvalidSubgraph::OrphanNode { orphan: node });
-    };
-
-    Ok(parent)
+        .chain(iter_outgoing(outputs).map(|(n, _)| n));
+    let first_node = nodes.next().ok_or(InvalidSubgraph::EmptySubgraph)?;
+    let first_parent = hugr
+        .get_parent(first_node)
+        .ok_or(InvalidSubgraph::OrphanNode { orphan: first_node })?;
+    for other_node in nodes {
+        let other_parent = hugr
+            .get_parent(other_node)
+            .ok_or(InvalidSubgraph::OrphanNode { orphan: other_node })?;
+        if other_parent != first_parent {
+            return Err(InvalidSubgraph::NoSharedParent {
+                first_node,
+                first_parent,
+                other_node,
+                other_parent,
+            });
+        }
+    }
+    Ok(first_parent)
 }
 
 fn make_boundary<'a, H: HugrView>(
@@ -979,7 +988,6 @@ pub struct ConvexChecker<'g, Base: HugrView, Checker> {
     /// The base HUGR to check convexity on.
     base: &'g Base,
     /// The parent of the region where we are checking convexity.
-    #[allow(unused)] // Useful for debugging
     region_parent: Base::Node,
     /// A convexity checker initialized for the nodes in that region
     checker: Checker,
@@ -1414,6 +1422,15 @@ pub enum InvalidSubgraph<N: HugrNode = Node> {
     /// An outgoing non-local edge was found.
     #[error("Unsupported edge kind at ({_0}, {_1:?}).")]
     UnsupportedEdgeKind(N, Port),
+    /// The [ConvexChecker::region_parent] did not match the parent of the nodes in the subgraph
+    #[error(
+        "ConvexChecker's region parent {checker_parent} did not match the subgraph parent {subgraph_parent}."
+    )]
+    #[allow(missing_docs)]
+    BadCheckerParent {
+        checker_parent: N,
+        subgraph_parent: N,
+    },
 }
 
 /// Errors that can occur while constructing a [`SiblingSubgraph`].
