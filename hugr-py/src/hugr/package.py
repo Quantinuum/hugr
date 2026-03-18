@@ -220,7 +220,7 @@ class Package:
         """
         self.used_extensions(resolve_from=registry)
         return self
-      
+
     def link(self, *other: Package):
         """Link this package with other packages, returning a new package containing the
         extensions of all packages, as well as a single module created from linking the
