@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.26.1](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.26.0...hugr-passes-v0.26.1) - 2026-03-18
+
+### Bug Fixes
+
+- ConstantFold fails when the module contains function declarations ([#2954](https://github.com/Quantinuum/hugr/pull/2954))
+
 ## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.7...hugr-passes-v0.26.0) - 2026-03-16
 
 ### New Features

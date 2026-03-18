@@ -1,5 +1,19 @@
 # Changelog
 
+## [0.26.1](https://github.com/Quantinuum/hugr/compare/hugr-v0.26.0...hugr-v0.26.1) - 2026-03-18
+
+### Bug Fixes
+
+- ConstantFold fails when the module contains function declarations ([#2954](https://github.com/Quantinuum/hugr/pull/2954))
+
+### New Features
+
+- *(hugr-py)* Allow linking packages and modules from Python ([#2947](https://github.com/Quantinuum/hugr/pull/2947))
+
+### Refactor
+
+- start cleaning up SiblingSubgraph convexity checking ([#2956](https://github.com/Quantinuum/hugr/pull/2956))
+
 ## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.7...hugr-v0.26.0) - 2026-03-16
 
 This release includes a restructuring of the optimization pass API and a major

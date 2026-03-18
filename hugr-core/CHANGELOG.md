@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.26.1](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.26.0...hugr-core-v0.26.1) - 2026-03-18
+
+### New Features
+
+- *(hugr-py)* Allow linking packages and modules from Python ([#2947](https://github.com/Quantinuum/hugr/pull/2947))
+
+### Refactor
+
+- start cleaning up SiblingSubgraph convexity checking ([#2956](https://github.com/Quantinuum/hugr/pull/2956))
+
 ## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.7...hugr-core-v0.26.0) - 2026-03-16
 
 ### Bug Fixes
