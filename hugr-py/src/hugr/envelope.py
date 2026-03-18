@@ -48,6 +48,7 @@ import hugr._hugr.model as rust
 import hugr._hugr.zstd as zstd
 
 if TYPE_CHECKING:
+    from hugr.ext import ExtensionRegistry
     from hugr.hugr.base import Hugr
     from hugr.package import Package
 
@@ -134,8 +135,19 @@ def _make_envelope_str(package: Package, config: EnvelopeConfig) -> str:
     return envelope.decode("utf-8")
 
 
-def read_envelope(envelope: bytes) -> Package:
-    """Decode a HUGR package from an envelope."""
+def read_envelope(
+    envelope: bytes, resolve_from: ExtensionRegistry | None = None
+) -> Package:
+    """Decode a HUGR package from an envelope.
+
+    Args:
+        envelope: The byte string representing a Package.
+        resolve_from: If not None, an extension registry to resolve the custom
+            operations and types.
+
+    Returns:
+        The deserialized Package object.
+    """
     import hugr._serialization.extension as ext_s
     from hugr.package import Package
 
@@ -147,24 +159,29 @@ def read_envelope(envelope: bytes) -> Package:
 
     match header.format:
         case EnvelopeFormat.JSON:
-            return ext_s.Package.model_validate_json(payload).deserialize()
+            from hugr.ext import ExtensionRegistry
+
+            pkg = ext_s.Package.model_validate_json(payload).deserialize()
+            pkg.resolve_extensions(resolve_from or ExtensionRegistry())
+            return pkg
         case EnvelopeFormat.MODEL | EnvelopeFormat._S_EXPRESSION:
             model_package, suffix = rust.bytes_to_package(payload)
             if suffix:
                 msg = f"Excess bytes in envelope with format {EnvelopeFormat.MODEL}."
                 raise ValueError(msg)
-            return Package.from_model(model_package)
+            return Package.from_model(model_package, resolve_from=resolve_from)
         case EnvelopeFormat.MODEL_WITH_EXTS:
             # Encoded model first, followed by json-encoded extensions.
             from hugr.ext import Extension
 
             model_package, suffix = rust.bytes_to_package(payload)
-            return Package(
-                modules=Package.from_model(model_package).modules,
-                extensions=[
-                    Extension.from_json(json.dumps(extension))
-                    for extension in json.loads(suffix)
-                ],
+            extensions = [
+                Extension.from_json(json.dumps(extension))
+                for extension in json.loads(suffix)
+            ]
+
+            return Package.from_model(
+                model_package, extensions=extensions, resolve_from=resolve_from
             )
         case EnvelopeFormat._S_EXPRESSION_WITH_EXTS:
             # Json-encoded extensions first, followed by s-expression.
@@ -181,19 +198,28 @@ def read_envelope(envelope: bytes) -> Package:
 
             model_package = rust.string_to_package(payload_str[parse_index:])
 
-            return Package(
-                modules=Package.from_model(model_package).modules,
-                extensions=extensions,
+            return Package.from_model(
+                model_package, extensions=extensions, resolve_from=resolve_from
             )
 
 
-def read_envelope_hugr(envelope: bytes) -> Hugr:
+def read_envelope_hugr(
+    envelope: bytes, resolve_from: ExtensionRegistry | None = None
+) -> Hugr:
     """Decode a HUGR from an envelope.
+
+    Args:
+        envelope: The byte string representing a Hugr envelope.
+        resolve_from: If not None, an extension registry to resolve the custom
+            operations and types.
+
+    Returns:
+        The deserialized Hugr object.
 
     Raises:
         ValueError: If the envelope does not contain a single module.
     """
-    pkg = read_envelope(envelope)
+    pkg = read_envelope(envelope, resolve_from=resolve_from)
     if len(pkg.modules) != 1:
         msg = (
             "Expected a single module in the envelope, but got "
@@ -203,18 +229,39 @@ def read_envelope_hugr(envelope: bytes) -> Hugr:
     return pkg.modules[0]
 
 
-def read_envelope_str(envelope: str) -> Package:
-    """Decode a HUGR package from an envelope."""
-    return read_envelope(envelope.encode("utf-8"))
+def read_envelope_str(
+    envelope: str, resolve_from: ExtensionRegistry | None = None
+) -> Package:
+    """Decode a HUGR package from an envelope.
+
+    Args:
+        envelope: The string representing a Package.
+        resolve_from: If not None, an extension registry to resolve the custom
+            operations and types.
+
+    Returns:
+        The deserialized Package object.
+    """
+    return read_envelope(envelope.encode("utf-8"), resolve_from=resolve_from)
 
 
-def read_envelope_hugr_str(envelope: str) -> Hugr:
+def read_envelope_hugr_str(
+    envelope: str, resolve_from: ExtensionRegistry | None = None
+) -> Hugr:
     """Decode a HUGR from an envelope.
+
+    Args:
+        envelope: The string representing a Hugr envelope.
+        resolve_from: If not None, an extension registry to resolve the custom
+            operations and types.
+
+    Returns:
+        The deserialized Hugr object.
 
     Raises:
         ValueError: If the envelope does not contain a single module.
     """
-    pkg = read_envelope_str(envelope)
+    pkg = read_envelope_str(envelope, resolve_from=resolve_from)
     if len(pkg.modules) != 1:
         msg = (
             "Expected a single module in the envelope, but got "
