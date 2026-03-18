@@ -14,7 +14,7 @@ from hugr.passes.composable_pass import (
 )
 
 if TYPE_CHECKING:
-    from hugr.passes._scope import PassScope
+    from hugr.passes.scope import PassScope
 
 
 def test_composable_pass() -> None:
