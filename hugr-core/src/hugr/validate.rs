@@ -13,7 +13,7 @@ use crate::core::HugrNode;
 use crate::extension::SignatureError;
 
 use crate::ops::constant::ConstTypeError;
-use crate::ops::custom::{ExtensionOp, OpaqueOpError};
+use crate::ops::custom::OpaqueOpError;
 use crate::ops::validate::{
     ChildrenEdgeData, ChildrenValidationError, EdgeValidationError, OpValidityFlags,
 };
@@ -584,20 +584,18 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
     ) -> Result<(), ValidationError<H::Node>> {
         let op_type = self.hugr.get_optype(node);
         // The op_type must be defined only in terms of type variables defined outside the node
-
-        let validate_ext = |ext_op: &ExtensionOp| -> Result<(), ValidationError<H::Node>> {
-            // Check TypeArgs are valid, and if we can, fit the declared TypeParams
-            ext_op
-                .def()
-                .validate_args(ext_op.args(), var_decls)
-                .map_err(|cause| ValidationError::SignatureError {
-                    node,
-                    op: op_type.name(),
-                    cause,
-                })
-        };
         match op_type {
-            OpType::ExtensionOp(ext_op) => validate_ext(ext_op)?,
+            OpType::ExtensionOp(ext_op) => {
+                // Check TypeArgs are valid, and if we can, fit the declared TypeParams
+                ext_op
+                    .def()
+                    .validate_args(ext_op.args(), var_decls)
+                    .map_err(|cause| ValidationError::SignatureError {
+                        node,
+                        op: op_type.name(),
+                        cause,
+                    })?;
+            }
             OpType::OpaqueOp(opaque) => {
                 Err(OpaqueOpError::UnresolvedOp(
                     node,
