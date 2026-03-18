@@ -562,15 +562,18 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             // Module children themselves cannot refer to function-local type variables.
             self.validate_subtree_node(child, &[])?;
 
-            let var_decls = if let OpType::FuncDefn(fd) = self.hugr.get_optype(child) {
-                fd.signature().params().to_vec()
-            } else {
-                vec![]
-            };
+            if let OpType::FuncDefn(fd) = self.hugr.get_optype(child) {
+                let var_decls = fd.signature().params().to_vec();
 
-            // `descendants` includes `child` itself; skip it.
-            for descendant in self.hugr.descendants(child).skip(1) {
-                self.validate_subtree_node(descendant, &var_decls)?;
+                // `descendants` includes `child` itself; skip it.
+                for descendant in self.hugr.descendants(child).skip(1) {
+                    self.validate_subtree_node(descendant, &var_decls)?;
+                }
+            } else {
+                assert!(
+                    self.hugr.children(child).next().is_none(),
+                    "non-FuncDefn module child {child} unexpectedly has children"
+                );
             }
         }
 
