@@ -6,7 +6,7 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hugr.hugr.base import Hugr
-from hugr.passes._composable_pass import (
+from hugr.passes.composable_pass import (
     ComposablePass,
     ComposedPass,
     PassResult,
@@ -14,7 +14,7 @@ from hugr.passes._composable_pass import (
 )
 
 if TYPE_CHECKING:
-    from hugr.passes._scope import PassScope
+    from hugr.passes.scope import PassScope
 
 
 def test_composable_pass() -> None:

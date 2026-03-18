@@ -4,7 +4,7 @@ import hugr
 from hugr.package import Package
 import hugr.ops as ops
 import hugr.tys as tys
-from hugr import ext, val
+from hugr import Hugr, ext, val
 
 from hugr.build import Dfg
 from hugr.std.collections.list import List
@@ -401,3 +401,57 @@ def test_lower_funcs_resolve() -> None:
     used_exts = package.used_extensions()
     assert outer_ext.name in used_exts.used_extensions.ids()
     assert inner_ext.name in used_exts.used_extensions.ids()
+
+
+def test_default_resolution() -> None:
+    """Loading a package without a resolve_from should resolve the standard
+    and bundled extensions."""
+
+    # Build an extension with a custom op
+    op_def = ext.OpDef(
+        name="CustomOp",
+        description="outer op with lowering",
+        signature=ext.OpDefSig(tys.FunctionType.endo([tys.Bool])),
+    )
+    extension = ext.Extension(
+        version=ext.Version(0, 1, 0),
+        name="outer",
+        types={},
+    )
+    extension.add_op_def(op_def)
+
+    # Build a HUGR with the custom op
+    h = Dfg(tys.Bool)
+    [b] = h.inputs()
+    b = h.add_op(extension.get_op("CustomOp").instantiate(args=[]), b).out(0)
+    h.set_outputs(b)
+
+    # Include the extension in a package and check that the lower func is resolved.
+    package = Package(
+        modules=[h.hugr],
+        extensions=[extension],
+    )
+    used_exts = package.used_extensions()
+    assert extension.name in used_exts.used_extensions
+    assert used_exts.unresolved_extensions == set()
+    assert used_exts.unresolved_ops == {}
+    assert used_exts.unresolved_types == {}
+
+    bytes = package.to_bytes()
+
+    # Load it as a Package and check that the op is resolved
+    package = Package.from_bytes(bytes)
+    assert len(package.extensions) == 1
+    for _, data in package.modules[0].nodes():
+        assert not isinstance(data.op, ops.Custom)
+        if isinstance(data.op, ops.Custom):
+            assert data.op.extension == extension.name
+            assert data.op.op_name == op_def.name
+
+    # Load it as a Hugr and check that the op is resolved
+    hugr = Hugr.from_bytes(bytes)
+    for _, data in hugr.nodes():
+        assert not isinstance(data.op, ops.Custom)
+        if isinstance(data.op, ops.Custom):
+            assert data.op.extension == extension.name
+            assert data.op.op_name == op_def.name
