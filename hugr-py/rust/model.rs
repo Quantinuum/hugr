@@ -6,6 +6,7 @@ use pyo3::exceptions::{PyException, PyValueError};
 use pyo3::{PyErr, PyResult, create_exception, pymodule};
 
 #[pymodule(submodule)]
+#[pyo3(module = "hugr._hugr")]
 pub mod model {
     use hugr_cli::CliArgs;
     use hugr_model::v0::ast;
@@ -132,13 +133,13 @@ pub mod model {
 
 // Define custom exceptions
 create_exception!(
-    _hugr,
+    hugr._hugr.model,
     HugrCliError,
     PyException,
     "Base exception for HUGR CLI errors."
 );
 create_exception!(
-    _hugr,
+    hugr._hugr.model,
     HugrCliDescribeError,
     HugrCliError,
     "Exception for HUGR CLI describe command errors with partial output."

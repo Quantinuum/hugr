@@ -1,14 +1,14 @@
 import pytest
 
 from hugr import Hugr, tys
-from hugr._hugr.linking import link_modules
+from hugr._hugr.linking import HugrLinkingError, link_modules
 from hugr.build import Module
 from hugr.ops import FuncDefn
 from hugr.package import Package
 from hugr.std import float, int, logic, ptr
 
 
-def build_module(*, entrypoint: bool) -> Hugr:
+def build_module(*, entrypoint: bool, public_func: bool = False) -> Hugr:
     builder = Module()
     if entrypoint:
         main = builder.define_function(
@@ -16,6 +16,16 @@ def build_module(*, entrypoint: bool) -> Hugr:
         )
         main.set_outputs(*main.inputs())
         builder.hugr.entrypoint = main.parent_node
+    elif public_func:
+        # Entrypoint is already public, so we only need to add one
+        # if no entrypoint was generated.
+        func = builder.define_function(
+            "public_func",
+            input_types=[tys.Bool],
+            output_types=[tys.Bool],
+            visibility="Public",
+        )
+        func.set_outputs(*func.inputs())
 
     return builder.hugr
 
@@ -55,6 +65,17 @@ def test_link_modules_multiple_entrypoints():
     hugr2 = build_module(entrypoint=True)
 
     with pytest.raises(ValueError, match="Cannot link two executable modules together"):
+        link_modules(hugr1.to_bytes(), hugr2.to_bytes())
+
+
+def test_link_modules_linking_error():
+    hugr1 = build_module(entrypoint=False, public_func=True)
+    hugr2 = build_module(entrypoint=False, public_func=True)
+
+    with pytest.raises(
+        HugrLinkingError,
+        match=r"Source \(Node\([0-9]+\)\) and target \(Node\([0-9]+\)\) both contained FuncDefn with same public name public_func",  # noqa: E501
+    ):
         link_modules(hugr1.to_bytes(), hugr2.to_bytes())
 
 
