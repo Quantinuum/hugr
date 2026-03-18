@@ -6,12 +6,13 @@ from typing import TYPE_CHECKING
 import pytest
 
 from hugr.hugr.base import Hugr
-from hugr.passes.composable_pass import (
+from hugr.passes._composable_pass import (
     ComposablePass,
     ComposedPass,
     PassResult,
     implement_pass_run,
 )
+from hugr.passes.composable_pass import *
 
 if TYPE_CHECKING:
     from hugr.passes.scope import PassScope

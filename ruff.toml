@@ -76,6 +76,8 @@ ignore = [
 
 [lint.per-file-ignores]
 "hugr-py/tests/**" = ["D"]
+"hugr-py/tests/test_passes.py" = ["F403"]
+"hugr-py/src/hugr/passes/_composable_pass.py" = ["F403"]
 "hugr-py/docs/**" = ["D"]
 "hugr-py/src/hugr/_serialization/**" = ["D"]
 "scripts/*" = ["T201", "EXE001", "D"]
