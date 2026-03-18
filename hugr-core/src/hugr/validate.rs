@@ -57,8 +57,8 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             self.validate_node(node)?;
         }
 
-        // Hierarchy and children. No type variables declared by the module root.
-        self.validate_subtree(self.hugr.module_root(), &[])?;
+        // Hierarchy and children.
+        self.validate_subtree()?;
 
         self.validate_linkage()?;
         // In tests we take the opportunity to verify that the hugr
@@ -550,7 +550,34 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
 
     /// Validates that `TypeArgs` are valid wrt the [`ExtensionRegistry`] and that nodes
     /// only refer to type variables declared by the closest enclosing `FuncDefn`.
-    fn validate_subtree(
+    ///
+    /// As `FuncDefn`s are children of the module root, we validate each
+    /// module child with no in-scope declarations, then validate all of its
+    /// strict descendants with declarations coming from that child if it is a
+    /// `FuncDefn`.
+    fn validate_subtree(&mut self) -> Result<(), ValidationError<H::Node>> {
+        let module_root = self.hugr.module_root();
+
+        for child in self.hugr.children(module_root) {
+            // Module children themselves cannot refer to function-local type variables.
+            self.validate_subtree_node(child, &[])?;
+
+            let var_decls = if let OpType::FuncDefn(fd) = self.hugr.get_optype(child) {
+                fd.signature().params().to_vec()
+            } else {
+                vec![]
+            };
+
+            // `descendants` includes `child` itself; skip it.
+            for descendant in self.hugr.descendants(child).skip(1) {
+                self.validate_subtree_node(descendant, &var_decls)?;
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_subtree_node(
         &mut self,
         node: H::Node,
         var_decls: &[TypeParam],
@@ -602,18 +629,6 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             for port in self.hugr.node_ports(node, dir) {
                 self.validate_port(node, port, op_type, var_decls)?;
             }
-        }
-
-        // For FuncDefn's, only the type variables declared by the FuncDefn can be referred to by nodes
-        // inside the function. (The same would be true for FuncDecl's, but they have no child nodes.)
-        let var_decls = if let OpType::FuncDefn(fd) = op_type {
-            fd.signature().params()
-        } else {
-            var_decls
-        };
-
-        for child in self.hugr.children(node) {
-            self.validate_subtree(child, var_decls)?;
         }
 
         Ok(())
