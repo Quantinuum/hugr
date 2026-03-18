@@ -465,13 +465,11 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         hugr: &'h H,
         mode: ValidationMode<'_, 'h, H>,
     ) -> Result<(), InvalidSubgraph<N>> {
-        let mut exp_nodes = {
-            let (subpg, node_map) = make_pg_subgraph(hugr, &self.inputs, &self.outputs);
-            subpg
-                .nodes_iter()
-                .map(|n| node_map.from_portgraph(n))
-                .collect_vec()
-        };
+        let (subpg, node_map) = make_pg_subgraph(hugr, &self.inputs, &self.outputs);
+        let mut exp_nodes = subpg
+            .nodes_iter()
+            .map(|n| node_map.from_portgraph(n))
+            .collect_vec();
         let mut nodes = self.nodes.clone();
 
         exp_nodes.sort_unstable();
@@ -499,7 +497,6 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             ValidationMode::SkipConvexity => None,
         };
         if let Some(checker) = checker_ref {
-            let (subpg, _) = make_pg_subgraph(hugr, &self.inputs, &self.outputs);
             if !subpg.is_convex_with_checker(&checker.checker) {
                 return Err(InvalidSubgraph::NotConvex);
             }
