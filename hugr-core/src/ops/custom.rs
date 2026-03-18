@@ -14,7 +14,7 @@ use {
 use crate::core::HugrNode;
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ConstFoldResult, ExtensionId, OpDef, SignatureError};
-use crate::types::{Signature, type_param::TypeArg};
+use crate::types::{Signature, Substitutable, type_param::TypeArg};
 use crate::{IncomingPort, ops};
 
 use super::dataflow::DataflowOpTrait;

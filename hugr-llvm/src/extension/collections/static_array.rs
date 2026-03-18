@@ -339,9 +339,10 @@ impl<SAC: StaticArrayCodegen + 'static> CodegenExtension for StaticArrayCodegenE
                 {
                     move |ts, custom_type| {
                         // check the arg type, even though the return is always ptr
-                        let _ = custom_type.args()[0]
-                            .as_runtime()
-                            .expect("Type argument for static array must be a type");
+                        assert!(
+                            custom_type.args()[0].is_runtime_type(),
+                            "Type argument for static array must be a type"
+                        );
                         Ok(ts.llvm_ptr_type().into())
                     }
                 },

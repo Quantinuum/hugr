@@ -1,7 +1,7 @@
 use ascent::Lattice;
 use ascent::lattice::BoundedLattice;
 use hugr_core::Node;
-use hugr_core::types::{SumType, Type, TypeArg, TypeEnum, TypeRow};
+use hugr_core::types::{SumType, Type, TypeArg, TypeRow};
 use itertools::{Itertools, zip_eq};
 use std::cmp::Ordering;
 use std::collections::HashMap;
@@ -199,9 +199,11 @@ impl<V: AbstractValue, N: std::fmt::Debug> PartialSum<V, N> {
     ///
     /// # Errors
     ///
-    /// If this `PartialSum` had multiple possible tags; or if `typ` was not a [`TypeEnum::Sum`]
+    /// If this `PartialSum` had multiple possible tags; or if `typ` was not a [`RuntimeSum`]
     /// supporting the single possible tag with the correct number of elements and no row variables;
     /// or if converting a child element failed via [`PartialValue::try_into_concrete`].
+    ///
+    /// [`RuntimeSum`]: hugr_core::types::Term::RuntimeSum
     #[allow(clippy::type_complexity)] // Since C is a parameter, can't declare type aliases
     pub fn try_into_sum<C: AsConcrete<V, N>>(
         self,
@@ -211,7 +213,7 @@ impl<V: AbstractValue, N: std::fmt::Debug> PartialSum<V, N> {
             return Err(ExtractValueError::MultipleVariants(self));
         }
         let (tag, v) = self.0.into_iter().exactly_one().unwrap();
-        if let TypeEnum::Sum(st) = typ.as_type_enum()
+        if let Some(st) = typ.as_sum()
             && let Some(r) = st.get_variant(tag)
             && let Ok(r) = TypeRow::try_from(r.clone())
             && v.len() == r.len()
