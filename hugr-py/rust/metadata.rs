@@ -1,7 +1,7 @@
 //! Bindings for metadata keys defined in the hugr-core crate.
 
 #[pyo3::pymodule(submodule)]
-#[pyo3(module = "hugr._hugr.metadata")]
+#[pyo3(module = "hugr._hugr")]
 pub mod metadata {
     use hugr_core::metadata::Metadata;
     use pyo3::types::{PyAnyMethods, PyModule};

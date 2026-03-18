@@ -3,6 +3,7 @@
 use pyo3::pymodule;
 
 #[pymodule(submodule)]
+#[pyo3(module = "hugr._hugr")]
 pub mod zstd {
     use pyo3::types::{PyAnyMethods, PyModule};
     use pyo3::{Bound, Python};
