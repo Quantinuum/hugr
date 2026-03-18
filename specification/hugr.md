@@ -103,6 +103,8 @@ The `Hierarchy` and `ControlFlow` edges from a node
 are ordered (the children of a container node have a linear ordering, as do the
 successors of a `BasicBlock` node).
 
+Static (`Const` or `Function`) edges for a node should come before `ControlFlow` edges, followed by `Order` edges. `Value` edges should come last.
+
 ### `Hierarchy` edges
 
 A `Hierarchy` edge from node *a* to *b* encodes that *a* is the direct parent
