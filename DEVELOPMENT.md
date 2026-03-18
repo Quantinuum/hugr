@@ -48,7 +48,7 @@ just setup
 
 You will need llvm 21.1 installed in order for `just check` to run all its
 checks successfully. On Debian-based systems you can install it as the
-`llvm-21` package; you may also need to install `libpolly21-dev`. You should
+`llvm-21` package; you may also need to install `libpolly-21-dev`. You should
 set the environment variable `LLVM_SYS_211_PREFIX` to point to its location
 (e.g. `/usr/lib/llvm-21`) when running `just check`.
 
