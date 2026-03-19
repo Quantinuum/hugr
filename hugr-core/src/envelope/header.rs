@@ -32,45 +32,51 @@ pub struct EnvelopeHeader {
     pub zstd: bool,
 }
 
-/// Encoded format of an envelope payload.
-#[derive(
-    Clone, Copy, Eq, PartialEq, Debug, Default, Hash, derive_more::Display, strum::FromRepr,
-)]
-#[non_exhaustive]
-pub enum EnvelopeFormat {
-    /// `hugr-model` v0 binary capnproto message.
-    Model = 1,
-    /// `hugr-model` v0 binary capnproto message followed by a json-encoded
-    /// [`crate::extension::ExtensionRegistry`].
-    ///
-    /// This is a temporary format required until the model adds support for
-    /// extensions.
-    #[default]
-    ModelWithExtensions = 2,
-    /// Human-readable S-expression encoding using [`hugr_model::v0`].
-    ///
-    /// Uses a printable ascii value as the discriminant so the envelope can be
-    /// read as text.
-    ///
-    /// :caution: This format does not yet support extension encoding, so it should
-    /// be avoided.
-    //
-    // TODO: Update comment once extension encoding is supported.
-    SExpression = 40, // '(' in ascii
-    /// Human-readable S-expression encoding using [`hugr_model::v0`].
-    ///
-    /// Uses a printable ascii value as the discriminant so the envelope can be
-    /// read as text.
-    ///
-    /// This is a temporary format required until the model adds support for
-    /// extensions.
-    SExpressionWithExtensions = 41, // ')' in ascii
-    /// Json-encoded [`crate::package::Package`]
-    ///
-    /// Uses a printable ascii value as the discriminant so the envelope can be
-    /// read as text.
-    PackageJson = 63, // '?' in ascii
+mod silenced {
+    #![expect(deprecated, reason = "https://github.com/Peternator7/strum/issues/404")]
+    /// Encoded format of an envelope payload.
+    #[derive(
+        Clone, Copy, Eq, PartialEq, Debug, Default, Hash, derive_more::Display, strum::FromRepr,
+    )]
+    #[non_exhaustive]
+    pub enum EnvelopeFormat {
+        /// `hugr-model` v0 binary capnproto message.
+        Model = 1,
+        /// `hugr-model` v0 binary capnproto message followed by a json-encoded
+        /// [`crate::extension::ExtensionRegistry`].
+        ///
+        /// This is a temporary format required until the model adds support for
+        /// extensions.
+        #[default]
+        ModelWithExtensions = 2,
+        /// Human-readable S-expression encoding using [`hugr_model::v0`].
+        ///
+        /// Uses a printable ascii value as the discriminant so the envelope can be
+        /// read as text.
+        ///
+        /// :caution: This format does not yet support extension encoding, so it should
+        /// be avoided.
+        //
+        // TODO: Update comment once extension encoding is supported.
+        SExpression = 40, // '(' in ascii
+        /// Human-readable S-expression encoding using [`hugr_model::v0`].
+        ///
+        /// Uses a printable ascii value as the discriminant so the envelope can be
+        /// read as text.
+        ///
+        /// This is a temporary format required until the model adds support for
+        /// extensions.
+        SExpressionWithExtensions = 41, // ')' in ascii
+        /// Json-encoded [`crate::package::Package`]
+        ///
+        /// Uses a printable ascii value as the discriminant so the envelope can be
+        /// read as text.
+        #[deprecated(since = "0.27.0")]
+        PackageJson = 63, // '?' in ascii
+    }
 }
+
+pub use silenced::EnvelopeFormat;
 
 // We use a u8 to represent EnvelopeFormat in the binary format, so we should not
 // add any non-unit variants or ones with discriminants > 255.
