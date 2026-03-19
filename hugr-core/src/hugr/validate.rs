@@ -764,7 +764,7 @@ pub enum ValidationError<N: HugrNode> {
     },
     /// Error in a [`ExtensionOp`] serialized as an [Opaque].
     ///
-    /// [ExtensionOp]: crate::ops::ExtensionOp
+    /// [`ExtensionOp`]: crate::ops::ExtensionOp
     /// [Opaque]: crate::ops::OpaqueOp
     #[error(transparent)]
     OpaqueOpError(#[from] OpaqueOpError<N>),
