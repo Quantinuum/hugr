@@ -15,6 +15,7 @@ from typing import (
 )
 
 import hugr._hugr.metadata as rust_metadata
+from hugr.debug_info import DebugRecord
 from hugr.envelope import ExtensionDesc, GeneratorDesc
 
 if TYPE_CHECKING:
@@ -193,3 +194,17 @@ class HugrUsedExtensions(Metadata[list[ExtensionDesc]]):
             )
             raise TypeError(msg)
         return [ExtensionDesc.from_json(e) for e in value]
+
+
+class HugrDebugInfo(Metadata[DebugRecord]):
+    """Metadata storing debug information obtained from the generator source."""
+
+    KEY = rust_metadata.HUGR_DEBUG_INFO
+
+    @classmethod
+    def to_json(cls, value: DebugRecord) -> JsonType:
+        return value.to_json()
+
+    @classmethod
+    def from_json(cls, value: JsonType) -> DebugRecord:
+        return DebugRecord.from_json(value)

@@ -4,9 +4,18 @@ from typing import Any
 
 from semver import Version
 
+from hugr import ops, tys
+from hugr.build.function import Module
+from hugr.debug_info import DICompileUnit, DILocation, DISubprogram
 from hugr.envelope import EnvelopeConfig, ExtensionDesc, GeneratorDesc
 from hugr.hugr import Hugr
-from hugr.metadata import HugrGenerator, HugrUsedExtensions, JsonType, Metadata
+from hugr.metadata import (
+    HugrDebugInfo,
+    HugrGenerator,
+    HugrUsedExtensions,
+    JsonType,
+    Metadata,
+)
 
 
 class CustomMetadata(Metadata[list[JsonType]]):
@@ -85,3 +94,45 @@ def test_metadata_default() -> None:
     ) == GeneratorDesc("hugr-py-test", Version.parse("1.2.3"))
     assert node.metadata.get("missing.metadata") is None
     assert node.metadata.get("missing.metadata", [1, 2, 3]) == [1, 2, 3]
+
+
+def test_debug_info_roundtrip() -> None:
+    mod = Module()
+
+    # Add DICompileUnit debug info to the module root
+    compile_unit = DICompileUnit(
+        directory="/user/project/",
+        filename=0,
+        file_table=["guppy1.py", "guppy2.py"],
+    )
+    mod.hugr[mod.hugr.module_root].metadata[HugrDebugInfo] = compile_unit
+
+    # Add a FuncDefn node to test DISubprogram debug info
+    func = mod.define_function("random_func", [tys.Bool], [tys.Bool])
+    [b] = func.inputs()
+    func.set_outputs(b)
+    subprogram = DISubprogram(file=0, line_no=10, scope_line=11)
+    mod.hugr[func.parent_node].metadata[HugrDebugInfo] = subprogram
+
+    # Add a call node test DILocation debug info
+    caller = mod.define_function("caller", [tys.Bool], [tys.Bool])
+    [b] = caller.inputs()
+    call_node = caller.call(func.parent_node, b)
+    caller.set_outputs(call_node)
+    location = DILocation(column=5, line_no=20)
+    mod.hugr[call_node].metadata[HugrDebugInfo] = location
+
+    # Roundtrip serialization
+    data = mod.hugr.to_bytes(EnvelopeConfig.TEXT)
+    loaded = Hugr.from_bytes(data)
+    module_node = loaded[loaded.module_root]
+
+    assert module_node.metadata[HugrDebugInfo] == compile_unit
+
+    [func_n, caller_n] = loaded.children(loaded.module_root)
+    assert loaded[func_n].metadata[HugrDebugInfo] == subprogram
+
+    call_n = next(
+        n for n in loaded.children(caller_n) if isinstance(loaded[n].op, ops.Call)
+    )
+    assert loaded[call_n].metadata[HugrDebugInfo] == location
