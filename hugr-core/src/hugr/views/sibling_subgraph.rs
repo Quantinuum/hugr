@@ -515,10 +515,10 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             &self.function_calls,
         )?;
 
-        if let Some(checker) = checker_ref {
-            if !subpg.is_convex_with_checker(&checker.checker) {
-                return Err(InvalidSubgraph::NotConvex);
-            }
+        if let Some(checker) = checker_ref
+            && !subpg.is_convex_with_checker(&checker.checker)
+        {
+            return Err(InvalidSubgraph::NotConvex);
         }
         Ok(())
     }
@@ -752,7 +752,7 @@ fn make_pg_subgraph<'h, H: HugrView>(
 ) -> portgraph::view::Subgraph<CheckerRegion<'h, H>> {
     // Ordering of the edges here is preserved and becomes ordering of the
     // signature.
-    let boundary = make_boundary::<H>(&region, &node_map, inputs, outputs);
+    let boundary = make_boundary::<H>(&region, node_map, inputs, outputs);
 
     portgraph::view::Subgraph::new_subgraph(region, boundary)
 }
