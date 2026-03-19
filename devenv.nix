@@ -1,13 +1,20 @@
 { pkgs, lib, inputs, config, ... }:
 let
-  pkgs-stable = import inputs.nixpkgs-2505 { system = pkgs.stdenv.system; };
   cfg = config.hugr;
+  darwinRuntimeLibraries = with pkgs; [
+    libiconv
+    xz
+    libffi
+    libxml2
+    ncurses
+  ];
+  darwinRuntimeLibraryPath = lib.makeLibraryPath darwinRuntimeLibraries;
 in
 {
   options.hugr = {
     llvmVersion = lib.mkOption {
       type = lib.types.str;
-      default = "14";
+      default = "21";
     };
   };
 
@@ -27,26 +34,42 @@ in
       pkgs.libffi
       pkgs.libxml2
       pkgs.ncurses
-    ] ++ lib.optionals pkgs.stdenv.isDarwin [
-      pkgs.xz
-    ];
+    ] ++ lib.optionals pkgs.stdenv.isDarwin darwinRuntimeLibraries;
 
-    env = {
-      "LLVM_SYS_${cfg.llvmVersion}0_PREFIX" = "${pkgs-stable."llvmPackages_${cfg.llvmVersion}".libllvm.dev}";
-    };
+    env =
+      let
+        llvmPackage = pkgs."llvmPackages_${cfg.llvmVersion}";
+        versionInfo = builtins.splitVersion llvmPackage.release_version;
+        llvmVersionMajor = builtins.elemAt versionInfo 0;
+        llvmVersionMinor = builtins.elemAt versionInfo 1;
+      in
+      {
+        "LLVM_SYS_${llvmVersionMajor}${llvmVersionMinor}_PREFIX" = "${llvmPackage.libllvm.dev}";
+      } // lib.optionalAttrs pkgs.stdenv.isDarwin {
+        # `uv` and other prebuilt binaries on macOS can link against `libiconv.2`
+        # without carrying an absolute runtime path to the Nix-provided library.
+        # Make the fallback loader path explicit so `uv sync` stays stable across
+        # devenv/nixpkgs updates instead of depending on incidental shell state.
+        DYLD_FALLBACK_LIBRARY_PATH = darwinRuntimeLibraryPath;
+      };
 
 
     enterShell = ''
       cargo --version
+      # UV_PYTHON is set by devenv to the Nix python-env derivation, which carries
+      # an EXTERNALLY-MANAGED marker. This causes `uv pip install` (invoked by
+      # maturin) to target the immutable Nix store Python instead of the project
+      # venv. Unset it so uv resolves the interpreter from the active venv instead.
+      unset UV_PYTHON
     '';
 
     languages.python = {
       enable = true;
+      venv.enable = false;
       uv = {
         enable = true;
         sync.enable = true;
       };
-      venv.enable = true;
     };
 
 

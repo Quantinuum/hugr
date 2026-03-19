@@ -1,16 +1,28 @@
 """Types and operations from the standard extension set."""
 
-import pkgutil
+from hugr.ext import Extension, ExtensionRegistry
 
-from hugr._serialization.extension import Extension as PdExtension
-from hugr.ext import Extension
+from . import collections, float, int, logic, prelude, ptr
 
+__all__ = ["PRELUDE", "collections", "float", "int", "logic", "prelude", "ptr"]
 
-def _load_extension(name: str) -> Extension:
-    replacement = name.replace(".", "/")
-    json_str = pkgutil.get_data(__name__, f"_json_defs/{replacement}.json")
-    assert json_str is not None
-    return PdExtension.model_validate_json(json_str).deserialize()
+PRELUDE: Extension = prelude.PRELUDE_EXTENSION
 
 
-PRELUDE = _load_extension("prelude")
+def _std_extensions() -> ExtensionRegistry:
+    return ExtensionRegistry.from_extensions(
+        [
+            PRELUDE,
+            int.CONVERSIONS_EXTENSION,
+            int.INT_TYPES_EXTENSION,
+            int.INT_OPS_EXTENSION,
+            float.FLOAT_OPS_EXTENSION,
+            float.FLOAT_TYPES_EXTENSION,
+            logic.EXTENSION,
+            ptr.EXTENSION,
+            collections.array.EXTENSION,
+            collections.borrow_array.EXTENSION,
+            collections.list.EXTENSION,
+            collections.static_array.EXTENSION,
+        ]
+    )

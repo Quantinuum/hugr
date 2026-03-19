@@ -4,7 +4,8 @@ The format is designed to be extensible and backwards-compatible. It
 consists of a header declaring the format used to encode the HUGR, followed
 by the encoded HUGR itself.
 
-## Payload formats
+Payload formats
+---------------
 
 The envelope may encode the HUGR in different formats, listed in
 :class:`hugr.envelope.EnvelopeFormat`. The payload may also be compressed with zstd.
@@ -13,21 +14,24 @@ Some formats can be represented as ASCII, as indicated by the
 :meth:`hugr.envelope.EnvelopeFormat.ascii_printable` method. When this is the case, the
 whole envelope can be stored in a string.
 
-## Envelope header
+Envelope header
+---------------
 
 The binary header format is 10 bytes, with the following fields:
 
-| Field  | Size (bytes) | Description |
-|--------|--------------|-------------|
++--------+--------------+--------------------------------------------------------------------------------+
+| Field  | Size (bytes) | Description                                                                    |
++========+==============+================================================================================+
 | Magic  | 8            | :class:`hugr.envelope.MAGIC_NUMBERS` constant identifying the envelope format. |
-| Format | 1            | :class:`hugr.envelope.EnvelopeFormat` describing the payload format. |
-| Flags  | 1            | Additional configuration flags. |
+| Format | 1            | :class:`hugr.envelope.EnvelopeFormat` describing the payload format.           |
+| Flags  | 1            | Additional configuration flags.                                                |
++--------+--------------+--------------------------------------------------------------------------------+
 
 Flags:
 
 - Bit 0: Whether the payload is compressed with zstd.
 - Bits 1-5: Reserved for future use.
-- Bit 7,6: Constant "01" to make some headers ascii-printable.
+- Bits 7,6: Constant "01" to make some headers ascii-printable.
 """  # noqa: E501
 
 from __future__ import annotations
@@ -35,13 +39,16 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from enum import Enum
-from typing import TYPE_CHECKING, ClassVar
+from typing import TYPE_CHECKING, Any, ClassVar
 
-import pyzstd
+from semver import Version
+from typing_extensions import deprecated
 
 import hugr._hugr.model as rust
+import hugr._hugr.zstd as zstd
 
 if TYPE_CHECKING:
+    from hugr.ext import ExtensionRegistry
     from hugr.hugr.base import Hugr
     from hugr.package import Package
 
@@ -55,14 +62,19 @@ _DEFAULT_FLAGS = 0b0100_0000
 _ZSTD_FLAG = 0b0000_0001
 
 
+@deprecated("Use Package/Hugr.to_bytes() instead.")
 def make_envelope(package: Package | Hugr, config: EnvelopeConfig) -> bytes:
-    """Encode a HUGR or Package into an envelope, using the given configuration."""
-    from hugr.package import Package
+    """Encode a Package into an envelope, using the given configuration."""
+    from hugr.hugr.base import Hugr
 
+    if isinstance(package, Hugr):
+        package = package.to_package()
+    return _make_envelope(package, config)
+
+
+def _make_envelope(package: Package, config: EnvelopeConfig) -> bytes:
+    """Encode a Package into an envelope, using the given configuration."""
     envelope = bytearray(config._make_header().to_bytes())
-
-    if not isinstance(package, Package):
-        package = Package(modules=[package], extensions=[])
 
     payload: bytes
     match config.format:
@@ -75,7 +87,11 @@ def make_envelope(package: Package | Hugr, config: EnvelopeConfig) -> bytes:
         case EnvelopeFormat.MODEL:
             payload = bytes(package.to_model())
 
+        case EnvelopeFormat._S_EXPRESSION:
+            payload = str(package.to_model()).encode("utf-8")
+
         case EnvelopeFormat.MODEL_WITH_EXTS:
+            # Encoded model first, followed by json-encoded extensions.
             package_bytes = bytes(package.to_model())
             extension_str = json.dumps(
                 [ext._to_serial().model_dump(mode="json") for ext in package.extensions]
@@ -83,24 +99,55 @@ def make_envelope(package: Package | Hugr, config: EnvelopeConfig) -> bytes:
             extension_bytes = extension_str.encode("utf8")
             payload = package_bytes + extension_bytes
 
+        case EnvelopeFormat._S_EXPRESSION_WITH_EXTS:
+            # Json-encoded extensions first, followed by s-expression.
+            # (Due to restrictions in S-expression parsing)
+            extension_str = json.dumps(
+                [ext._to_serial().model_dump(mode="json") for ext in package.extensions]
+            )
+            package_str = str(package.to_model())
+            payload_str = extension_str + package_str
+            payload = payload_str.encode("utf-8")
+
     if config.zstd is not None:
-        payload = pyzstd.compress(payload, config.zstd)
+        payload = zstd.compress(payload, config.zstd)
 
     envelope += payload
     return bytes(envelope)
 
 
+@deprecated("Use Package/Hugr.to_str() instead.")
 def make_envelope_str(package: Package | Hugr, config: EnvelopeConfig) -> str:
-    """Encode a HUGR or Package into an envelope, using the given configuration."""
+    """Encode a Package into an envelope, using the given configuration."""
+    from hugr.hugr.base import Hugr
+
+    if isinstance(package, Hugr):
+        package = package.to_package()
+    return _make_envelope_str(package, config)
+
+
+def _make_envelope_str(package: Package, config: EnvelopeConfig) -> str:
+    """Encode a Package into an envelope, using the given configuration."""
     if not config.format.ascii_printable():
         msg = "Only ascii-printable envelope formats can be encoded into a string."
         raise ValueError(msg)
-    envelope = make_envelope(package, config)
+    envelope = _make_envelope(package, config)
     return envelope.decode("utf-8")
 
 
-def read_envelope(envelope: bytes) -> Package:
-    """Decode a HUGR package from an envelope."""
+def read_envelope(
+    envelope: bytes, resolve_from: ExtensionRegistry | None = None
+) -> Package:
+    """Decode a HUGR package from an envelope.
+
+    Args:
+        envelope: The byte string representing a Package.
+        resolve_from: If not None, an extension registry to resolve the custom
+            operations and types.
+
+    Returns:
+        The deserialized Package object.
+    """
     import hugr._serialization.extension as ext_s
     from hugr.package import Package
 
@@ -108,37 +155,71 @@ def read_envelope(envelope: bytes) -> Package:
     payload = envelope[10:]
 
     if header.zstd:
-        payload = pyzstd.decompress(payload)
+        payload = zstd.decompress(payload)
 
     match header.format:
         case EnvelopeFormat.JSON:
-            return ext_s.Package.model_validate_json(payload).deserialize()
-        case EnvelopeFormat.MODEL:
+            from hugr.ext import ExtensionRegistry
+
+            pkg = ext_s.Package.model_validate_json(payload).deserialize()
+            pkg.resolve_extensions(resolve_from or ExtensionRegistry())
+            return pkg
+        case EnvelopeFormat.MODEL | EnvelopeFormat._S_EXPRESSION:
             model_package, suffix = rust.bytes_to_package(payload)
             if suffix:
                 msg = f"Excess bytes in envelope with format {EnvelopeFormat.MODEL}."
                 raise ValueError(msg)
-            return Package.from_model(model_package)
+            return Package.from_model(model_package, resolve_from=resolve_from)
         case EnvelopeFormat.MODEL_WITH_EXTS:
+            # Encoded model first, followed by json-encoded extensions.
             from hugr.ext import Extension
 
             model_package, suffix = rust.bytes_to_package(payload)
-            return Package(
-                modules=Package.from_model(model_package).modules,
-                extensions=[
-                    Extension.from_json(json.dumps(extension))
-                    for extension in json.loads(suffix)
-                ],
+            extensions = [
+                Extension.from_json(json.dumps(extension))
+                for extension in json.loads(suffix)
+            ]
+
+            return Package.from_model(
+                model_package, extensions=extensions, resolve_from=resolve_from
+            )
+        case EnvelopeFormat._S_EXPRESSION_WITH_EXTS:
+            # Json-encoded extensions first, followed by s-expression.
+            # (Due to restrictions in S-expression parsing)
+            from hugr.ext import Extension
+
+            decoder = json.JSONDecoder()
+            payload_str = payload.decode("utf-8")
+            extensions, parse_index = decoder.raw_decode(payload_str)
+
+            extensions = [
+                Extension.from_json(json.dumps(extension)) for extension in extensions
+            ]
+
+            model_package = rust.string_to_package(payload_str[parse_index:])
+
+            return Package.from_model(
+                model_package, extensions=extensions, resolve_from=resolve_from
             )
 
 
-def read_envelope_hugr(envelope: bytes) -> Hugr:
+def read_envelope_hugr(
+    envelope: bytes, resolve_from: ExtensionRegistry | None = None
+) -> Hugr:
     """Decode a HUGR from an envelope.
+
+    Args:
+        envelope: The byte string representing a Hugr envelope.
+        resolve_from: If not None, an extension registry to resolve the custom
+            operations and types.
+
+    Returns:
+        The deserialized Hugr object.
 
     Raises:
         ValueError: If the envelope does not contain a single module.
     """
-    pkg = read_envelope(envelope)
+    pkg = read_envelope(envelope, resolve_from=resolve_from)
     if len(pkg.modules) != 1:
         msg = (
             "Expected a single module in the envelope, but got "
@@ -148,18 +229,39 @@ def read_envelope_hugr(envelope: bytes) -> Hugr:
     return pkg.modules[0]
 
 
-def read_envelope_str(envelope: str) -> Package:
-    """Decode a HUGR package from an envelope."""
-    return read_envelope(envelope.encode("utf-8"))
+def read_envelope_str(
+    envelope: str, resolve_from: ExtensionRegistry | None = None
+) -> Package:
+    """Decode a HUGR package from an envelope.
+
+    Args:
+        envelope: The string representing a Package.
+        resolve_from: If not None, an extension registry to resolve the custom
+            operations and types.
+
+    Returns:
+        The deserialized Package object.
+    """
+    return read_envelope(envelope.encode("utf-8"), resolve_from=resolve_from)
 
 
-def read_envelope_hugr_str(envelope: str) -> Hugr:
+def read_envelope_hugr_str(
+    envelope: str, resolve_from: ExtensionRegistry | None = None
+) -> Hugr:
     """Decode a HUGR from an envelope.
+
+    Args:
+        envelope: The string representing a Hugr envelope.
+        resolve_from: If not None, an extension registry to resolve the custom
+            operations and types.
+
+    Returns:
+        The deserialized Hugr object.
 
     Raises:
         ValueError: If the envelope does not contain a single module.
     """
-    pkg = read_envelope_str(envelope)
+    pkg = read_envelope_str(envelope, resolve_from=resolve_from)
     if len(pkg.modules) != 1:
         msg = (
             "Expected a single module in the envelope, but got "
@@ -177,11 +279,28 @@ class EnvelopeFormat(Enum):
     MODEL_WITH_EXTS = 2
     """A capnp-encoded hugr-model, immediately followed by a json-encoded
     extension registry."""
+    _S_EXPRESSION = 40
+    """A textual representation of a hugr.
+
+    Note: This format is **experimental** and not fully tested.
+    It is not recommended for production use.
+    """
+    _S_EXPRESSION_WITH_EXTS = 41
+    """A textual representation of a hugr, preceded by a json-encoded
+    extension registry.
+
+    Note: This format is **experimental** and not fully tested.
+    It is not recommended for production use.
+    """
     JSON = 63  # '?' in ASCII
     """A json-encoded hugr-package. This format is ASCII-printable."""
 
     def ascii_printable(self) -> bool:
-        return self in {EnvelopeFormat.JSON}
+        return self in {
+            EnvelopeFormat.JSON,
+            EnvelopeFormat._S_EXPRESSION,
+            EnvelopeFormat._S_EXPRESSION_WITH_EXTS,
+        }
 
 
 @dataclass
@@ -263,3 +382,97 @@ class EnvelopeConfig:
 # These can only be initialized _after_ the class is defined.
 EnvelopeConfig.TEXT = EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=None)
 EnvelopeConfig.BINARY = EnvelopeConfig(format=EnvelopeFormat.MODEL_WITH_EXTS, zstd=0)
+
+
+@dataclass(frozen=True)
+class GeneratorDesc:
+    """Description of the generator that defined the HUGR module.
+
+    These are stored at the module root node metadata under the
+    :class:`hugr.metadata.HugrGenerator` entry.
+    """
+
+    name: str
+    version: Version | None
+
+    def to_json(self) -> dict[str, str]:
+        """Encodes the generator as a dictionary of native types that can be
+        serialized by `json.dump`.
+        """
+        if self.version is None:
+            return {
+                "name": self.name,
+            }
+        else:
+            return {
+                "name": self.name,
+                "version": str(self.version),
+            }
+
+    @classmethod
+    def from_json(cls, value: Any) -> GeneratorDesc:
+        """Decodes the generator from a native types obtained from `json.load`."""
+        if isinstance(value, str):
+            return GeneratorDesc(name=value, version=None)
+
+        if not isinstance(value, dict):
+            msg = (
+                "Expected generator metadata to be a string or a dict,"
+                + " but got {type(value)}"
+            )
+            raise TypeError(msg)
+
+        fallback_name = " ".join(f"{k}: {v}" for k, v in value.items())
+        if "name" not in value or any(k != "name" and k != "version" for k in value):
+            return GeneratorDesc(name=fallback_name, version=None)
+        if "version" in value:
+            try:
+                version = Version.parse(value["version"])
+            except ValueError:
+                return GeneratorDesc(name=fallback_name, version=None)
+            return GeneratorDesc(name=value["name"], version=version)
+        else:
+            return GeneratorDesc(name=value["name"], version=None)
+
+
+@dataclass
+class ExtensionDesc:
+    """High level description of a HUGR extension.
+
+    A list of these is stored at the module root node metadata under the
+    :class:`hugr.metadata.HugrUsedExtensions` entry.
+    """
+
+    name: str
+    version: Version
+
+    def to_json(self) -> dict[str, str]:
+        """Encodes the extension as a dictionary of native types that can be
+        serialized by `json.dump`.
+        """
+        return {
+            "name": self.name,
+            "version": str(self.version),
+        }
+
+    @classmethod
+    def from_json(cls, value: Any) -> ExtensionDesc:
+        """Decodes the extension from a native types obtained from `json.load`."""
+        if not isinstance(value, dict):
+            msg = f"Expected extension metadata to be a dict, but got {type(value)}"
+            raise TypeError(msg)
+        if "name" not in value:
+            msg = (
+                "Expected extension metadata to be a dict with a 'name' key,"
+                + f" but got {value}"
+            )
+            raise TypeError(msg)
+        if "version" not in value:
+            msg = (
+                "Expected extension metadata to be a dict with a 'version' key,"
+                + f" but got {value}"
+            )
+            raise TypeError(msg)
+        return ExtensionDesc(
+            name=value["name"], version=Version.parse(value["version"])
+        )

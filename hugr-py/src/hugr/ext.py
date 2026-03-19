@@ -24,7 +24,7 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Sequence
+    from collections.abc import Callable, Iterable, Sequence
 
     from hugr.hugr import Hugr
     from hugr.tys import ExtensionId
@@ -336,6 +336,27 @@ class Extension:
         self.types[type_def.name] = type_def
         return self.types[type_def.name]
 
+    def _resolve_used_extensions(
+        self, registry: ExtensionRegistry | None = None
+    ) -> ExtensionResolutionResult:
+        """Collect extension dependencies from this extension's op signatures."""
+        if registry is not None and self.name not in registry:
+            registry.register_updated(self)
+
+        result = ExtensionResolutionResult()
+        for op_def in self.operations.values():
+            poly_func = op_def.signature.poly_func
+            if poly_func is None:
+                continue
+            _, sig_result = poly_func._resolve_used_extensions(registry)
+            result.extend(sig_result)
+
+            for lower_func in op_def.lower_funcs:
+                lower_result = lower_func.hugr.used_extensions(registry)
+                result.extend(lower_result)
+
+        return result
+
     @dataclass
     class OperationNotFound(NotFound):
         """Operation not found in extension."""
@@ -441,6 +462,19 @@ class ExtensionRegistry:
 
         extension_id: ExtensionId
 
+    @classmethod
+    def from_extensions(cls, extensions: Iterable[Extension]) -> ExtensionRegistry:
+        """Create an extension registry from a list of extensions."""
+        return cls(extensions={extension.name: extension for extension in extensions})
+
+    def ids(self) -> set[ExtensionId]:
+        """Get the set of extension IDs in the registry.
+
+        Returns:
+            Set of extension IDs.
+        """
+        return set(self.extensions.keys())
+
     def add_extension(self, extension: Extension) -> Extension:
         """Add an extension to the registry.
 
@@ -474,3 +508,99 @@ class ExtensionRegistry:
             return self.extensions[name]
         except KeyError as e:
             raise self.ExtensionNotFound(name) from e
+
+    def register_updated(self, extension: Extension) -> None:
+        """Add or update an extension in the registry.
+
+        If an extension with the same name already exists, keeps the one
+        with the higher version.
+
+        Args:
+            extension: The extension to add or update.
+        """
+        name = extension.name
+        existing = self.extensions.get(name)
+        if existing is None or existing.version < extension.version:
+            self.extensions[name] = extension
+
+    def extend(self, other: ExtensionRegistry) -> None:
+        """Add a registry of extensions to this registry.
+
+        If an extension with the same name already exists, the one with the
+        higher version is kept.
+
+        Args:
+            other: The extension registry to add.
+        """
+        for ext in other.extensions.values():
+            self.register_updated(ext)
+
+    def __str__(self) -> str:
+        return "ExtensionRegistry(" + ", ".join(self.extensions.keys()) + ")"
+
+    def __contains__(self, name: ExtensionId) -> bool:
+        return name in self.extensions
+
+
+@dataclass
+class ExtensionResolutionResult:
+    """Result of resolving extensions in a HUGR.
+
+    Args:
+        used_extensions: The extensions used by the HUGR.
+        unresolved_extensions: A set of extension IDs referenced in the HUGR but
+            not found in the given registry.
+        unresolved_ops: The Custom operations that could not be resolved to an
+            ExtOp because the operation was not found in the registry.
+            Indexed by (extension ID, operation name).
+        unresolved_types: The Opaque types that could not be resolved to an
+            ExtType because the type was not found in the registry.
+            Indexed by (extension ID, type name).
+    """
+
+    used_extensions: ExtensionRegistry = field(default_factory=ExtensionRegistry)
+    unresolved_extensions: set[ExtensionId] = field(default_factory=set)
+    unresolved_ops: dict[tuple[tys.ExtensionId, str], ops.Custom] = field(
+        default_factory=dict
+    )
+    unresolved_types: dict[tuple[tys.ExtensionId, str], tys.Opaque] = field(
+        default_factory=dict
+    )
+
+    def ids(self) -> set[ExtensionId]:
+        """Get the set of used extension IDs.
+
+        This includes both resolved and unresolved extensions referenced in the
+        HUGR.
+        """
+        return self.used_extensions.ids() | self.unresolved_extensions
+
+    def extend(self, other: ExtensionResolutionResult) -> None:
+        """Add the extensions from another result to this result.
+
+        Args:
+            other: The result of resolving extensions to add.
+        """
+        self.used_extensions.extend(other.used_extensions)
+        self.unresolved_extensions.update(other.unresolved_extensions)
+        self.unresolved_ops.update(other.unresolved_ops)
+        self.unresolved_types.update(other.unresolved_types)
+
+    def _extend_with_transitive_ops(
+        self, registry: ExtensionRegistry | None = None
+    ) -> None:
+        """Extend the set of extensions with transitive dependencies required by
+        the OpDefs in each extension definition.
+        """
+        queue: list[Extension] = list(self.used_extensions.extensions.values())
+
+        while queue:
+            ext = queue.pop()
+            op_result = ext._resolve_used_extensions(registry)
+
+            self.unresolved_extensions.update(op_result.unresolved_extensions)
+
+            for new_ext in op_result.used_extensions.extensions.values():
+                if new_ext.name not in self.used_extensions:
+                    self.used_extensions.register_updated(new_ext)
+                    queue.append(new_ext)

@@ -10,7 +10,8 @@ use hugr_core::{HugrView, IncomingPort, Node, OutgoingPort};
 use itertools::Itertools;
 use petgraph::visit::Walker;
 
-use crate::ComposablePass;
+use crate::composable::WithScope;
+use crate::{ComposablePass, PassScope};
 
 /// A pass for removing order edges in a Hugr region that are already implied by
 /// other order or dataflow dependencies.
@@ -21,10 +22,10 @@ use crate::ComposablePass;
 /// Each evaluation on a region runs in `O(e + n log(n) * #order_edges)` time,
 /// where `e` and `n` are the number of edges and nodes in the region,
 /// respectively.
-#[derive(Default, Debug, Clone, Copy)]
+#[derive(Debug, Default, Clone)]
 pub struct RedundantOrderEdgesPass {
-    /// Whether to traverse the HUGR recursively.
-    recursive: bool,
+    /// On what part of the Hugr to run
+    scope: PassScope,
 }
 
 /// Result type for the redundant order edges pass.
@@ -35,17 +36,6 @@ pub struct RedundantOrderEdgesResult {
 }
 
 impl RedundantOrderEdgesPass {
-    /// Create a new redundant order edges pass with the given configuration.
-    pub fn new() -> Self {
-        Self { recursive: true }
-    }
-
-    /// Sets whether the pass should traverse the HUGR recursively.
-    pub fn recursive(mut self, recursive: bool) -> Self {
-        self.recursive = recursive;
-        self
-    }
-
     /// Evaluate the pass on the given dataflow region.
     ///
     /// # Arguments
@@ -79,23 +69,23 @@ impl RedundantOrderEdgesPass {
         // Traverse the region in topological order.
         let (region, node_map) = hugr.region_portgraph(parent);
         let postorder = petgraph::visit::Topo::new(&region);
-        for pg_node in postorder.iter(&region) {
-            let node = node_map.from_portgraph(pg_node);
-            let op = hugr.get_optype(node);
+        for pg_child in postorder.iter(&region) {
+            let child = node_map.from_portgraph(pg_child);
+            let op = hugr.get_optype(child);
 
-            // If the node has children and we are running recursively, add the children to the region candidates.
-            if self.recursive && hugr.first_child(node).is_some() {
-                region_candidates.extend(hugr.children(node));
+            // If the child itself is a region (parent) and we are running recursively, add the child to the region candidates.
+            if self.scope.recursive() && hugr.first_child(child).is_some() {
+                region_candidates.push_back(child);
             }
 
-            let predecessor_edges = predecessor_order_edges.remove(&node).unwrap_or_default();
+            let predecessor_edges = predecessor_order_edges.remove(&child).unwrap_or_default();
 
             // If we have reached the target of an order edge by exploring
             // connected nodes from the source, then mark the order edge for
             // removal.
             let removable_edges: HashSet<PredecessorOrderEdges<H::Node>> = predecessor_edges
                 .iter()
-                .filter(|edge| edge.to_node == node)
+                .filter(|edge| edge.to_node == child)
                 .copied()
                 .collect();
 
@@ -110,13 +100,13 @@ impl RedundantOrderEdgesPass {
             // The latter may be necessary for keeping external edges valid.
             let new_edges = match op.other_output_port() {
                 Some(out_order_port) => hugr
-                    .linked_inputs(node, out_order_port)
+                    .linked_inputs(child, out_order_port)
                     .filter(|(to_node, _)| {
                         hugr.get_parent(*to_node) == Some(parent)
                             && hugr.first_child(*to_node).is_none()
                     })
                     .map(|(to_node, to_port)| PredecessorOrderEdges {
-                        from_node: node,
+                        from_node: child,
                         from_port: out_order_port,
                         to_node,
                         to_port,
@@ -127,7 +117,7 @@ impl RedundantOrderEdgesPass {
 
             // Add the order edges to the `predecessor_order_edges` of the forward neighbors of the node.
             for out_port in op.value_output_ports().chain(op.static_output_port()) {
-                for (to_node, _) in hugr.linked_inputs(node, out_port) {
+                for (to_node, _) in hugr.linked_inputs(child, out_port) {
                     if hugr.get_parent(to_node) != Some(parent) {
                         continue;
                     }
@@ -139,7 +129,7 @@ impl RedundantOrderEdgesPass {
             }
             // Do not propagate new order edges through themselves (otherwise we'd always remove them).
             if let Some(out_port) = op.other_output_port() {
-                for (to_node, _) in hugr.linked_inputs(node, out_port) {
+                for (to_node, _) in hugr.linked_inputs(child, out_port) {
                     if hugr.get_parent(to_node) != Some(parent) {
                         continue;
                     }
@@ -169,7 +159,7 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RedundantOrderEdgesPass {
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
         // Nodes to explore in the hugr.
-        let mut region_candidates = VecDeque::from_iter([hugr.entrypoint()]);
+        let mut region_candidates = VecDeque::from_iter(self.scope.root(hugr));
         let mut result = RedundantOrderEdgesResult::default();
 
         while let Some(region) = region_candidates.pop_front() {
@@ -177,13 +167,19 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for RedundantOrderEdgesPass {
 
             if OpTag::DataflowParent.is_superset(op.tag()) {
                 result += self.run_on_df_region(hugr, region, &mut region_candidates)?;
-            } else {
-                // When exploring non-dataflow regions, add the children recursively (independently of self.recursive).
+            } else if self.scope.recursive() {
                 region_candidates.extend(hugr.children(region));
             }
         }
 
         Ok(result)
+    }
+}
+
+impl WithScope for RedundantOrderEdgesPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
     }
 }
 
@@ -218,7 +214,7 @@ mod tests {
     /// - noop3 -> nested_op
     #[test]
     fn test_redundant_order_edges() {
-        let mut hugr = FunctionBuilder::new("f", Signature::new_endo(vec![bool_t()])).unwrap();
+        let mut hugr = FunctionBuilder::new("f", Signature::new_endo([bool_t()])).unwrap();
         let op = Noop::new(bool_t());
 
         let [input, output] = hugr.io();
@@ -250,7 +246,7 @@ mod tests {
         let mut hugr = hugr.finish_hugr_with_outputs([noop5.out_wire(0)]).unwrap();
 
         // Run the pass
-        let result = RedundantOrderEdgesPass::new().run(&mut hugr).unwrap();
+        let result = RedundantOrderEdgesPass::default().run(&mut hugr).unwrap();
         assert_eq!(result.edges_removed, 2);
 
         // Check that we removed the correct order edges.

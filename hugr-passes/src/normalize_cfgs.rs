@@ -9,7 +9,7 @@ use std::collections::HashMap;
 use hugr_core::extension::prelude::UnpackTuple;
 use hugr_core::hugr::hugrmut::HugrMut;
 use hugr_core::types::{EdgeKind, Signature, TypeRow};
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 
 use hugr_core::hugr::patch::inline_dfg::InlineDFG;
 use hugr_core::hugr::patch::replace::{NewEdgeKind, NewEdgeSpec, Replacement};
@@ -18,7 +18,8 @@ use hugr_core::ops::{
 };
 use hugr_core::{Direction, Hugr, HugrView, Node, OutgoingPort, PortIndex};
 
-use crate::ComposablePass;
+use crate::composable::WithScope;
+use crate::{ComposablePass, PassScope};
 
 /// Merge any basic blocks that are direct children of the specified [`CFG`]-entrypoint
 /// Hugr.
@@ -96,45 +97,33 @@ pub enum NormalizeCFGResult<N = Node> {
 }
 
 /// A [ComposablePass] that normalizes CFGs (i.e. [normalize_cfg]) in a Hugr.
-#[derive(Clone, Debug)]
-pub struct NormalizeCFGPass<N> {
-    cfgs: Vec<N>,
+#[derive(Clone, Debug, Default)]
+pub struct NormalizeCFGPass {
+    scope: PassScope,
 }
 
-impl<N> Default for NormalizeCFGPass<N> {
-    fn default() -> Self {
-        Self { cfgs: vec![] }
-    }
-}
-
-impl<N> NormalizeCFGPass<N> {
-    /// Allows mutating the set of CFG nodes that will be normalized.
-    ///
-    /// If empty (the default), all (non-strict) descendants of the [HugrView::entrypoint]
-    /// will be normalized.
-    pub fn cfgs(&mut self) -> &mut Vec<N> {
-        &mut self.cfgs
-    }
-}
-
-impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
+impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass {
     type Error = NormalizeCFGError;
 
     /// For each CFG node that was normalized, the [NormalizeCFGResult] for that CFG
     type Result = HashMap<H::Node, NormalizeCFGResult<H::Node>>;
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
-        let cfgs = if self.cfgs.is_empty() {
-            let mut v = hugr
-                .entry_descendants()
-                .filter(|n| hugr.get_optype(*n).is_cfg())
-                .collect::<Vec<_>>();
+        let ctrs = {
+            let r = self.scope.root(hugr);
+            if let Some(r) = r.filter(|_| self.scope.recursive()) {
+                Either::Right(hugr.descendants(r))
+            } else {
+                Either::Left(r.into_iter())
+            }
+        };
+
+        let cfgs = {
+            let mut cfgs: Vec<H::Node> = ctrs.filter(|n| hugr.get_optype(*n).is_cfg()).collect();
             // Process inner CFGs first, in case they are removed (if they are in a completely
             // disconnected block when the Entry node has only the Exit as successor).
-            v.reverse();
-            v
-        } else {
-            self.cfgs.clone()
+            cfgs.reverse();
+            cfgs
         };
         let mut results = HashMap::new();
         for cfg in cfgs {
@@ -142,6 +131,13 @@ impl<H: HugrMut> ComposablePass<H> for NormalizeCFGPass<H::Node> {
             results.insert(cfg, res);
         }
         Ok(results)
+    }
+}
+
+impl WithScope for NormalizeCFGPass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
     }
 }
 
@@ -683,7 +679,7 @@ mod test {
             .into_owned()
             .try_into()
             .unwrap();
-        let mut h = CFGBuilder::new(inout_sig(qb_t(), res_t.clone()))?;
+        let mut h = CFGBuilder::new(inout_sig([qb_t()], [res_t.clone()]))?;
         let mut bb1 = h.simple_entry_builder(vec![usize_t(), qb_t()].into(), 1)?;
         let [inw] = bb1.input_wires_arr();
         let load_cst = bb1.add_load_value(ConstUsize::new(1));
@@ -702,7 +698,7 @@ mod test {
         let mut bb3 = h.block_builder(
             vec![qb_t(), usize_t()].into(),
             vec![type_row![]],
-            res_t.clone().into(),
+            [res_t.clone()].into(),
         )?;
         let [q, u] = bb3.input_wires_arr();
         let tst = bb3.add_dataflow_op(tst_op, [q, u])?;
@@ -761,7 +757,7 @@ mod test {
         let exit_types: TypeRow = vec![usize_t()].into();
         let e = extension();
         let tst_op = e.instantiate_extension_op("Test", [])?;
-        let mut h = CFGBuilder::new(inout_sig(qb_t(), usize_t()))?;
+        let mut h = CFGBuilder::new(inout_sig([qb_t()], [usize_t()]))?;
         let mut nop_b = h.simple_entry_builder(loop_variants.clone(), 1)?;
         let n = nop_b.add_dataflow_op(Noop::new(qb_t()), nop_b.input_wires())?;
         let br = nop_b.add_load_value(Value::unary_unit_sum());
@@ -897,7 +893,7 @@ mod test {
         let qq = TypeRow::from(vec![qb_t(); 2]);
         let mut outer = CFGBuilder::new(inout_sig(qqu.clone(), vec![usize_t(), qb_t()])).unwrap();
         let mut entry = outer
-            .entry_builder(vec![qq.clone()], usize_t().into())
+            .entry_builder(vec![qq.clone()], [usize_t()].into())
             .unwrap();
         let [q1, q2, u] = entry.input_wires_arr();
         let (inner, inner_pred) = {
@@ -924,7 +920,7 @@ mod test {
         let loop_b = {
             let qu = [qb_t(), usize_t()];
             let mut loop_b = outer
-                .block_builder(qqu, qu.clone().map(TypeRow::from), Vec::from(qu).into())
+                .block_builder(qqu, qu.clone().map(|t| [t].into()), qu.into())
                 .unwrap();
             let [q1, q2, u_local] = loop_b.input_wires_arr();
             // u here is `dom` edge from entry block

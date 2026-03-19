@@ -1,6 +1,52 @@
 # Changelog
 
 
+## [0.26.1](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.26.0...hugr-passes-v0.26.1) - 2026-03-18
+
+### Bug Fixes
+
+- ConstantFold fails when the module contains function declarations ([#2954](https://github.com/Quantinuum/hugr/pull/2954))
+
+## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.7...hugr-passes-v0.26.0) - 2026-03-16
+
+### New Features
+
+- [**breaking**] `hugr-passes` is no longer reexported from `hugr::algorithms` ([#2922](https://github.com/Quantinuum/hugr/pull/2922))
+- *(llvm)* [**breaking**] Upgrade to LLVM 21 ([#2901](https://github.com/Quantinuum/hugr/pull/2901))
+- [**breaking**] Update remainder of passes to use PassScope, drop default with_scope ([#2871](https://github.com/Quantinuum/hugr/pull/2871))
+- [**breaking**] Make `WithScope` a supertrait of `ComposablePass` ([#2921](https://github.com/Quantinuum/hugr/pull/2921))
+- [**breaking**] TypeRow: add impl From array of Type, remove From<Type> ([#2784](https://github.com/Quantinuum/hugr/pull/2784))
+- Deprecate HugrView::as_petgraph ([#2944](https://github.com/Quantinuum/hugr/pull/2944))
+
+### Refactor
+
+- [**breaking**] Remove deprecated Value::Function ([#2928](https://github.com/Quantinuum/hugr/pull/2928))
+- [**breaking**] Remove deprecated pass configuration ([#2938](https://github.com/Quantinuum/hugr/pull/2938))
+
+## [0.25.7](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.6...hugr-passes-v0.25.7) - 2026-03-06
+
+### Documentation
+
+- added examples in docs srtring ([#2920](https://github.com/Quantinuum/hugr/pull/2920))
+
+### New Features
+
+- Define pass application scopes ([#2772](https://github.com/Quantinuum/hugr/pull/2772))
+- Modify dead code elimination pass to remove unreachable basic blocks ([#2884](https://github.com/Quantinuum/hugr/pull/2884))
+- Add non-generic `with_scope` method for composable passes ([#2910](https://github.com/Quantinuum/hugr/pull/2910))
+- update passes to use PassScope where non-breaking ([#2836](https://github.com/Quantinuum/hugr/pull/2836))
+
+## [0.25.6](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.5...hugr-passes-v0.25.6) - 2026-02-20
+
+### Bug Fixes
+
+- Panic on UntuplePass when nodes had order edges ([#2883](https://github.com/Quantinuum/hugr/pull/2883))
+
+### New Features
+
+- added hash.rs, updated imports ([#2840](https://github.com/Quantinuum/hugr/pull/2840))
+- Add a `NodeTemplate::call_to_function` helper ([#2878](https://github.com/Quantinuum/hugr/pull/2878))
+
 ## [0.25.4](https://github.com/Quantinuum/hugr/compare/hugr-passes-v0.25.3...hugr-passes-v0.25.4) - 2026-01-14
 
 ### Bug Fixes

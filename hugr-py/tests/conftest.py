@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, TypeVar
 
 from typing_extensions import Self
 
-from hugr import cli, ext, tys
+from hugr import cli, ext, ops, tys
 from hugr.envelope import EnvelopeConfig, EnvelopeFormat
 from hugr.hugr import Hugr
 from hugr.ops import AsExtOp, Command, Const, Custom, DataflowOp, ExtOp, RegisteredOp
@@ -37,6 +37,45 @@ QUANTUM_EXT.add_op_def(
         description="CNOT gate",
         signature=ext.OpDefSig(tys.FunctionType.endo([tys.Qubit] * 2)),
     )
+)
+
+# Shared test extension
+TEST_EXT = ext.Extension("pytest.test_ext", ext.Version(0, 1, 0))
+
+
+def test_ext_registry() -> ext.ExtensionRegistry:
+    """Registry containing TEST_EXT."""
+    registry = ext.ExtensionRegistry()
+    registry.add_extension(TEST_EXT)
+    return registry
+
+
+TEST_TYPE_DEF = TEST_EXT.add_type_def(
+    ext.TypeDef(
+        name="TestType",
+        description="A custom type for testing",
+        params=[],
+        bound=ext.ExplicitBound(tys.TypeBound.Copyable),
+    )
+)
+TEST_OP_DEF = TEST_EXT.add_op_def(
+    ext.OpDef(
+        name="TestOp",
+        description="A custom operation for testing",
+        signature=ext.OpDefSig(tys.FunctionType([tys.Bool], [tys.Bool])),
+    )
+)
+TEST_OP = ops.ExtOp(TEST_OP_DEF, args=[])
+TEST_TYPE = tys.ExtType(TEST_TYPE_DEF, args=[])
+
+# Unresolved opaque type and Custom op for testing resolution
+TEST_TYPE_OPAQUE = tys.Opaque(
+    id="TestType", bound=tys.TypeBound.Copyable, extension=TEST_EXT.name
+)
+TEST_OP_OPAQUE = ops.Custom(
+    op_name="TestOp",
+    signature=tys.FunctionType([tys.Bool], [tys.Bool]),
+    extension=TEST_EXT.name,
 )
 
 
@@ -175,6 +214,10 @@ def validate(
         "model-exts-no-compression": EnvelopeConfig(
             format=EnvelopeFormat.MODEL_WITH_EXTS, zstd=None
         ),
+        "s-expression": EnvelopeConfig(format=EnvelopeFormat._S_EXPRESSION, zstd=None),
+        "s-expression-exts": EnvelopeConfig(
+            format=EnvelopeFormat._S_EXPRESSION_WITH_EXTS, zstd=None
+        ),
     }
     # Envelope formats used when exporting test hugrs.
     WRITE_FORMATS = [
@@ -182,10 +225,19 @@ def validate(
         "json-compressed",
         "model-exts",
         "model-exts-no-compression",
+        # Requires extension-encoding for the cli validation to load the envelope
+        # "s-expression",
+        # TODO: Raises multiple errors when loading values
+        # "s-expression-exts",
     ]
     # Envelope formats used as target before loading back the test hugrs.
     # These should correspond to the formats supported by `hugr convert`.
-    LOAD_FORMATS = ["json", "model-exts"]
+    LOAD_FORMATS = [
+        "json",
+        "model-exts",
+        # TODO: Raises multiple errors when loading values
+        # "s-expression-exts"
+    ]
 
     # validate text and binary formats
     for write_fmt in WRITE_FORMATS:

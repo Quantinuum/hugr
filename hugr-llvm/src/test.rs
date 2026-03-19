@@ -168,25 +168,54 @@ impl TestContext {
     /// Lower `hugr` to LLVM, then JIT and execute the function named
     /// by `entry_point` in the inner module.
     ///
-    /// That function must take no arguments and return an LLVM `i64`.
-    pub fn exec_hugr_u64(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> u64 {
+    /// That function must take no arguments and return FFI-compatible type `T`.
+    pub fn exec_hugr<T>(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> T {
         let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
         emission.verify().unwrap();
 
-        emission.exec_u64(entry_point).unwrap()
+        emission.jit_exec::<T>(entry_point).unwrap()
+    }
+
+    /// For a given integer size, exec a HUGR returning an integer of that size,
+    /// cast the expected value to that size, and assert equality.
+    pub fn check_int_hugr(
+        &self,
+        hugr: THugrView,
+        entry_point: impl AsRef<str>,
+        log_width: u8,
+        expected: u64,
+        signed: bool,
+    ) {
+        // an integer of "log width" N has 2^(2^N) bits
+        match (log_width, signed) {
+            (0, false) => assert_eq!(self.exec_hugr::<bool>(hugr, entry_point), expected != 0),
+            (0, true) => panic!("Signed bool does not exist"),
+            // casting to smaller int types in rust is a truncation,
+            // plus reinterpret-cast if signedness changes
+            (3, true) => assert_eq!(self.exec_hugr::<i8>(hugr, entry_point), expected as i8),
+            (3, false) => assert_eq!(self.exec_hugr::<u8>(hugr, entry_point), expected as u8),
+            (4, true) => assert_eq!(self.exec_hugr::<i16>(hugr, entry_point), expected as i16),
+            (4, false) => assert_eq!(self.exec_hugr::<u16>(hugr, entry_point), expected as u16),
+            (5, true) => assert_eq!(self.exec_hugr::<i32>(hugr, entry_point), expected as i32),
+            (5, false) => assert_eq!(self.exec_hugr::<u32>(hugr, entry_point), expected as u32),
+            // casting to/from signedness in rust is just a reinterpret-cast
+            (6, true) => assert_eq!(self.exec_hugr::<i64>(hugr, entry_point), expected as i64),
+            (6, false) => assert_eq!(self.exec_hugr::<u64>(hugr, entry_point), expected),
+            _ => panic!("Unsupported log width {log_width} for exec_hugr"),
+        }
+    }
+
+    // legacy wrappers for common types
+    pub fn exec_hugr_u64(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> u64 {
+        self.exec_hugr::<u64>(hugr, entry_point)
     }
 
     pub fn exec_hugr_i64(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> i64 {
-        let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
-        emission.verify().unwrap();
-
-        emission.exec_i64(entry_point).unwrap()
+        self.exec_hugr::<i64>(hugr, entry_point)
     }
 
     pub fn exec_hugr_f64(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> f64 {
-        let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
-
-        emission.exec_f64(entry_point).unwrap()
+        self.exec_hugr::<f64>(hugr, entry_point)
     }
 
     /// Lower `hugr` to LLVM, then JIT and execute the function named `entry_point` in the

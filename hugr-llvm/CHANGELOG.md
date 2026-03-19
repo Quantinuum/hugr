@@ -1,6 +1,25 @@
 # Changelog
 
 
+## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.25.7...hugr-llvm-v0.26.0) - 2026-03-16
+
+### New Features
+
+- *(llvm)* [**breaking**] Upgrade to LLVM 21 ([#2901](https://github.com/Quantinuum/hugr/pull/2901))
+- Include private HUGR functions in the local symbol table ([#2831](https://github.com/Quantinuum/hugr/pull/2831))
+- [**breaking**] TypeRow: add impl From array of Type, remove From<Type> ([#2784](https://github.com/Quantinuum/hugr/pull/2784))
+
+### Refactor
+
+- [**breaking**] Remove deprecated Value::Function ([#2928](https://github.com/Quantinuum/hugr/pull/2928))
+- [**breaking**] Remove deprecated stack_array codegen ([#2929](https://github.com/Quantinuum/hugr/pull/2929))
+
+## [0.25.6](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.25.5...hugr-llvm-v0.25.6) - 2026-02-20
+
+### New Features
+
+- Add error context when lowering hugrs to LLVM ([#2869](https://github.com/Quantinuum/hugr/pull/2869))
+
 ## [0.25.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.24.3...hugr-llvm-v0.25.0) - 2025-12-22
 
 ### New Features

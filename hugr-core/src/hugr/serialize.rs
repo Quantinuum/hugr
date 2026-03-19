@@ -6,7 +6,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 use crate::core::NodeIndex;
-use crate::hugr::Hugr;
+use crate::hugr::{CanonicalOrderStrat, Hugr};
 use crate::ops::OpType;
 use crate::types::EdgeKind;
 use crate::{Node, PortIndex};
@@ -126,7 +126,7 @@ pub enum HUGRSerializationError {
         /// The direction of the port without an offset
         dir: Direction,
         /// The operation type of the node.
-        op_type: OpType,
+        op_type: Box<OpType>,
     },
     /// Edges with wrong node indices
     #[error("The edge endpoint {node} is not a node in the graph.")]
@@ -175,7 +175,10 @@ impl TryFrom<&Hugr> for SerHugrLatest {
         // We compact the operation nodes during the serialization process,
         // and ignore the copy nodes.
         let mut node_rekey: HashMap<Node, Node> = HashMap::with_capacity(hugr.num_nodes());
-        for (order, node) in hugr.canonical_order(hugr.module_root()).enumerate() {
+        for (order, node) in hugr
+            .canonical_order(hugr.module_root(), CanonicalOrderStrat::Quick)
+            .enumerate()
+        {
             node_rekey.insert(node, portgraph::NodeIndex::new(order).into());
         }
 
@@ -295,7 +298,7 @@ impl TryFrom<SerHugrLatest> for Hugr {
                     .ok_or(HUGRSerializationError::MissingPortOffset {
                         node,
                         dir,
-                        op_type: op_type.clone(),
+                        op_type: Box::new(op_type.clone()),
                     })?
                     .index()
             };

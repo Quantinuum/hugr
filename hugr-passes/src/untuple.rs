@@ -13,19 +13,8 @@ use hugr_core::types::Type;
 use hugr_core::{HugrView, Node, PortIndex, SimpleReplacement};
 use itertools::Itertools;
 
-use crate::ComposablePass;
-
-/// Configuration enum for the untuple rewrite pass.
-///
-/// Indicates whether the pattern match should traverse the HUGR recursively.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-pub enum UntupleRecursive {
-    /// Traverse the HUGR recursively, i.e. consider the entire subtree
-    Recursive,
-    /// Do not traverse the HUGR recursively, i.e. consider only the sibling subgraph
-    #[default]
-    NonRecursive,
-}
+use crate::composable::WithScope;
+use crate::{ComposablePass, PassScope};
 
 /// A pass that removes unnecessary `MakeTuple` operations immediately followed
 /// by `UnpackTuple`s.
@@ -40,16 +29,11 @@ pub enum UntupleRecursive {
 /// Removes `MakeTuple` operations that are not consumed by any other
 /// operations.
 ///
-/// # Panics
-///
-/// - Order edges are not supported yet. The pass currently panics if it encounters
-///   a pack/unpack pair with connected order edges. See <https://github.com/CQCL/hugr/issues/1974>.
+/// Ignores pack/unpack nodes with order edges.
+// TODO: Supporting those requires updating the `SiblingSubgraph` implementation. See <https://github.com/CQCL/hugr/issues/1974>.
 #[derive(Debug, Clone, Default)]
 pub struct UntuplePass {
-    /// Whether to traverse the HUGR recursively.
-    recursive: UntupleRecursive,
-    /// Parent node under which to operate; None indicates the Hugr root
-    parent: Option<Node>,
+    scope: PassScope,
 }
 
 #[derive(Debug, derive_more::Display, derive_more::Error, derive_more::From)]
@@ -68,59 +52,47 @@ pub struct UntupleResult {
 }
 
 impl UntuplePass {
-    /// Create a new untuple pass with the given configuration.
-    #[must_use]
-    pub fn new(recursive: UntupleRecursive) -> Self {
-        Self {
-            recursive,
-            parent: None,
-        }
-    }
-
-    /// Sets the parent node to optimize (overwrites any previous setting)
-    pub fn set_parent(mut self, parent: impl Into<Option<Node>>) -> Self {
-        self.parent = parent.into();
-        self
-    }
-
-    /// Sets whether the pass should traverse the HUGR recursively.
-    #[must_use]
-    pub fn recursive(mut self, recursive: UntupleRecursive) -> Self {
-        self.recursive = recursive;
-        self
-    }
-
     /// Find tuple pack operations followed by tuple unpack operations
     /// and generate rewrites to remove them.
     ///
     /// The returned rewrites are guaranteed to be independent of each other.
     ///
     /// Returns an iterator over the rewrites.
-    pub fn find_rewrites<H: HugrView>(
+    pub fn all_rewrites<H: HugrView<Node = Node>>(
         &self,
         hugr: &H,
-        parent: H::Node,
     ) -> Vec<SimpleReplacement<H::Node>> {
-        let mut res = Vec::new();
-        let mut children_queue = VecDeque::new();
-        children_queue.push_back(parent);
+        let Some(parent) = self.scope.root(hugr) else {
+            return vec![];
+        };
+        find_rewrites(hugr, parent, self.scope.recursive())
+    }
+}
 
-        // Required to create SimpleReplacements.
-        let mut convex_checker: Option<TopoConvexChecker<H>> = None;
+fn find_rewrites<H: HugrView>(
+    hugr: &H,
+    parent: H::Node,
+    recursive: bool,
+) -> Vec<SimpleReplacement<H::Node>> {
+    let mut res = Vec::new();
+    let mut children_queue = VecDeque::new();
+    children_queue.push_back(parent);
 
-        while let Some(parent) = children_queue.pop_front() {
-            for node in hugr.children(parent) {
-                let op = hugr.get_optype(node);
-                if let Some(rw) = make_rewrite(hugr, &mut convex_checker, node, op) {
-                    res.push(rw);
-                }
-                if self.recursive == UntupleRecursive::Recursive && op.is_container() {
-                    children_queue.push_back(node);
-                }
+    // Required to create SimpleReplacements.
+    let mut convex_checker: Option<TopoConvexChecker<H>> = None;
+
+    while let Some(parent) = children_queue.pop_front() {
+        for node in hugr.children(parent) {
+            let op = hugr.get_optype(node);
+            if let Some(rw) = make_rewrite(hugr, &mut convex_checker, node, op) {
+                res.push(rw);
+            }
+            if recursive && op.is_container() {
+                children_queue.push_back(node);
             }
         }
-        res
     }
+    res
 }
 
 impl<H: HugrMut<Node = Node>> ComposablePass<H> for UntuplePass {
@@ -128,13 +100,20 @@ impl<H: HugrMut<Node = Node>> ComposablePass<H> for UntuplePass {
     type Result = UntupleResult;
 
     fn run(&self, hugr: &mut H) -> Result<Self::Result, Self::Error> {
-        let rewrites = self.find_rewrites(hugr, self.parent.unwrap_or(hugr.entrypoint()));
+        let rewrites = self.all_rewrites(hugr);
         let rewrites_applied = rewrites.len();
         // The rewrites are independent, so we can always apply them all.
         for rewrite in rewrites {
             hugr.apply_patch(rewrite)?;
         }
         Ok(UntupleResult { rewrites_applied })
+    }
+}
+
+impl WithScope for UntuplePass {
+    fn with_scope(mut self, scope: impl Into<PassScope>) -> Self {
+        self.scope = scope.into();
+        self
     }
 }
 
@@ -166,6 +145,25 @@ fn make_rewrite<'h, T: HugrView>(
     if !is_make_tuple(op) {
         return None;
     }
+
+    let has_order_edges = |node: T::Node| -> bool {
+        let op = hugr.get_optype(node);
+        let has_input_order = op
+            .other_input_port()
+            .and_then(|p| hugr.linked_outputs(node, p).next())
+            .is_some();
+        let has_output_order = op
+            .other_output_port()
+            .and_then(|p| hugr.linked_inputs(node, p).next())
+            .is_some();
+        has_input_order || has_output_order
+    };
+
+    // If the node has order edges, ignore it.
+    if has_order_edges(node) {
+        return None;
+    }
+
     let tuple_types = op.dataflow_signature().unwrap().input_types().to_vec();
     let node_parent = hugr.get_parent(node);
 
@@ -179,6 +177,7 @@ fn make_rewrite<'h, T: HugrView>(
         .iter()
         .filter(|&&neigh| hugr.get_parent(neigh) == node_parent)
         .filter(|&&neigh| is_unpack_tuple(hugr.get_optype(neigh)))
+        .filter(|&&neigh| !has_order_edges(neigh))
         .copied()
         .collect_vec();
 
@@ -260,10 +259,10 @@ fn remove_pack_unpack<'h, T: HugrView>(
 #[cfg(test)]
 mod test {
     use super::*;
+    use crate::composable::WithScope;
+    use hugr_core::Hugr;
     use hugr_core::builder::FunctionBuilder;
     use hugr_core::extension::prelude::{UnpackTuple, bool_t, qb_t};
-
-    use hugr_core::Hugr;
     use hugr_core::ops::handle::NodeHandle;
     use hugr_core::std_extensions::arithmetic::float_types::float64_type;
     use hugr_core::types::Signature;
@@ -289,7 +288,7 @@ mod test {
     /// These can be removed entirely.
     #[fixture]
     fn simple_pack_unpack() -> Hugr {
-        let mut h = DFGBuilder::new(Signature::new_endo(vec![qb_t(), bool_t()])).unwrap();
+        let mut h = DFGBuilder::new(Signature::new_endo([qb_t(), bool_t()])).unwrap();
         let mut inps = h.input_wires();
         let qb1 = inps.next().unwrap();
         let b2 = inps.next().unwrap();
@@ -322,6 +321,46 @@ mod test {
         h.set_order(&tuple.node(), &untuple.node());
 
         h.set_order(&untuple.node(), &h.output());
+        h.finish_hugr_with_outputs([qb1, b2]).unwrap()
+    }
+
+    /// A simple pack/unpack pair with an order from the pack node to a downstream node.
+    ///
+    /// The order edge should be preserved, so we move it to the predecessor of the pack node.
+    #[fixture]
+    fn outgoing_ordered_pack_unpack() -> Hugr {
+        let mut h = DFGBuilder::new(Signature::new_endo(vec![qb_t(), bool_t()])).unwrap();
+        let mut inps = h.input_wires();
+        let qb1 = inps.next().unwrap();
+        let b2 = inps.next().unwrap();
+
+        let tuple = h.make_tuple([qb1, b2]).unwrap();
+
+        let op = UnpackTuple::new(vec![qb_t(), bool_t()].into());
+        let untuple = h.add_dataflow_op(op, [tuple]).unwrap();
+        let [qb1, b2] = untuple.outputs_arr();
+
+        h.set_order(&tuple.node(), &h.output());
+        h.finish_hugr_with_outputs([qb1, b2]).unwrap()
+    }
+
+    /// A simple pack/unpack pair with an order from a downstream node to the pack node.
+    ///
+    /// The order edge should be preserved, so we move it to the successor of the unpack node.
+    #[fixture]
+    fn incoming_ordered_pack_unpack() -> Hugr {
+        let mut h = DFGBuilder::new(Signature::new_endo(vec![qb_t(), bool_t()])).unwrap();
+        let mut inps = h.input_wires();
+        let qb1 = inps.next().unwrap();
+        let b2 = inps.next().unwrap();
+
+        let tuple = h.make_tuple([qb1, b2]).unwrap();
+
+        let op = UnpackTuple::new(vec![qb_t(), bool_t()].into());
+        let untuple = h.add_dataflow_op(op, [tuple]).unwrap();
+        let [qb1, b2] = untuple.outputs_arr();
+
+        h.set_order(&h.input(), &untuple.node());
         h.finish_hugr_with_outputs([qb1, b2]).unwrap()
     }
 
@@ -408,22 +447,19 @@ mod test {
     #[case::simple(simple_pack_unpack(), 1, 2)]
     #[case::multi(multi_unpack(), 1, 2)]
     #[case::partial(partial_unpack(), 1, 3)]
-    // TODO: Remove this once <https://github.com/CQCL/hugr/issues/1974>, and update the `UntuplePass` docs.
-    #[should_panic(expected = "UnsupportedEdgeKind(Node(7), Port(Incoming, 2))")]
-    #[case::ordered(ordered_pack_unpack(), 1, 2)]
     #[case::unpack_discard_first(unpack_discard_first(), 1, 2)]
+    // Nodes with order edges are ignored.
+    #[case::ordered(ordered_pack_unpack(), 0, 4)]
+    #[case::outgoing_ordered(outgoing_ordered_pack_unpack(), 0, 4)]
+    #[case::incoming_ordered(incoming_ordered_pack_unpack(), 0, 4)]
     fn test_pack_unpack(
         #[case] mut hugr: Hugr,
         #[case] expected_rewrites: usize,
         #[case] remaining_nodes: usize,
     ) {
-        let pass = UntuplePass::default().recursive(UntupleRecursive::NonRecursive);
-
         let parent = hugr.entrypoint();
-        let res = pass
-            .set_parent(parent)
-            .run(&mut hugr)
-            .unwrap_or_else(|e| panic!("{e}"));
+        let pass = UntuplePass::default().with_scope(PassScope::EntrypointFlat);
+        let res = pass.run(&mut hugr).unwrap_or_else(|e| panic!("{e}"));
         assert_eq!(res.rewrites_applied, expected_rewrites);
         assert_eq!(hugr.children(parent).count(), remaining_nodes);
     }

@@ -19,40 +19,49 @@ expression: ast
 (declare-func
   public
   example.callee
-  (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])
+  (core.fn [(arithmetic.int.types.int 5)] [(arithmetic.int.types.int 5)])
   (meta (compat.meta_json "description" "\"This is a function declaration.\""))
   (meta (compat.meta_json "title" "\"Callee\"")))
 
 (define-func
   public
   example.caller
-  (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])
+  (core.fn [(arithmetic.int.types.int 5)] [(arithmetic.int.types.int 5)])
   (meta
     (compat.meta_json
       "description"
       "\"This defines a function that calls the function which we declared earlier.\""))
   (meta (compat.meta_json "title" "\"Caller\""))
   (dfg [%0] [%1]
-    (signature (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int]))
+    (signature
+      (core.fn [(arithmetic.int.types.int 5)] [(arithmetic.int.types.int 5)]))
     ((core.call
-        [arithmetic.int.types.int]
-        [arithmetic.int.types.int]
+        [(arithmetic.int.types.int 5)]
+        [(arithmetic.int.types.int 5)]
         example.callee)
       [%0] [%1]
       (signature
-        (core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])))))
+        (core.fn
+          [(arithmetic.int.types.int 5)]
+          [(arithmetic.int.types.int 5)])))))
 
 (define-func
   public
   example.load
-  (core.fn [] [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])])
+  (core.fn
+    []
+    [(core.fn [(arithmetic.int.types.int 5)] [(arithmetic.int.types.int 5)])])
   (dfg [] [%0]
     (signature
       (core.fn
         []
-        [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])]))
+        [(core.fn
+           [(arithmetic.int.types.int 5)]
+           [(arithmetic.int.types.int 5)])]))
     ((core.load_const example.caller) [] [%0]
       (signature
         (core.fn
           []
-          [(core.fn [arithmetic.int.types.int] [arithmetic.int.types.int])])))))
+          [(core.fn
+             [(arithmetic.int.types.int 5)]
+             [(arithmetic.int.types.int 5)])])))))

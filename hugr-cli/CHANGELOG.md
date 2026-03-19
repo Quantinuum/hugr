@@ -1,6 +1,29 @@
 # Changelog
 
 
+## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.25.7...hugr-cli-v0.26.0) - 2026-03-16
+
+### Documentation
+
+- Move `spec/schema` and `spec/std_extensions` to `resources/` ([#2897](https://github.com/Quantinuum/hugr/pull/2897))
+
+### New Features
+
+- [**breaking**] Rename ModelText envelope format to SExpression ([#2927](https://github.com/Quantinuum/hugr/pull/2927))
+- [**breaking**] TypeRow: add impl From array of Type, remove From<Type> ([#2784](https://github.com/Quantinuum/hugr/pull/2784))
+
+## [0.25.6](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.25.5...hugr-cli-v0.25.6) - 2026-02-20
+
+### New Features
+
+- Add s expression format to envelope formats ([#2864](https://github.com/Quantinuum/hugr/pull/2864))
+
+## [0.25.5](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.25.4...hugr-cli-v0.25.5) - 2026-02-03
+
+### Refactor
+
+- make EnvelopeFormat::ModelWithExtensions the default ([#2816](https://github.com/Quantinuum/hugr/pull/2816))
+
 ## [0.25.0](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.24.3...hugr-cli-v0.25.0) - 2025-12-22
 
 ### New Features

@@ -1,14 +1,20 @@
+from __future__ import annotations
+
 from copy import deepcopy
+from typing import TYPE_CHECKING
 
 import pytest
 
 from hugr.hugr.base import Hugr
-from hugr.passes._composable_pass import (
+from hugr.passes.composable_pass import (
     ComposablePass,
     ComposedPass,
     PassResult,
     implement_pass_run,
 )
+
+if TYPE_CHECKING:
+    from hugr.passes.scope import PassScope
 
 
 def test_composable_pass() -> None:
@@ -28,6 +34,9 @@ def test_composable_pass() -> None:
                 ),
             )
 
+        def with_scope(self, scope: PassScope) -> DummyInlinePass:
+            return self
+
     class DummyCopyPass(ComposablePass):
         def run(self, hugr: Hugr, inplace: bool = True) -> PassResult:
             return implement_pass_run(
@@ -43,6 +52,9 @@ def test_composable_pass() -> None:
                     modified=True,
                 ),
             )
+
+        def with_scope(self, scope: PassScope) -> DummyCopyPass:
+            return self
 
     dummy_inline = DummyInlinePass()
     dummy_copy = DummyCopyPass()
@@ -96,6 +108,9 @@ def test_invalid_composable_pass() -> None:
                 hugr=hugr,
                 inplace=inplace,
             )
+
+        def with_scope(self, scope: PassScope) -> DummyInvalidPass:
+            return self
 
     dummy_invalid = DummyInvalidPass()
     with pytest.raises(

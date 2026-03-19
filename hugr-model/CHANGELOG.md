@@ -1,6 +1,19 @@
 # Changelog
 
 
+## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.25.7...hugr-model-v0.26.0) - 2026-03-16
+
+### Testing
+
+- Replace model text snapshots with roundtrip tests ([#2933](https://github.com/Quantinuum/hugr/pull/2933))
+- Add missing width arg in model-call example ([#2945](https://github.com/Quantinuum/hugr/pull/2945))
+
+## [0.25.6](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.25.5...hugr-model-v0.25.6) - 2026-02-20
+
+### New Features
+
+- Remove size limitation for binary envelopes ([#2880](https://github.com/Quantinuum/hugr/pull/2880))
+
 ## [0.25.0](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.24.3...hugr-model-v0.25.0) - 2025-12-22
 
 ### Bug Fixes

@@ -10,6 +10,8 @@ pub mod serialize;
 pub mod validate;
 pub mod views;
 
+use std::cmp::Ordering;
+use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::io;
 use std::iter;
@@ -157,9 +159,24 @@ impl Hugr {
         reader: impl io::BufRead,
         extensions: Option<&ExtensionRegistry>,
     ) -> Result<Self, ReadError> {
+        let (hugr, _) = Self::load_with_exts(reader, extensions)?;
+        Ok(hugr)
+    }
+
+    /// Read a HUGR from an Envelope, and return the enclosed extensions.
+    ///
+    /// To load a HUGR, all the extensions used in its definition must be
+    /// available. The Envelope may include some of the extensions, but any
+    /// additional extensions must be provided in the `extensions` parameter. If
+    /// `extensions` is `None`, the default [`crate::std_extensions::STD_REG`]
+    /// is used.
+    pub fn load_with_exts(
+        reader: impl io::BufRead,
+        extensions: Option<&ExtensionRegistry>,
+    ) -> Result<(Self, ExtensionRegistry), ReadError> {
         let pkg = Package::load(reader, extensions)?;
         match pkg.modules.into_iter().exactly_one() {
-            Ok(hugr) => Ok(hugr),
+            Ok(hugr) => Ok((hugr, pkg.extensions)),
             Err(e) => Err(ReadError::ExpectedSingleHugr { count: e.count() }),
         }
     }
@@ -306,9 +323,22 @@ impl Hugr {
             );
         }
 
+        used_extensions.extend_with_dependencies()?;
+
         self.extensions = used_extensions;
         Ok(())
     }
+}
+
+/// Strategy to use for ordering nodes.
+#[derive(Clone, Copy, Debug)]
+enum CanonicalOrderStrat {
+    /// Do a breadth-first search through the hierarchy, ordering sibling nodes
+    /// according to a partial order that is somewhat arbitrary but fine-grained
+    /// enough to be practically useful for testing.
+    TryHard,
+    /// Quickly order by a breadth-first search through the hierarchy.
+    Quick,
 }
 
 /// Internal API for HUGRs, not intended for use by users.
@@ -322,23 +352,116 @@ impl Hugr {
         node.into()
     }
 
-    /// Produce a canonical ordering of the descendant nodes of a root,
-    /// following the graph hierarchy.
+    /// Move all Const nodes to the same region as their succeeding LoadConstant
+    /// nodes. If a Const node has no successors, remove it. This is a hack to
+    /// make round-trip equality checking work, necessary because the model has
+    /// no representation of Const nodes.
+    fn canonicalize_consts(&mut self) {
+        let const_nodes = self
+            .nodes()
+            .filter(|n| self.get_optype(*n).is_const())
+            .collect_vec();
+        for node in const_nodes {
+            let const_parent = self.get_parent(node).unwrap();
+            let outport = self.node_outputs(node).exactly_one().ok().unwrap();
+            let succ_nodeports = self.all_linked_inputs(node).collect_vec();
+            for (succ_node, succ_inport) in succ_nodeports {
+                let succ_parent = self.get_parent(succ_node).unwrap();
+                if succ_parent == const_parent {
+                    continue;
+                }
+                self.disconnect_edge(node, outport, succ_node, succ_inport);
+                let new_node = self.add_node_before(succ_node, self.get_optype(node).clone());
+                self.connect(new_node, 0, succ_node, succ_inport);
+            }
+            if self.output_neighbours(node).peekable().peek().is_none() {
+                self.remove_node(node);
+            }
+        }
+    }
+
+    /// Whether the node's children form either a dataflow sibling graph or a
+    /// control-flow sibling graph. (For these nodes the positions of the first
+    /// two children have semantic significance.)
+    fn contains_dsg_or_csg(&self, node: Node) -> bool {
+        let tag = self.get_optype(node).tag();
+        tag <= OpTag::DataflowParent || tag <= OpTag::Cfg
+    }
+
+    /// Produce an almost (but not perfectly) canonical ordering of the
+    /// descendant nodes of a root, following the graph hierarchy.
     ///
     /// This starts with the root, and then proceeds in BFS order through the
     /// contained regions.
     ///
     /// Used by [`HugrMut::canonicalize_nodes`] and the serialization code.
-    fn canonical_order(&self, root: Node) -> impl Iterator<Item = Node> + '_ {
+    fn canonical_order(
+        &self,
+        root: Node,
+        strategy: CanonicalOrderStrat,
+    ) -> impl Iterator<Item = Node> + '_ {
         // Generate a BFS-ordered list of nodes based on the hierarchy
         let mut queue = VecDeque::from([root]);
         iter::from_fn(move || {
             let node = queue.pop_front()?;
-            for child in self.children(node) {
-                queue.push_back(child);
+            let mut children = self.children(node).collect_vec();
+            match strategy {
+                CanonicalOrderStrat::TryHard => {
+                    let sort_fn = |a: &Node, b: &Node| {
+                        let n_a_inp = self.input_neighbours(*a).count();
+                        let n_b_inp = self.input_neighbours(*b).count();
+                        let n_a_out = self.output_neighbours(*a).count();
+                        let n_b_out = self.output_neighbours(*b).count();
+                        if n_a_inp < n_b_inp {
+                            Ordering::Less
+                        } else if n_a_inp > n_b_inp {
+                            Ordering::Greater
+                        } else if n_a_out < n_b_out {
+                            Ordering::Less
+                        } else if n_a_out > n_b_out {
+                            Ordering::Greater
+                        } else {
+                            self.get_optype(*a)
+                                .partial_cmp(self.get_optype(*b))
+                                .unwrap_or_else(|| a.cmp(b))
+                        }
+                    };
+                    if self.contains_dsg_or_csg(node) {
+                        children[2..].sort_by(sort_fn);
+                    } else {
+                        children.sort_by(sort_fn);
+                    }
+                }
+                CanonicalOrderStrat::Quick => {}
             }
+            queue.extend(children);
             Some(node)
         })
+    }
+
+    /// Order siblings by node index throughout the hierarchy, ignoring (i.e.
+    /// keeping fixed) the first two nodes in each control-flow sibling graph
+    /// (since these must be the entry and exit blocks) and in each dataflow
+    /// sibling graph (since these must be the input and output nodes).
+    fn order_siblings_by_node_index(&mut self) {
+        let mut node_children: HashMap<Node, Vec<Node>> = HashMap::default();
+        for node in self.nodes() {
+            let mut children = self.children(node).collect_vec();
+            if self.contains_dsg_or_csg(node) {
+                children[2..].sort();
+            } else {
+                children.sort();
+            }
+            node_children.insert(node, children);
+        }
+        for (node, children) in &node_children {
+            self.hierarchy.detach_children(node.into_portgraph());
+            for child in children {
+                self.hierarchy
+                    .push_child(child.into_portgraph(), node.into_portgraph())
+                    .ok();
+            }
+        }
     }
 
     /// Compact the nodes indices of the hugr to be contiguous, and order them as a breadth-first
@@ -349,10 +472,12 @@ impl Hugr {
     /// After this operation, a serialization and deserialization of the Hugr is guaranteed to
     /// preserve the indices.
     pub fn canonicalize_nodes(&mut self, mut rekey: impl FnMut(Node, Node)) {
+        self.canonicalize_consts();
+
         // Generate the ordered list of nodes
         let ordered = {
             let mut v = Vec::with_capacity(self.num_nodes());
-            v.extend(self.canonical_order(self.module_root()));
+            v.extend(self.canonical_order(self.module_root(), CanonicalOrderStrat::TryHard));
             v
         };
         let mut new_entrypoint = None;
@@ -387,10 +512,12 @@ impl Hugr {
         self.module_root = portgraph::NodeIndex::new(0);
         self.entrypoint = new_entrypoint.unwrap();
 
-        // Finish by compacting the copy nodes.
+        // Compact the copy nodes.
         // The operation nodes will be left in place.
         // This step is not strictly necessary.
         self.graph.compact_nodes(|_, _| {});
+
+        self.order_siblings_by_node_index();
     }
 }
 
@@ -535,11 +662,16 @@ fn make_module_hugr(root_op: OpType, nodes: usize, ports: usize) -> Option<Hugr>
 
 #[cfg(test)]
 pub(crate) mod test {
+    use crate::Extension;
+    use crate::extension::prelude::qb_t;
+    use crate::extension::prelude::usize_t;
     use std::{fs::File, io::BufReader};
 
     use super::*;
 
+    use crate::builder::test::simple_package;
     use crate::builder::{Container, Dataflow, DataflowSubContainer, ModuleBuilder};
+    use crate::extension::ExtensionId;
     use crate::extension::prelude::bool_t;
     use crate::ops::OpaqueOp;
     use crate::ops::handle::NodeHandle;
@@ -591,8 +723,8 @@ pub(crate) mod test {
             assert_eq!(new_graph.num_inputs(n), old_graph.num_inputs(n));
             assert_eq!(new_graph.num_outputs(n), old_graph.num_outputs(n));
             assert_eq!(
-                new_graph.output_neighbours(n).collect_vec(),
-                old_graph.output_neighbours(n).collect_vec()
+                new_graph.output_neighbours(n).sorted().collect_vec(),
+                old_graph.output_neighbours(n).sorted().collect_vec()
             );
         }
     }
@@ -680,7 +812,7 @@ pub(crate) mod test {
     }
 
     fn hugr_failing_2262() -> Hugr {
-        let sig = Signature::new(vec![bool_t(); 2], bool_t());
+        let sig = Signature::new(vec![bool_t(); 2], [bool_t()]);
         let mut mb = ModuleBuilder::new();
         let mut fa = mb.define_function("a", sig.clone()).unwrap();
         let mut dfg = fa.dfg_builder(sig.clone(), fa.input_wires()).unwrap();
@@ -726,5 +858,32 @@ pub(crate) mod test {
                 assert_eq!(hugr.get_optype(n), h2.entrypoint_optype());
             }
         }
+    }
+
+    #[rstest]
+    fn load_extensions() {
+        let my_ext_id = ExtensionId::new("test.ext").unwrap();
+        let my_ext = Extension::new_test_arc(my_ext_id, |ext, extension_ref| {
+            ext.add_op(
+                "MyOp".into(),
+                String::new(),
+                Signature::new(vec![qb_t(), usize_t()], vec![qb_t()]),
+                extension_ref,
+            )
+            .unwrap();
+        });
+
+        let mut package = simple_package();
+        package.extensions.register(my_ext).unwrap();
+        let mut hugr_str = Vec::new();
+        package
+            .store(&mut hugr_str, EnvelopeConfig::default())
+            .unwrap();
+
+        let (_, exts) = Hugr::load_with_exts(hugr_str.as_slice(), None).unwrap();
+        assert_eq!(exts.len(), 1);
+        assert_matches!(exts.get("test.ext"), Some(ext) => {
+            assert!(ext.get_op("MyOp").is_some());
+        });
     }
 }

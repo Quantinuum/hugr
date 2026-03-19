@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 from typing import TYPE_CHECKING, Annotated, Any, Literal
 
 import pydantic as pd
@@ -77,15 +78,10 @@ class FixedHugr(ConfiguredBaseModel):
     hugr: str
 
     def deserialize(self) -> ext.FixedHugr:
-        # Loading fixed HUGRs requires reading hugr-model envelopes,
-        # which is not currently supported in Python.
-        # TODO: Add support for loading fixed HUGRs in Python.
-        # https://github.com/CQCL/hugr/issues/2287
-        msg = (
-            "Loading extensions with operation lowering functions is not "
-            + "supported in Python"
+        return ext.FixedHugr(
+            extensions=self.extensions,
+            hugr=Hugr.from_bytes(base64.b64decode(self.hugr)),
         )
-        raise NotImplementedError(msg)
 
 
 class OpDef(ConfiguredBaseModel, populate_by_name=True):
@@ -105,13 +101,7 @@ class OpDef(ConfiguredBaseModel, populate_by_name=True):
             self.binary,
         )
 
-        # Loading fixed HUGRs requires reading hugr-model envelopes,
-        # which is not currently supported in Python.
-        # We currently ignore any lower functions instead of raising an error.
-        #
-        # TODO: Add support for loading fixed HUGRs in Python.
-        # https://github.com/CQCL/hugr/issues/2287
-        lower_funcs: list[ext.FixedHugr] = []
+        lower_funcs: list[ext.FixedHugr] = [f.deserialize() for f in self.lower_funcs]
 
         return extension.add_op_def(
             ext.OpDef(

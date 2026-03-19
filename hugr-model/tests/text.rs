@@ -1,6 +1,7 @@
 #![allow(missing_docs)]
 
 use hugr_model::v0::ast;
+use rstest::rstest;
 use std::str::FromStr as _;
 
 fn roundtrip(source: &str) -> String {
@@ -8,14 +9,20 @@ fn roundtrip(source: &str) -> String {
     package.to_string()
 }
 
-#[test]
+#[rstest]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
-pub fn test_declarative_extensions() {
-    insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-decl-exts.edn")));
-}
-
-#[test]
-#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
-pub fn test_literals() {
-    insta::assert_snapshot!(roundtrip(include_str!("fixtures/model-literals.edn")));
+pub fn test_roundtrip(
+    #[files("tests/fixtures/*.edn")]
+    #[mode = str]
+    expected: &str,
+) {
+    let actual = roundtrip(expected);
+    // Trim whitespace from the strings to compare them
+    let expected_trim = expected
+        .split_whitespace()
+        .fold(String::new(), |acc, s| acc + s);
+    let actual_trim = actual
+        .split_whitespace()
+        .fold(String::new(), |acc, s| acc + s);
+    assert_eq!(expected_trim, actual_trim);
 }

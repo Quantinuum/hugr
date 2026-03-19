@@ -49,16 +49,16 @@ use crate::{Hugr, hugr::HugrMut, type_row};
 /// };
 ///
 /// fn make_cfg() -> Result<Hugr, BuildError> {
-///     let mut cfg_builder = CFGBuilder::new(Signature::new_endo(usize_t()))?;
+///     let mut cfg_builder = CFGBuilder::new(Signature::new_endo([usize_t()]))?;
 ///
 ///     // Outputs from basic blocks must be packed in a sum which corresponds to
 ///     // which successor to pick. We'll either choose the first branch and pass
 ///     // it a usize, or the second branch and pass it nothing.
-///     let sum_variants = vec![vec![usize_t()].into(), type_row![]];
+///     let sum_variants = vec![[usize_t()].into(), [].into()];
 ///
 ///     // The second argument says what types will be passed through to every
 ///     // successor, in addition to the appropriate `sum_variants` type.
-///     let mut entry_b = cfg_builder.entry_builder(sum_variants.clone(), vec![usize_t()].into())?;
+///     let mut entry_b = cfg_builder.entry_builder(sum_variants.clone(), [usize_t()].into())?;
 ///
 ///     let [inw] = entry_b.input_wires_arr();
 ///     let entry = {
@@ -77,7 +77,7 @@ use crate::{Hugr, hugr::HugrMut, type_row};
 ///     // `usize` arguments: one from the `sum_variants` type, and another from the
 ///     // entry node's `other_outputs`.
 ///     let mut successor_builder = cfg_builder.simple_block_builder(
-///         inout_sig(vec![usize_t(), usize_t()], usize_t()),
+///         inout_sig([usize_t(), usize_t()], [usize_t()]),
 ///         1, // only one successor to this block
 ///     )?;
 ///     let successor_a = {
@@ -91,7 +91,7 @@ use crate::{Hugr, hugr::HugrMut, type_row};
 ///     };
 ///
 ///     // The only argument to this block is the entry node's `other_outputs`.
-///     let mut successor_builder = cfg_builder.simple_block_builder(endo_sig(usize_t()), 1)?;
+///     let mut successor_builder = cfg_builder.simple_block_builder(endo_sig([usize_t()]), 1)?;
 ///     let successor_b = {
 ///         let sum_unary = successor_builder.add_load_value(ops::Value::unary_unit_sum());
 ///         let [in_wire] = successor_builder.input_wires_arr();
@@ -514,7 +514,7 @@ pub(crate) mod test {
             entry_b.finish_with_outputs(sum, [])?
         };
         let mut middle_b =
-            cfg_builder.simple_block_builder(Signature::new(type_row![], vec![usize_t()]), 1)?;
+            cfg_builder.simple_block_builder(Signature::new(type_row![], [usize_t()]), 1)?;
         let middle = {
             let c = middle_b.load_const(&sum_tuple_const);
             middle_b.finish_with_outputs(c, [inw])?

@@ -3,16 +3,17 @@
 use std::sync::{Arc, LazyLock};
 
 use hugr::builder::{
-    BuildError, CFGBuilder, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-    ModuleBuilder,
+    BuildError, CFGBuilder, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    FunctionBuilder, HugrBuilder, ModuleBuilder,
 };
 use hugr::extension::ExtensionRegistry;
 use hugr::extension::prelude::{bool_t, qb_t, usize_t};
+use hugr::hugr::hugrmut::HugrMut;
 use hugr::ops::{OpName, Value, handle::FuncID};
 use hugr::std_extensions::STD_REG;
 use hugr::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
 use hugr::types::Signature;
-use hugr::{CircuitUnit, Extension, Hugr, Node, type_row};
+use hugr::{CircuitUnit, Extension, Hugr, HugrView, Node, type_row};
 
 pub fn simple_dfg_hugr() -> Hugr {
     let dfg_builder = DFGBuilder::new(Signature::new(vec![bool_t()], vec![bool_t()])).unwrap();
@@ -53,18 +54,18 @@ pub fn simple_cfg_hugr() -> Hugr {
 }
 
 pub fn dfg_calling_defn_decl() -> (Hugr, FuncID<true>, FuncID<false>) {
-    let mut dfb = DFGBuilder::new(Signature::new(vec![], bool_t())).unwrap();
+    let mut dfb = DFGBuilder::new(Signature::new([], [bool_t()])).unwrap();
     let new_defn = {
         let mut mb = dfb.module_root_builder();
         let fb = mb
-            .define_function("helper_id", Signature::new_endo(bool_t()))
+            .define_function("helper_id", Signature::new_endo([bool_t()]))
             .unwrap();
         let [f_inp] = fb.input_wires_arr();
         fb.finish_with_outputs([f_inp]).unwrap()
     };
     let new_decl = dfb
         .module_root_builder()
-        .declare("helper2", Signature::new_endo(bool_t()).into())
+        .declare("helper2", Signature::new_endo([bool_t()]).into())
         .unwrap();
     let cst = dfb.add_load_value(Value::true_val());
     let [c1] = dfb
@@ -87,7 +88,7 @@ pub static QUANTUM_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             ext.add_op(
                 OpName::new_inline("H"),
                 String::new(),
-                Signature::new_endo(qb_t()),
+                Signature::new_endo([qb_t()]),
                 extension_ref,
             )
             .unwrap();
@@ -102,7 +103,7 @@ pub static QUANTUM_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             ext.add_op(
                 OpName::new_inline("CX"),
                 String::new(),
-                Signature::new_endo(vec![qb_t(), qb_t()]),
+                Signature::new_endo([qb_t(), qb_t()]),
                 extension_ref,
             )
             .unwrap();
@@ -128,7 +129,7 @@ pub fn circuit(layers: usize) -> (Hugr, Vec<CircuitLayer>) {
     let h_gate = QUANTUM_EXT.instantiate_extension_op("H", []).unwrap();
     let cx_gate = QUANTUM_EXT.instantiate_extension_op("CX", []).unwrap();
     let rz = QUANTUM_EXT.instantiate_extension_op("Rz", []).unwrap();
-    let signature = Signature::new_endo(vec![qb_t(), qb_t()]);
+    let signature = Signature::new_endo([qb_t(), qb_t()]);
     let mut module_builder = ModuleBuilder::new();
     let mut f_build = module_builder.define_function("main", signature).unwrap();
 
@@ -160,4 +161,17 @@ pub fn circuit(layers: usize) -> (Hugr, Vec<CircuitLayer>) {
     f_build.finish_with_outputs(outs).unwrap();
 
     (module_builder.finish_hugr().unwrap(), layer_ids)
+}
+
+/// Returns a Hugr that serializes to approximately `byte_size` bytes in binary
+/// format by defining a large metadata payload.
+pub fn big_hugr(byte_size: usize) -> Hugr {
+    let big_payload: String = "a".repeat(byte_size);
+
+    let mut hugr = FunctionBuilder::new("main", Signature::new_endo(vec![]))
+        .unwrap()
+        .finish_hugr()
+        .unwrap();
+    hugr.set_metadata_any(hugr.entrypoint(), "big", big_payload);
+    hugr
 }

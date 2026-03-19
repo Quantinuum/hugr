@@ -1,6 +1,7 @@
 //! Tests for extension resolution.
 
 use core::{f64, panic};
+use std::io::BufReader;
 use std::sync::Arc;
 
 use itertools::Itertools;
@@ -18,7 +19,9 @@ use crate::extension::{
 };
 use crate::ops::constant::CustomConst;
 use crate::ops::constant::test::CustomTestValue;
-use crate::ops::{CallIndirect, ExtensionOp, Input, OpType, Tag, Value};
+use crate::ops::{CallIndirect, ExtensionOp, Input, NamedOp, OpType, Tag, Value};
+use crate::package::Package;
+use crate::std_extensions::arithmetic::conversions::{self, ConvertOpDef};
 use crate::std_extensions::arithmetic::float_types::{self, ConstF64, float64_type};
 use crate::std_extensions::arithmetic::int_ops;
 use crate::std_extensions::arithmetic::int_types::{self, int_type};
@@ -32,7 +35,7 @@ use crate::{Extension, Hugr, HugrView, type_row};
 #[case::empty(Input { types: type_row![]}, ExtensionRegistry::default())]
 // A type with extra extensions in its instantiated type arguments.
 #[case::parametric_op(int_ops::IntOpDef::ieq.with_log_width(4),
-    ExtensionRegistry::new([int_ops::EXTENSION.to_owned(), int_types::EXTENSION.to_owned()]
+    ExtensionRegistry::new([int_ops::EXTENSION.to_owned(), int_types::EXTENSION.to_owned(), PRELUDE.to_owned()]
 ))]
 fn collect_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: ExtensionRegistry) {
     let op = op.into();
@@ -44,7 +47,7 @@ fn collect_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: Ex
 #[case::empty(Input { types: type_row![]}, ExtensionRegistry::default())]
 // A type with extra extensions in its instantiated type arguments.
 #[case::parametric_op(int_ops::IntOpDef::ieq.with_log_width(4),
-    ExtensionRegistry::new([int_ops::EXTENSION.to_owned(), int_types::EXTENSION.to_owned()]
+    ExtensionRegistry::new([int_ops::EXTENSION.to_owned(), int_types::EXTENSION.to_owned(), PRELUDE.to_owned()]
 ))]
 fn resolve_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: ExtensionRegistry) {
     let op = op.into();
@@ -78,7 +81,7 @@ fn make_extension(name: &str, op_name: &str) -> (Arc<Extension>, OpType) {
         ext.add_op(
             op_name.into(),
             String::new(),
-            Signature::new_endo(vec![bool_t()]),
+            Signature::new_endo([bool_t()]),
             extension_ref,
         )
         .unwrap();
@@ -219,7 +222,7 @@ fn resolve_hugr_extensions() {
     let decl = module
         .declare(
             "dummy_declaration",
-            Signature::new_endo(vec![float64_type()]).into(),
+            Signature::new_endo([float64_type()]).into(),
         )
         .unwrap();
 
@@ -237,7 +240,7 @@ fn resolve_hugr_extensions() {
     let loaded_func = func.load_func(&decl, &[]).unwrap();
     func.add_dataflow_op(
         CallIndirect {
-            signature: Signature::new_endo(vec![float64_type()]),
+            signature: Signature::new_endo([float64_type()]),
         },
         vec![loaded_func, func_i0],
     )
@@ -363,6 +366,125 @@ fn resolve_call() {
     }
 
     check_extension_resolution(hugr);
+}
+
+/// Test that extension resolution is transitive across extension dependencies.
+///
+/// `arithmetic.conversions` depends on `arithmetic.int_types` and
+/// `arithmetic.float_types`, so using an op from the former should cause all
+/// three extensions to be resolved even if the operation itself doesn't
+/// directly use floats.
+#[rstest]
+fn resolve_transitive_extension_deps() {
+    let mut build = DFGBuilder::new(Signature::new(vec![int_type(6)], vec![usize_t()])).unwrap();
+    let [input] = build.input_wires_arr();
+
+    let out = build
+        .add_dataflow_op(ConvertOpDef::itousize.without_log_width(), [input])
+        .unwrap();
+
+    let hugr = build
+        .finish_hugr_with_outputs(out.outputs())
+        .unwrap_or_else(|e| panic!("{e}"));
+
+    assert!(hugr.extensions().contains(&conversions::EXTENSION_ID));
+    assert!(hugr.extensions().contains(&float_types::EXTENSION_ID));
+
+    check_extension_resolution(hugr);
+}
+
+/// Test that extensions in `lower_funcs` are properly resolved when loading a package.
+///
+/// <https://github.com/Quantinuum/hugr/issues/2520>
+#[rstest]
+fn resolve_lower_func_extensions() {
+    // Create an inner extension with a simple op.
+    let (inner_ext, inner_op) = make_extension("inner.extension", "InnerOp");
+
+    // Build a HUGR that uses the inner op as its lowering body.
+    let mut dfg = DFGBuilder::new(Signature::new_endo(vec![bool_t()])).unwrap();
+    let [input] = dfg.input_wires_arr();
+    let inner_result = dfg.add_dataflow_op(inner_op.clone(), [input]).unwrap();
+    let lower_hugr = dfg
+        .finish_hugr_with_outputs(inner_result.outputs())
+        .unwrap();
+
+    // The lower func is stored as a Package so its extension definitions travel with it.
+    let mut lower_pkg = Package::from_hugr(lower_hugr);
+    lower_pkg.extensions.register_updated(inner_ext.clone());
+
+    // Create an outer extension whose op has the lower func.
+    let inner_ext_name = inner_ext.name().clone();
+    let outer_ext = Extension::new_test_arc(
+        ExtensionId::new_unchecked("outer.extension"),
+        |ext, ext_ref| {
+            let op_def = ext
+                .add_op(
+                    "OuterOp".into(),
+                    String::new(),
+                    Signature::new_endo(vec![bool_t()]),
+                    ext_ref,
+                )
+                .unwrap();
+            op_def.add_lower_func(crate::extension::op_def::LowerFunc::FixedHugr {
+                extensions: ExtensionSet::singleton(inner_ext_name),
+                pkg: Box::new(lower_pkg),
+            });
+        },
+    );
+
+    // Build a package containing only the outer extension.
+    // The inner extension is embedded inside the lower func's Package.
+    let mut outer_pkg = Package::default();
+    outer_pkg.extensions.register_updated(outer_ext.clone());
+
+    // Serialize and reload using only the standard extensions as the external registry.
+    // The inner extension must be recovered from the embedded lower func package.
+    let mut buffer = Vec::new();
+    outer_pkg
+        .store(&mut buffer, EnvelopeConfig::binary())
+        .expect("serialize outer package");
+    let loaded_pkg =
+        Package::load(BufReader::new(buffer.as_slice()), None).expect("load outer package");
+
+    // The outer extension should be present and its op should have a lower func.
+    let loaded_outer_ext = loaded_pkg
+        .extensions
+        .get(outer_ext.name())
+        .expect("outer extension missing after load");
+    let loaded_op_def = loaded_outer_ext
+        .get_op("OuterOp")
+        .expect("OuterOp missing after load");
+    assert_eq!(
+        loaded_op_def.lower_funcs.len(),
+        1,
+        "expected 1 lower func after load"
+    );
+
+    // Calling try_lower should succeed and return a properly resolved HUGR
+    // (all inner ops must be ExtensionOps, not OpaqueOps).
+    let available = ExtensionSet::singleton(inner_ext.name().clone());
+    let lower_hugr = loaded_op_def
+        .try_lower(&[], &available)
+        .expect("try_lower should succeed when inner extension is available");
+
+    // No unresolved OpaqueOps after loading.
+    for node in lower_hugr.nodes() {
+        let op = lower_hugr.get_optype(node);
+        assert!(
+            !matches!(op, crate::ops::OpType::OpaqueOp(_)),
+            "Op {op:?} on {node} is an unresolved OpaqueOp after loading"
+        );
+    }
+
+    // There is some inner_ext operation in the lower hugr.
+    lower_hugr.nodes().any(|node| {
+        let op = lower_hugr.get_optype(node);
+        let crate::ops::OpType::ExtensionOp(op) = op else {
+            return false;
+        };
+        op.extension_id() == inner_ext.name() && op.name() == inner_op.name()
+    });
 }
 
 /// Test the [`ExtensionRegistry::new_cyclic`] and [`ExtensionRegistry::new_with_extension_resolution`] methods.
