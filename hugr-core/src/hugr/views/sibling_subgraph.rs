@@ -1017,6 +1017,11 @@ where
         self.checker.graph()
     }
 
+    /// Parent of the region in which this checker can check convexity of subgraphs.
+    pub fn parent(&self) -> Base::Node {
+        self.region_parent
+    }
+
     /// Create a new convexity checker for the region of the entrypoint.
     #[inline(always)]
     pub fn from_entrypoint(base: &'g Base) -> Self {
@@ -1422,7 +1427,7 @@ pub enum InvalidSubgraph<N: HugrNode = Node> {
     /// An outgoing non-local edge was found.
     #[error("Unsupported edge kind at ({_0}, {_1:?}).")]
     UnsupportedEdgeKind(N, Port),
-    /// The [ConvexChecker::region_parent] did not match the parent of the nodes in the subgraph
+    /// The [ConvexChecker::parent()] did not match the parent of the nodes in the subgraph
     #[error(
         "ConvexChecker's region parent {checker_parent} did not match the subgraph parent {subgraph_parent}."
     )]
