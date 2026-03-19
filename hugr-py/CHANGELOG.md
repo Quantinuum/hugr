@@ -1,5 +1,20 @@
 # Changelog
 
+## [0.15.6](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.5...hugr-py-v0.15.6) (2026-03-19)
+
+
+### Features
+
+* **hugr-py:** Allow linking packages and modules from Python ([#2947](https://github.com/Quantinuum/hugr/issues/2947)) ([329c243](https://github.com/Quantinuum/hugr/commit/329c243fffff0d6c4437664a012361619a0a425e))
+* make `_composable_pass` and `_scope` public modules  ([#2962](https://github.com/Quantinuum/hugr/issues/2962)) ([1d6af9a](https://github.com/Quantinuum/hugr/commit/1d6af9a331b1dc68eddd3a0d5283e7b9dab6aa1c)), closes [#2961](https://github.com/Quantinuum/hugr/issues/2961)
+
+
+### Bug Fixes
+
+* allow both _composable_pass and composable_pass imports ([#2965](https://github.com/Quantinuum/hugr/issues/2965)) ([0a5664d](https://github.com/Quantinuum/hugr/commit/0a5664d2374d1bd18aedb4e7619d26d2f564b412))
+* Always do extension resolution when loading packages and hugrs ([#2953](https://github.com/Quantinuum/hugr/issues/2953)) ([0086d2a](https://github.com/Quantinuum/hugr/commit/0086d2a9483283216858ca5f4e86691541d3530a))
+* Correct pyo3 module definitions and add missing exception class export ([#2964](https://github.com/Quantinuum/hugr/issues/2964)) ([3df73f4](https://github.com/Quantinuum/hugr/commit/3df73f4d3d0520fcbf278b4072a15e3b24c6edab))
+
 ## [0.15.5](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.4...hugr-py-v0.15.5) (2026-03-16)
 
 
