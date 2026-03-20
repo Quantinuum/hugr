@@ -2,9 +2,9 @@
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from typing import cast
+from typing import ClassVar, cast
 
-from hugr.metadata import JsonType
+from hugr.utils import JsonType
 
 
 @dataclass
@@ -18,14 +18,36 @@ class DebugRecord(ABC):
         """
 
     @classmethod
-    @abstractmethod
     def from_json(cls, value: JsonType) -> "DebugRecord":
-        """Decodes the extension from a native types obtained from `json.load`."""
+        """Decode a debug record from json. This is not an abstract method because when
+        decoding from json by calling `DebugRecord.from_json` we do not have concrete
+        subtype information, so we decode from the explicit variant tag stored in `kind`
+        instead.
+        """
+        if not isinstance(value, dict):
+            msg = f"Expected a dictionary for DebugRecord, but got {type(value)}"
+            raise TypeError(msg)
+
+        kind = value.get("kind")
+        if isinstance(kind, str):
+            if kind == DICompileUnit.KIND:
+                return DICompileUnit.from_json(value)
+            if kind == DISubprogram.KIND:
+                return DISubprogram.from_json(value)
+            if kind == DILocation.KIND:
+                return DILocation.from_json(value)
+            msg = f"Unknown DebugRecord kind: {kind}"
+            raise TypeError(msg)
+
+        msg = "Expected DebugRecord to contain string field 'kind'."
+        raise TypeError(msg)
 
 
 @dataclass
 class DICompileUnit(DebugRecord):
     """Debug information for a compilation unit, corresponds to a HUGR module node."""
+
+    KIND: ClassVar[str] = "compile_unit"
 
     directory: str  # Working directory of the compiler that generated the HUGR.
     filename: int  # File that contains the HUGR entrypoint.
@@ -33,6 +55,7 @@ class DICompileUnit(DebugRecord):
 
     def to_json(self) -> dict[str, JsonType]:
         return {
+            "kind": self.KIND,
             "directory": self.directory,
             "filename": self.filename,
             "file_table": cast("list[JsonType]", self.file_table),
@@ -43,7 +66,7 @@ class DICompileUnit(DebugRecord):
         if not isinstance(value, dict):
             msg = f"Expected a dictionary for DICompileUnit, but got {type(value)}"
             raise TypeError(msg)
-        for key in ("directory", "filename", "file_table"):
+        for key in ("kind", "directory", "filename", "file_table"):
             if key not in value:
                 msg = f"Expected DICompileUnit to have a '{key}' key but got {value}"
                 raise TypeError(msg)
@@ -64,12 +87,15 @@ class DISubprogram(DebugRecord):
     declaration node.
     """
 
+    KIND: ClassVar[str] = "subprogram"
+
     file: int  # Index into the string table for filenames.
     line_no: int  # First line of the function definition.
     scope_line: int | None = None  # First line of the function body.
 
     def to_json(self) -> dict[str, str]:
         data = {
+            "kind": self.KIND,
             "file": str(self.file),
             "line_no": str(self.line_no),
         }
@@ -83,7 +109,7 @@ class DISubprogram(DebugRecord):
         if not isinstance(value, dict):
             msg = f"Expected a dictionary for DISubprogram, but got {type(value)}"
             raise TypeError(msg)
-        for key in ("file", "line_no"):
+        for key in ("kind", "file", "line_no"):
             if key not in value:
                 msg = f"Expected DISubprogram to have a '{key}' key but got {value}"
                 raise TypeError(msg)
@@ -102,11 +128,14 @@ class DILocation(DebugRecord):
     node.
     """
 
+    KIND: ClassVar[str] = "location"
+
     column: int
     line_no: int
 
     def to_json(self) -> dict[str, str]:
         return {
+            "kind": self.KIND,
             "column": str(self.column),
             "line_no": str(self.line_no),
         }
@@ -116,7 +145,7 @@ class DILocation(DebugRecord):
         if not isinstance(value, dict):
             msg = f"Expected a dictionary for DILocation, but got {type(value)}"
             raise TypeError(msg)
-        for key in ("column", "line_no"):
+        for key in ("kind", "column", "line_no"):
             if key not in value:
                 msg = f"Expected DILocation to have a '{key}' key but got {value}"
                 raise TypeError(msg)

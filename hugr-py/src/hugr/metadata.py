@@ -21,11 +21,10 @@ from hugr.envelope import ExtensionDesc, GeneratorDesc
 if TYPE_CHECKING:
     from collections.abc import Iterable, Iterator
 
-Meta = TypeVar("Meta")
+    from hugr.utils import JsonType
 
-# Type alias for json values.
-# See <https://github.com/python/typing/issues/182#issuecomment-1320974824>
-JsonType = str | int | float | bool | None | Mapping[str, "JsonType"] | list["JsonType"]
+
+Meta = TypeVar("Meta")
 
 
 class Metadata(Protocol[Meta]):

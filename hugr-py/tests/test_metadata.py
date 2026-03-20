@@ -13,9 +13,9 @@ from hugr.metadata import (
     HugrDebugInfo,
     HugrGenerator,
     HugrUsedExtensions,
-    JsonType,
     Metadata,
 )
+from hugr.utils import JsonType
 
 
 class CustomMetadata(Metadata[list[JsonType]]):
