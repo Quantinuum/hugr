@@ -255,10 +255,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         outputs: OutgoingPorts<N>,
         hugr: &impl HugrView<Node = N>,
     ) -> Result<Self, InvalidSubgraph<N>> {
-        // try_new_with_checker will check all the inputs/outputs have the same parent
-        let parent = boundary_nodes(&inputs, &outputs)
-            .next()
-            .ok_or(InvalidSubgraph::EmptySubgraph)?;
+        let parent = pick_parent(hugr, &inputs, &outputs)?;
         let checker = TopoConvexChecker::new(hugr, parent);
         Self::try_new_with_checker(inputs, outputs, hugr, &checker)
     }
@@ -940,12 +937,6 @@ fn iter_io<'a, N: HugrNode>(
         .chain(iter_outgoing(outputs).map(|(n, p)| (n, Port::from(p))))
 }
 
-fn boundary_nodes<N>(
-    inputs: &IncomingPorts<N>,
-    outputs: &OutgoingPorts<N>,
-) -> impl Iterator<Item = N> + '_ {
-    iter_io(inputs, outputs).map(|(n, _)| n)
-}
 /// Pick a parent node from the set of incoming and outgoing ports.
 ///
 /// This checks that all nodes have the same parent.
@@ -954,7 +945,9 @@ fn pick_parent<'a, N: HugrNode>(
     inputs: &'a IncomingPorts<N>,
     outputs: &'a OutgoingPorts<N>,
 ) -> Result<N, InvalidSubgraph<N>> {
-    let mut nodes = boundary_nodes(inputs, outputs);
+    let mut nodes = iter_incoming(inputs)
+        .map(|(n, _)| n)
+        .chain(iter_outgoing(outputs).map(|(n, _)| n));
     let first_node = nodes.next().ok_or(InvalidSubgraph::EmptySubgraph)?;
     let first_parent = hugr
         .get_parent(first_node)
