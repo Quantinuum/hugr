@@ -4,6 +4,10 @@ from collections.abc import Hashable, ItemsView, Iterable, Mapping, MutableMappi
 from dataclasses import dataclass, field
 from typing import Generic, Protocol, TypeVar
 
+# Type alias for json values.
+# See <https://github.com/python/typing/issues/182#issuecomment-1320974824>
+JsonType = str | int | float | bool | None | Mapping[str, "JsonType"] | list["JsonType"]
+
 L = TypeVar("L", bound=Hashable)
 R = TypeVar("R", bound=Hashable)
 
