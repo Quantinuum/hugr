@@ -28,6 +28,80 @@ use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
 use super::RootChecked;
 
+/// Checks validity and convexity of potential sibling subgraphs
+/// within a Hugr region.
+pub trait HugrConvexChecker<N: HugrNode> {
+    /// The parent node of the region within which this checker can check convexity
+    fn region_parent(&self) -> N;
+
+    /// Gets the nodes within the subgraph given its boundary after checking it's valid and convex.
+    ///
+    /// Verifies that input and output ports are valid subgraph boundaries, i.e.
+    /// they belong to nodes within the subgraph and are linked to at least one node
+    /// outside of the subgraph.
+    ///
+    /// # Errors
+    ///
+    /// This function will return an error in the following cases
+    ///  - An [`InvalidSubgraph::NotConvex`] error if the subgraph is not
+    ///    convex,
+    ///  - An [`InvalidSubgraph::NoSharedParent`] or
+    ///    [`InvalidSubgraph::OrphanNode`] error if the boundary nodes do not
+    ///    share a common parent or have no parent,
+    ///  - An [`InvalidSubgraph::EmptySubgraph`] error if the subgraph is empty,
+    ///  - An [`InvalidSubgraph::InvalidBoundary`] error if a boundary port is
+    ///    invalid, i.e. if the boundary port is not in the subgraph or if none
+    ///    of the linked ports are outside of the subgraph.
+    fn nodes_if_valid_and_convex(
+        &self,
+        hugr: &impl HugrView<Node = N>,
+        inputs: &IncomingPorts<N>,
+        outputs: &OutgoingPorts<N>,
+        function_calls: &IncomingPorts<N>,
+    ) -> Result<Vec<N>, InvalidSubgraph<N>>;
+}
+
+impl<'a, H: HugrView, CC: CreateConvexChecker<CheckerRegion<'a, H>>> HugrConvexChecker<H::Node>
+    for ConvexChecker<'a, H, CC>
+{
+    fn region_parent(&self) -> H::Node {
+        self.region_parent
+    }
+
+    fn nodes_if_valid_and_convex(
+        &self,
+        hugr: &impl HugrView<Node = H::Node>,
+        inputs: &IncomingPorts<H::Node>,
+        outputs: &OutgoingPorts<H::Node>,
+        function_calls: &IncomingPorts<H::Node>,
+    ) -> Result<Vec<H::Node>, InvalidSubgraph<H::Node>> {
+        let parent = pick_parent(hugr, inputs, outputs)?;
+        if parent != self.region_parent() {
+            return Err(InvalidSubgraph::BadCheckerParent {
+                checker_parent: self.region_parent,
+                subgraph_parent: parent,
+            });
+        }
+        let subpg = make_pg_subgraph::<H>(
+            self.checker.graph().clone(),
+            inputs,
+            outputs,
+            &self.node_map,
+        );
+        let nodes = subpg
+            .nodes_iter()
+            .map(|index| self.node_map.from_portgraph(index))
+            .collect_vec();
+        validate_subgraph(hugr, &nodes, inputs, outputs, function_calls)?;
+
+        if subpg.is_convex_with_checker(self) {
+            Ok(nodes)
+        } else {
+            Err(InvalidSubgraph::NotConvex)
+        }
+    }
+}
+
 /// A non-empty convex subgraph of a HUGR sibling graph.
 ///
 /// A HUGR region in which all nodes share the same parent. A convex subgraph is
@@ -175,16 +249,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     ///
     /// ## Errors
     ///
-    /// This function will return an error in the following cases
-    ///  - An [`InvalidSubgraph::NotConvex`] error if the subgraph is not
-    ///    convex,
-    ///  - An [`InvalidSubgraph::NoSharedParent`] or
-    ///    [`InvalidSubgraph::OrphanNode`] error if the boundary nodes do not
-    ///    share a common parent or have no parent,
-    ///  - An [`InvalidSubgraph::EmptySubgraph`] error if the subgraph is empty,
-    ///  - An [`InvalidSubgraph::InvalidBoundary`] error if a boundary port is
-    ///    invalid, i.e. if the boundary port is not in the subgraph or if none
-    ///    of the linked ports are outside of the subgraph.
+    /// May return any of the errors from [HugrConvexChecker::nodes_if_valid_and_convex]
     pub fn try_new(
         inputs: IncomingPorts<N>,
         outputs: OutgoingPorts<N>,
@@ -227,32 +292,20 @@ impl<N: HugrNode> SiblingSubgraph<N> {
 
     /// Create a new convex sibling subgraph from input and output boundaries.
     ///
-    /// Provide a [`TopoConvexChecker`] instance to avoid constructing one for
+    /// Provide a [`HugrConvexChecker`] instance to avoid constructing one for
     /// faster convexity check. If you do not have one, use
     /// [`SiblingSubgraph::try_new`].
     ///
     /// Refer to [`SiblingSubgraph::try_new`] for the full
     /// documentation.
-    // TODO(breaking): generalize to any convex checker
     pub fn try_new_with_checker<H: HugrView<Node = N>>(
         mut inputs: IncomingPorts<N>,
         outputs: OutgoingPorts<N>,
         hugr: &H,
-        checker: &TopoConvexChecker<H>,
+        checker: &impl HugrConvexChecker<H::Node>,
     ) -> Result<Self, InvalidSubgraph<N>> {
-        let (subpg, node_map) = make_pg_subgraph(hugr, &inputs, &outputs);
-        let nodes = subpg
-            .nodes_iter()
-            .map(|index| node_map.from_portgraph(index))
-            .collect_vec();
-
         let function_calls = drain_function_calls(&mut inputs, hugr);
-
-        validate_subgraph(hugr, &nodes, &inputs, &outputs, &function_calls)?;
-
-        if nodes.len() > 1 && !subpg.is_convex_with_checker(checker) {
-            return Err(InvalidSubgraph::NotConvex);
-        }
+        let nodes = checker.nodes_if_valid_and_convex(hugr, &inputs, &outputs, &function_calls)?;
 
         Ok(Self {
             nodes,
@@ -295,17 +348,16 @@ impl<N: HugrNode> SiblingSubgraph<N> {
 
     /// Create a subgraph from a set of nodes.
     ///
-    /// Provide a [`TopoConvexChecker`] instance to avoid constructing one for
+    /// Provide a [`HugrConvexChecker`] instance to avoid constructing one for
     /// faster convexity check. If you do not have one, use
     /// [`SiblingSubgraph::try_from_nodes`].
     ///
     /// Refer to [`SiblingSubgraph::try_from_nodes`] for the full
     /// documentation.
-    // TODO(breaking): generalize to any convex checker
     pub fn try_from_nodes_with_checker<H: HugrView<Node = N>>(
         nodes: impl Into<Vec<N>>,
         hugr: &H,
-        checker: &TopoConvexChecker<H>,
+        checker: &impl HugrConvexChecker<H::Node>,
     ) -> Result<Self, InvalidSubgraph<N>> {
         let mut nodes: Vec<N> = nodes.into();
         let num_nodes = nodes.len();
@@ -465,12 +517,31 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         hugr: &'h H,
         mode: ValidationMode<'_, 'h, H>,
     ) -> Result<(), InvalidSubgraph<N>> {
-        let mut exp_nodes = {
-            let (subpg, node_map) = make_pg_subgraph(hugr, &self.inputs, &self.outputs);
-            subpg
-                .nodes_iter()
-                .map(|n| node_map.from_portgraph(n))
-                .collect_vec()
+        let checker;
+        let checker_ref = match mode {
+            ValidationMode::WithChecker(c) => Some(c),
+            ValidationMode::CheckConvexity => {
+                checker = TopoConvexChecker::new(hugr, self.get_parent(hugr));
+                Some(&checker)
+            }
+            ValidationMode::SkipConvexity => None,
+        };
+
+        let mut exp_nodes = match checker_ref {
+            Some(checker_ref) => checker_ref.nodes_if_valid_and_convex(
+                hugr,
+                &self.inputs,
+                &self.outputs,
+                &self.function_calls,
+            )?,
+            // Note we used to check exp_nodes == nodes *before* the convexity check
+            None => {
+                let (region, node_map) = hugr.region_portgraph(self.get_parent(hugr));
+                make_pg_subgraph::<H>(region, &self.inputs, &self.outputs, &node_map)
+                    .nodes_iter()
+                    .map(|n| node_map.from_portgraph(n))
+                    .collect_vec()
+            }
         };
         let mut nodes = self.nodes.clone();
 
@@ -481,29 +552,6 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             return Err(InvalidSubgraph::InvalidNodeSet);
         }
 
-        validate_subgraph(
-            hugr,
-            &self.nodes,
-            &self.inputs,
-            &self.outputs,
-            &self.function_calls,
-        )?;
-
-        let checker;
-        let checker_ref = match mode {
-            ValidationMode::WithChecker(c) => Some(c),
-            ValidationMode::CheckConvexity => {
-                checker = TopoConvexChecker::new(hugr, self.get_parent(hugr));
-                Some(&checker)
-            }
-            ValidationMode::SkipConvexity => None,
-        };
-        if let Some(checker) = checker_ref {
-            let (subpg, _) = make_pg_subgraph(hugr, &self.inputs, &self.outputs);
-            if !subpg.is_convex_with_checker(&checker.checker) {
-                return Err(InvalidSubgraph::NotConvex);
-            }
-        }
         Ok(())
     }
 
@@ -729,33 +777,16 @@ pub enum ValidationMode<'t, 'h, H: HugrView> {
 }
 
 fn make_pg_subgraph<'h, H: HugrView>(
-    hugr: &'h H,
+    region: CheckerRegion<'h, H>,
     inputs: &IncomingPorts<H::Node>,
     outputs: &OutgoingPorts<H::Node>,
-) -> (
-    portgraph::view::Subgraph<CheckerRegion<'h, H>>,
-    H::RegionPortgraphNodes,
-) {
-    // Pick the hugr region that contains the boundary nodes.
-    // If the nodes are not in the same region, we'll fail the convexity check later on.
-    let mut io_nodes = inputs
-        .iter()
-        .flat_map(|inps| inps.iter().map(|(n, _)| *n))
-        .chain(outputs.iter().map(|(n, _)| *n));
-    let hugr_region = io_nodes
-        .next()
-        .and_then(|n| hugr.get_parent(n))
-        .unwrap_or(hugr.entrypoint());
-
-    let (region, node_map) = hugr.region_portgraph(hugr_region);
-
+    node_map: &H::RegionPortgraphNodes,
+) -> portgraph::view::Subgraph<CheckerRegion<'h, H>> {
     // Ordering of the edges here is preserved and becomes ordering of the
     // signature.
-    let boundary = make_boundary::<H>(&region, &node_map, inputs, outputs);
-    (
-        portgraph::view::Subgraph::new_subgraph(region, boundary),
-        node_map,
-    )
+    let boundary = make_boundary::<H>(&region, node_map, inputs, outputs);
+
+    portgraph::view::Subgraph::new_subgraph(region, boundary)
 }
 
 /// Returns the input and output boundary ports for a given set of nodes.
@@ -908,31 +939,33 @@ fn iter_io<'a, N: HugrNode>(
 
 /// Pick a parent node from the set of incoming and outgoing ports.
 ///
-/// This *does not* validate that all nodes have the same parent, but just picks
-/// the first one found.
-///
-/// # Errors
-///
-/// If there are no nodes in the subgraph, or if the first node does not have a
-/// parent, this will return an error.
+/// This checks that all nodes have the same parent.
 fn pick_parent<'a, N: HugrNode>(
     hugr: &impl HugrView<Node = N>,
     inputs: &'a IncomingPorts<N>,
     outputs: &'a OutgoingPorts<N>,
 ) -> Result<N, InvalidSubgraph<N>> {
-    // Pick an arbitrary node so we know the shared parent.
-    let Some(node) = iter_incoming(inputs)
+    let mut nodes = iter_incoming(inputs)
         .map(|(n, _)| n)
-        .chain(iter_outgoing(outputs).map(|(n, _)| n))
-        .next()
-    else {
-        return Err(InvalidSubgraph::EmptySubgraph);
-    };
-    let Some(parent) = hugr.get_parent(node) else {
-        return Err(InvalidSubgraph::OrphanNode { orphan: node });
-    };
-
-    Ok(parent)
+        .chain(iter_outgoing(outputs).map(|(n, _)| n));
+    let first_node = nodes.next().ok_or(InvalidSubgraph::EmptySubgraph)?;
+    let first_parent = hugr
+        .get_parent(first_node)
+        .ok_or(InvalidSubgraph::OrphanNode { orphan: first_node })?;
+    for other_node in nodes {
+        let other_parent = hugr
+            .get_parent(other_node)
+            .ok_or(InvalidSubgraph::OrphanNode { orphan: other_node })?;
+        if other_parent != first_parent {
+            return Err(InvalidSubgraph::NoSharedParent {
+                first_node,
+                first_parent,
+                other_node,
+                other_parent,
+            });
+        }
+    }
+    Ok(first_parent)
 }
 
 fn make_boundary<'a, H: HugrView>(
@@ -987,7 +1020,6 @@ pub struct ConvexChecker<'g, Base: HugrView, Checker> {
     /// The base HUGR to check convexity on.
     base: &'g Base,
     /// The parent of the region where we are checking convexity.
-    #[allow(unused)] // Useful for debugging
     region_parent: Base::Node,
     /// A convexity checker initialized for the nodes in that region
     checker: Checker,
@@ -1417,6 +1449,15 @@ pub enum InvalidSubgraph<N: HugrNode = Node> {
     /// An outgoing non-local edge was found.
     #[error("Unsupported edge kind at ({_0}, {_1:?}).")]
     UnsupportedEdgeKind(N, Port),
+    /// The [HugrConvexChecker::region_parent] did not match the parent of the nodes in the subgraph
+    #[error(
+        "ConvexChecker's region parent {checker_parent} did not match the subgraph parent {subgraph_parent}."
+    )]
+    #[allow(missing_docs)]
+    BadCheckerParent {
+        checker_parent: N,
+        subgraph_parent: N,
+    },
 }
 
 /// Errors that can occur while constructing a [`SiblingSubgraph`].
