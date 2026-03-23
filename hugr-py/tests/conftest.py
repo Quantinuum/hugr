@@ -227,8 +227,7 @@ def validate(
         "model-exts-no-compression",
         # Requires extension-encoding for the cli validation to load the envelope
         # "s-expression",
-        # TODO: Raises multiple errors when loading values
-        # "s-expression-exts",
+        "s-expression-exts",
     ]
     # Envelope formats used as target before loading back the test hugrs.
     # These should correspond to the formats supported by `hugr convert`.
