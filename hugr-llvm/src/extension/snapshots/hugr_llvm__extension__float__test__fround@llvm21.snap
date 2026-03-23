@@ -1,0 +1,21 @@
+---
+source: hugr-llvm/src/extension/float.rs
+assertion_line: 234
+expression: mod_str
+---
+; ModuleID = 'test_context'
+source_filename = "test_context"
+
+define internal double @_hl.main.1(double %0) {
+alloca_block:
+  br label %entry_block
+
+entry_block:                                      ; preds = %alloca_block
+  %1 = call double @llvm.round.f64(double %0)
+  ret double %1
+}
+
+; Function Attrs: nocallback nofree nosync nounwind speculatable willreturn memory(none)
+declare double @llvm.round.f64(double) #0
+
+attributes #0 = { nocallback nofree nosync nounwind speculatable willreturn memory(none) }
