@@ -67,15 +67,17 @@ as well as anything which cannot - e.g. quantum data.
 A `Const` edge can only carry a `CopyableType`. For
 more details see the [Type System](type-system.md) section.
 
-As well as the type, Dataflow edges are also parametrized by a
-`Locality`, which declares whether the edge crosses levels in the hierarchy. See
-[Edge Locality](#edge-locality) for details.
+As well as the type, `Value` and `Const` edges are also parametrized by a
+`Locality`, which declares whether the edge crosses levels in the hierarchy.
+`Function` edges are always non-local (`Ext`), as they originate from
+module-level `FuncDefn` or `FuncDecl` nodes.
+See [Edge Locality](#edge-locality) for details.
 
 ```haskell
 AnyType ⊃ CopyableType
 
 EdgeKind ::= Value(Locality, AnyType)
-             | Const(Local | Ext, CopyableType) | Function(Local | Ext, PolyFuncType)
+             | Const(Local | Ext, CopyableType) | Function(PolyFuncType)
              | Hierarchy | Order | ControlFlow
 ```
 
@@ -188,7 +190,7 @@ The following operations are valid at the module level as well as in dataflow
 regions and control-flow regions:
 
 - `Const<T>` : a static constant value of type T stored in the node
-  weight. Like `FuncDecl` and `FuncDefn` this has one `Const<T>` out-edge per use.
+  weight. This has one `Const<T>` out-edge per use.
 
 A **loadable HUGR** is a module HUGR where all input ports are connected and there are
 no `FuncDecl/AliasDecl` nodes.
@@ -499,7 +501,7 @@ has no parent).
 | Conditional               | **D**                          | `Conditional`      | **C**         | `Case`                   | No edges                                 |
 | **C:** Dataflow container | **D**                          | `TailLoop`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
 | **C**                     | **D**                          | `DFG`              | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
-| **C**                     | `Function`                     | `FuncDefn`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
+| **C**                     | `Function`                     | `FuncDefn`         | `Module`      |  **D**                   | First(second) is `Input`(`Output`)       |
 | **C**                     | `ControlFlow`                  | `DFB`              | CFG           |  **D**                   | First(second) is `Input`(`Output`)       |
 | **C**                     | \-                             | `Case`             | `Conditional` |  **D**                   | First(second) is `Input`(`Output`)       |
 | Root                      | \-                             | `Module`           | none          |  **D**                   | Contains main `FuncDefn` for executable HUGR. |
@@ -523,7 +525,8 @@ The common parent may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 | Hierarchy      | Defines hierarchy; each node has \<=1 parent                                                                                                                                                            |
 | Order, Control | Local (Source + target have same parent) |
 | Value          | Local, Ext or Dom - see [Edge Locality](#edge-locality) |
-| Static         | Local or Ext - see [Edge Locality](#edge-locality) |
+| Const          | Local or Ext - see [Edge Locality](#edge-locality) |
+| Function       | Ext - see [Edge Locality](#edge-locality) |
 
 (edge-locality)=
 ## Edge Locality
