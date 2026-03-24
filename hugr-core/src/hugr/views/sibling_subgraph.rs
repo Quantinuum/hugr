@@ -1752,27 +1752,60 @@ mod tests {
         let mut hugr2 = hugr.clone();
         match hugr2.optype_mut(func_root) {
             OpType::FuncDefn(fd) => *fd.func_name_mut() = "test2".into(),
-            _ => panic!()
+            _ => panic!(),
         };
-        let func2 = hugr.insert_hugr(hugr.module_root(), hugr2).inserted_entrypoint;
+        let func2 = hugr
+            .insert_hugr(hugr.module_root(), hugr2)
+            .inserted_entrypoint;
         hugr.validate().unwrap();
 
         let checker1 = TopoConvexChecker::new(&hugr, func_root);
         let checker2 = TopoConvexChecker::new(&hugr, func2);
         let sub1 = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
-            RootChecked::try_new(&hugr).expect("Root should be FuncDefn.")
-        ).unwrap();
-        sub1.validate(&hugr, ValidationMode::WithChecker(&checker1)).unwrap();
+            RootChecked::try_new(&hugr).expect("Root should be FuncDefn."),
+        )
+        .unwrap();
+        sub1.validate(&hugr, ValidationMode::WithChecker(&checker1))
+            .unwrap();
         let e = sub1.validate(&hugr, ValidationMode::WithChecker(&checker2));
-        assert_eq!(e, Err(InvalidSubgraph::MismatchedCheckerParent { checker_parent: func2, subgraph_parent: func_root }));
+        assert_eq!(
+            e,
+            Err(InvalidSubgraph::MismatchedCheckerParent {
+                checker_parent: func2,
+                subgraph_parent: func_root
+            })
+        );
 
-        SiblingSubgraph::try_new_with_checker(sub1.inputs.clone(), sub1.outputs.clone(), &hugr, &checker1).unwrap();
-        let e = SiblingSubgraph::try_new_with_checker(sub1.inputs.clone(), sub1.outputs.clone(), &hugr, &checker2);
-        assert_eq!(e, Err(InvalidSubgraph::MismatchedCheckerParent { checker_parent: func2, subgraph_parent: func_root }));
+        SiblingSubgraph::try_new_with_checker(
+            sub1.inputs.clone(),
+            sub1.outputs.clone(),
+            &hugr,
+            &checker1,
+        )
+        .unwrap();
+        let e = SiblingSubgraph::try_new_with_checker(
+            sub1.inputs.clone(),
+            sub1.outputs.clone(),
+            &hugr,
+            &checker2,
+        );
+        assert_eq!(
+            e,
+            Err(InvalidSubgraph::MismatchedCheckerParent {
+                checker_parent: func2,
+                subgraph_parent: func_root
+            })
+        );
 
         SiblingSubgraph::try_from_nodes_with_checker(sub1.nodes.clone(), &hugr, &checker1).unwrap();
         let e = SiblingSubgraph::try_from_nodes_with_checker(sub1.nodes.clone(), &hugr, &checker2);
-        assert_eq!(e, Err(InvalidSubgraph::MismatchedCheckerParent { checker_parent: func2, subgraph_parent: func_root }));
+        assert_eq!(
+            e,
+            Err(InvalidSubgraph::MismatchedCheckerParent {
+                checker_parent: func2,
+                subgraph_parent: func_root
+            })
+        );
     }
 
     #[test]
