@@ -1,4 +1,7 @@
-"""Typed generator source debug information metadata for HUGR nodes."""
+"""Typed debug information metadata for HUGR nodes, to be attached by the generator
+in order to propagate information about the generator source throughout the compilation
+stack.
+"""
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
@@ -77,7 +80,7 @@ class DICompileUnit(DebugRecord):
         return DICompileUnit(
             directory=str(value["directory"]),
             filename=int(value["filename"]),
-            file_table=list[str](value["file_table"]),
+            file_table=list[str](files),
         )
 
 
@@ -93,15 +96,15 @@ class DISubprogram(DebugRecord):
     line_no: int  # First line of the function definition.
     scope_line: int | None = None  # First line of the function body.
 
-    def to_json(self) -> dict[str, str]:
-        data = {
+    def to_json(self) -> dict[str, JsonType]:
+        data: dict[str, JsonType] = {
             "kind": self.KIND,
-            "file": str(self.file),
-            "line_no": str(self.line_no),
+            "file": self.file,
+            "line_no": self.line_no,
         }
         # Declarations have no function body so could have no scope_line.
         if self.scope_line is not None:
-            data["scope_line"] = str(self.scope_line)
+            data["scope_line"] = self.scope_line
         return data
 
     @classmethod
@@ -133,11 +136,11 @@ class DILocation(DebugRecord):
     column: int
     line_no: int
 
-    def to_json(self) -> dict[str, str]:
+    def to_json(self) -> dict[str, JsonType]:
         return {
             "kind": self.KIND,
-            "column": str(self.column),
-            "line_no": str(self.line_no),
+            "column": self.column,
+            "line_no": self.line_no,
         }
 
     @classmethod
