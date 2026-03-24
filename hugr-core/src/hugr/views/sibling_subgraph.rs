@@ -301,7 +301,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     /// # Errors
     ///
     /// As per [`SiblingSubgraph::try_new`] but with the additional possibility of an
-    /// [`InvalidSubgraph::BadCheckerParent`] error if the provided checker is for a
+    /// [`InvalidSubgraph::MismatchedCheckerParent`] error if the provided checker is for a
     /// different region than that containing the input and output boundary nodes.
     pub fn try_new_with_checker<H: HugrView<Node = N>>(
         mut inputs: IncomingPorts<N>,
@@ -312,7 +312,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         let subgraph_parent = pick_parent(hugr, &inputs, &outputs)?;
         let checker_parent = checker.region_parent();
         if subgraph_parent != checker_parent {
-            return Err(InvalidSubgraph::BadCheckerParent {
+            return Err(InvalidSubgraph::MismatchedCheckerParent {
                 checker_parent,
                 subgraph_parent,
             });
@@ -1468,7 +1468,7 @@ pub enum InvalidSubgraph<N: HugrNode = Node> {
         "ConvexChecker's region parent {checker_parent} did not match the subgraph parent {subgraph_parent}."
     )]
     #[allow(missing_docs)]
-    BadCheckerParent {
+    MismatchedCheckerParent {
         checker_parent: N,
         subgraph_parent: N,
     },
