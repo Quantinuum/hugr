@@ -5,9 +5,18 @@ stack.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
+from enum import StrEnum
 from typing import ClassVar, cast
 
 from hugr.utils import JsonType
+
+
+class DebugRecordKind(StrEnum):
+    """Discriminator for serialized debug record variants."""
+
+    COMPILE_UNIT = "compile_unit"
+    SUBPROGRAM = "subprogram"
+    LOCATION = "location"
 
 
 @dataclass
@@ -33,12 +42,19 @@ class DebugRecord(ABC):
 
         kind = value.get("kind")
         if isinstance(kind, str):
-            if kind == DICompileUnit.KIND:
+            try:
+                record_kind = DebugRecordKind(kind)
+            except ValueError as error:
+                msg = f"Unknown DebugRecord kind: {kind}"
+                raise TypeError(msg) from error
+
+            if record_kind is DebugRecordKind.COMPILE_UNIT:
                 return DICompileUnit.from_json(value)
-            if kind == DISubprogram.KIND:
+            if record_kind is DebugRecordKind.SUBPROGRAM:
                 return DISubprogram.from_json(value)
-            if kind == DILocation.KIND:
+            if record_kind is DebugRecordKind.LOCATION:
                 return DILocation.from_json(value)
+
             msg = f"Unknown DebugRecord kind: {kind}"
             raise TypeError(msg)
 
@@ -50,7 +66,7 @@ class DebugRecord(ABC):
 class DICompileUnit(DebugRecord):
     """Debug information for a compilation unit, corresponds to a HUGR module node."""
 
-    KIND: ClassVar[str] = "compile_unit"
+    KIND: ClassVar[DebugRecordKind] = DebugRecordKind.COMPILE_UNIT
 
     directory: str  # Working directory of the compiler that generated the HUGR.
     filename: int  # File that contains the HUGR entrypoint.
@@ -58,7 +74,7 @@ class DICompileUnit(DebugRecord):
 
     def to_json(self) -> dict[str, JsonType]:
         return {
-            "kind": self.KIND,
+            "kind": str(self.KIND),
             "directory": self.directory,
             "filename": self.filename,
             "file_table": cast("list[JsonType]", self.file_table),
@@ -90,7 +106,7 @@ class DISubprogram(DebugRecord):
     declaration node.
     """
 
-    KIND: ClassVar[str] = "subprogram"
+    KIND: ClassVar[DebugRecordKind] = DebugRecordKind.SUBPROGRAM
 
     file: int  # Index into the string table for filenames.
     line_no: int  # First line of the function definition.
@@ -98,7 +114,7 @@ class DISubprogram(DebugRecord):
 
     def to_json(self) -> dict[str, JsonType]:
         data: dict[str, JsonType] = {
-            "kind": self.KIND,
+            "kind": str(self.KIND),
             "file": self.file,
             "line_no": self.line_no,
         }
@@ -131,14 +147,14 @@ class DILocation(DebugRecord):
     node.
     """
 
-    KIND: ClassVar[str] = "location"
+    KIND: ClassVar[DebugRecordKind] = DebugRecordKind.LOCATION
 
     column: int
     line_no: int
 
     def to_json(self) -> dict[str, JsonType]:
         return {
-            "kind": self.KIND,
+            "kind": str(self.KIND),
             "column": self.column,
             "line_no": self.line_no,
         }
