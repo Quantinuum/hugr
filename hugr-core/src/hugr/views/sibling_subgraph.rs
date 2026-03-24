@@ -309,7 +309,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         hugr: &H,
         checker: &impl HugrConvexChecker<H::Node>,
     ) -> Result<Self, InvalidSubgraph<N>> {
-        let subgraph_parent = pick_parent(hugr, &inputs, &outputs)?;
+        let subgraph_parent = check_parent(hugr, &inputs, &outputs)?;
         let checker_parent = checker.region_parent();
         if subgraph_parent != checker_parent {
             return Err(InvalidSubgraph::MismatchedCheckerParent {
@@ -531,7 +531,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         hugr: &'h H,
         mode: ValidationMode<'_, 'h, H>,
     ) -> Result<(), InvalidSubgraph<N>> {
-        let subgraph_parent = pick_parent(hugr, &self.inputs, &self.outputs)?;
+        let subgraph_parent = check_parent(hugr, &self.inputs, &self.outputs)?;
         let checker;
         let checker_ref = match mode {
             ValidationMode::WithChecker(c) => Some(c),
@@ -955,7 +955,7 @@ fn iter_io<'a, N: HugrNode>(
 /// Pick a parent node from the set of incoming and outgoing ports.
 ///
 /// This checks that all nodes have the same parent.
-fn pick_parent<'a, N: HugrNode>(
+fn check_parent<'a, N: HugrNode>(
     hugr: &impl HugrView<Node = N>,
     inputs: &'a IncomingPorts<N>,
     outputs: &'a OutgoingPorts<N>,
