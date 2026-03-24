@@ -5,13 +5,13 @@ stack.
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass
-from enum import StrEnum
+from enum import Enum
 from typing import ClassVar, cast
 
 from hugr.utils import JsonType
 
 
-class DebugRecordKind(StrEnum):
+class DebugRecordKind(str, Enum):
     """Discriminator for serialized debug record variants."""
 
     COMPILE_UNIT = "compile_unit"
@@ -74,7 +74,7 @@ class DICompileUnit(DebugRecord):
 
     def to_json(self) -> dict[str, JsonType]:
         return {
-            "kind": str(self.KIND),
+            "kind": self.KIND,
             "directory": self.directory,
             "filename": self.filename,
             "file_table": cast("list[JsonType]", self.file_table),
@@ -114,7 +114,7 @@ class DISubprogram(DebugRecord):
 
     def to_json(self) -> dict[str, JsonType]:
         data: dict[str, JsonType] = {
-            "kind": str(self.KIND),
+            "kind": self.KIND,
             "file": self.file,
             "line_no": self.line_no,
         }
@@ -154,7 +154,7 @@ class DILocation(DebugRecord):
 
     def to_json(self) -> dict[str, JsonType]:
         return {
-            "kind": str(self.KIND),
+            "kind": self.KIND,
             "column": self.column,
             "line_no": self.line_no,
         }
