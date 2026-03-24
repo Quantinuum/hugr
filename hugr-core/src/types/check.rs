@@ -3,7 +3,10 @@
 use thiserror::Error;
 
 use super::{Type, TypeRow};
-use crate::{extension::SignatureError, ops::Value};
+use crate::{
+    ops::Value,
+    types::{Term, type_param::TermTypeError},
+};
 
 /// Errors that arise from typechecking constants
 #[derive(Clone, Debug, PartialEq, Error)]
@@ -69,10 +72,16 @@ impl super::SumType {
                 num_variants: self.num_variants(),
             })?;
         let variant: TypeRow = variant.clone().try_into().map_err(|e| {
-            let SignatureError::RowVarWhereTypeExpected { var } = e else {
-                panic!("Unexpected error")
+            let TermTypeError::TypeMismatch { term, .. } = e else {
+                panic!("Unexpected error {e}")
             };
-            SumTypeError::VariantNotConcrete { tag, varidx: var.0 }
+            let Term::Variable(tv) = &*term else {
+                panic!("Unexpected term {term}");
+            };
+            SumTypeError::VariantNotConcrete {
+                tag,
+                varidx: tv.index(),
+            }
         })?;
 
         if variant.len() != val.len() {

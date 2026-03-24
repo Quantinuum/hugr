@@ -32,7 +32,7 @@ use hugr_core::std_extensions::collections::borrow_array::{
     BArrayRepeat, BArrayScan, BArrayToArray, BArrayToArrayDef, BArrayUnsafeOp, BArrayUnsafeOpDef,
     borrow_array_type,
 };
-use hugr_core::types::{TypeArg, TypeEnum};
+use hugr_core::types::TypeArg;
 use hugr_core::{HugrView, Node};
 use inkwell::IntPredicate;
 use inkwell::builder::Builder;
@@ -1083,7 +1083,7 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
                 .ok_or(anyhow!("BArrayOp::get has no outputs"))?;
 
             let res_sum_ty = {
-                let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
+                let Some(st) = res_hugr_ty.as_sum() else {
                     Err(anyhow!("BArrayOp::get output is not a sum type"))?
                 };
                 ts.llvm_sum_type(st.clone())?
@@ -1149,7 +1149,7 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
                 .ok_or(anyhow!("BArrayOp::set has no outputs"))?;
 
             let res_sum_ty = {
-                let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
+                let Some(st) = res_hugr_ty.as_sum() else {
                     Err(anyhow!("BArrayOp::set output is not a sum type"))?
                 };
                 ts.llvm_sum_type(st.clone())?
@@ -1216,7 +1216,7 @@ pub fn emit_barray_op<'c, H: HugrView<Node = Node>>(
                 .ok_or(anyhow!("BArrayOp::swap has no outputs"))?;
 
             let res_sum_ty = {
-                let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
+                let Some(st) = res_hugr_ty.as_sum() else {
                     Err(anyhow!("BArrayOp::swap output is not a sum type"))?
                 };
                 ts.llvm_sum_type(st.clone())?

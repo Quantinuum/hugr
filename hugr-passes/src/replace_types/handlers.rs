@@ -110,9 +110,10 @@ pub fn linearize_generic_array<AK: ArrayKind>(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = args else {
+    let [TypeArg::BoundedNat(n), ty] = args else {
         panic!("Illegal TypeArgs to array: {args:?}")
     };
+    let ty = Type::try_from(ty.clone()).unwrap();
     if num_outports == 0 {
         // "Simple" discard
         let array_scan = GenericArrayScan::<AK>::new(ty.clone(), Type::UNIT, vec![], *n);
@@ -131,7 +132,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
                         )
                         .unwrap();
                     let [to_discard] = fb.input_wires_arr();
-                    let disc = lin.copy_discard_op(ty, 0)?;
+                    let disc = lin.copy_discard_op(&ty, 0)?;
                     disc.add(&mut fb, [to_discard]).map_err(|e| {
                         LinearizeError::NestedTemplateError(Box::new(ty.clone()), Box::new(e))
                     })?;
@@ -217,7 +218,7 @@ pub fn linearize_generic_array<AK: ArrayKind>(
             .unwrap()
             .outputs_arr();
         let mut copies = lin
-            .copy_discard_op(ty, num_outports)?
+            .copy_discard_op(&ty, num_outports)?
             .add(&mut fb, [elem])
             .map_err(|e| LinearizeError::NestedTemplateError(Box::new(ty.clone()), Box::new(e)))?
             .outputs();
@@ -332,9 +333,10 @@ pub fn copy_discard_array(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = args else {
+    let [TypeArg::BoundedNat(n), ty] = args else {
         panic!("Illegal TypeArgs to array: {args:?}")
     };
+    let ty = Type::try_from(ty.clone()).expect("Illegal array element type");
     if ty.copyable() {
         // For arrays with copyable elements, we can just use the clone/discard ops
         if num_outports == 0 {
@@ -379,9 +381,10 @@ pub fn copy_discard_borrow_array(
 ) -> Result<NodeTemplate, LinearizeError> {
     // Require known length i.e. usable only after monomorphization, due to no-variables limitation
     // restriction on NodeTemplate::CompoundOp
-    let [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] = args else {
+    let [TypeArg::BoundedNat(n), ty] = args else {
         panic!("Illegal TypeArgs to borrow array: {args:?}")
     };
+    let ty = Type::try_from(ty.clone()).expect("Illegal BorrowArray element type");
     if ty.copyable() {
         // For arrays with copyable elements, we can just use the clone/discard ops
         if num_outports == 0 {
@@ -411,7 +414,7 @@ pub fn copy_discard_borrow_array(
         }
     } else if num_outports == 0 {
         // Override "generic" array discard to only discard non-borrowed elements.
-        let elem_discard = lin.copy_discard_op(ty, 0)?;
+        let elem_discard = lin.copy_discard_op(&ty, 0)?;
         let array_ty = || borrow_array_type(*n, ty.clone());
         let i64_t = || INT_TYPES[6].clone();
         let mut dfb = DFGBuilder::new(inout_sig([array_ty()], [])).unwrap();

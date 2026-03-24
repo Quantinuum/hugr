@@ -146,10 +146,8 @@ impl TypeDef {
                 }
                 least_upper_bound(indices.iter().map(|i| {
                     let ta = args.get(*i);
-                    match ta {
-                        Some(TypeArg::Runtime(s)) => s.least_upper_bound(),
-                        _ => panic!("TypeArg index does not refer to a type."),
-                    }
+                    ta.and_then(|t| t.least_upper_bound())
+                        .expect("TypeArg index does not refer to a type.")
                 }))
             }
         }

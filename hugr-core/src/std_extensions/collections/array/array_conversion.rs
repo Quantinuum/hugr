@@ -231,9 +231,10 @@ impl<AK: ArrayKind, const DIR: Direction, OtherAK: ArrayKind> HasConcrete
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] => {
-                Ok(GenericArrayConvert::new(ty.clone(), *n))
-            }
+            [TypeArg::BoundedNat(n), ty] => Ok(GenericArrayConvert::new(
+                ty.clone().try_into().map_err(SignatureError::from)?,
+                *n,
+            )),
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }
     }
