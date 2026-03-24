@@ -534,7 +534,15 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         let subgraph_parent = check_parent(hugr, &self.inputs, &self.outputs)?;
         let checker;
         let checker_ref = match mode {
-            ValidationMode::WithChecker(c) => Some(c),
+            ValidationMode::WithChecker(c) => {
+                if c.region_parent() != subgraph_parent {
+                    return Err(InvalidSubgraph::MismatchedCheckerParent {
+                        checker_parent: c.region_parent(),
+                        subgraph_parent,
+                    });
+                }
+                Some(c)
+            }
             ValidationMode::CheckConvexity => {
                 checker = TopoConvexChecker::new(hugr, subgraph_parent);
                 Some(&checker)
