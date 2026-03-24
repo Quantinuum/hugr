@@ -16,10 +16,10 @@ expression: ast
 
 (declare-operation
   arithmetic.int.iadd
-  (param ?0 core.nat)
+  (param ?_0 core.nat)
   (core.fn
-    [(arithmetic.int.types.int ?0) (arithmetic.int.types.int ?0)]
-    [(arithmetic.int.types.int ?0)])
+    [(arithmetic.int.types.int ?_0) (arithmetic.int.types.int ?_0)]
+    [(arithmetic.int.types.int ?_0)])
   (meta
     (core.meta.description
       "addition modulo 2^N (signed and unsigned versions are the same op)")))

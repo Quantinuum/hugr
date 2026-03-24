@@ -101,5 +101,5 @@ expression: ast
 (declare-func
   public
   example.const_as_param
-  (param ?0 (core.const arithmetic.float.types.float64))
+  (param ?_0 (core.const arithmetic.float.types.float64))
   (core.fn [] [arithmetic.float.types.float64]))
