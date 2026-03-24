@@ -13,7 +13,7 @@ from hugr.passes._composable_pass import (
     ComposablePass,
     ComposedPass,
 )
-from hugr.passes.composable_pass import (
+from hugr.passes.composable import (
     PassResult,
     implement_pass_run,
 )
