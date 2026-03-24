@@ -9,11 +9,9 @@ from hugr.hugr.base import Hugr
 
 # Import some items from the deprecated module and some from the stable
 # version to ensure the deprecated module is still functional.
-from hugr.passes._composable_pass import (
+from hugr.passes.composable import (
     ComposablePass,
     ComposedPass,
-)
-from hugr.passes.composable_pass import (
     PassResult,
     implement_pass_run,
 )

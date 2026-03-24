@@ -1,9 +1,9 @@
 """A Protocol for a composable pass.
 
-Deprecated module alias for `hugr.passes.composable_pass`.
+Deprecated module alias for `hugr.passes.composable`.
 """
 
-from .composable_pass import (
+from .composable import (
     ComposablePass,
     ComposedPass,
     PassName,
