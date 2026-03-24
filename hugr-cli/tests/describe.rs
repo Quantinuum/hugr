@@ -385,7 +385,7 @@ fn test_schema(mut describe_cmd: Command) {
               "type": "string"
             },
             "version": {
-              "description": "Version of the extension.",
+              "description": "Version of the extension.\n\nA version value of `0.0.0` is used for extensions that do not have a version.",
               "type": "string"
             }
           },

@@ -75,11 +75,15 @@ class ExtensionDesc(BaseModel):
 
     Attributes:
         name: The name of the extension.
-        version: The version string of the extension.
+        version: The version string of the extension, if present.
     """
 
     name: str
-    version: str
+    # TODO: `hugr-rs <=0.26.1` expects this field to be present.
+    #
+    # This value should be set to "0.0.0" for backwards compatibility, until the
+    # next major hugr-rs version.
+    version: str | None
 
 
 class ModuleDesc(BaseModel):

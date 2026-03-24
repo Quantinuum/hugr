@@ -535,5 +535,18 @@ pub(crate) mod test {
         ];
         hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(check(&hugr, &registry), Ok(()));
+
+        //  Multiple extensions with one unversioned - should fail
+        let used_exts = vec![
+            ExtensionDesc::new("test-v0", Version::new(0, 2, 2)),
+            ExtensionDesc::new_unversioned("test-v1"),
+        ];
+        hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
+        assert_matches!(check(&hugr, &registry), Err(ExtensionBreakingError::ExtensionVersionMismatch(ExtensionVersionMismatch {
+            name,
+            registered,
+            used
+        })) if name == "test-v1" && registered == Version::new(1, 2, 3) && used == Version::new(0, 0, 0)
+        );
     }
 }

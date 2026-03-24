@@ -444,7 +444,7 @@ class ExtensionDesc:
     """
 
     name: str
-    version: Version
+    version: Version | None = None
 
     def to_json(self) -> dict[str, str]:
         """Encodes the extension as a dictionary of native types that can be
@@ -452,7 +452,12 @@ class ExtensionDesc:
         """
         return {
             "name": self.name,
-            "version": str(self.version),
+            # TODO: We set a valid version here for backwards compatibility with
+            # `hugr-rs <=0.26.1`.
+            #
+            # This should be left as None once we use hugr-rs >=0.26.2 everywhere
+            # or after the next breaking release.
+            "version": str(self.version) if self.version is not None else "0.0.0",
         }
 
     @classmethod
@@ -467,12 +472,9 @@ class ExtensionDesc:
                 + f" but got {value}"
             )
             raise TypeError(msg)
-        if "version" not in value:
-            msg = (
-                "Expected extension metadata to be a dict with a 'version' key,"
-                + f" but got {value}"
-            )
-            raise TypeError(msg)
-        return ExtensionDesc(
-            name=value["name"], version=Version.parse(value["version"])
-        )
+
+        version = Version.parse(value["version"]) if "version" in value else None
+        if version == Version.parse("0.0.0"):
+            version = None
+
+        return ExtensionDesc(name=value["name"], version=version)
