@@ -77,7 +77,7 @@ impl<'a, H: HugrView, CC: CreateConvexChecker<CheckerRegion<'a, H>>> HugrConvexC
             .nodes_iter()
             .map(|index| self.node_map.from_portgraph(index))
             .collect_vec();
-        validate_subgraph(hugr, &nodes, inputs, outputs, function_calls)?;
+        validate_subgraph_boundary(hugr, &nodes, inputs, outputs, function_calls)?;
 
         if subpg.is_convex_with_checker(self) {
             Ok(nodes)
@@ -187,7 +187,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         let non_local = get_non_local_edges(&nodes, &dfg_graph);
         let function_calls = group_into_function_calls(non_local, &dfg_graph)?;
 
-        validate_subgraph(dfg_graph, &nodes, &inputs, &outputs, &function_calls)?;
+        validate_subgraph_boundary(dfg_graph, &nodes, &inputs, &outputs, &function_calls)?;
 
         Ok(Self {
             nodes,
@@ -1186,11 +1186,13 @@ fn get_edge_type<H: HugrView, P: Into<Port> + Copy>(
 
 /// Whether a subgraph is valid.
 ///
-/// Verifies that input and output ports are valid subgraph boundaries, i.e.
-/// they belong to nodes within the subgraph and are linked to at least one node
-/// outside of the subgraph. This does NOT check convexity proper, i.e. whether
-/// the set of nodes form a convex induced graph.
-fn validate_subgraph<H: HugrView>(
+/// Verifies that each partition of `inputs` is linked to exactly one port outside of the subgraph;
+/// that each port in `outputs` is linked to at least one port outside of the subgraph;
+/// that there are no linked "other" ports; that `inputs` and
+/// `outputs` are accurate wrt. `nodes`.
+///
+/// Does NOT check convexity proper, i.e. whether the set of nodes form a convex induced graph.
+fn validate_subgraph_boundary<H: HugrView>(
     hugr: &H,
     nodes: &[H::Node],
     inputs: &IncomingPorts<H::Node>,
@@ -1203,27 +1205,6 @@ fn validate_subgraph<H: HugrView>(
     // Check nodes is not empty
     if nodes.is_empty() {
         return Err(InvalidSubgraph::EmptySubgraph);
-    }
-    // Check all nodes share parent
-    if !nodes.iter().map(|&n| hugr.get_parent(n)).all_equal() {
-        let first_node = nodes[0];
-        let first_parent = hugr
-            .get_parent(first_node)
-            .ok_or(InvalidSubgraph::OrphanNode { orphan: first_node })?;
-        let other_node = *nodes
-            .iter()
-            .skip(1)
-            .find(|&&n| hugr.get_parent(n) != Some(first_parent))
-            .unwrap();
-        let other_parent = hugr
-            .get_parent(other_node)
-            .ok_or(InvalidSubgraph::OrphanNode { orphan: other_node })?;
-        return Err(InvalidSubgraph::NoSharedParent {
-            first_node,
-            first_parent,
-            other_node,
-            other_parent,
-        });
     }
 
     // Check there are no linked "other" ports
