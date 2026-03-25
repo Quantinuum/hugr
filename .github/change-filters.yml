@@ -26,7 +26,6 @@ rust: &rust
   - "hugr/**"
   - "hugr-cli/**"
   - "hugr-core/**"
-  - "hugr-passes/**"
   - "hugr-persistent/**"
   - "resources/json-schema/**"
 

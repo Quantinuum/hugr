@@ -6,14 +6,13 @@ resolver = "2"
 members = [
     "hugr",
     "hugr-core",
-    "hugr-passes",
     "hugr-cli",
     "hugr-model",
     "hugr-llvm",
     "hugr-py",
     "hugr-persistent",
 ]
-default-members = ["hugr", "hugr-core", "hugr-passes", "hugr-cli", "hugr-model"]
+default-members = ["hugr", "hugr-core", "hugr-cli", "hugr-model"]
 
 [workspace.package]
 rust-version = "1.91"
