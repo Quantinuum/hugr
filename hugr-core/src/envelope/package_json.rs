@@ -69,10 +69,13 @@ struct HugrSer<'h>(#[serde(serialize_with = "Hugr::serde_serialize")] pub &'h Hu
 /// We use this to avoid exposing a public implementation of Serialize/Deserialize,
 /// as the json definition is not stable, and should always be wrapped in an Envelope.
 #[derive(Debug, serde::Deserialize)]
+#[deprecated(since = "0.27.0")]
 pub(super) struct PackageDeser {
+    #[expect(deprecated)]
     pub modules: Vec<HugrDeser>,
     pub extensions: Vec<Extension>,
 }
 #[derive(Debug, serde::Deserialize)]
 #[serde(transparent)]
+#[deprecated(since = "0.27.0")]
 pub(super) struct HugrDeser(#[serde(deserialize_with = "Hugr::serde_deserialize")] pub Hugr);

@@ -174,6 +174,7 @@ impl<R: BufRead> EnvelopeReader<R> {
     /// Read a Package in json format from an io reader.
     /// Returns package and the combined extension registry
     /// of the provided registry and the package extensions.
+    #[allow(deprecated)]
     fn decode_json(&mut self) -> Result<Package, PackageEncodingError> {
         let super::package_json::PackageDeser {
             modules,
