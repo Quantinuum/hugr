@@ -153,7 +153,7 @@ impl EnvelopeConfig {
     #[must_use]
     pub const fn text() -> Self {
         Self {
-            format: EnvelopeFormat::PackageJson,
+            format: EnvelopeFormat::SExpressionWithExtensions,
             zstd: None,
         }
     }
