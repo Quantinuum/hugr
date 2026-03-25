@@ -77,7 +77,7 @@ impl<'a, H: HugrView, CC: CreateConvexChecker<CheckerRegion<'a, H>>> HugrConvexC
             .nodes_iter()
             .map(|index| self.node_map.from_portgraph(index))
             .collect_vec();
-        validate_subgraph_boundary(hugr, &nodes, inputs, outputs, function_calls)?;
+        validate_boundary(hugr, &nodes, inputs, outputs, function_calls)?;
 
         if subpg.is_convex_with_checker(self) {
             Ok(nodes)
@@ -187,7 +187,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         let non_local = get_non_local_edges(&nodes, &dfg_graph);
         let function_calls = group_into_function_calls(non_local, &dfg_graph)?;
 
-        validate_subgraph_boundary(dfg_graph, &nodes, &inputs, &outputs, &function_calls)?;
+        validate_boundary(dfg_graph, &nodes, &inputs, &outputs, &function_calls)?;
 
         Ok(Self {
             nodes,
@@ -1200,7 +1200,7 @@ fn get_edge_type<H: HugrView, P: Into<Port> + Copy>(
 /// `outputs` are accurate wrt. `nodes`.
 ///
 /// Does NOT check convexity proper, i.e. whether the set of nodes form a convex induced graph.
-fn validate_subgraph_boundary<H: HugrView>(
+fn validate_boundary<H: HugrView>(
     hugr: &H,
     nodes: &[H::Node],
     inputs: &IncomingPorts<H::Node>,
