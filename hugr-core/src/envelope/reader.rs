@@ -108,16 +108,15 @@ impl<R: BufRead> EnvelopeReader<R> {
             }
             | ExtensionResolutionError::MissingTypeExtension {
                 missing_extension, ..
-            } => desc.extend_used_extensions_resolved([ExtensionDesc::new(
+            } => desc.extend_used_extensions_resolved([ExtensionDesc::new_unversioned(
                 missing_extension,
-                crate::extension::Version::new(0, 0, 0),
             )]),
             ExtensionResolutionError::InvalidConstTypes {
                 missing_extensions, ..
             } => desc.extend_used_extensions_resolved(
                 missing_extensions
                     .iter()
-                    .map(|ext| ExtensionDesc::new(ext, crate::extension::Version::new(0, 0, 0))),
+                    .map(ExtensionDesc::new_unversioned),
             ),
             _ => {}
         }

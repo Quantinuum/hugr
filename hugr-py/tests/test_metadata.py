@@ -47,7 +47,7 @@ def test_metadata_roundtrip() -> None:
     gen = GeneratorDesc(name="hugr-py-test", version=Version.parse("1.2.3"))
     exts = [
         ExtensionDesc(name="ext.a", version=Version.parse("0.1.0")),
-        ExtensionDesc(name="ext.b", version=Version.parse("2.0.0")),
+        ExtensionDesc(name="ext.b", version=None),
     ]
 
     # Set the metadata on the module root node
@@ -79,7 +79,7 @@ def test_metadata_roundtrip() -> None:
     assert raw[HugrGenerator.KEY] == {"name": "hugr-py-test", "version": "1.2.3"}
     assert raw[HugrUsedExtensions.KEY] == [
         {"name": "ext.a", "version": "0.1.0"},
-        {"name": "ext.b", "version": "2.0.0"},
+        {"name": "ext.b", "version": "0.0.0"},
     ]
     assert raw["custom.metadata"] == custom_payload
 
