@@ -100,10 +100,7 @@ impl EnvelopeFormat {
     /// If true, the encoded envelope can be read as text.
     #[must_use]
     pub fn ascii_printable(self) -> bool {
-        matches!(
-            self,
-            Self::PackageJson | Self::SExpression | Self::SExpressionWithExtensions
-        )
+        !matches!(self, Self::Model | Self::ModelWithExtensions)
     }
 }
 
@@ -357,6 +354,7 @@ mod tests {
     #[case(EnvelopeFormat::SExpression)]
     #[case(EnvelopeFormat::SExpressionWithExtensions)]
     #[case(EnvelopeFormat::PackageJson)]
+    #[allow(deprecated)]
     fn header_round_trip(#[case] format: EnvelopeFormat) {
         // With zstd compression
         let header = EnvelopeHeader { format, zstd: true };

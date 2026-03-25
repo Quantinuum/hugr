@@ -48,6 +48,7 @@ fn write_impl<'h>(
     config: EnvelopeConfig,
 ) -> Result<(), WriteError> {
     match config.format {
+        #[expect(deprecated)]
         EnvelopeFormat::PackageJson => {
             super::package_json::to_json_writer(hugrs, extensions, writer)?
         }
@@ -184,6 +185,7 @@ mod test {
     use std::io::Cursor;
 
     #[test]
+    #[allow(deprecated)]
     fn test_write_empty_package() {
         let config = EnvelopeConfig {
             format: EnvelopeFormat::PackageJson,

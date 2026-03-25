@@ -124,6 +124,7 @@ impl<R: BufRead> EnvelopeReader<R> {
 
     fn read_impl(&mut self) -> Result<Package, PayloadError> {
         let mut package = match self.header().format {
+            #[expect(deprecated)]
             EnvelopeFormat::PackageJson => self.decode_json()?,
             EnvelopeFormat::Model | EnvelopeFormat::ModelWithExtensions => self.decode_model()?,
             EnvelopeFormat::SExpression | EnvelopeFormat::SExpressionWithExtensions => {
@@ -342,6 +343,7 @@ mod test {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_read_invalid_json_payload() {
         let header = EnvelopeHeader {
             format: EnvelopeFormat::PackageJson,
@@ -379,6 +381,7 @@ mod test {
     }
 
     #[test]
+    #[allow(deprecated)]
     fn test_partial_description_on_error() {
         let header = EnvelopeHeader {
             format: EnvelopeFormat::PackageJson,
@@ -526,6 +529,7 @@ mod test {
     #[case::model_text_with_extensions(EnvelopeFormat::SExpressionWithExtensions)]
     #[case::package_json(EnvelopeFormat::PackageJson)]
     #[ignore = "This test takes > 15s due to the large payload size."]
+    #[allow(deprecated)]
     fn big_hugr_payload(#[case] format: EnvelopeFormat, big_hugr: Hugr) {
         let config = EnvelopeConfig { format, zstd: None };
         let mut buffer = Vec::with_capacity(64 * 1024 * 1024);

@@ -72,6 +72,7 @@ impl ConvertArgs {
             // Parse the requested format
             let format = match &self.format {
                 Some(fmt) => match fmt.as_str() {
+                    #[expect(deprecated)]
                     "json" => EnvelopeFormat::PackageJson,
                     "model" => EnvelopeFormat::Model,
                     "model-exts" => EnvelopeFormat::ModelWithExtensions,
