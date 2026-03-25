@@ -32,7 +32,8 @@ pub struct MermaidArgs {
     #[arg(
         short = 'D',
         long,
-        help = "Print debug info attached to nodes if it exists."
+        help = "Print debug info attached to nodes if it exists. For rendering purposes, \
+                we replace double quotes with single quotes and newlines with spaces."
     )]
     pub debug_info: bool,
 
@@ -75,7 +76,7 @@ impl MermaidArgs {
 
         for hugr in package.modules {
             let mmd_fmt = if self.debug_info {
-                // TODO: hardcoded
+                // TODO: hardcoded key
                 hugr.mermaid_format()
                     .with_node_labels(NodeLabel::MetadataKey("core.debug_info".to_string()))
             } else {

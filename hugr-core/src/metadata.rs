@@ -22,6 +22,7 @@
 //! let payload = hugr.get_metadata::<SomeMetadata>(hugr.module_root());
 //! assert_eq!(payload, Some("payload"));
 //! ```
+pub mod debug_info;
 //
 // When adding new metadata keys, they should be re-exported by the python bindings.
 // See hugr-py/rust/metadata.rs
