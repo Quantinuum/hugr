@@ -39,7 +39,7 @@ impl<'c> Emission<'c> {
         hugr: FatNode<'c, hugr_core::ops::Module, H>,
         eh: EmitHugr<'c, 'a, H>,
     ) -> Result<Self> where {
-        let module = eh.emit_module(hugr)?.finish();
+        let module = eh.emit_module(hugr, true)?.finish();
         Ok(Self { module })
     }
 

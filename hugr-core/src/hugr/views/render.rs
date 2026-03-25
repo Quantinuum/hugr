@@ -233,12 +233,22 @@ pub(in crate::hugr) fn node_style<'a>(
                     .unwrap_or(&serde_json::Value::Null),
             )
             .expect("Could not render JSON metadata");
+            // mermaid renderer in portgraph does not like double quotes or newlines
+            let metadata_clean = metadata.replace('\n', " ").replace('"', "\'");
 
             if Some(n) == entrypoint {
-                NodeStyle::boxed(format!("{} <{}>", numeric_label(h, n, true), metadata))
-                    .with_attrs(entrypoint_style.clone())
+                NodeStyle::boxed(format!(
+                    "{} <{}>",
+                    numeric_label(h, n, true),
+                    metadata_clean
+                ))
+                .with_attrs(entrypoint_style.clone())
             } else {
-                NodeStyle::boxed(format!("{} <{}>", numeric_label(h, n, false), metadata))
+                NodeStyle::boxed(format!(
+                    "{} <{}>",
+                    numeric_label(h, n, false),
+                    metadata_clean
+                ))
             }
         }),
         NodeLabel::Custom(labels) => Box::new(move |n| {
