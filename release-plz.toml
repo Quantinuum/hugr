@@ -57,18 +57,13 @@ protect_breaking_commits = true
 
 [[package]]
 name = "hugr"
-changelog_include = ["hugr-core", "hugr-passes"]
+changelog_include = ["hugr-core"]
 release = true
 version_group = "hugr"
 git_release_latest = true
 
 [[package]]
 name = "hugr-core"
-release = true
-version_group = "hugr"
-
-[[package]]
-name = "hugr-passes"
 release = true
 version_group = "hugr"
 
