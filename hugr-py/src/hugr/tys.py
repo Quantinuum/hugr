@@ -758,7 +758,7 @@ class Variable(Type):
         return f"${self.idx}"
 
     def to_model(self) -> model.Term:
-        return model.Var(str(self.idx))
+        return model.Var(f"_{self.idx}")
 
 
 @dataclass(frozen=True)

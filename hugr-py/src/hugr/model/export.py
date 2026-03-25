@@ -574,7 +574,7 @@ class ModelExport:
         params = []
 
         for i, param_type in enumerate(param_types):
-            param_name = str(i)
+            param_name = f"_{i}"
 
             params.append(model.Param(name=param_name, type=param_type.to_model()))
 
