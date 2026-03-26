@@ -208,8 +208,7 @@ multiple `FuncDecl` nodes may share the same name provided they all have
 identical signatures (this represents multiple declaration sites for the same
 external symbol).
 Any name shared between a `FuncDefn` and another `Public` `FuncDefn` or
-`FuncDecl`, or between two `FuncDecl`s with different signatures, is a
-validation error.
+`FuncDecl`, or between two `FuncDecl`s with different signatures, is invalid.
 
 There may also be other [scoped definitions](#scoped-definitions).
 
