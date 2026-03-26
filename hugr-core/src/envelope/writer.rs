@@ -132,6 +132,7 @@ impl WriteError {
 /// Error encoding an envelope payload with enumerated variants.
 pub(crate) enum WriteErrorInner {
     /// Error encoding a JSON format package.
+    #[deprecated(since = "0.27.0")]
     JsonWrite(#[from] PackageEncodingError),
     /// Error encoding a binary model format package.
     ModelBinary(#[from] ModelBinaryWriteError),

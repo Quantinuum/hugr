@@ -282,6 +282,7 @@ pub struct PayloadError(PayloadErrorInner);
 /// Error decoding an envelope payload with enumerated variants.
 pub(crate) enum PayloadErrorInner {
     /// Error decoding a JSON format package.
+    #[deprecated(since = "0.27.0")]
     JsonRead(#[from] PackageEncodingError),
     /// Error decoding a binary model format package.
     ModelBinary(#[from] ModelBinaryReadError),

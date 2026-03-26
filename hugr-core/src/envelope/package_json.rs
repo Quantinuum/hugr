@@ -9,6 +9,7 @@ use crate::{Extension, Hugr};
 
 /// Write the Package in json format into an io writer.
 #[deprecated(since = "0.27.0")]
+#[allow(deprecated)]
 pub(super) fn to_json_writer<'h>(
     hugrs: impl IntoIterator<Item = &'h Hugr>,
     extensions: &ExtensionRegistry,
@@ -56,12 +57,15 @@ pub enum PackageEncodingError {
 /// We use this to avoid exposing a public implementation of Serialize/Deserialize,
 /// as the json definition is not stable, and should always be wrapped in an Envelope.
 #[derive(Debug, serde::Serialize)]
+#[deprecated(since = "0.27.0")]
+#[allow(deprecated)]
 struct PackageSer<'h> {
     pub modules: Vec<HugrSer<'h>>,
     pub extensions: Vec<&'h Extension>,
 }
 #[derive(Debug, serde::Serialize)]
 #[serde(transparent)]
+#[deprecated(since = "0.27.0")]
 struct HugrSer<'h>(#[serde(serialize_with = "Hugr::serde_serialize")] pub &'h Hugr);
 
 /// A private package structure implementing the serde traits.
