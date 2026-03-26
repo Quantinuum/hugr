@@ -287,7 +287,7 @@ class EnvelopeFormat(Enum):
     extension registry.
     """
     JSON = 63  # '?' in ASCII
-    """A json-encoded hugr-package. This format is ASCII-printable."""
+    """A json-encoded hugr-package. This format is ASCII-printable. DEPRECATED."""
 
     def ascii_printable(self) -> bool:
         return self in {
