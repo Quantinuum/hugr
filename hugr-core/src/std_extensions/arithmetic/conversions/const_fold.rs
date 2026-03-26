@@ -159,11 +159,16 @@ impl ConstFold for IFromBool {
         let [(_, b0)] = consts else {
             return None;
         };
+        let b0 = if b0 == &Value::true_val() {
+            true
+        } else if b0 == &Value::false_val() {
+            false
+        } else {
+            return None;
+        };
         Some(vec![(
             0.into(),
-            Value::extension(
-                ConstInt::new_u(0, u64::from(b0.clone() == Value::true_val())).unwrap(),
-            ),
+            Value::extension(ConstInt::new_u(0, u64::from(b0)).unwrap()),
         )])
     }
 }
