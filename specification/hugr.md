@@ -172,14 +172,43 @@ edges. The following operations are *only* valid as immediate children of a
   edge for each use of the function. The function name is used at link time to
   look up definitions in linked
   modules (other hugr instances specified to the linker).
+  `FuncDecl` nodes have a *visibility*, either `Public` (default) or `Private`;
+  see [Function Visibility](#function-visibility).
 - `AliasDecl`: an external type alias declaration. At link time this can be
   replaced with the definition. An alias declared with `AliasDecl` is equivalent to a
   named opaque type.
 - `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
   The function body is defined by the sibling graph formed by its children.
   At link time `FuncDecl` nodes are replaced by `FuncDefn`.
+  `FuncDefn` nodes have a *visibility*, either `Public` or `Private` (default);
+  see [Function Visibility](#function-visibility).
 - `AliasDefn`: type alias definition. At link time `AliasDecl` can be replaced with
   `AliasDefn`.
+
+(function-visibility)=
+#### Function Visibility
+
+Both `FuncDefn` and `FuncDecl` nodes carry a **visibility** attribute that
+controls whether the linker treats the function as a cross-module symbol:
+
+- **`Public`**: the function is exported and visible to the linker. Public
+  functions can be called from other modules and are used during linking to
+  resolve `FuncDecl` references. `FuncDecl`s are `Public` unless specified
+  otherwise.
+- **`Private`**: the function is local to the HUGR in which it is defined and
+  is not exposed for linking. Private functions are only callable within the
+  same HUGR. `FuncDefn`s are `Private` unless specified otherwise.
+
+When exporting a HUGR, `Public` functions are identified by their plain name.
+`Private` functions are name-mangled to avoid conflicts with same-named symbols
+in other modules.
+
+Public function names must be unique within a module, with one exception:
+multiple `FuncDecl` nodes may share the same name provided they all have
+identical signatures (this represents multiple declaration sites for the same
+external symbol).
+Any name shared between a `FuncDefn` and another `Public` `FuncDefn` or
+`FuncDecl`, or between two `FuncDecl`s with different signatures, is invalid.
 
 There may also be other [scoped definitions](#scoped-definitions).
 
