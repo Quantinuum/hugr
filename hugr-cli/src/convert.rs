@@ -23,7 +23,7 @@ pub struct ConvertArgs {
     #[clap(short, long, value_parser, default_value = "-")]
     pub output: Output,
 
-    /// Output format. One of: json, model, model-exts, s-expression, s-expression-exts
+    /// Output format. One of: json (deprecated), model, model-exts, s-expression, s-expression-exts
     #[clap(short, long, value_name = "FORMAT")]
     pub format: Option<String>,
 
