@@ -319,8 +319,10 @@ mod test {
 
             // Nothing got folded.
             assert_eq!(
-                res, None,
-                "folding should fail on opaque constants for {}", opdef.opdef_id()
+                res,
+                None,
+                "folding should fail on opaque constants for {}",
+                opdef.opdef_id()
             );
         }
     }
