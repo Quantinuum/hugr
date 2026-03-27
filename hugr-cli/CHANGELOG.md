@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.26.2](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.26.1...hugr-cli-v0.26.2) - 2026-03-27
+
+### Bug Fixes
+
+- Do extension resolution on exts loaded by hugr-cli ([#2987](https://github.com/Quantinuum/hugr/pull/2987))
+
+### New Features
+
+- *(py)* Allow missing ext versions ExtensionDesc metadata ([#2979](https://github.com/Quantinuum/hugr/pull/2979))
+
 ## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.25.7...hugr-cli-v0.26.0) - 2026-03-16
 
 ### Documentation
