@@ -263,8 +263,9 @@ def convert(
 
     Args:
         hugr_bytes: The HUGR package as bytes.
-        format: Output format. One of: json, model, model-exts, s-expression,
-            s-expression-exts (default: None, meaning same format as input).
+        format: Output format. One of: json (deprecated), model, model-exts,
+            s-expression, s-expression-exts (default: None, meaning same format as
+            input).
         text: Use default text-based envelope configuration. Cannot be combined
             with format or binary (default: False).
         binary: Use default binary envelope configuration. Cannot be combined
