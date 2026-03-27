@@ -362,7 +362,7 @@ class EnvelopeConfig:
             Use 0 for the default level.
     """
 
-    format: EnvelopeFormat = EnvelopeFormat.JSON
+    format: EnvelopeFormat = EnvelopeFormat.MODEL_WITH_EXTS
     zstd: int | None = None
 
     TEXT: ClassVar[EnvelopeConfig]
@@ -374,7 +374,9 @@ class EnvelopeConfig:
 
 # Set EnvelopeConfig's class variables.
 # These can only be initialized _after_ the class is defined.
-EnvelopeConfig.TEXT = EnvelopeConfig(format=EnvelopeFormat.JSON, zstd=None)
+EnvelopeConfig.TEXT = EnvelopeConfig(
+    format=EnvelopeFormat.S_EXPRESSION_WITH_EXTS, zstd=None
+)
 EnvelopeConfig.BINARY = EnvelopeConfig(format=EnvelopeFormat.MODEL_WITH_EXTS, zstd=0)
 
 
