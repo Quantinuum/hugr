@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.15.6](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.5...hugr-py-v0.15.6) (2026-03-27)
+
+
+### Features
+
+* Add debug info metadata specification in `hugr-py` ([#2971](https://github.com/Quantinuum/hugr/issues/2971)) ([a4da8ef](https://github.com/Quantinuum/hugr/commit/a4da8ef4c53eddf443b0b8d854c961451c881e3c))
+* **hugr-py:** Allow linking packages and modules from Python ([#2947](https://github.com/Quantinuum/hugr/issues/2947)) ([329c243](https://github.com/Quantinuum/hugr/commit/329c243fffff0d6c4437664a012361619a0a425e))
+* make `_composable_pass` and `_scope` public modules  ([#2962](https://github.com/Quantinuum/hugr/issues/2962)) ([1d6af9a](https://github.com/Quantinuum/hugr/commit/1d6af9a331b1dc68eddd3a0d5283e7b9dab6aa1c)), closes [#2961](https://github.com/Quantinuum/hugr/issues/2961)
+* **py:** Allow missing ext versions ExtensionDesc metadata ([#2979](https://github.com/Quantinuum/hugr/issues/2979)) ([bc1c445](https://github.com/Quantinuum/hugr/commit/bc1c4453b46ab24c52ca7b3c679730645da691bc))
+* **python:** allow dfg conversion in to TrackedDfg ([#2993](https://github.com/Quantinuum/hugr/issues/2993)) ([3bd7a88](https://github.com/Quantinuum/hugr/commit/3bd7a887a20289b6fcd6dd3f9c62886f31663518))
+
+
+### Bug Fixes
+
+* allow both _composable_pass and composable_pass imports ([#2965](https://github.com/Quantinuum/hugr/issues/2965)) ([0a5664d](https://github.com/Quantinuum/hugr/commit/0a5664d2374d1bd18aedb4e7619d26d2f564b412))
+* Always do extension resolution when loading packages and hugrs ([#2953](https://github.com/Quantinuum/hugr/issues/2953)) ([0086d2a](https://github.com/Quantinuum/hugr/commit/0086d2a9483283216858ca5f4e86691541d3530a))
+* Correct pyo3 module definitions and add missing exception class export ([#2964](https://github.com/Quantinuum/hugr/issues/2964)) ([3df73f4](https://github.com/Quantinuum/hugr/commit/3df73f4d3d0520fcbf278b4072a15e3b24c6edab))
+* Prefix names with underscores during serialization ([#2989](https://github.com/Quantinuum/hugr/issues/2989)) ([8aab636](https://github.com/Quantinuum/hugr/commit/8aab6366134db1ffdb7e65d70c9bcd04d661851d))
+* Use valid identifiers when constructing AST model ([#2973](https://github.com/Quantinuum/hugr/issues/2973)) ([8750a6b](https://github.com/Quantinuum/hugr/commit/8750a6b29ad93aaa72ff3fc48804e4f03b878d6c))
+
 ## [0.15.5](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.4...hugr-py-v0.15.5) (2026-03-16)
 
 
