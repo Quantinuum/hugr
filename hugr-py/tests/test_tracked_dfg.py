@@ -69,3 +69,30 @@ def test_complex_circuit():
     assert circ._output_op().types == [tys.Qubit, tys.Qubit, tys.Bool]
 
     validate(Package([circ.hugr], [QUANTUM_EXT]))
+
+
+def test_from_dfg():
+    from hugr.build.dfg import Dfg
+
+    # Build a plain Dfg with two qubits
+    dfg = Dfg(tys.Qubit, tys.Qubit)
+
+    # Convert to TrackedDfg without tracking inputs
+    tracked = TrackedDfg.from_dfg(dfg)
+    assert isinstance(tracked, TrackedDfg)
+    assert tracked.hugr is dfg.hugr  # shares the same hugr
+    assert tracked.parent_node == dfg.parent_node
+    assert tracked.tracked == []
+
+    # Convert to TrackedDfg WITH tracking inputs
+    dfg2 = Dfg(tys.Qubit, tys.Qubit)
+    tracked2 = TrackedDfg.from_dfg(dfg2, track_inputs=True)
+    assert isinstance(tracked2, TrackedDfg)
+    assert tracked2.tracked == list(tracked2.inputs())
+
+    # Can now use tracked-index operations on the converted builder
+    tracked2.add(H(0))
+    tracked2.add(CX(0, 1))
+    tracked2.set_tracked_outputs()
+
+    validate(Package([tracked2.hugr], [QUANTUM_EXT]))

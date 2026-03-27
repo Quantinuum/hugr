@@ -4,7 +4,7 @@ from collections.abc import Iterable
 from typing import Any
 
 from hugr import tys
-from hugr.build.dfg import Dfg
+from hugr.build.dfg import DfBase, Dfg
 from hugr.hugr.node_port import Node, Wire
 from hugr.ops import Command, ComWire
 
@@ -202,3 +202,22 @@ class TrackedDfg(Dfg):
             >>> dfg.set_tracked_outputs()
         """
         self.set_outputs(*(w for w in self.tracked if w is not None))
+
+    @classmethod
+    def from_dfg(cls, dfg: DfBase, track_inputs: bool = False) -> "TrackedDfg":
+        """Create a TrackedDfg from an existing Dfg.
+
+        This is a shallow conversion: the returned ``TrackedDfg`` shares the
+        same underlying :class:`Hugr` instance as the source ``dfg``.
+
+        Args:
+            dfg: The Dfg to convert.
+            track_inputs: Whether to track the input wires of the Dfg.
+
+        Returns:
+            A new TrackedDfg backed by the same Hugr as the given Dfg.
+        """
+        new = cls.__new__(cls)
+        new.__dict__.update(dfg.__dict__)  # type: ignore[attr-defined]
+        new.tracked = list(new.inputs()) if track_inputs else []
+        return new
