@@ -48,6 +48,7 @@ fn write_impl<'h>(
     config: EnvelopeConfig,
 ) -> Result<(), WriteError> {
     match config.format {
+        #[expect(deprecated)]
         EnvelopeFormat::PackageJson => {
             super::package_json::to_json_writer(hugrs, extensions, writer)?
         }
@@ -131,6 +132,7 @@ impl WriteError {
 /// Error encoding an envelope payload with enumerated variants.
 pub(crate) enum WriteErrorInner {
     /// Error encoding a JSON format package.
+    #[deprecated(since = "0.27.0")]
     JsonWrite(#[from] PackageEncodingError),
     /// Error encoding a binary model format package.
     ModelBinary(#[from] ModelBinaryWriteError),
@@ -184,6 +186,7 @@ mod test {
     use std::io::Cursor;
 
     #[test]
+    #[allow(deprecated)]
     fn test_write_empty_package() {
         let config = EnvelopeConfig {
             format: EnvelopeFormat::PackageJson,
