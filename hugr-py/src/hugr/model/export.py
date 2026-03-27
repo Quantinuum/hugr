@@ -59,10 +59,10 @@ class ModelExport:
         if root in self.link_names:
             return self.link_names[root]
         else:
-            index = str(self.link_next)
+            name = f"_{self.link_next}"
             self.link_next += 1
-            self.link_names[root] = index
-            return index
+            self.link_names[root] = name
+            return name
 
     def export_node(
         self, node: Node, virtual_input_links: Sequence[str] = []
@@ -526,7 +526,7 @@ class ModelExport:
                         source_types = model.List(
                             [type.to_model() for type in op.inputs]
                         )
-                        source = str(self.link_next)
+                        source = f"_{self.link_next}"
                         self.link_next += 1
 
                         child_node = self.export_node(

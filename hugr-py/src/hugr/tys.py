@@ -596,7 +596,7 @@ class VariableArg(TypeArg):
         return f"${self.idx}"
 
     def to_model(self) -> model.Term:
-        return model.Var(str(self.idx))
+        return model.Var(f"_{self.idx}")
 
     def _resolve_used_extensions(
         self, registry: ExtensionRegistry | None = None
@@ -778,7 +778,7 @@ class RowVariable(Type):
         return f"${self.idx}"
 
     def to_model(self):
-        return model.Splice(model.Var(str(self.idx)))
+        return model.Splice(model.Var(f"_{self.idx}"))
 
 
 @dataclass(frozen=True)
