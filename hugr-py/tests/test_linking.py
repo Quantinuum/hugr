@@ -1,6 +1,6 @@
 import pytest
 
-from hugr import Hugr, tys
+from hugr import Hugr, ext, tys
 from hugr._hugr.linking import HugrLinkingError, link_modules
 from hugr.build import Module
 from hugr.ops import FuncDefn
@@ -122,3 +122,40 @@ def test_link_packages_extensions():
         float.FLOAT_OPS_EXTENSION,
         float.FLOAT_TYPES_EXTENSION,
     ]
+
+
+def test_link_packages_extension_requires_resolution():
+    """Tests that a package using an extension can be serialized and deserialized during
+    the linking process."""
+    type_def = ext.TypeDef(
+        name="TestType",
+        description="A type definition.",
+        params=[],
+        bound=ext.ExplicitBound(tys.TypeBound.Copyable),
+    )
+    extension = ext.Extension(
+        version=ext.Version(0, 1, 0),
+        name="outer",
+        types={},
+    )
+    extension.add_type_def(type_def)
+    opaque_type_def = tys.Opaque(
+        id="TestType", bound=tys.TypeBound.Copyable, extension=extension.name
+    )
+
+    # Build a HUGR with the custom opaque type that requires the extension to be
+    # resolved during the deserialization process that happens during linking.
+    builder = Module()
+    func = builder.define_function(
+        "use_type_def",
+        input_types=[opaque_type_def],
+        output_types=[opaque_type_def],
+    )
+    func.set_outputs(*func.inputs())
+
+    pkg1 = Package(modules=[builder.hugr], extensions=[extension])
+    pkg2 = Package(modules=[build_module(entrypoint=False)])
+
+    result_pkg = pkg1.link(pkg2)
+
+    assert result_pkg.extensions == [extension]
