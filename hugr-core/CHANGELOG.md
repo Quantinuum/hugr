@@ -1,6 +1,22 @@
 # Changelog
 
 
+## [0.26.2](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.26.1...hugr-core-v0.26.2) - 2026-03-27
+
+### Bug Fixes
+
+- Use valid identifiers when constructing AST model ([#2973](https://github.com/Quantinuum/hugr/pull/2973))
+- Panic on constant folding with opaque consts ([#2986](https://github.com/Quantinuum/hugr/pull/2986))
+
+### New Features
+
+- *(py)* Allow missing ext versions ExtensionDesc metadata ([#2979](https://github.com/Quantinuum/hugr/pull/2979))
+
+### Refactor
+
+- Simplify validate_subtree ([#2969](https://github.com/Quantinuum/hugr/pull/2969))
+- further cleanups to SiblingSubgraph + generalize over trait HugrConvexChecker ([#2957](https://github.com/Quantinuum/hugr/pull/2957))
+
 ## [0.26.1](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.26.0...hugr-core-v0.26.1) - 2026-03-18
 
 ### New Features
