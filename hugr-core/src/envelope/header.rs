@@ -99,8 +99,12 @@ impl EnvelopeFormat {
     ///
     /// If true, the encoded envelope can be read as text.
     #[must_use]
+    #[expect(deprecated)]
     pub fn ascii_printable(self) -> bool {
-        !matches!(self, Self::Model | Self::ModelWithExtensions)
+        matches!(
+            self,
+            Self::PackageJson | Self::SExpression | Self::SExpressionWithExtensions
+        )
     }
 }
 
