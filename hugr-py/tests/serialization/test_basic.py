@@ -64,23 +64,23 @@ def test_entrypoint():
 
 def test_params_vars():
     # https://github.com/Quantinuum/hugr/issues/2988
-    # 
+    #
     # This is a regression test for generation of invalid model data from certain guppy-
     # generated HUGRs prior to https://github.com/Quantinuum/hugr/pull/2989. For
     # example:
-    # 
+    #
     # ```guppy
     # N = guppy.nat_var("N")
-    # 
+    #
     # @guppy.declare
     # def foo(_: array[int, N]) -> None: ...
-    # 
+    #
     # pkg = foo.compile()
     # pkg.to_bytes()
     # ```
-    # 
+    #
     # would generate model data like
-    # 
+    #
     # ```
     # (declare-func
     # public
@@ -90,10 +90,10 @@ def test_params_vars():
     #   [(collections.borrow_arr.borrow_array ?0 (arithmetic.int.types.int 6))]
     #   [(collections.borrow_arr.borrow_array ?0 (arithmetic.int.types.int 6))]))
     # ```
-    # 
+    #
     # leading to `ValueError: unknown var: ?0`, as the type parameter in the signature
     # of the function (representing the size of the array) was incorrectly named.
-    
+
     pkg = Package.from_bytes(
         b"HUGRiHJv?@"
         + b"""{
