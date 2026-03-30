@@ -75,6 +75,7 @@ impl HugrInputArgs {
     ///
     /// If `reader` is `None`, reads from the input specified in the args.
     /// This is a legacy option for reading old HUGR JSON files.
+    #[deprecated(since = "0.27.0")]
     pub(crate) fn get_hugr_with_reader<R: Read>(
         &mut self,
         reader: Option<R>,

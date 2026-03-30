@@ -323,6 +323,7 @@ pub(crate) mod test {
     fn compressed_roundtrip(#[case] package: Package) {
         let mut buffer = Vec::new();
         let config = EnvelopeConfig {
+            #[expect(deprecated)]
             format: EnvelopeFormat::PackageJson,
             zstd: Some(ZstdConfig::default()),
         };
