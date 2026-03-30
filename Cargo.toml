@@ -94,7 +94,7 @@ schemars = "1.2.1"
 
 # These public dependencies usually require breaking changes downstream, so we
 # try to be as permissive as possible.
-portgraph = { version = "0.15.3" }
+portgraph = { version = "0.16.0" }
 petgraph = { version = ">= 0.8.3, < 0.9", default-features = false }
 # There can only be one `pyo3` dependency in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.
