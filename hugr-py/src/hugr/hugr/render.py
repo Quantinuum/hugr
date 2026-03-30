@@ -298,16 +298,10 @@ class DotRenderer:
         )
 
         match hugr[node].op:
-            case AsExtOp() as op:
-                if not self.config.qualify_op_name:
-                    op_name = name_w_args(op.op_def().name, op.type_args())
-                else:
-                    op_name = name_w_args(op.name(), op.type_args())
-            case Case() as op:
-                if sibling_order is not None:
-                    op_name = f"{op.name()}[{sibling_order}]"
-                else:
-                    op_name = op.name()
+            case AsExtOp() as op if not self.config.qualify_op_name:
+                op_name = name_w_args(op.op_def().name, op.type_args())
+            case Case() as op if sibling_order is not None:
+                op_name = f"{op.name()}[{sibling_order}]"
             case Custom() as op:
                 op_name = name_w_args(op.name(), op.args)
             case op:
