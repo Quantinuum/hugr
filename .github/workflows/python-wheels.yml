@@ -44,13 +44,30 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       run: ${{ steps.check-tag.outputs.run }}
+    permissions:
+      # Used to mark the release as draft
+      contents: write
     steps:
+      - uses: actions/checkout@v6
       - name: Check tag
         id: check-tag
         run: |
           echo "run=$SHOULD_RUN" >> $GITHUB_OUTPUT
         env:
           SHOULD_RUN: ${{ github.ref_type != 'tag' || ( github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/hugr-py-v') ) }}
+
+      - name: Temporarily mark the release as draft
+        if: ${{ github.ref_type == 'tag' && startsWith(github.ref, 'refs/tags/hugr-py-v') }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release view ${{ github.ref_name }}
+          if [ $? -ne 0 ]; then
+            echo "No release found for tag ${{ github.ref_name }}"
+            exit 1
+          fi
+          # Make the GitHub release a draft until the package has been published to PyPI
+          gh release edit ${{ github.ref_name }} --draft=true
 
   linux:
     needs: check-tag
@@ -305,6 +322,8 @@ jobs:
       - uses: actions/checkout@v6
 
       - name: Check if the tag has an associated release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           gh release view ${{ github.ref_name }}
           if [ $? -ne 0 ]; then
