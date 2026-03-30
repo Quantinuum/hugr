@@ -9,7 +9,7 @@ use crate::{Extension, Hugr};
 
 /// Write the Package in json format into an io writer.
 #[deprecated(since = "0.27.0")]
-#[allow(deprecated)]
+#[expect(deprecated)]
 pub(super) fn to_json_writer<'h>(
     hugrs: impl IntoIterator<Item = &'h Hugr>,
     extensions: &ExtensionRegistry,
@@ -58,7 +58,7 @@ pub enum PackageEncodingError {
 /// as the json definition is not stable, and should always be wrapped in an Envelope.
 #[derive(Debug, serde::Serialize)]
 #[deprecated(since = "0.27.0")]
-#[allow(deprecated)]
+#[expect(deprecated)]
 struct PackageSer<'h> {
     pub modules: Vec<HugrSer<'h>>,
     pub extensions: Vec<&'h Extension>,

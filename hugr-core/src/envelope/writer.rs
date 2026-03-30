@@ -186,7 +186,7 @@ mod test {
     use std::io::Cursor;
 
     #[test]
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     fn test_write_empty_package() {
         let config = EnvelopeConfig {
             format: EnvelopeFormat::PackageJson,

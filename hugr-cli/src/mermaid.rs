@@ -74,7 +74,7 @@ impl MermaidArgs {
     }
 
     /// Write the mermaid diagram for a legacy HUGR json with optional I/O overrides.
-    #[allow(deprecated)]
+    #[expect(deprecated)]
     fn run_print_hugr_with_io<R: Read, W: Write>(
         &mut self,
         input_override: Option<R>,

@@ -22,7 +22,7 @@ trait Serializer {
 
 struct JsonSer;
 
-#[allow(deprecated)]
+#[expect(deprecated)]
 impl Serializer for JsonSer {
     fn serialize(&self, hugr: &Hugr) -> Vec<u8> {
         let cfg = EnvelopeConfig::new(EnvelopeFormat::PackageJson).disable_compression();
