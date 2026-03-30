@@ -9,8 +9,16 @@ from graphviz import Digraph
 from typing_extensions import assert_never
 
 from hugr.hugr import Hugr
-from hugr.ops import AsExtOp, Case
-from hugr.tys import CFKind, ConstKind, FunctionKind, Kind, OrderKind, ValueKind
+from hugr.ops import AsExtOp, Case, Custom
+from hugr.tys import (
+    CFKind,
+    ConstKind,
+    FunctionKind,
+    Kind,
+    OrderKind,
+    ValueKind,
+)
+from hugr.utils import name_w_args
 
 from .node_port import InPort, Node, OutPort
 
@@ -289,14 +297,21 @@ class DotRenderer:
             else ""
         )
 
-        op = hugr[node].op
-        if isinstance(op, AsExtOp) and not self.config.qualify_op_name:
-            op_name = op.op_def().name
-        elif isinstance(op, Case) and sibling_order is not None:
-            # Indicate the case number
-            op_name = f"{op.name()}[{sibling_order}]"
-        else:
-            op_name = op.name()
+        match hugr[node].op:
+            case AsExtOp() as op:
+                if not self.config.qualify_op_name:
+                    op_name = name_w_args(op.op_def().name, op.type_args())
+                else:
+                    op_name = name_w_args(op.name(), op.type_args())
+            case Case() as op:
+                if sibling_order is not None:
+                    op_name = f"{op.name()}[{sibling_order}]"
+                else:
+                    op_name = op.name()
+            case Custom() as op:
+                op_name = name_w_args(op.name(), op.args)
+            case op:
+                op_name = op.name()
 
         if self.config.max_node_label_length is not None:
             op_name = _smart_truncate(
