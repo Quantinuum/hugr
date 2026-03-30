@@ -43,10 +43,12 @@ use rstest::rstest;
 /// A serde-serializable hugr. Used for testing.
 #[derive(Debug, serde::Serialize)]
 #[serde(transparent)]
+#[allow(deprecated)]
 pub(super) struct HugrSer<'h>(#[serde(serialize_with = "Hugr::serde_serialize")] pub &'h Hugr);
 /// A serde-deserializable hugr. Used for testing.
 #[derive(Debug, serde::Deserialize)]
 #[serde(transparent)]
+#[allow(deprecated)]
 pub(super) struct HugrDeser(#[serde(deserialize_with = "Hugr::serde_deserialize")] pub Hugr);
 
 /// Version 1 of the Testing HUGR serialization format, see `testing_hugr.py`.

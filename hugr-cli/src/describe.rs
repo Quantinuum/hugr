@@ -31,11 +31,11 @@ pub struct DescribeArgs {
     pub module_args: ModuleArgs,
 
     #[arg(long, default_value = "false", help_heading = "JSON")]
-    /// Output in json format
+    /// Output in json format (deprecated)
     pub json: bool,
 
     #[arg(long, default_value = "false", help_heading = "JSON")]
-    /// Output JSON schema for the description format.
+    /// Output JSON schema for the description format (deprecated).
     /// Can't be combined with --json.
     pub json_schema: bool,
 
