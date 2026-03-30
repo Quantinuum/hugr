@@ -70,7 +70,7 @@ mod silenced {
         /// Json-encoded [`crate::package::Package`]
         ///
         /// Uses a printable ascii value as the discriminant so the envelope can be
-        /// read as text.
+        /// read as text. DEPRECATED.
         #[deprecated(since = "0.27.0")]
         PackageJson = 63, // '?' in ascii
     }
