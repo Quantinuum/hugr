@@ -12,6 +12,7 @@ mod syn_edge;
 #[cfg(test)]
 mod tests;
 
+use ::petgraph::visit as pv;
 use serde::de::Deserialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -412,7 +413,7 @@ pub trait HugrView: HugrInternals {
         };
         SchedulingGraph {
             graph,
-            nodes: region_nodes,
+            node_map: region_nodes,
             region_parent: parent,
         }
     }
@@ -569,7 +570,7 @@ impl<S: HugrNode> ExtractionResult<S> for HashMap<S, Node> {
 /// A graph of a flat region of a Hugr, including ordering constraints from nonlocal edges
 pub struct SchedulingGraph<'a, V: HugrView + ?Sized + 'a> {
     graph: SynEdgeWrapper<portgraph::view::FlatRegion<'a, V::RegionPortgraph<'a>>>,
-    nodes: V::RegionPortgraphNodes,
+    node_map: V::RegionPortgraphNodes,
     region_parent: V::Node,
 }
 
@@ -577,6 +578,23 @@ impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
     /// Get the parent node of the region represented by this scheduling graph
     pub fn region_parent(&self) -> V::Node {
         self.region_parent
+    }
+
+    /// Allows translating between the [V::Node]s of the original Hugr and the
+    /// [portgraph::NodeIndex]es of [Self::graph()]
+    pub fn node_map(&self) -> &V::RegionPortgraphNodes {
+        &self.node_map
+    }
+
+    /// Access to the graph, sufficient to allow [pv::Topo]
+    pub fn graph(
+        &self,
+    ) -> impl pv::NodeCount
+    + pv::IntoNodeIdentifiers
+    + pv::IntoEdgeReferences
+    + pv::IntoNeighborsDirected
+    + pv::Visitable<NodeId = portgraph::NodeIndex> {
+        &self.graph
     }
 }
 
