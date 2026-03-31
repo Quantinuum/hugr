@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.6.0](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.5.1...hugr-persistent-v0.6.0) - 2026-03-31
+
+### New Features
+
+- [**breaking**] Deprecate JSON serialization format ([#2991](https://github.com/Quantinuum/hugr/pull/2991))
+
 ## [0.5.0](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.4.7...hugr-persistent-v0.5.0) - 2026-03-16
 
 ### New Features
