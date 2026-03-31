@@ -6,6 +6,9 @@ import pytest
 from hugr import tys, val
 from hugr.build import Module
 from hugr.hugr import Hugr, Node
+
+# Import some items from the deprecated _scope module and some from the stable
+# version to ensure the deprecated module is still functional.
 from hugr.passes._scope import LocalScope, PassScope
 from hugr.passes.scope import GlobalScope, InScope
 
