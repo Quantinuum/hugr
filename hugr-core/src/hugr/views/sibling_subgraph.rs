@@ -53,9 +53,9 @@ pub trait HugrConvexChecker<N: HugrNode> {
     ) -> Result<Vec<N>, InvalidSubgraph<N>>;
 }
 
-impl<'a, H: HugrView, CC: CreateConvexChecker<CheckerRegion<'a, H>>> HugrConvexChecker<H::Node>
-    for ConvexChecker<'a, H, CC>
+impl<'a, H, CC> HugrConvexChecker<H::Node> for ConvexChecker<'a, H, CC>
 where
+    H: HugrView,
     CC: CreateConvexChecker<CheckerRegion<'a, H>, NodeIndexBase = u32, PortIndexBase = u32>,
 {
     fn region_parent(&self) -> H::Node {
