@@ -53,8 +53,10 @@ pub trait HugrConvexChecker<N: HugrNode> {
     ) -> Result<Vec<N>, InvalidSubgraph<N>>;
 }
 
-impl<'a, H: HugrView, CC: CreateConvexChecker<CheckerRegion<'a, H>>> HugrConvexChecker<H::Node>
-    for ConvexChecker<'a, H, CC>
+impl<'a, H, CC> HugrConvexChecker<H::Node> for ConvexChecker<'a, H, CC>
+where
+    H: HugrView,
+    CC: CreateConvexChecker<CheckerRegion<'a, H>, NodeIndexBase = u32, PortIndexBase = u32>,
 {
     fn region_parent(&self) -> H::Node {
         self.region_parent
@@ -991,7 +993,7 @@ fn check_parent<'a, N: HugrNode>(
 }
 
 fn make_boundary<'a, H: HugrView>(
-    region: &impl LinkView<PortOffsetBase = u32>,
+    region: &impl LinkView<NodeIndexBase = u32, PortIndexBase = u32, PortOffsetBase = u32>,
     node_map: &H::RegionPortgraphNodes,
     inputs: &'a IncomingPorts<H::Node>,
     outputs: &'a OutgoingPorts<H::Node>,
@@ -1082,8 +1084,11 @@ where
 impl<'g, Base, Checker> portgraph::algorithms::ConvexChecker for ConvexChecker<'g, Base, Checker>
 where
     Base: HugrView,
-    Checker: CreateConvexChecker<CheckerRegion<'g, Base>>,
+    Checker: CreateConvexChecker<CheckerRegion<'g, Base>, NodeIndexBase = u32, PortIndexBase = u32>,
 {
+    type NodeIndexBase = u32;
+    type PortIndexBase = u32;
+
     fn is_convex(
         &self,
         nodes: impl IntoIterator<Item = portgraph::NodeIndex>,

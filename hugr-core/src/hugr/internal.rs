@@ -21,7 +21,9 @@ use crate::ops::handle::NodeHandle;
 /// view.
 pub trait HugrInternals {
     /// The portgraph graph structure returned by [`HugrInternals::region_portgraph`].
-    type RegionPortgraph<'p>: LinkView<LinkEndpoint: Eq, PortOffsetBase = u32> + Clone + 'p
+    type RegionPortgraph<'p>: LinkView<LinkEndpoint: Eq, NodeIndexBase = u32, PortIndexBase = u32, PortOffsetBase = u32>
+        + Clone
+        + 'p
     where
         Self: 'p;
 
