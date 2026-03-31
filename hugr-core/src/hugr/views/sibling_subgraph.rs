@@ -28,6 +28,8 @@ use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
 use super::RootChecked;
 
+mod convex;
+
 /// Checks convexity of potential sibling subgraphs within a Hugr region.
 pub trait HugrConvexChecker<N: HugrNode> {
     /// The parent node of the region within which this checker can check convexity
