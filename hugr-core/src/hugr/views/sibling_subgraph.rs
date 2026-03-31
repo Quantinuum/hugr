@@ -1526,21 +1526,33 @@ fn has_unique_linear_ports<H: HugrView>(host: &H, ports: &OutgoingPorts<H::Node>
     linear_ports.len() == unique_ports.len()
 }
 
-pub struct SchedGraphChecker<'h, H: HugrView> {
-    graph: SchedulingGraph<'h, H>,
-    checker: convex::TopoConvexChecker<SynEdgeWrapper<H::RegionPortgraph<'h>>>,
+pub struct SchedGraphChecker<'h, H: HugrView + 'h> {
+    node_map: H::RegionPortgraphNodes,
+    region_parent: H::Node,
+    checker: convex::TopoConvexChecker<
+        &'h SynEdgeWrapper<portgraph::view::FlatRegion<'h, H::RegionPortgraph<'h>>>,
+    >,
 }
 
 impl<'h, H: HugrView> SchedGraphChecker<'h, H> {
     pub fn new(graph: SchedulingGraph<'h, H>) -> Self {
-        let checker = convex::TopoConvexChecker::new(graph.region_view());
-        Self { graph, checker }
+        let SchedulingGraph {
+            graph,
+            node_map,
+            region_parent,
+        } = graph;
+        let checker = convex::TopoConvexChecker::new(graph);
+        Self {
+            node_map,
+            region_parent,
+            checker,
+        }
     }
 }
 
 impl<H: HugrView> HugrConvexChecker<H::Node> for SchedGraphChecker<'_, H> {
     fn region_parent(&self) -> H::Node {
-        self.graph.region_parent
+        self.region_parent
     }
     fn nodes_if_convex(
         &self,
@@ -1549,13 +1561,19 @@ impl<H: HugrView> HugrConvexChecker<H::Node> for SchedGraphChecker<'_, H> {
         outputs: &OutgoingPorts<H::Node>,
         function_calls: &IncomingPorts<H::Node>,
     ) -> Result<Vec<H::Node>, InvalidSubgraph<H::Node>> {
-        let nodes = self
-            .graph
-            .graph
-            .node_identifiers()
-            .map(|index| self.graph.node_map.from_portgraph(index))
-            .collect_vec();
+        let node_indices = make_pg_subgraph::<H>(
+            self.checker.graph().region_view.clone(),
+            inputs,
+            outputs,
+            &self.node_map,
+        )
+        .node_identifiers()
+        .collect_vec();
 
+        let nodes = node_indices
+            .iter()
+            .map(|&pg_node| self.node_map.from_portgraph(pg_node))
+            .collect_vec();
         validate_boundary(hugr, &nodes, inputs, &outputs, function_calls)?;
 
         if nodes.len() <= 1 {
@@ -1573,7 +1591,7 @@ impl<H: HugrView> HugrConvexChecker<H::Node> for SchedGraphChecker<'_, H> {
             return Err(InvalidSubgraph::NotConvex);
         }
 
-        if self.checker.is_node_convex(nodes) {
+        if self.checker.is_node_convex(node_indices) {
             Ok(nodes)
         } else {
             Err(InvalidSubgraph::NotConvex)
