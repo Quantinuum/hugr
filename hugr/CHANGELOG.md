@@ -2,6 +2,12 @@
 
 ## [0.27.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.26.1...hugr-v0.27.0) - 2026-03-31
 
+This release deprecates the JSON serialization format. Now hugrs can be encoded in a readable file
+using the S-expressions format instead.
+
+The release contains multiple bug fixes, including a breaking version bump for
+the public `portgraph` dependency.
+
 ### Bug Fixes
 
 - Use valid identifiers when constructing AST model ([#2973](https://github.com/Quantinuum/hugr/pull/2973))
