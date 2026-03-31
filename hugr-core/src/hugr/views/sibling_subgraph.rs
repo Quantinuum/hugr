@@ -3,7 +3,7 @@
 //! Views into convex subgraphs of HUGRs within a single level of the
 //! hierarchy, i.e. within a sibling graph. Convex subgraph are always
 //! induced subgraphs, i.e. they are defined by a subset of the sibling nodes.
-
+#![expect(deprecated)] // ALAN TODO use scheduling_graph instead of region_portgraph
 use std::collections::HashSet;
 use std::mem;
 
