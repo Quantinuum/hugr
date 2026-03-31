@@ -6,7 +6,8 @@ import pytest
 from hugr import tys, val
 from hugr.build import Module
 from hugr.hugr import Hugr, Node
-from hugr.passes.scope import GlobalScope, InScope, LocalScope, PassScope
+from hugr.passes._scope import LocalScope, PassScope
+from hugr.passes.scope import GlobalScope, InScope
 
 
 @dataclass(frozen=True)
