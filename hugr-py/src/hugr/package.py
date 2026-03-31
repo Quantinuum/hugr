@@ -232,22 +232,28 @@ class Package:
         Returns:
             A new package containing the modules and extensions of all packages.
         """
+        from hugr.ext import ExtensionRegistry
+
         modules = self.modules[:]
-        extensions = self.extensions[:]
+        registry = ExtensionRegistry.from_extensions(self.extensions)
         for pkg in other:
             modules.extend(pkg.modules)
             for new_ext in pkg.extensions:
-                if new_ext not in extensions:
-                    extensions.append(new_ext)
+                registry.register_updated(new_ext)
 
         if len(modules) == 0:
-            return Package([], extensions)
+            return Package([], list(registry.extensions.values()))
 
-        result_module_bytes = modules[0].to_bytes()
+        result_module_bytes = modules[0].to_bytes(include_extensions=registry)
         for module in modules[1:]:
-            result_module_bytes = link_modules(result_module_bytes, module.to_bytes())
+            result_module_bytes = link_modules(
+                result_module_bytes, module.to_bytes(include_extensions=registry)
+            )
 
-        return Package([Hugr.from_bytes(result_module_bytes)], extensions)
+        return Package(
+            [Hugr.from_bytes(result_module_bytes)],
+            list(registry.extensions.values()),
+        )
 
 
 @dataclass(frozen=True)
