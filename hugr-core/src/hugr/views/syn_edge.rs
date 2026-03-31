@@ -208,24 +208,3 @@ impl<T: pv::GraphBase + pv::Visitable> pv::Visitable for SynEdgeWrapper<T> {
         self.region_view.reset_map(map);
     }
 }
-
-/*impl <T> pv::GetAdjacencyMatrix for PetgraphWrapper<'_, T>
-where
-    T: HugrView,
-{
-    type AdjMatrix = std::collections::HashSet<(Self::NodeId, Self::NodeId)>;
-
-    fn adjacency_matrix(&self) -> Self::AdjMatrix {
-        let mut matrix = std::collections::HashSet::new();
-        for node in self.hugr.nodes() {
-            for neighbour in self.hugr.output_neighbours(node) {
-                matrix.insert((node, neighbour));
-            }
-        }
-        matrix
-    }
-
-    fn is_adjacent(&self, matrix: &Self::AdjMatrix, a: Self::NodeId, b: Self::NodeId) -> bool {
-        matrix.contains(&(a, b))
-    }
-}*/
