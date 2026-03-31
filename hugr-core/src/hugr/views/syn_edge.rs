@@ -208,3 +208,26 @@ impl<T: pv::GraphBase + pv::Visitable> pv::Visitable for SynEdgeWrapper<T> {
         self.region_view.reset_map(map);
     }
 }
+
+#[cfg(test)]
+mod test {
+    use petgraph::visit as pv;
+    use petgraph::visit::Walker as _;
+    use rstest::rstest;
+
+    use crate::builder::test::simple_dfg_hugr;
+    use crate::{Hugr, HugrView};
+
+    #[rstest]
+    fn test(simple_dfg_hugr: Hugr) {
+        fn check_into_edges(_x: impl pv::IntoEdgeReferences) {}
+
+        let sg = simple_dfg_hugr.scheduling_graph(simple_dfg_hugr.module_root());
+        let n = pv::NodeFiltered::from_fn(&sg.graph, |n| n.index() % 2 == 0);
+        check_into_edges(&sg.graph);
+        check_into_edges(&n);
+        pv::Topo::new(&sg.graph)
+            .iter(&sg.graph)
+            .for_each(|n| println!("Node: {:?}", n));
+    }
+}
