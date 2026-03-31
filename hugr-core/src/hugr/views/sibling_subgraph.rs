@@ -1529,4 +1529,19 @@ fn has_unique_linear_ports<H: HugrView>(host: &H, ports: &OutgoingPorts<H::Node>
 }
 
 #[cfg(test)]
+mod test_traits_impld {
+    use crate::{Hugr, HugrView, builder::test::simple_dfg_hugr};
+    use portgraph::NodeIndex;
+    use rstest::rstest;
+
+    #[rstest]
+    fn test(simple_dfg_hugr: Hugr) {
+        let sg = simple_dfg_hugr.scheduling_graph(simple_dfg_hugr.module_root());
+        // Just to check that this compiles, never mind the actual result.
+        super::convex::TopoConvexChecker::new(sg.graph())
+            .is_node_convex([NodeIndex::new(0), NodeIndex::new(2)]);
+    }
+}
+
+#[cfg(test)]
 mod tests;
