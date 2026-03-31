@@ -4,15 +4,13 @@
 //! hierarchy, i.e. within a sibling graph. Convex subgraph are always
 //! induced subgraphs, i.e. they are defined by a subset of the sibling nodes.
 #![expect(deprecated)] // ALAN TODO use scheduling_graph instead of region_portgraph
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::mem;
 
 use itertools::Itertools;
-use portgraph::LinkView;
-use portgraph::PortView;
-use portgraph::algorithms::CreateConvexChecker;
+use petgraph::visit::IntoNodeIdentifiers;
 use portgraph::algorithms::convex::{LineIndex, LineIntervals, Position};
-use portgraph::boundary::Boundary;
+use portgraph::{LinkView, PortView, algorithms::CreateConvexChecker, boundary::Boundary};
 use rustc_hash::FxHashSet;
 use thiserror::Error;
 
@@ -26,7 +24,7 @@ use crate::ops::{NamedOp, OpTag, OpTrait, OpType};
 use crate::types::{Signature, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
-use super::RootChecked;
+use super::{RootChecked, SchedulingGraph, SynEdgeWrapper};
 
 mod convex;
 
@@ -1526,6 +1524,61 @@ fn has_unique_linear_ports<H: HugrView>(host: &H, ports: &OutgoingPorts<H::Node>
         .collect();
     let unique_ports: HashSet<_> = linear_ports.iter().collect();
     linear_ports.len() == unique_ports.len()
+}
+
+pub struct SchedGraphChecker<'h, H: HugrView> {
+    graph: SchedulingGraph<'h, H>,
+    checker: convex::TopoConvexChecker<SynEdgeWrapper<H::RegionPortgraph<'h>>>,
+}
+
+impl<'h, H: HugrView> SchedGraphChecker<'h, H> {
+    pub fn new(graph: SchedulingGraph<'h, H>) -> Self {
+        let checker = convex::TopoConvexChecker::new(graph.region_view());
+        Self { graph, checker }
+    }
+}
+
+impl<H: HugrView> HugrConvexChecker<H::Node> for SchedGraphChecker<'_, H> {
+    fn region_parent(&self) -> H::Node {
+        self.graph.region_parent
+    }
+    fn nodes_if_convex(
+        &self,
+        hugr: &impl HugrView<Node = H::Node>,
+        inputs: &IncomingPorts<H::Node>,
+        outputs: &OutgoingPorts<H::Node>,
+        function_calls: &IncomingPorts<H::Node>,
+    ) -> Result<Vec<H::Node>, InvalidSubgraph<H::Node>> {
+        let nodes = self
+            .graph
+            .graph
+            .node_identifiers()
+            .map(|index| self.graph.node_map.from_portgraph(index))
+            .collect_vec();
+
+        validate_boundary(hugr, &nodes, inputs, &outputs, function_calls)?;
+
+        if nodes.len() <= 1 {
+            return Ok(nodes);
+        }
+        let post_outputs: BTreeSet<_> = outputs
+            .into_iter()
+            .flat_map(|(n, p)| hugr.linked_inputs(*n, *p))
+            .collect();
+        if inputs
+            .into_iter()
+            .flatten()
+            .any(|p| post_outputs.contains(&p))
+        {
+            return Err(InvalidSubgraph::NotConvex);
+        }
+
+        if self.checker.is_node_convex(nodes) {
+            Ok(nodes)
+        } else {
+            Err(InvalidSubgraph::NotConvex)
+        }
+    }
 }
 
 #[cfg(test)]
