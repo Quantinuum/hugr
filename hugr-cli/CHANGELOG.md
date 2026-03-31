@@ -1,6 +1,17 @@
 # Changelog
 
 
+## [0.27.0](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.26.1...hugr-cli-v0.27.0) - 2026-03-31
+
+### Bug Fixes
+
+- Do extension resolution on exts loaded by hugr-cli ([#2987](https://github.com/Quantinuum/hugr/pull/2987))
+
+### New Features
+
+- *(py)* Allow missing ext versions ExtensionDesc metadata ([#2979](https://github.com/Quantinuum/hugr/pull/2979))
+- [**breaking**] Deprecate JSON serialization format ([#2991](https://github.com/Quantinuum/hugr/pull/2991))
+
 ## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.25.7...hugr-cli-v0.26.0) - 2026-03-16
 
 ### Documentation
