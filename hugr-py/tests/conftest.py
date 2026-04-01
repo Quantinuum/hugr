@@ -46,7 +46,7 @@ TEST_EXT = ext.Extension("pytest.test_ext", ext.Version(0, 1, 0))
 def test_ext_registry() -> ext.ExtensionRegistry:
     """Registry containing TEST_EXT."""
     registry = ext.ExtensionRegistry()
-    registry.add_extension(TEST_EXT)
+    registry.register(TEST_EXT)
     return registry
 
 

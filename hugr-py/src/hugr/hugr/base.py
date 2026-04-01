@@ -1207,7 +1207,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             include_extensions = self.used_extensions().used_extensions
         std = _std_extensions()
         extensions = [
-            ext for ext in include_extensions.extensions.values() if ext.name not in std
+            ext for ext in include_extensions.all_extensions if ext.name not in std
         ]
         return Package(modules=[self], extensions=extensions)
 

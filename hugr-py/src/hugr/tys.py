@@ -805,7 +805,7 @@ class USize(Type):
         from hugr.std.prelude import PRELUDE_EXTENSION
 
         result = ExtensionResolutionResult()
-        result.used_extensions.add_extension(PRELUDE_EXTENSION)
+        result.used_extensions.register(PRELUDE_EXTENSION)
         return (self, result)
 
 
@@ -997,7 +997,7 @@ class ExtType(Type):
         from hugr.ext import ExtensionResolutionResult
 
         result = ExtensionResolutionResult()
-        result.used_extensions.add_extension(self.type_def.get_extension())
+        result.used_extensions.register(self.type_def.get_extension())
 
         new_args = []
         for arg in self.args:
@@ -1090,7 +1090,7 @@ class _QubitDef(Type):
         from hugr.std.prelude import PRELUDE_EXTENSION
 
         result = ExtensionResolutionResult()
-        result.used_extensions.add_extension(PRELUDE_EXTENSION)
+        result.used_extensions.register(PRELUDE_EXTENSION)
         return (self, result)
 
 

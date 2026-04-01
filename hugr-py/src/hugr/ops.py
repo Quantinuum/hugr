@@ -601,7 +601,7 @@ class ExtOp(AsExtOp):
         from hugr.ext import ExtensionResolutionResult
 
         result = ExtensionResolutionResult()
-        result.used_extensions.register_updated(self._op_def.get_extension())
+        result.used_extensions.register(self._op_def.get_extension())
 
         # Signature
         new_signature: tys.FunctionType | None = self.signature
@@ -693,7 +693,7 @@ class MakeTuple(AsExtOp, _PartialOp):
         from hugr.ext import ExtensionResolutionResult
 
         result = ExtensionResolutionResult()
-        result.used_extensions.register_updated(std.PRELUDE)
+        result.used_extensions.register(std.PRELUDE)
         if self._types is not None:
             result.extend(tys._resolve_typerow_exts_inplace(self._types, registry))
 
@@ -761,7 +761,7 @@ class UnpackTuple(AsExtOp, _PartialOp):
         from hugr.ext import ExtensionResolutionResult
 
         result = ExtensionResolutionResult()
-        result.used_extensions.register_updated(std.PRELUDE)
+        result.used_extensions.register(std.PRELUDE)
         if self._types is not None:
             result.extend(tys._resolve_typerow_exts_inplace(self._types, registry))
 

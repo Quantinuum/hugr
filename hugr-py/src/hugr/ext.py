@@ -24,7 +24,7 @@ __all__ = [
 ]
 
 if TYPE_CHECKING:
-    from collections.abc import Callable, Iterable, Sequence
+    from collections.abc import Callable, Iterable, Iterator, Sequence
 
     from hugr.hugr import Hugr
     from hugr.tys import ExtensionId
@@ -341,7 +341,7 @@ class Extension:
     ) -> ExtensionResolutionResult:
         """Collect extension dependencies from this extension's op signatures."""
         if registry is not None and self.name not in registry:
-            registry.register_updated(self)
+            registry.register(self)
 
         result = ExtensionResolutionResult()
         for op_def in self.operations.values():
@@ -444,11 +444,89 @@ class Extension:
 
 
 @dataclass
+class ExtensionVersions:
+    """Set of versions of an extension.
+
+    Older versions of an extension may be kept for backwards compatibility.
+    """
+
+    id: ExtensionId
+    latest_version: Version
+    _exts: dict[Version, Extension]
+
+    def __init__(self, latest: Extension) -> None:
+        self.id = latest.name
+        self.latest_version = latest.version
+        self._exts = {latest.version: latest}
+
+    @property
+    def latest(self) -> Extension:
+        """Get latest version of the extension."""
+        return self._exts[self.latest_version]
+
+    @property
+    def versions(self) -> list[Version]:
+        """Get all versions of the extension."""
+        return list(self._exts.keys())
+
+    def add(self, extension: Extension) -> None:
+        """Add an extension to the set."""
+        if extension.name != self.id:
+            msg = f"Extension {extension.name} has a different name than {self.id}"
+            raise ValueError(msg)
+
+        self._exts[extension.version] = extension
+
+        if extension.version > self.latest_version:
+            self.latest_version = extension.version
+
+    def __contains__(self, version: Version) -> bool:
+        """Check if a version is in the set."""
+        return version in self._exts
+
+    def __getitem__(self, version: Version) -> Extension:
+        """Get an extension by version."""
+        return self._exts[version]
+
+    def __iter__(self) -> Iterator[Extension]:
+        """Iterate over the extensions in the set.
+
+        Yields extensions.
+        """
+        return iter(self._exts.values())
+
+    def __len__(self) -> int:
+        """Get the number of extensions in the set."""
+        return len(self._exts)
+
+
+@dataclass
 class ExtensionRegistry:
     """Registry of extensions."""
 
-    #: Extensions in the registry, indexed by name.
-    extensions: dict[ExtensionId, Extension] = field(default_factory=dict)
+    #: Set of different versions of each extension in the registry.
+    versioned_extensions: dict[ExtensionId, ExtensionVersions] = field(
+        default_factory=dict
+    )
+
+    @property
+    def extensions(self) -> Iterator[Extension]:
+        """Get the latest version of each extension in the registry.
+
+        To get all registered versions of all extensions, use :meth:`all_extensions`.
+        """
+        for versions in self.versioned_extensions.values():
+            yield versions.latest
+
+    @property
+    def all_extensions(self) -> Iterator[Extension]:
+        """Get all extensions in the registry.
+
+        This may contain different versions of the same extension.
+        To get only the latest version of each extension, use :meth:`extensions`.
+        """
+        for versions in self.versioned_extensions.values():
+            yield from versions
 
     @dataclass
     class ExtensionNotFound(Exception):
@@ -456,16 +534,13 @@ class ExtensionRegistry:
 
         extension_id: ExtensionId
 
-    @dataclass
-    class ExtensionExists(Exception):
-        """Extension already exists in registry."""
-
-        extension_id: ExtensionId
-
     @classmethod
     def from_extensions(cls, extensions: Iterable[Extension]) -> ExtensionRegistry:
         """Create an extension registry from a list of extensions."""
-        return cls(extensions={extension.name: extension for extension in extensions})
+        self = cls()
+        for extension in extensions:
+            self.register(extension)
+        return self
 
     def ids(self) -> set[ExtensionId]:
         """Get the set of extension IDs in the registry.
@@ -473,10 +548,12 @@ class ExtensionRegistry:
         Returns:
             Set of extension IDs.
         """
-        return set(self.extensions.keys())
+        return set(self.versioned_extensions.keys())
 
-    def add_extension(self, extension: Extension) -> Extension:
+    def register(self, extension: Extension) -> Extension:
         """Add an extension to the registry.
+
+        If a different version of the same extension already exists, keeps both.
 
         Args:
             extension: The extension to add.
@@ -487,10 +564,11 @@ class ExtensionRegistry:
         Raises:
             ExtensionExists: If an extension with the same name already exists.
         """
-        if extension.name in self.extensions:
-            raise self.ExtensionExists(extension.name)
-        self.extensions[extension.name] = extension
-        return self.extensions[extension.name]
+        if extension.name not in self.versioned_extensions:
+            self.versioned_extensions[extension.name] = ExtensionVersions(extension)
+        else:
+            self.versioned_extensions[extension.name].add(extension)
+        return self.versioned_extensions[extension.name][extension.version]
 
     def get_extension(self, name: ExtensionId) -> Extension:
         """Retrieve an extension by name.
@@ -505,23 +583,9 @@ class ExtensionRegistry:
             ExtensionNotFound: If the extension is not found in the registry.
         """
         try:
-            return self.extensions[name]
+            return self.versioned_extensions[name].latest
         except KeyError as e:
             raise self.ExtensionNotFound(name) from e
-
-    def register_updated(self, extension: Extension) -> None:
-        """Add or update an extension in the registry.
-
-        If an extension with the same name already exists, keeps the one
-        with the higher version.
-
-        Args:
-            extension: The extension to add or update.
-        """
-        name = extension.name
-        existing = self.extensions.get(name)
-        if existing is None or existing.version < extension.version:
-            self.extensions[name] = extension
 
     def extend(self, other: ExtensionRegistry) -> None:
         """Add a registry of extensions to this registry.
@@ -532,14 +596,14 @@ class ExtensionRegistry:
         Args:
             other: The extension registry to add.
         """
-        for ext in other.extensions.values():
-            self.register_updated(ext)
+        for ext in other.all_extensions:
+            self.register(ext)
 
     def __str__(self) -> str:
-        return "ExtensionRegistry(" + ", ".join(self.extensions.keys()) + ")"
+        return "ExtensionRegistry(" + ", ".join(self.ids()) + ")"
 
     def __contains__(self, name: ExtensionId) -> bool:
-        return name in self.extensions
+        return name in self.versioned_extensions
 
 
 @dataclass
@@ -592,7 +656,7 @@ class ExtensionResolutionResult:
         """Extend the set of extensions with transitive dependencies required by
         the OpDefs in each extension definition.
         """
-        queue: list[Extension] = list(self.used_extensions.extensions.values())
+        queue: list[Extension] = list(self.used_extensions.all_extensions)
 
         while queue:
             ext = queue.pop()
@@ -600,7 +664,7 @@ class ExtensionResolutionResult:
 
             self.unresolved_extensions.update(op_result.unresolved_extensions)
 
-            for new_ext in op_result.used_extensions.extensions.values():
+            for new_ext in op_result.used_extensions.extensions:
                 if new_ext.name not in self.used_extensions:
-                    self.used_extensions.register_updated(new_ext)
+                    self.used_extensions.register(new_ext)
                     queue.append(new_ext)
