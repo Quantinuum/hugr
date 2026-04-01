@@ -469,6 +469,7 @@ mod test {
     }
 
     #[derive(Default, Deserialize, Serialize)]
+    #[allow(deprecated)]
     struct LegacyHugr {
         #[serde(deserialize_with = "Hugr::serde_deserialize")]
         #[serde(serialize_with = "Hugr::serde_serialize")]

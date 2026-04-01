@@ -874,12 +874,12 @@ pub(crate) mod test {
 
     #[test]
     fn non_cfg_ancestor() -> Result<(), BuildError> {
-        let unit_sig = Signature::new(type_row![Type::UNIT], type_row![Type::UNIT]);
+        let unit_sig = Signature::new_endo([Type::UNIT]);
         let mut b = DFGBuilder::new(unit_sig.clone())?;
-        let b_child = b.dfg_builder(unit_sig.clone(), [b.input().out_wire(0)])?;
-        let b_child_in_wire = b_child.input().out_wire(0);
-        b_child.finish_with_outputs([])?;
-        let b_child_2 = b.dfg_builder(unit_sig.clone(), [])?;
+        let b_child = b.dfg_builder(unit_sig.clone(), b.input_wires())?;
+        let [b_child_in_wire] = b_child.input_wires_arr();
+        b_child.finish_with_outputs([b_child_in_wire])?;
+        let b_child_2 = b.dfg_builder(Signature::new([], [Type::UNIT]), [])?;
 
         // DFG block has edge coming a sibling block, which is only valid for
         // CFGs

@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.27.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.26.1...hugr-llvm-v0.27.0) - 2026-03-31
+
+### New Features
+
+- *(hugr-llvm)* Emit rounding operation for `FloatOps::fround` extension ops ([#2949](https://github.com/Quantinuum/hugr/pull/2949))
+
 ## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.25.7...hugr-llvm-v0.26.0) - 2026-03-16
 
 ### New Features

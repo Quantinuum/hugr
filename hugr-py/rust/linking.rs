@@ -4,8 +4,11 @@ use pyo3::exceptions::PyException;
 use pyo3::{create_exception, pymodule};
 
 #[pymodule(submodule)]
-#[pyo3(module = "hugr._hugr.linking")]
+#[pyo3(module = "hugr._hugr")]
 pub mod linking {
+    #[pymodule_export]
+    use super::HugrLinkingError;
+
     use hugr_core::envelope::EnvelopeConfig;
     use hugr_core::hugr::hugrmut::HugrMut;
     use hugr_core::hugr::linking::{HugrLinking, NameLinkingPolicy};
@@ -47,7 +50,7 @@ pub mod linking {
 
         let forest = hugr_into
             .link_module(hugr_from, &NameLinkingPolicy::default())
-            .map_err(|err| super::HugrLinkingError::new_err(err.to_string()))?;
+            .map_err(|err| HugrLinkingError::new_err(err.to_string()))?;
         if let Some(new_entrypoint) = replacement_entrypoint {
             let Some(node) = forest.node_map.get(&new_entrypoint) else {
                 panic!("Entrypoint is to be replaced but was not found after linking");
@@ -69,7 +72,7 @@ pub mod linking {
 }
 
 create_exception!(
-    _hugr.linking,
+    hugr._hugr.linking,
     HugrLinkingError,
     PyException,
     "Base exception for HUGR linking errors."

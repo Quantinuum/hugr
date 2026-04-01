@@ -146,6 +146,7 @@ impl Hugr {
     /// Serializes the HUGR using a serde encoder.
     ///
     /// This is an internal API, used to generate the JSON variant of the HUGR envelope format.
+    #[deprecated(since = "0.27.0")]
     pub(crate) fn serde_serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
     where
         S: serde::Serializer,
@@ -158,6 +159,7 @@ impl Hugr {
     /// Deserializes the HUGR using a serde decoder.
     ///
     /// This is an internal API, used to read the JSON variant of the HUGR envelope format.
+    #[deprecated(since = "0.27.0")]
     pub(crate) fn serde_deserialize<'de, D>(deserializer: D) -> Result<Hugr, D::Error>
     where
         D: Deserializer<'de>,

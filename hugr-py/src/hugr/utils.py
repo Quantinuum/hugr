@@ -1,8 +1,22 @@
 """Shared utility classes and functions."""
 
-from collections.abc import Hashable, ItemsView, Iterable, Mapping, MutableMapping
+from collections.abc import (
+    Hashable,
+    ItemsView,
+    Iterable,
+    Mapping,
+    MutableMapping,
+    Sequence,
+)
 from dataclasses import dataclass, field
-from typing import Generic, Protocol, TypeVar
+from typing import TYPE_CHECKING, Generic, Protocol, TypeVar
+
+if TYPE_CHECKING:
+    from hugr.tys import TypeArg
+
+# Type alias for json values.
+# See <https://github.com/python/typing/issues/182#issuecomment-1320974824>
+JsonType = str | int | float | bool | None | Mapping[str, "JsonType"] | list["JsonType"]
 
 L = TypeVar("L", bound=Hashable)
 R = TypeVar("R", bound=Hashable)
@@ -239,3 +253,10 @@ def comma_sep_repr_paren(items: Iterable[T]) -> str:
         return f"{items[0]}"
     else:
         return f"({comma_sep_repr(items)})"
+
+
+def name_w_args(name: str, args: Sequence["TypeArg"]) -> str:
+    """Helper to format a type name with type arguments."""
+    if len(args) == 0:
+        return name
+    return f"{name}<{comma_sep_str(args)}>"

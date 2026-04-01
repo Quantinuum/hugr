@@ -138,6 +138,10 @@ pub struct ExtensionDesc {
     /// Name of the extension.
     pub name: String,
     /// Version of the extension.
+    ///
+    /// A version value of `0.0.0` is used for extensions that do not have a version.
+    //
+    // TODO: Make this optional in `hugr-rs 0.27.0`.
     #[schemars(with = "String")]
     pub version: Version,
 }
@@ -148,6 +152,14 @@ impl ExtensionDesc {
         Self {
             name: name.to_string(),
             version: version.into(),
+        }
+    }
+
+    /// Create a new extension description without a version.
+    pub fn new_unversioned(name: impl ToString) -> Self {
+        Self {
+            name: name.to_string(),
+            version: Version::new(0, 0, 0),
         }
     }
 }

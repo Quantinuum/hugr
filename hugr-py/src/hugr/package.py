@@ -71,10 +71,7 @@ class Package:
         Returns:
             The deserialized Package object.
         """
-        package = read_envelope(envelope)
-        if extensions is not None:
-            package.used_extensions(extensions)
-        return package
+        return read_envelope(envelope, extensions)
 
     @staticmethod
     def from_str(envelope: str, extensions: ExtensionRegistry | None = None) -> Package:
@@ -91,16 +88,34 @@ class Package:
         Returns:
             The deserialized Package object.
         """
-        package = read_envelope_str(envelope)
-        if extensions is not None:
-            package.used_extensions(extensions)
-        return package
+        return read_envelope_str(envelope, extensions)
 
     @staticmethod
-    def from_model(package: model.Package, extensions: list[Extension] | None = None):
+    def from_model(
+        package: model.Package,
+        extensions: list[Extension] | None = None,
+        *,
+        resolve_from: ExtensionRegistry | None = None,
+    ):
+        """Deserialize a hugr model to a Package object.
+
+        Args:
+            package: The hugr model representing a Package.
+            extensions: If not None, the extensions to include in the package.
+            resolve_from: If not None, an extension registry to resolve the custom
+                operations and types. Defaults to the standard extensions, plus any
+                extensions included in the package.
+        """
+        from hugr.ext import ExtensionRegistry
+
         if extensions is None:
             extensions = []
-        return Package([Hugr.from_model(hugr) for hugr in package.modules], extensions)
+        pkg = Package([Hugr.from_model(hugr) for hugr in package.modules], extensions)
+
+        # Resolve extensions in the modules and inside the bundled extension definitions
+        pkg.resolve_extensions(resolve_from or ExtensionRegistry())
+
+        return pkg
 
     def to_bytes(self, config: EnvelopeConfig | None = None) -> bytes:
         """Serialize the package to a HUGR envelope byte string.
@@ -170,12 +185,13 @@ class Package:
             {'prelude'}
         """
         from hugr.ext import ExtensionResolutionResult
+        from hugr.std import _std_extensions
 
         packaged_extensions = ext.ExtensionRegistry.from_extensions(self.extensions)
 
-        if resolve_from is None:
-            resolve_from = ext.ExtensionRegistry()
-        resolve_from.extend(packaged_extensions)
+        if resolve_from is not None:
+            resolve_from.extend(_std_extensions())
+            resolve_from.extend(packaged_extensions)
 
         # Packaged extensions are always marked as "used".
         result = ExtensionResolutionResult(
@@ -189,6 +205,22 @@ class Package:
 
         return result
 
+    def resolve_extensions(self, registry: ext.ExtensionRegistry) -> Package:
+        """Resolve extension references in the types and operations of the package.
+
+        This method modifies the HUGR modules and packaged extensions in-place,
+        replacing Custom operations with ExtOp operations and
+        opaque types with ExtType when their extensions are found in the registry.
+
+        This is an alias for :meth:`used_extensions` that discards the computed
+        extensions.
+
+        Args:
+            registry: The extension registry to resolve against.
+        """
+        self.used_extensions(resolve_from=registry)
+        return self
+
     def link(self, *other: Package):
         """Link this package with other packages, returning a new package containing the
         extensions of all packages, as well as a single module created from linking the
@@ -200,22 +232,28 @@ class Package:
         Returns:
             A new package containing the modules and extensions of all packages.
         """
+        from hugr.ext import ExtensionRegistry
+
         modules = self.modules[:]
-        extensions = self.extensions[:]
+        registry = ExtensionRegistry.from_extensions(self.extensions)
         for pkg in other:
             modules.extend(pkg.modules)
             for new_ext in pkg.extensions:
-                if new_ext not in extensions:
-                    extensions.append(new_ext)
+                registry.register_updated(new_ext)
 
         if len(modules) == 0:
-            return Package([], extensions)
+            return Package([], list(registry.extensions.values()))
 
-        result_module_bytes = modules[0].to_bytes()
+        result_module_bytes = modules[0].to_bytes(include_extensions=registry)
         for module in modules[1:]:
-            result_module_bytes = link_modules(result_module_bytes, module.to_bytes())
+            result_module_bytes = link_modules(
+                result_module_bytes, module.to_bytes(include_extensions=registry)
+            )
 
-        return Package([Hugr.from_bytes(result_module_bytes)], extensions)
+        return Package(
+            [Hugr.from_bytes(result_module_bytes)],
+            list(registry.extensions.values()),
+        )
 
 
 @dataclass(frozen=True)

@@ -14,11 +14,12 @@ from hugr.utils import (
     comma_sep_repr,
     comma_sep_str,
     comma_sep_str_paren,
+    name_w_args,
     ser_it,
 )
 
 if TYPE_CHECKING:
-    from collections.abc import Iterable, Sequence
+    from collections.abc import Iterable
 
     from hugr import ext
     from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
@@ -596,7 +597,7 @@ class VariableArg(TypeArg):
         return f"${self.idx}"
 
     def to_model(self) -> model.Term:
-        return model.Var(str(self.idx))
+        return model.Var(f"_{self.idx}")
 
     def _resolve_used_extensions(
         self, registry: ExtensionRegistry | None = None
@@ -758,7 +759,7 @@ class Variable(Type):
         return f"${self.idx}"
 
     def to_model(self) -> model.Term:
-        return model.Var(str(self.idx))
+        return model.Var(f"_{self.idx}")
 
 
 @dataclass(frozen=True)
@@ -778,7 +779,7 @@ class RowVariable(Type):
         return f"${self.idx}"
 
     def to_model(self):
-        return model.Splice(model.Var(str(self.idx)))
+        return model.Splice(model.Var(f"_{self.idx}"))
 
 
 @dataclass(frozen=True)
@@ -979,7 +980,7 @@ class ExtType(Type):
         )
 
     def __str__(self) -> str:
-        return _type_str(self.type_def.name, self.args)
+        return name_w_args(self.type_def.name, self.args)
 
     def __eq__(self, value):
         # Ignore extra attributes on subclasses
@@ -1006,12 +1007,6 @@ class ExtType(Type):
         return (ExtType(self.type_def, new_args), result)
 
 
-def _type_str(name: str, args: Sequence[TypeArg]) -> str:
-    if len(args) == 0:
-        return name
-    return f"{name}<{comma_sep_str(args)}>"
-
-
 @dataclass
 class Opaque(Type):
     """Opaque type, identified by `id` and with optional type arguments and bound."""
@@ -1033,7 +1028,7 @@ class Opaque(Type):
         return self.bound
 
     def __str__(self) -> str:
-        return _type_str(self.id, self.args)
+        return name_w_args(self.id, self.args)
 
     def to_model(self) -> model.Term:
         # This cast is only necessary because `Type` can both be an

@@ -1,6 +1,6 @@
 [package]
 name = "hugr-cli"
-version = "0.26.0"
+version = "0.27.0"
 edition = { workspace = true }
 rust-version = { workspace = true }
 license = { workspace = true }
@@ -23,14 +23,14 @@ tracing = ["dep:tracing", "dep:tracing-subscriber"]
 clap = { workspace = true, features = ["derive", "cargo"] }
 clap-verbosity-flag.workspace = true
 derive_more = { workspace = true, features = ["display", "error", "from"] }
-hugr = { path = "../hugr", version = "0.26.0" }
+hugr = { path = "../hugr", version = "0.27.0" }
 serde_json.workspace = true
 serde = { workspace = true, features = ["derive"] }
 clio = { workspace = true, features = ["clap-parse"] }
 anyhow.workspace = true
 thiserror.workspace = true
 tracing = { version = "0.1.44", optional = true }
-tracing-subscriber = { version = "0.3.20", features = ["fmt"], optional = true }
+tracing-subscriber = { version = "0.3.23", features = ["fmt"], optional = true }
 tabled = "0.20.0"
 schemars = { workspace = true, features = ["derive"] }
 

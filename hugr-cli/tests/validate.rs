@@ -12,6 +12,7 @@ use hugr::envelope::description::GeneratorDesc;
 use hugr::extension::Version;
 use hugr::metadata;
 use hugr::package::Package;
+use hugr::std_extensions::collections::list::list_type;
 use hugr::types::Type;
 use hugr::{
     builder::{Container, Dataflow},
@@ -41,6 +42,12 @@ fn val_cmd(mut cmd: Command) -> Command {
 const FLOAT_EXT_FILE: &str = concat!(
     env!("CARGO_MANIFEST_DIR"),
     "/../resources/std_extensions/arithmetic/float/types.json"
+);
+
+// path to the fully serialized list extension
+const LIST_EXT_FILE: &str = concat!(
+    env!("CARGO_MANIFEST_DIR"),
+    "/../resources/std_extensions/collections/list.json"
 );
 
 /// A test package, containing a module-rooted HUGR.
@@ -196,6 +203,25 @@ fn test_float_extension(float_hugr_string: String, mut val_cmd: Command) {
 
     val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }
+
+#[fixture]
+fn float_list_hugr_string(#[with(list_type(float64_type()))] test_package: Package) -> String {
+    test_package.store_str(EnvelopeConfig::text()).unwrap()
+}
+
+#[rstest]
+fn test_list_float_extension(float_list_hugr_string: String, mut val_cmd: Command) {
+    val_cmd.write_stdin(float_list_hugr_string);
+    val_cmd.arg("-");
+    val_cmd.arg("--no-std");
+    val_cmd.arg("--extensions");
+    val_cmd.arg(LIST_EXT_FILE);
+    val_cmd.arg("--extensions");
+    val_cmd.arg(FLOAT_EXT_FILE);
+
+    val_cmd.assert().success().stderr(contains(VALID_PRINT));
+}
+
 #[fixture]
 fn package_string(#[with(float64_type())] test_package: Package) -> String {
     test_package.store_str(EnvelopeConfig::text()).unwrap()
