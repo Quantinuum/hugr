@@ -72,18 +72,19 @@ impl<T: pv::GraphBase + pv::Data> pv::Data for SynEdgeWrapper<T> {
     type EdgeWeight = MaybeSynEdge<T::EdgeWeight>;
 }
 
-impl<T: pv::GraphBase + pv::IntoNodeReferences> pv::IntoNodeReferences for &SynEdgeWrapper<T> {
-    type NodeRef = T::NodeRef;
-    type NodeReferences = T::NodeReferences;
+impl<'a, T: pv::GraphBase + pv::Data> pv::IntoNodeReferences for &'a SynEdgeWrapper<T>
+where &'a T : pv::IntoNodeReferences + pv::GraphBase<NodeId=T::NodeId> + pv::Data<NodeWeight = T::NodeWeight>{
+    type NodeRef = <&'a T as pv::IntoNodeReferences>::NodeRef;
+    type NodeReferences = <&'a T as pv::IntoNodeReferences>::NodeReferences;
 
     fn node_references(self) -> Self::NodeReferences {
         self.region_view.node_references()
     }
 }
 
-impl<'a, T: pv::GraphBase> pv::IntoNodeIdentifiers for &'a SynEdgeWrapper<T>
+impl<'a, T: pv::GraphBase + pv::Data> pv::IntoNodeIdentifiers for &'a SynEdgeWrapper<T>
 where
-    &'a T: pv::IntoNodeIdentifiers<NodeId = T::NodeId>,
+    &'a T: pv::GraphBase + pv::IntoNodeIdentifiers<NodeId = T::NodeId>,
 {
     type NodeIdentifiers = <&'a T as pv::IntoNodeIdentifiers>::NodeIdentifiers;
 
@@ -92,10 +93,9 @@ where
     }
 }
 
-impl<'a, T> pv::IntoNeighbors for &'a SynEdgeWrapper<T>
+impl<'a, T: pv::GraphBase<NodeId=NIdx>> pv::IntoNeighbors for &'a SynEdgeWrapper<T>
 where
-    T: pv::GraphBase<NodeId = NIdx>,
-    &'a T: pv::IntoNeighbors<NodeId = NIdx, Neighbors: 'a>,
+    &'a T: pv::GraphBase<NodeId = NIdx> + pv::IntoNeighbors<NodeId = NIdx, Neighbors: 'a>,
 {
     type Neighbors = Box<dyn Iterator<Item = NIdx> + 'a>;
 
@@ -143,10 +143,10 @@ impl<W: Copy, ID: Copy> pv::EdgeRef for EdgeRef<W, ID> {
     }
 }
 
-impl<'a, T, W: Copy> pv::IntoEdgeReferences for &'a SynEdgeWrapper<T>
+impl<'a, W:Copy, T: pv::GraphBase<NodeId=NIdx> + pv::Data<EdgeWeight=W>> pv::IntoEdgeReferences for &'a SynEdgeWrapper<T>
 where
-    T: pv::GraphBase<NodeId = NIdx> + pv::Data<EdgeWeight = W>,
-    &'a T: pv::IntoEdgeReferences<
+    &'a T: pv::GraphBase<NodeId = NIdx, EdgeId = T::EdgeId> + pv::Data<EdgeWeight = W>
+         + pv::IntoEdgeReferences<
             EdgeRef: pv::EdgeRef<NodeId = NIdx, Weight = W, EdgeId = T::EdgeId> + 'a,
         >,
 {
