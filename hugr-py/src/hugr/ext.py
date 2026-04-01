@@ -450,35 +450,40 @@ class ExtensionVersions:
     Older versions of an extension may be kept for backwards compatibility.
     """
 
-    id: ExtensionId
-    latest_version: Version
+    _id: ExtensionId
+    _latest_version: Version
     _exts: dict[Version, Extension]
 
     def __init__(self, latest: Extension) -> None:
-        self.id = latest.name
-        self.latest_version = latest.version
+        self._id = latest.name
+        self._latest_version = latest.version
         self._exts = {latest.version: latest}
+
+    @property
+    def id(self) -> ExtensionId:
+        """Get the ID of the extension."""
+        return self._id
 
     @property
     def latest(self) -> Extension:
         """Get latest version of the extension."""
-        return self._exts[self.latest_version]
+        return self._exts[self._latest_version]
 
     @property
-    def versions(self) -> list[Version]:
+    def versions(self) -> frozenset[Version]:
         """Get all versions of the extension."""
-        return list(self._exts.keys())
+        return frozenset(self._exts.keys())
 
     def add(self, extension: Extension) -> None:
         """Add an extension to the set."""
-        if extension.name != self.id:
-            msg = f"Extension {extension.name} has a different name than {self.id}"
+        if extension.name != self._id:
+            msg = f"Extension {extension.name} has a different name than {self._id}"
             raise ValueError(msg)
 
         self._exts[extension.version] = extension
 
-        if extension.version > self.latest_version:
-            self.latest_version = extension.version
+        if extension.version > self._latest_version:
+            self._latest_version = extension.version
 
     def __contains__(self, version: Version) -> bool:
         """Check if a version is in the set."""
