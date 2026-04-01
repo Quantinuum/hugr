@@ -1,5 +1,45 @@
 # Changelog
 
+## [0.16.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.4...hugr-py-v0.16.0) (2026-04-01)
+
+
+### ⚠ BREAKING CHANGES
+
+* `ExtensionRegistry` may now contain multiple versions of the same extension. `.extensions` is now an iterator of the latest versions instead of a dictionary. `.register_updated` and `.add_extension` have been replaced with a singular `.register`.
+* 
+* **hugr_py:** Substituted `hugr-py/src/hugr/tys.py::_type_str` with
+
+### Features
+
+* Add debug info metadata specification in `hugr-py` ([#2971](https://github.com/Quantinuum/hugr/issues/2971)) ([a4da8ef](https://github.com/Quantinuum/hugr/commit/a4da8ef4c53eddf443b0b8d854c961451c881e3c))
+* Allow multiple versions of an extension in an ExtensionRegistry ([#3005](https://github.com/Quantinuum/hugr/issues/3005)) ([ee90cd1](https://github.com/Quantinuum/hugr/commit/ee90cd1f4f34ceb9772990aadb4f4064dddc4b1e))
+* Define pass application scopes ([#2772](https://github.com/Quantinuum/hugr/issues/2772)) ([847b864](https://github.com/Quantinuum/hugr/commit/847b8640582f229d45577439bd58c587242b52fc))
+* deprecate Function (Value) in hugr-py too ([#2882](https://github.com/Quantinuum/hugr/issues/2882)) ([043fec2](https://github.com/Quantinuum/hugr/commit/043fec20d9ef973bf1162d250b667c1a57fa3de2))
+* Deprecate JSON serialization format ([#2991](https://github.com/Quantinuum/hugr/issues/2991)) ([0f7a880](https://github.com/Quantinuum/hugr/commit/0f7a88036b5253c60bd36e78d2d06cf2869a981a))
+* **hugr_py:** operation parameter rendering in HUGR visualizations ([#2995](https://github.com/Quantinuum/hugr/issues/2995)) ([d619148](https://github.com/Quantinuum/hugr/commit/d61914880eaa94fbd198a087df1be95425633ce8))
+* **hugr-py:** Allow linking packages and modules from Python ([#2947](https://github.com/Quantinuum/hugr/issues/2947)) ([329c243](https://github.com/Quantinuum/hugr/commit/329c243fffff0d6c4437664a012361619a0a425e))
+* Improve rendering of tags and cases ([#2943](https://github.com/Quantinuum/hugr/issues/2943)) ([6ba9e45](https://github.com/Quantinuum/hugr/commit/6ba9e45d70e0a6a6255474c1c78b5ed7b91c705b))
+* make `_composable_pass` and `_scope` public modules  ([#2962](https://github.com/Quantinuum/hugr/issues/2962)) ([1d6af9a](https://github.com/Quantinuum/hugr/commit/1d6af9a331b1dc68eddd3a0d5283e7b9dab6aa1c)), closes [#2961](https://github.com/Quantinuum/hugr/issues/2961)
+* **py:** Allow missing ext versions ExtensionDesc metadata ([#2979](https://github.com/Quantinuum/hugr/issues/2979)) ([bc1c445](https://github.com/Quantinuum/hugr/commit/bc1c4453b46ab24c52ca7b3c679730645da691bc))
+* **python:** allow dfg conversion in to TrackedDfg ([#2993](https://github.com/Quantinuum/hugr/issues/2993)) ([3bd7a88](https://github.com/Quantinuum/hugr/commit/3bd7a887a20289b6fcd6dd3f9c62886f31663518))
+
+
+### Bug Fixes
+
+* allow both _composable_pass and composable_pass imports ([#2965](https://github.com/Quantinuum/hugr/issues/2965)) ([0a5664d](https://github.com/Quantinuum/hugr/commit/0a5664d2374d1bd18aedb4e7619d26d2f564b412))
+* allow both _scope and scope imports ([#3003](https://github.com/Quantinuum/hugr/issues/3003)) ([de0458c](https://github.com/Quantinuum/hugr/commit/de0458c1620c95d045df1e6660d6ae5934be6e66))
+* Always do extension resolution when loading packages and hugrs ([#2953](https://github.com/Quantinuum/hugr/issues/2953)) ([0086d2a](https://github.com/Quantinuum/hugr/commit/0086d2a9483283216858ca5f4e86691541d3530a))
+* Correct pyo3 module definitions and add missing exception class export ([#2964](https://github.com/Quantinuum/hugr/issues/2964)) ([3df73f4](https://github.com/Quantinuum/hugr/commit/3df73f4d3d0520fcbf278b4072a15e3b24c6edab))
+* Include extensions during link serialization ([#2992](https://github.com/Quantinuum/hugr/issues/2992)) ([9236e89](https://github.com/Quantinuum/hugr/commit/9236e8972acb0682ff1493d7ba6df8f9a3f1578d))
+* Prefix names with underscores during serialization ([#2989](https://github.com/Quantinuum/hugr/issues/2989)) ([8aab636](https://github.com/Quantinuum/hugr/commit/8aab6366134db1ffdb7e65d70c9bcd04d661851d))
+* **py:** Load and resolve lower_funcs in extensions ([#2924](https://github.com/Quantinuum/hugr/issues/2924)) ([6dfc8e3](https://github.com/Quantinuum/hugr/commit/6dfc8e37bc4c4b98881e3b5abe1ffa50df34adc2))
+* Use valid identifiers when constructing AST model ([#2973](https://github.com/Quantinuum/hugr/issues/2973)) ([8750a6b](https://github.com/Quantinuum/hugr/commit/8750a6b29ad93aaa72ff3fc48804e4f03b878d6c))
+
+
+### Documentation
+
+* Add specification to sphinx docs ([#2907](https://github.com/Quantinuum/hugr/issues/2907)) ([46ea04b](https://github.com/Quantinuum/hugr/commit/46ea04b17e176cf54f1ddbc63efd72aa4dcc31f0))
+
 ## [0.15.5](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.4...hugr-py-v0.15.5) (2026-03-16)
 
 
