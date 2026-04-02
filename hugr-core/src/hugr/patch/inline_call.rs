@@ -312,7 +312,10 @@ mod test {
             hugr.output_neighbours(helper.node()).collect::<Vec<_>>(),
             [call1.node(), call2.node()]
         );
+        let call1_sig = hugr.signature(call1.node()).unwrap().into_owned();
         hugr.apply_patch(InlineCall::new(call1.node()))?;
+        hugr.validate().unwrap();
+        assert_eq!(hugr.signature(call1.node()).unwrap().as_ref(), &call1_sig);
 
         assert_eq!(
             hugr.output_neighbours(helper.node()).collect::<Vec<_>>(),
