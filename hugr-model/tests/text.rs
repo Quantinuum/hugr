@@ -1,14 +1,14 @@
 #![allow(missing_docs)]
 
-use hugr_core::{Hugr, HugrView};
+use hugr_core::package::Package;
 use hugr_model::v0::ast;
 use rstest::rstest;
 use std::str::FromStr as _;
 
 fn validate_hugr(mut source: String) -> Result<(), anyhow::Error> {
     source.insert_str(0, "HUGRiHJv(@");
-    let hugr = Hugr::load_str(source, None)?;
-    hugr.validate()?;
+    let pkg = Package::load_str(source, None)?;
+    pkg.validate()?;
     Ok(())
 }
 
