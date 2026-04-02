@@ -24,25 +24,22 @@ pub(super) struct SynEdgeWrapper<T> {
     pub(super) syn_edges: Vec<(NIdx, NIdx)>,
 }
 
-impl<'a, T> pv::GraphBase for &'a SynEdgeWrapper<T> 
-where &'a T: pv::GraphBase {
-    type NodeId = <&'a T as pv::GraphBase>::NodeId;
-    type EdgeId = MaybeSynEdge<<&'a T as pv::GraphBase>::EdgeId>;
+impl<T: pv::GraphBase> pv::GraphBase for SynEdgeWrapper<T> {
+    type NodeId = T::NodeId;
+    type EdgeId = MaybeSynEdge<T::EdgeId>;
 }
 
-impl<T> pv::GraphProp for SynEdgeWrapper<T> {
+impl<T: pv::GraphBase> pv::GraphProp for SynEdgeWrapper<T> {
     type EdgeType = petgraph::Directed;
 }
 
-impl<'a, T> pv::NodeCount for &'a SynEdgeWrapper<T> 
-where &'a T: pv::NodeCount {
+impl<T: pv::GraphBase + pv::NodeCount> pv::NodeCount for SynEdgeWrapper<T> {
     fn node_count(&self) -> usize {
         self.region_view.node_count()
     }
 }
 
-impl<'a, T> pv::NodeIndexable for &'a SynEdgeWrapper<T>
-where &'a T: pv::NodeIndexable {
+impl<T: pv::GraphBase + pv::NodeIndexable> pv::NodeIndexable for SynEdgeWrapper<T> {
     fn node_bound(&self) -> usize {
         self.region_view.node_bound()
     }
@@ -56,40 +53,35 @@ where &'a T: pv::NodeIndexable {
     }
 }
 
-impl<'a, T> pv::EdgeCount for &'a SynEdgeWrapper<T>
-where &'a T: pv::EdgeCount {
+impl<T: pv::GraphBase + pv::EdgeCount> pv::EdgeCount for SynEdgeWrapper<T> {
     fn edge_count(&self) -> usize {
         self.region_view.edge_count() + self.syn_edges.len()
     }
 }
 
-impl<'a, T> pv::Data for &'a SynEdgeWrapper<T>
-where &'a T: pv::Data {
+impl<T: pv::GraphBase + pv::Data> pv::Data for SynEdgeWrapper<T> {
     /// Turns out the underlying [FlatRegion] has unit node weights, we may want to fix that.
     ///
     /// [FlatRegion]: portgraph::view::FlatRegion
-    type NodeWeight = <&'a T as pv::Data>::NodeWeight;
+    type NodeWeight = T::NodeWeight;
 
     /// Turns out the underlying [FlatRegion] has unit node weights; we may want to fix that,
     /// but at least this distinguishes synthetic edges from original edges.
     ///
     /// [FlatRegion]: portgraph::view::FlatRegion
-    type EdgeWeight = MaybeSynEdge<<&'a T as pv::Data>::EdgeWeight>;
+    type EdgeWeight = MaybeSynEdge<T::EdgeWeight>;
 }
 
-impl<'a, T: pv::GraphBase + pv::Data> pv::IntoNodeReferences for &'a SynEdgeWrapper<T>
-where &'a T : pv::IntoNodeReferences + pv::GraphBase<NodeId=T::NodeId> + pv::Data<NodeWeight = T::NodeWeight>{
-    type NodeRef = <&'a T as pv::IntoNodeReferences>::NodeRef;
-    type NodeReferences = <&'a T as pv::IntoNodeReferences>::NodeReferences;
+impl<T: pv::GraphBase + pv::IntoNodeReferences> pv::IntoNodeReferences for &SynEdgeWrapper<T> {
+    type NodeRef = T::NodeRef;
+    type NodeReferences = T::NodeReferences;
 
     fn node_references(self) -> Self::NodeReferences {
         self.region_view.node_references()
     }
 }
 
-impl<'a, T: pv::GraphBase + pv::Data> pv::IntoNodeIdentifiers for &'a SynEdgeWrapper<T>
-where
-    &'a T: pv::GraphBase + pv::IntoNodeIdentifiers<NodeId = T::NodeId>,
+impl<'a, T: pv::GraphBase + pv::IntoNodeIdentifiers> pv::IntoNodeIdentifiers for &'a SynEdgeWrapper<T>
 {
     type NodeIdentifiers = <&'a T as pv::IntoNodeIdentifiers>::NodeIdentifiers;
 
@@ -98,9 +90,7 @@ where
     }
 }
 
-impl<'a, T: pv::GraphBase<NodeId=NIdx>> pv::IntoNeighbors for &'a SynEdgeWrapper<T>
-where
-    &'a T: pv::GraphBase<NodeId = NIdx> + pv::IntoNeighbors<NodeId = NIdx, Neighbors: 'a>,
+impl<'a, T: pv::GraphBase<NodeId = NIdx> + pv::IntoNeighbors> pv::IntoNeighbors for &'a SynEdgeWrapper<T>
 {
     type Neighbors = Box<dyn Iterator<Item = NIdx> + 'a>;
 
@@ -148,27 +138,27 @@ impl<W: Copy, ID: Copy> pv::EdgeRef for EdgeRef<W, ID> {
     }
 }
 
-impl<'a, W:Copy, T: pv::GraphBase<NodeId=NIdx> + pv::Data<EdgeWeight=W>> pv::IntoEdgeReferences for &'a SynEdgeWrapper<T>
-where
-    &'a T: pv::GraphBase<NodeId = NIdx, EdgeId = T::EdgeId> + pv::Data<EdgeWeight = W>
-         + pv::IntoEdgeReferences<
+impl<'a, W: Copy + 'a, T: pv::GraphBase<NodeId = NIdx>
+     + pv::Data<EdgeWeight = W>
+     + pv::IntoEdgeReferences> pv::IntoEdgeReferences for &'a SynEdgeWrapper<T>
+/*where
+    &'a T: pv::IntoEdgeReferences<
             EdgeRef: pv::EdgeRef<NodeId = NIdx, Weight = W, EdgeId = T::EdgeId> + 'a,
-        >,
+        >,*/
 {
     type EdgeRef = EdgeRef<W, T::EdgeId>;
     type EdgeReferences = Box<dyn Iterator<Item = Self::EdgeRef> + 'a>;
 
     fn edge_references(self) -> Self::EdgeReferences {
+        let original_edges = self.region_view.edge_references().map(|er| EdgeRef {
+            src: er.source(),
+            tgt: er.target(),
+            weight: MaybeSynEdge::Original(*er.weight()),
+            id: MaybeSynEdge::Original(er.id()),
+        }).collect::<Vec<Self::EdgeRef>>();
         Box::new(
-            self.region_view
-                .edge_references()
-                .map(|er| EdgeRef {
-                    src: er.source(),
-                    tgt: er.target(),
-                    id: MaybeSynEdge::Original(er.id()),
-                    weight: MaybeSynEdge::Original(*er.weight()),
-                })
-                .chain(self.syn_edges.iter().map(|(src, tgt)| EdgeRef {
+            original_edges.into_iter()
+                .chain(self.syn_edges.iter().map(|(src, tgt)| EdgeRef::<W, T::EdgeId> {
                     src: *src,
                     tgt: *tgt,
                     id: MaybeSynEdge::NonLocalOrderingConstraint,
@@ -178,10 +168,7 @@ where
     }
 }
 
-impl<'a, T> pv::IntoNeighborsDirected for &'a SynEdgeWrapper<T>
-where
-    T: pv::GraphBase<NodeId = NIdx>,
-    &'a T: pv::IntoNeighborsDirected<NodeId = NIdx, NeighborsDirected: 'a>,
+impl<'a, T: pv::GraphBase<NodeId=NIdx> + pv::IntoNeighborsDirected> pv::IntoNeighborsDirected for &'a SynEdgeWrapper<T>
 {
     type NeighborsDirected = Box<dyn Iterator<Item = NIdx> + 'a>;
 
@@ -202,10 +189,8 @@ where
     }
 }
 
-impl<'a ,T> pv::Visitable for &'a SynEdgeWrapper<T>
-where &'a T: pv::Visitable,
-{
-    type Map = <&'a T as pv::Visitable>::Map;
+impl<T: pv::GraphBase + pv::Visitable> pv::Visitable for SynEdgeWrapper<T> {
+    type Map = T::Map;
 
     fn visit_map(&self) -> Self::Map {
         self.region_view.visit_map()

@@ -600,7 +600,7 @@ impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
     + pv::IntoEdgeReferences
     + pv::IntoNeighborsDirected
     + pv::Visitable<NodeId = portgraph::NodeIndex> {
-        &self.graph
+        panic!()
     }
 }
 
