@@ -70,10 +70,10 @@ where
         debug_assert!(i.out_value_types().count() == self.inputs.as_ref().unwrap().len());
         debug_assert!(o.in_value_types().count() == self.outputs.as_ref().unwrap().len());
 
-        let sg = node.hugr().scheduling_graph(node.node());
-        let topo = Topo::new(sg.graph());
-        for n in topo.iter(sg.graph()) {
-            let node = node.hugr().fat_optype(sg.node_map().from_portgraph(n));
+        let (region_graph, node_map) = node.hugr().region_portgraph(node.node());
+        let topo = Topo::new(&region_graph);
+        for n in topo.iter(&region_graph) {
+            let node = node.hugr().fat_optype(node_map.from_portgraph(n));
             let inputs_rmb = context.node_ins_rmb(node)?;
             let inputs = inputs_rmb.read(context.builder(), [])?;
             let outputs = context.node_outs_rmb(node)?.promise();

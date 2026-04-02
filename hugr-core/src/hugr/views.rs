@@ -406,7 +406,6 @@ pub trait HugrView: HugrInternals {
     /// A view of a flat region, including ordering constraints from nonlocal edges,
     /// suitable for use with petgraph algorithms.
     fn scheduling_graph(&self, parent: Self::Node) -> SchedulingGraph<'_, Self> {
-        #[expect(deprecated)] // Inline region_portgraph here when removing
         let (region_view, region_nodes) = self.region_portgraph(parent);
         let graph = SynEdgeWrapper {
             region_view,
@@ -587,13 +586,8 @@ impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
         &self.node_map
     }
 
-    /// Like [Self::node_map] but extracts the map, discarding the rest of `self`
-    pub fn into_node_map(self) -> V::RegionPortgraphNodes {
-        self.node_map
-    }
-
-    /// Access to the graph, sufficient to allow [pv::Topo]
-    pub fn graph(
+    // Access to the graph, sufficient to allow [pv::Topo]
+    /*pub fn graph(
         &self,
     ) -> impl pv::NodeCount
     + pv::IntoNodeIdentifiers
@@ -601,7 +595,7 @@ impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
     + pv::IntoNeighborsDirected
     + pv::Visitable<NodeId = portgraph::NodeIndex> {
         panic!()
-    }
+    }*/
 }
 
 impl HugrView for Hugr {
