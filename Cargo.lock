@@ -1137,10 +1137,12 @@ dependencies = [
 name = "hugr-model"
 version = "0.27.0"
 dependencies = [
+ "anyhow",
  "base64",
  "bumpalo",
  "capnp",
  "derive_more 2.1.1",
+ "hugr-core",
  "indexmap 2.13.0",
  "itertools 0.14.0",
  "ordered-float",
