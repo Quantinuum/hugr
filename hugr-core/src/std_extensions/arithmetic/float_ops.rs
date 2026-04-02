@@ -153,6 +153,7 @@ mod test {
     #[rstest]
     #[case::fadd(FloatOps::fadd, &[0.1, 0.2], &[0.30000000000000004])]
     #[case::fsub(FloatOps::fsub, &[1., 2.], &[-1.])]
+    #[case::fneg(FloatOps::fneg, &[42.42], &[-42.42])]
     #[case::fmul(FloatOps::fmul, &[2., 3.], &[6.])]
     #[case::fdiv(FloatOps::fdiv, &[7., 2.], &[3.5])]
     #[case::fpow(FloatOps::fpow, &[0.5, 3.], &[0.125])]
