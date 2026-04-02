@@ -24,22 +24,25 @@ pub(super) struct SynEdgeWrapper<T> {
     pub(super) syn_edges: Vec<(NIdx, NIdx)>,
 }
 
-impl<T: pv::GraphBase> pv::GraphBase for SynEdgeWrapper<T> {
-    type NodeId = T::NodeId;
-    type EdgeId = MaybeSynEdge<T::EdgeId>;
+impl<'a, T> pv::GraphBase for &'a SynEdgeWrapper<T> 
+where &'a T: pv::GraphBase {
+    type NodeId = <&'a T as pv::GraphBase>::NodeId;
+    type EdgeId = MaybeSynEdge<<&'a T as pv::GraphBase>::EdgeId>;
 }
 
-impl<T: pv::GraphBase> pv::GraphProp for SynEdgeWrapper<T> {
+impl<T> pv::GraphProp for SynEdgeWrapper<T> {
     type EdgeType = petgraph::Directed;
 }
 
-impl<T: pv::GraphBase + pv::NodeCount> pv::NodeCount for SynEdgeWrapper<T> {
+impl<'a, T> pv::NodeCount for &'a SynEdgeWrapper<T> 
+where &'a T: pv::NodeCount {
     fn node_count(&self) -> usize {
         self.region_view.node_count()
     }
 }
 
-impl<T: pv::GraphBase + pv::NodeIndexable> pv::NodeIndexable for SynEdgeWrapper<T> {
+impl<'a, T> pv::NodeIndexable for &'a SynEdgeWrapper<T>
+where &'a T: pv::NodeIndexable {
     fn node_bound(&self) -> usize {
         self.region_view.node_bound()
     }
@@ -53,23 +56,25 @@ impl<T: pv::GraphBase + pv::NodeIndexable> pv::NodeIndexable for SynEdgeWrapper<
     }
 }
 
-impl<T: pv::GraphBase + pv::EdgeCount> pv::EdgeCount for SynEdgeWrapper<T> {
+impl<'a, T> pv::EdgeCount for &'a SynEdgeWrapper<T>
+where &'a T: pv::EdgeCount {
     fn edge_count(&self) -> usize {
         self.region_view.edge_count() + self.syn_edges.len()
     }
 }
 
-impl<T: pv::GraphBase + pv::Data> pv::Data for SynEdgeWrapper<T> {
+impl<'a, T> pv::Data for &'a SynEdgeWrapper<T>
+where &'a T: pv::Data {
     /// Turns out the underlying [FlatRegion] has unit node weights, we may want to fix that.
     ///
     /// [FlatRegion]: portgraph::view::FlatRegion
-    type NodeWeight = T::NodeWeight;
+    type NodeWeight = <&'a T as pv::Data>::NodeWeight;
 
     /// Turns out the underlying [FlatRegion] has unit node weights; we may want to fix that,
     /// but at least this distinguishes synthetic edges from original edges.
     ///
     /// [FlatRegion]: portgraph::view::FlatRegion
-    type EdgeWeight = MaybeSynEdge<T::EdgeWeight>;
+    type EdgeWeight = MaybeSynEdge<<&'a T as pv::Data>::EdgeWeight>;
 }
 
 impl<'a, T: pv::GraphBase + pv::Data> pv::IntoNodeReferences for &'a SynEdgeWrapper<T>
@@ -197,8 +202,10 @@ where
     }
 }
 
-impl<T: pv::GraphBase + pv::Visitable> pv::Visitable for SynEdgeWrapper<T> {
-    type Map = T::Map;
+impl<'a ,T> pv::Visitable for &'a SynEdgeWrapper<T>
+where &'a T: pv::Visitable,
+{
+    type Map = <&'a T as pv::Visitable>::Map;
 
     fn visit_map(&self) -> Self::Map {
         self.region_view.visit_map()
