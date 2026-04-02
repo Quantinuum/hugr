@@ -116,6 +116,12 @@ enum ImportErrorInner {
     ExtensionResolution(#[from] ExtensionResolutionError),
 }
 
+impl From<TermTypeError> for ImportErrorInner {
+    fn from(err: TermTypeError) -> Self {
+        SignatureError::from(err).into()
+    }
+}
+
 #[derive(Debug, Clone, Error)]
 enum ExtensionError {
     /// An extension is missing.
@@ -1439,7 +1445,7 @@ impl<'a> Context<'a> {
     }
 
     fn import_type(&mut self, term_id: table::TermId) -> Result<Type, ImportErrorInner> {
-        Ok(Type::try_from(self.import_term(term_id)?).map_err(SignatureError::from)?)
+        Ok(Type::try_from(self.import_term(term_id)?)?)
     }
 
     fn import_term_with_bound(
@@ -1655,11 +1661,11 @@ impl<'a> Context<'a> {
             let inputs = self
                 .import_term(inputs)
                 .map_err(|err| error_context!(err, "function inputs"))?;
-            let inputs = TypeRowRV::try_from(inputs).map_err(SignatureError::from)?;
+            let inputs = TypeRowRV::try_from(inputs)?;
             let outputs = self
                 .import_term(outputs)
                 .map_err(|err| error_context!(err, "function outputs"))?;
-            let outputs = TypeRowRV::try_from(outputs).map_err(SignatureError::from)?;
+            let outputs = TypeRowRV::try_from(outputs)?;
 
             Ok(FuncValueType::new(inputs, outputs))
         })()
@@ -1776,8 +1782,7 @@ impl<'a> Context<'a> {
             .into_iter()
             .map(|id| self.import_term(id))
             .collect::<Result<Vec<_>, _>>()?
-            .try_into()
-            .map_err(SignatureError::from)?)
+            .try_into()?)
     }
 
     fn import_custom_name(
