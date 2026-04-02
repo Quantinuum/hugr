@@ -7,10 +7,12 @@ pub mod render;
 mod rerooted;
 mod root_checked;
 pub mod sibling_subgraph;
+mod syn_edge;
 
 #[cfg(test)]
 mod tests;
 
+use ::petgraph::visit as pv;
 use serde::de::Deserialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
@@ -24,23 +26,21 @@ pub use rerooted::Rerooted;
 pub use root_checked::{InvalidSignature, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use portgraph::render::{DotFormat, MermaidFormat};
 use portgraph::{LinkView, PortView};
+
+use crate::core::HugrNode;
+use crate::extension::ExtensionRegistry;
+use crate::hugr::views::syn_edge::SynEdgeWrapper;
+use crate::metadata::{Metadata, RawMetadataValue};
+use crate::ops::{OpParent, OpTag, OpTrait, OpType, handle::NodeHandle};
+use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
+use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 use super::internal::{HugrInternals, HugrMutInternals};
 use super::validate::ValidationContext;
 use super::{Hugr, HugrMut, Node, ValidationError};
-use crate::core::HugrNode;
-use crate::extension::ExtensionRegistry;
-use crate::metadata::{Metadata, RawMetadataValue};
-use crate::ops::handle::NodeHandle;
-use crate::ops::{OpParent, OpTag, OpTrait, OpType};
-
-use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
-use crate::{Direction, IncomingPort, OutgoingPort, Port};
-
-use itertools::Either;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
@@ -403,6 +403,22 @@ pub trait HugrView: HugrInternals {
         PetgraphWrapper { hugr: self }
     }
 
+    /// A view of a flat region, including ordering constraints from nonlocal edges,
+    /// suitable for use with petgraph algorithms.
+    fn scheduling_graph(&self, parent: Self::Node) -> SchedulingGraph<'_, Self> {
+        #[expect(deprecated)] // Inline region_portgraph here when removing
+        let (region_view, region_nodes) = self.region_portgraph(parent);
+        let graph = SynEdgeWrapper {
+            region_view,
+            syn_edges: Vec::new(),
+        };
+        SchedulingGraph {
+            graph,
+            node_map: region_nodes,
+            region_parent: parent,
+        }
+    }
+
     /// Return the mermaid representation of the underlying hierarchical graph.
     ///
     /// The hierarchy is represented using subgraphs. Edges are labelled with
@@ -549,6 +565,42 @@ impl<S: HugrNode> ExtractionResult<S> for HashMap<S, Node> {
     #[inline]
     fn extracted_node(&self, node: S) -> Node {
         self[&node]
+    }
+}
+
+/// A graph of a flat region of a Hugr, including ordering constraints from nonlocal edges
+pub struct SchedulingGraph<'a, V: HugrView + ?Sized + 'a> {
+    graph: SynEdgeWrapper<portgraph::view::FlatRegion<'a, V::RegionPortgraph<'a>>>,
+    node_map: V::RegionPortgraphNodes,
+    region_parent: V::Node,
+}
+
+impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
+    /// Get the parent node of the region represented by this scheduling graph
+    pub fn region_parent(&self) -> V::Node {
+        self.region_parent
+    }
+
+    /// Allows translating between the [V::Node]s of the original Hugr and the
+    /// [portgraph::NodeIndex]es of [Self::graph()]
+    pub fn node_map(&self) -> &V::RegionPortgraphNodes {
+        &self.node_map
+    }
+
+    /// Like [Self::node_map] but extracts the map, discarding the rest of `self`
+    pub fn into_node_map(self) -> V::RegionPortgraphNodes {
+        self.node_map
+    }
+
+    /// Access to the graph, sufficient to allow [pv::Topo]
+    pub fn graph(
+        &self,
+    ) -> impl pv::NodeCount
+    + pv::IntoNodeIdentifiers
+    + pv::IntoEdgeReferences
+    + pv::IntoNeighborsDirected
+    + pv::Visitable<NodeId = portgraph::NodeIndex> {
+        &self.graph
     }
 }
 

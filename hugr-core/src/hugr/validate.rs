@@ -128,10 +128,10 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         &self,
         parent: H::Node,
     ) -> (Dominators<portgraph::NodeIndex>, H::RegionPortgraphNodes) {
-        let (region, node_map) = self.hugr.region_portgraph(parent);
+        let sg = self.hugr.scheduling_graph(parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
-        let doms = dominators::simple_fast(&region, node_map.to_portgraph(entry_node));
-        (doms, node_map)
+        let doms = dominators::simple_fast(sg.graph(), sg.node_map().to_portgraph(entry_node));
+        (doms, sg.into_node_map())
     }
 
     /// Check the constraints on a single node.
@@ -422,11 +422,11 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             return Ok(());
         }
 
-        let (region, node_map) = self.hugr.region_portgraph(parent);
-        let postorder = Topo::new(&region);
+        let sg = self.hugr.scheduling_graph(parent);
+        let postorder = Topo::new(sg.graph());
         let nodes_visited = postorder
-            .iter(&region)
-            .filter(|n| *n != node_map.to_portgraph(parent))
+            .iter(sg.graph())
+            .filter(|n| *n != sg.node_map().to_portgraph(parent))
             .count();
         let node_count = self.hugr.children(parent).count();
         if nodes_visited != node_count {
