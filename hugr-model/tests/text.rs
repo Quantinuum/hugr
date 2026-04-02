@@ -5,7 +5,7 @@ use hugr_model::v0::ast;
 use rstest::rstest;
 use std::str::FromStr as _;
 
-fn envelope_parse(source: &mut String) -> Result<(), anyhow::Error> {
+fn validate_hugr(mut source: String) -> Result<(), anyhow::Error> {
     source.insert_str(0, "HUGRiHJv(@");
     let hugr = Hugr::load_str(source, None)?;
     hugr.validate()?;
@@ -24,10 +24,7 @@ pub fn test_roundtrip(
     #[mode = str]
     expected: &str,
 ) -> Result<(), anyhow::Error> {
-    {
-        let mut s: String = expected.to_string();
-        envelope_parse(&mut s)?;
-    }
+    validate_hugr(expected.to_string())?;
     let actual = roundtrip(expected);
     // Trim whitespace from the strings to compare them
     let expected_trim = expected
