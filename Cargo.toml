@@ -40,7 +40,7 @@ too_long_first_doc_paragraph = "warn"
 
 [workspace.dependencies]
 anyhow = "1.0.101"
-insta = { version = "1.46.3" }
+insta = { version = "1.47.2" }
 bitvec = "1.0.1"
 capnp = "0.25.2"
 cgmath = "0.18.0"
@@ -81,7 +81,7 @@ rustc-hash = "2.1.1"
 bumpalo = "3.20.1"
 pathsearch = "0.2.0"
 base64 = "0.22.1"
-ordered-float = "5.2.0"
+ordered-float = "5.3.0"
 pest = "2.8.6"
 pest_derive = "2.8.6"
 pretty = "0.12.5"
