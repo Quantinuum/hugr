@@ -1,5 +1,11 @@
 # Changelog
 
+## [0.27.1](https://github.com/Quantinuum/hugr/compare/hugr-v0.27.0...hugr-v0.27.1) - 2026-04-02
+
+### Testing
+
+- Test execution results of float op LLVM lowering ([#3013](https://github.com/Quantinuum/hugr/pull/3013))
+
 ## [0.27.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.26.1...hugr-v0.27.0) - 2026-03-31
 
 This release deprecates the JSON serialization format. Now hugrs can be encoded in a readable file
