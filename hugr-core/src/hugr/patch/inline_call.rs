@@ -3,7 +3,7 @@
 use derive_more::{Display, Error};
 
 use crate::core::HugrNode;
-use crate::ops::{DFG, DataflowParent, OpType};
+use crate::ops::{DFG, OpType};
 use crate::types::Substitution;
 use crate::{Direction, HugrView, Node};
 
@@ -71,22 +71,20 @@ impl<N: HugrNode> PatchHugrMut for InlineCall<N> {
         let order_preds = h.linked_outputs(self.0, old_order_in).collect::<Vec<_>>();
         h.disconnect(self.0, old_order_in); // PortGraph currently does this anyway
 
+        let ty_args = h.get_optype(self.0).as_call().unwrap().type_args.clone();
+
         let new_op = OpType::from(DFG {
             signature: h
                 .get_optype(orig_func)
                 .as_func_defn()
                 .unwrap()
-                .inner_signature()
-                .into_owned(),
+                .signature()
+                .instantiate(&ty_args)
+                .unwrap(),
         });
         let new_order_in = new_op.other_input_port().unwrap();
 
-        let ty_args = h
-            .replace_op(self.0, new_op)
-            .as_call()
-            .unwrap()
-            .type_args
-            .clone();
+        h.replace_op(self.0, new_op);
 
         h.add_ports(self.0, Direction::Incoming, -1);
 
