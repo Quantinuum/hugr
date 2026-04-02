@@ -47,7 +47,7 @@
 
 (define-func public example.f64-json
   (core.fn []
-           [arithmetic.float.types.float64])
+           [arithmetic.float.types.float64 arithmetic.float.types.float64])
   (dfg [] [%0 %1]
        (signature (core.fn [] [arithmetic.float.types.float64 arithmetic.float.types.float64]))
        ((core.load_const
