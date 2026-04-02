@@ -171,7 +171,7 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayRepeatDef<AK> {
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
             [TypeArg::BoundedNat(n), ty] => {
-                let ty = Type::try_from(ty.clone()).map_err(SignatureError::from)?;
+                let ty = Type::try_from(ty.clone())?;
                 Ok(GenericArrayRepeat::new(ty, *n))
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),

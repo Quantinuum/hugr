@@ -331,7 +331,7 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayOpDef<AK> {
             _ => return Err(SignatureError::InvalidTypeArgs.into()),
         };
 
-        Ok(self.to_concrete(ty.try_into().map_err(SignatureError::from)?, size))
+        Ok(self.to_concrete(ty.try_into()?, size))
     }
 }
 

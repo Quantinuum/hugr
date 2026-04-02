@@ -353,7 +353,7 @@ impl MakeExtensionOp for ListOpInst {
         let [ty] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs.into());
         };
-        let elem_type = ty.clone().try_into().map_err(SignatureError::from)?;
+        let elem_type = ty.clone().try_into()?;
         let name = ext_op.unqualified_id();
         let Ok(op) = ListOp::from_str(name) else {
             return Err(OpLoadError::NotMember(name.to_string()));

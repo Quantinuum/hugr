@@ -690,7 +690,7 @@ impl MakeExtensionOp for MakeTuple {
         let [TypeArg::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        let tys = elems.clone().try_into().map_err(SignatureError::from)?;
+        let tys = elems.clone().try_into()?;
         Ok(Self(tys))
     }
 
@@ -739,7 +739,7 @@ impl MakeExtensionOp for UnpackTuple {
         let [Term::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        let tys = elems.clone().try_into().map_err(SignatureError::from)?;
+        let tys = elems.clone().try_into()?;
         Ok(Self(tys))
     }
 
@@ -851,7 +851,7 @@ impl MakeExtensionOp for Noop {
         let [t] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        Ok(Self(t.clone().try_into().map_err(SignatureError::from)?))
+        Ok(Self(t.clone().try_into()?))
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
@@ -957,7 +957,7 @@ impl MakeExtensionOp for Barrier {
         let [TypeArg::List(elems)] = ext_op.args() else {
             return Err(SignatureError::InvalidTypeArgs)?;
         };
-        let type_row = elems.clone().try_into().map_err(SignatureError::from)?;
+        let type_row = elems.clone().try_into()?;
         Ok(Self { type_row })
     }
 

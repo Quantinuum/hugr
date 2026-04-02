@@ -215,15 +215,12 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayScanDef<AK> {
                 tgt_elem_ty,
                 TypeArg::List(acc_tys),
             ] => {
-                let src_elem_ty =
-                    Type::try_from(src_elem_ty.clone()).map_err(SignatureError::from)?;
-                let tgt_elem_ty =
-                    Type::try_from(tgt_elem_ty.clone()).map_err(SignatureError::from)?;
+                let src_elem_ty = Type::try_from(src_elem_ty.clone())?;
+                let tgt_elem_ty = Type::try_from(tgt_elem_ty.clone())?;
                 let acc_tys = acc_tys
                     .iter()
                     .map(|tm| Type::try_from(tm.clone()))
-                    .collect::<Result<Vec<_>, _>>()
-                    .map_err(SignatureError::from)?;
+                    .collect::<Result<Vec<_>, _>>()?;
                 Ok(GenericArrayScan::new(src_elem_ty, tgt_elem_ty, acc_tys, *n))
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
