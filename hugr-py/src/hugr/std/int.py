@@ -98,7 +98,7 @@ class IntVal(val.ExtensionValue):
         self, registry: ext.ExtensionRegistry | None = None
     ) -> ext.ExtensionResolutionResult:
         result = ext.ExtensionResolutionResult()
-        result.used_extensions.add_extension(INT_TYPES_EXTENSION)
+        result.used_extensions.register(INT_TYPES_EXTENSION)
         return result
 
     def to_model(self) -> model.Term:

@@ -65,7 +65,7 @@ def test_stringly_typed():
 
     # Resolve with the extension in the registry
     registry = ext.ExtensionRegistry()
-    registry.add_extension(STRINGLY_EXT)
+    registry.register(STRINGLY_EXT)
     new_h.resolve_extensions(registry)
 
     assert isinstance(new_h[n].op, ExtOp)
@@ -73,11 +73,9 @@ def test_stringly_typed():
 
 def test_registry():
     reg = ext.ExtensionRegistry()
-    reg.add_extension(LOGIC_EXT)
+    reg.register(LOGIC_EXT)
     assert reg.get_extension(LOGIC_EXT.name).name == LOGIC_EXT.name
-    assert len(reg.extensions) == 1
-    with pytest.raises(ext.ExtensionRegistry.ExtensionExists):
-        reg.add_extension(LOGIC_EXT)
+    assert len(reg.versioned_extensions) == 1
 
     with pytest.raises(ext.ExtensionRegistry.ExtensionNotFound):
         reg.get_extension("not_found")
@@ -86,12 +84,12 @@ def test_registry():
 @pytest.fixture
 def registry() -> ext.ExtensionRegistry:
     reg = ext.ExtensionRegistry()
-    reg.add_extension(LOGIC_EXT)
-    reg.add_extension(QUANTUM_EXT)
-    reg.add_extension(STRINGLY_EXT)
-    reg.add_extension(INT_TYPES_EXTENSION)
-    reg.add_extension(INT_OPS_EXTENSION)
-    reg.add_extension(FLOAT_EXT)
+    reg.register(LOGIC_EXT)
+    reg.register(QUANTUM_EXT)
+    reg.register(STRINGLY_EXT)
+    reg.register(INT_TYPES_EXTENSION)
+    reg.register(INT_OPS_EXTENSION)
+    reg.register(FLOAT_EXT)
 
     return reg
 
