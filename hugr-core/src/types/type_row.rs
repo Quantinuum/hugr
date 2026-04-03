@@ -392,14 +392,22 @@ mod test {
         // Test successful conversion with List
         let types = vec![Type::new_unit_sum(1), bool_t()];
         let term = Term::new_list(types.iter().cloned().map_into());
-        let result = TypeRow::try_from(term);
-        assert!(result.is_ok());
-        assert_eq!(result.unwrap(), TypeRow::from(types));
+        assert_eq!(
+            TypeRow::try_from(term.clone()),
+            Ok(TypeRow::from(types.clone()))
+        );
+        assert_eq!(
+            TypeRowRV::try_from(term.clone()),
+            Ok(TypeRowRV::from(types.clone()))
+        );
+        assert_eq!(*TypeRowRV::try_from(term.clone()).unwrap(), term);
 
         // Test failure with non-list
         let term = Term::from(Type::UNIT);
-        let result = TypeRow::try_from(term);
-        assert!(result.is_err());
+        assert!(TypeRow::try_from(term.clone()).is_err());
+        assert!(TypeRowRV::try_from(term).is_err());
+
+        assert!(TypeRow::try_from(Term::new_row_var_use(0, TypeBound::Linear)).is_err());
     }
 
     #[test]

@@ -869,7 +869,7 @@ pub(crate) mod test {
 
         use crate::proptest::RecursionDepth;
 
-        use crate::types::{CustomType, FuncValueType, SumType, Type, TypeBound, TypeRow};
+        use crate::types::{CustomType, FuncValueType, SumType, Term, Type, TypeBound, TypeRow};
         use proptest::{prelude::*, strategy::Union};
 
         impl Arbitrary for SumType {
@@ -909,6 +909,14 @@ pub(crate) mod test {
                         .boxed())
                     .or(any_with::<SumType>(depth).prop_map(Type::from).boxed())
                     .boxed()
+            }
+        }
+
+        proptest! {
+            #[test]
+            fn type_term_roundtrip(t: Type) {
+                let tm = Term::from(t.clone());
+                assert_eq!(Type::try_from(tm), Ok(t));
             }
         }
     }
