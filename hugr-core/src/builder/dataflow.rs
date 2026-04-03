@@ -926,7 +926,7 @@ pub(crate) mod test {
     #[test]
     fn no_outer_row_variables() -> Result<(), BuildError> {
         let e = crate::hugr::validate::test::extension_with_eval_parallel();
-        let rv = Term::new_row_var_use(0, TypeBound::Copyable);
+        let rv = TypeRowRV::just_row_var(0, TypeBound::Copyable);
         // Can *declare* a function that takes a function-value of unknown #args
         FunctionBuilder::new(
             "bad_eval",
@@ -935,13 +935,13 @@ pub(crate) mod test {
                 Signature::new(
                     [Type::new_function(FuncValueType::new(
                         [usize_t()],
-                        TypeRowRV::try_from(rv.clone()).unwrap(),
+                        rv.clone(),
                     ))],
                     [],
                 ),
             ),
         )?;
-
+        let rv: Term = rv.into();
         // But cannot eval it...
         let ev = e.instantiate_extension_op("eval", [vec![usize_t()].into(), rv.clone()]);
         assert_eq!(
