@@ -111,7 +111,7 @@ pub(super) enum TypeParamSer {
 #[serde(tag = "tya")]
 pub(super) enum TypeArgSer {
     Type {
-        ty: SerSimpleType,
+        ty: Type,
     },
     BoundedNat {
         n: u64,
@@ -176,15 +176,13 @@ impl From<Term> for TermSer {
             Term::Float(value) => TermSer::TypeArg(TypeArgSer::Float { value }),
             Term::List(elems) => TermSer::TypeArg(TypeArgSer::List { elems }),
             Term::Tuple(elems) => TermSer::TypeArg(TypeArgSer::Tuple { elems }),
-            Term::Variable(v) => {
-                TermSer::TypeArg(if matches!(&*v.cached_decl, Term::RuntimeType(_)) {
-                    TypeArgSer::Type {
-                        ty: SerSimpleType::try_from(Term::Variable(v)).unwrap(),
-                    }
-                } else {
-                    TypeArgSer::Variable { v }
+            Term::Variable(ref v) if matches!(&*v.cached_decl, Term::RuntimeType(_)) => {
+                TermSer::TypeArg(TypeArgSer::Type {
+                    ty: value.try_into().unwrap(),
                 })
             }
+            Term::Variable(v) => TermSer::TypeArg(TypeArgSer::Variable { v }),
+
             Term::ListConcat(lists) => TermSer::TypeArg(TypeArgSer::ListConcat { lists }),
             Term::TupleConcat(tuples) => TermSer::TypeArg(TypeArgSer::TupleConcat { tuples }),
         }
