@@ -321,8 +321,6 @@ mod test {
             type Strategy = BoxedStrategy<Self>;
 
             fn arbitrary_with(params: Self::Parameters) -> Self::Strategy {
-                // We want to generate a random number of type parameters, and then generate a body that can refer to those parameters.
-                // To do this, we first generate the type parameters, and then pass them as parameters to the body strategy.
                 (any_with::<T>(params), any_with::<T>(params))
                     .prop_map(|(input, output)| Self::new(input, output))
                     .boxed()
