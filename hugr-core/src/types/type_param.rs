@@ -56,7 +56,20 @@ pub type TypeArg = Term;
 /// A [`Term`] that is the static type of an operation or constructor parameter.
 pub type TypeParam = Term;
 
-/// A term in the language of static parameters in HUGR.
+/// The main entity in the static language (aka "type system") of Hugr.
+///
+/// Terms include types (i.e. which describe sets of runtime values)
+/// but also other compile-time entities which can be used to parametrize
+/// and instantiate functions, ops, and types. (For example, array lengths
+/// are not types but they are static parameters of array types and ops.)
+///
+/// Terms are used for both parameter declarations and arguments fitting those
+/// parameters, e.g. a [Term::FloatType] parameter would be instantiated (statically)
+/// with a [Term::Float] argument. [`check_term_type`] checks that an argument
+/// is valid (of the correct kind) for the parameter.
+// TODO it might be good to have a separate function that tells, for a given Term,
+// whether there is *any* valid argument; we could then rule out using as parameters
+// any Term for which there are no valid arguments.
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
