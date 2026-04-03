@@ -5,6 +5,7 @@ use std::sync::{Arc, Weak};
 use strum::IntoEnumIterator;
 
 use crate::ops::{ExtensionOp, OpName, OpNameRef};
+use crate::types::type_param::TermTypeError;
 use crate::{Extension, ops::OpType, types::TypeArg};
 
 use super::{ExtensionBuildError, ExtensionId, OpDef, SignatureError, op_def::SignatureFunc};
@@ -23,6 +24,12 @@ pub enum OpLoadError {
     InvalidArgs(#[from] SignatureError),
     #[error("OpDef belongs to extension {0}, expected {1}.")]
     WrongExtension(ExtensionId, ExtensionId),
+}
+
+impl From<TermTypeError> for OpLoadError {
+    fn from(value: TermTypeError) -> Self {
+        SignatureError::from(value).into()
+    }
 }
 
 /// Traits implemented by types which can add themselves to [`Extension`]s as
