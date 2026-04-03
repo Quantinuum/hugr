@@ -554,8 +554,8 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
-    let tv = Term::new_row_var_use(0, TypeBound::Linear);
-    let tv_row = TypeRowRV::try_from(tv.clone()).unwrap();
+    let tv_row = TypeRowRV::just_row_var(0, TypeBound::Linear);
+    let tv = Term::from(tv_row.clone());
     let inner_ft = Type::new_function(FuncValueType::new_endo(tv_row.clone()));
     let ft_usz = Type::new_function(FuncValueType::new_endo(tv_row.concat([usize_t()])));
     let mut fb = FunctionBuilder::new(
