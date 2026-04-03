@@ -26,6 +26,7 @@ use clap::{Parser, crate_version};
 #[cfg(feature = "tracing")]
 use clap_verbosity_flag::VerbosityFilter;
 use clap_verbosity_flag::{InfoLevel, Verbosity};
+use hugr::extension::resolution::ExtensionResolutionError;
 use hugr::package::PackageValidationError;
 use thiserror::Error;
 #[cfg(feature = "tracing")]
@@ -111,6 +112,9 @@ pub enum CliError {
     #[error("Error reading envelope.")]
     /// Errors produced when reading an envelope.
     ReadEnvelope(#[from] hugr::envelope::ReadError),
+    /// Error produced while loading extension files.
+    #[error("Error loading extension file.")]
+    LoadExtensionFile(#[from] ExtensionResolutionError),
 }
 
 impl CliError {

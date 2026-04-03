@@ -4,7 +4,7 @@ import hugr
 from hugr.package import Package
 import hugr.ops as ops
 import hugr.tys as tys
-from hugr import ext, val
+from hugr import Hugr, ext, val
 
 from hugr.build import Dfg
 from hugr.std.collections.list import List
@@ -159,7 +159,7 @@ def test_type_resolution(typ: tys.Type, extensions: list[ext.Extension]) -> None
 
     test_registry = ext.ExtensionRegistry()
     for extension in extensions:
-        test_registry.add_extension(extension)
+        test_registry.register(extension)
     _, result = typ._resolve_used_extensions(test_registry)
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
@@ -202,7 +202,7 @@ def test_type_arg_resolution(arg: tys.TypeArg, extensions: list[ext.Extension]) 
 
     test_registry = ext.ExtensionRegistry()
     for extension in extensions:
-        test_registry.add_extension(extension)
+        test_registry.register(extension)
     _, result = arg._resolve_used_extensions(test_registry)
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
@@ -239,7 +239,7 @@ def test_type_param_resolution(
 
     test_registry = ext.ExtensionRegistry()
     for extension in extensions:
-        test_registry.add_extension(extension)
+        test_registry.register(extension)
     _, result = param._resolve_used_extensions(test_registry)
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
@@ -292,7 +292,7 @@ def test_op_resolution(op: ops.Op, extensions: list[ext.Extension]) -> None:
 
     test_ext_registry = ext.ExtensionRegistry()
     for extension in extensions:
-        test_ext_registry.add_extension(extension)
+        test_ext_registry.register(extension)
     _, result = op._resolve_used_extensions(test_ext_registry)
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
@@ -322,7 +322,7 @@ def test_value_resolution(value: val.Value, extensions: list[ext.Extension]) -> 
     # Reset the value for the second test by creating a fresh copy
     test_ext_registry = ext.ExtensionRegistry()
     for extension in extensions:
-        test_ext_registry.add_extension(extension)
+        test_ext_registry.register(extension)
     result = value._resolve_used_extensions_inplace(test_ext_registry)
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
@@ -341,7 +341,7 @@ def test_hugr_with_opaque_type_resolve() -> None:
 
     # With resolve_from, should work
     test_ext_registry = ext.ExtensionRegistry()
-    test_ext_registry.add_extension(TEST_EXT)
+    test_ext_registry.register(TEST_EXT)
     exts = h.hugr.used_extensions(resolve_from=test_ext_registry)
     assert TEST_EXT.name in exts.used_extensions.ids()
 
@@ -401,3 +401,57 @@ def test_lower_funcs_resolve() -> None:
     used_exts = package.used_extensions()
     assert outer_ext.name in used_exts.used_extensions.ids()
     assert inner_ext.name in used_exts.used_extensions.ids()
+
+
+def test_default_resolution() -> None:
+    """Loading a package without a resolve_from should resolve the standard
+    and bundled extensions."""
+
+    # Build an extension with a custom op
+    op_def = ext.OpDef(
+        name="CustomOp",
+        description="outer op with lowering",
+        signature=ext.OpDefSig(tys.FunctionType.endo([tys.Bool])),
+    )
+    extension = ext.Extension(
+        version=ext.Version(0, 1, 0),
+        name="outer",
+        types={},
+    )
+    extension.add_op_def(op_def)
+
+    # Build a HUGR with the custom op
+    h = Dfg(tys.Bool)
+    [b] = h.inputs()
+    b = h.add_op(extension.get_op("CustomOp").instantiate(args=[]), b).out(0)
+    h.set_outputs(b)
+
+    # Include the extension in a package and check that the lower func is resolved.
+    package = Package(
+        modules=[h.hugr],
+        extensions=[extension],
+    )
+    used_exts = package.used_extensions()
+    assert extension.name in used_exts.used_extensions
+    assert used_exts.unresolved_extensions == set()
+    assert used_exts.unresolved_ops == {}
+    assert used_exts.unresolved_types == {}
+
+    bytes = package.to_bytes()
+
+    # Load it as a Package and check that the op is resolved
+    package = Package.from_bytes(bytes)
+    assert len(package.extensions) == 1
+    for _, data in package.modules[0].nodes():
+        assert not isinstance(data.op, ops.Custom)
+        if isinstance(data.op, ops.Custom):
+            assert data.op.extension == extension.name
+            assert data.op.op_name == op_def.name
+
+    # Load it as a Hugr and check that the op is resolved
+    hugr = Hugr.from_bytes(bytes)
+    for _, data in hugr.nodes():
+        assert not isinstance(data.op, ops.Custom)
+        if isinstance(data.op, ops.Custom):
+            assert data.op.extension == extension.name
+            assert data.op.op_name == op_def.name

@@ -1,6 +1,65 @@
 # Changelog
 
 
+## [0.27.0](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.26.1...hugr-core-v0.27.0) - 2026-03-31
+
+### Bug Fixes
+
+- Use valid identifiers when constructing AST model ([#2973](https://github.com/Quantinuum/hugr/pull/2973))
+- Panic on constant folding with opaque consts ([#2986](https://github.com/Quantinuum/hugr/pull/2986))
+
+### New Features
+
+- *(py)* Allow missing ext versions ExtensionDesc metadata ([#2979](https://github.com/Quantinuum/hugr/pull/2979))
+- [**breaking**] Deprecate JSON serialization format ([#2991](https://github.com/Quantinuum/hugr/pull/2991))
+- [**breaking**] Bump public `portgraph` dependency to `0.16.0` ([#2998](https://github.com/Quantinuum/hugr/pull/2998))
+
+### Refactor
+
+- Simplify validate_subtree ([#2969](https://github.com/Quantinuum/hugr/pull/2969))
+- further cleanups to SiblingSubgraph + generalize over trait HugrConvexChecker ([#2957](https://github.com/Quantinuum/hugr/pull/2957))
+
+## [0.26.1](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.26.0...hugr-core-v0.26.1) - 2026-03-18
+
+### New Features
+
+- *(hugr-py)* Allow linking packages and modules from Python ([#2947](https://github.com/Quantinuum/hugr/pull/2947))
+
+### Refactor
+
+- start cleaning up SiblingSubgraph convexity checking ([#2956](https://github.com/Quantinuum/hugr/pull/2956))
+
+## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.7...hugr-core-v0.26.0) - 2026-03-16
+
+### Bug Fixes
+
+- Keep declared used_extensions in envelope description ([#2932](https://github.com/Quantinuum/hugr/pull/2932))
+
+### Documentation
+
+- Move `spec/schema` and `spec/std_extensions` to `resources/` ([#2897](https://github.com/Quantinuum/hugr/pull/2897))
+
+### Miscellaneous Tasks
+
+- [**breaking**] Fix new clippy warning on rust 1.94 ([#2912](https://github.com/Quantinuum/hugr/pull/2912))
+
+### New Features
+
+- [**breaking**] Rename ModelText envelope format to SExpression ([#2927](https://github.com/Quantinuum/hugr/pull/2927))
+- [**breaking**] Fix lower_funcs with custom extensions failing to load ([#2925](https://github.com/Quantinuum/hugr/pull/2925))
+- [**breaking**] TypeRow: add impl From array of Type, remove From<Type> ([#2784](https://github.com/Quantinuum/hugr/pull/2784))
+- Deprecate HugrView::as_petgraph ([#2944](https://github.com/Quantinuum/hugr/pull/2944))
+
+### Refactor
+
+- [**breaking**] Remove deprecated Value::Function ([#2928](https://github.com/Quantinuum/hugr/pull/2928))
+- [**breaking**] Remove deprecated definitions ([#2930](https://github.com/Quantinuum/hugr/pull/2930))
+
+### Testing
+
+- Fix type_row intos in doctests ([#2941](https://github.com/Quantinuum/hugr/pull/2941))
+- Add missing width arg in model-call example ([#2945](https://github.com/Quantinuum/hugr/pull/2945))
+
 ## [0.25.7](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.25.6...hugr-core-v0.25.7) - 2026-03-06
 
 ### Documentation

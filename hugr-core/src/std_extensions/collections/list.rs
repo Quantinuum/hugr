@@ -379,15 +379,17 @@ impl ListOpInst {
 #[cfg(test)]
 mod test {
     use rstest::rstest;
+    use strum::IntoEnumIterator;
 
-    use crate::PortIndex;
     use crate::extension::prelude::{
         ConstUsize, const_fail_tuple, const_none, const_ok_tuple, const_some_tuple, qb_t, usize_t,
     };
     use crate::ops::OpTrait;
+    use crate::ops::constant::CustomSerialized;
     use crate::std_extensions::arithmetic::float_types::{ConstF64, float64_type};
     use crate::type_row;
     use crate::types::TypeRow;
+    use crate::{IncomingPort, PortIndex};
 
     use super::*;
 
@@ -521,6 +523,40 @@ mod test {
                 .clone();
 
             assert_eq!(res_val, expected);
+        }
+    }
+
+    /// Check that opaque constants don't cause panics when they fail to be folded.
+    #[rstest]
+    fn list_opaque_fold() {
+        for opdef in ListOp::iter() {
+            let op = opdef.with_type(usize_t());
+            let optype = op.clone().to_extension_op().unwrap();
+            let sig = optype.dataflow_signature().unwrap();
+
+            let consts: Vec<_> = sig
+                .input
+                .iter()
+                .enumerate()
+                .map(|(i, typ)| {
+                    let port: IncomingPort = i.into();
+                    let val = Value::extension(CustomSerialized::new(
+                        typ.clone(),
+                        format!("opaque{i}").into(),
+                    ));
+                    (port, val)
+                })
+                .collect();
+
+            let res = op.to_extension_op().unwrap().constant_fold(&consts);
+
+            // Nothing got folded.
+            assert_eq!(
+                res,
+                None,
+                "folding should fail on opaque constants for {}",
+                opdef.opdef_id()
+            );
         }
     }
 }

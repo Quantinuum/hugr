@@ -13,7 +13,7 @@ use crate::core::HugrNode;
 use crate::extension::SignatureError;
 
 use crate::ops::constant::ConstTypeError;
-use crate::ops::custom::{ExtensionOp, OpaqueOpError};
+use crate::ops::custom::OpaqueOpError;
 use crate::ops::validate::{
     ChildrenEdgeData, ChildrenValidationError, EdgeValidationError, OpValidityFlags,
 };
@@ -58,8 +58,8 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             self.validate_node(node)?;
         }
 
-        // Hierarchy and children. No type variables declared by the module root.
-        self.validate_subtree(self.hugr.module_root(), &[])?;
+        // Hierarchy and children.
+        self.validate_subtree()?;
 
         self.validate_linkage()?;
         // In tests we take the opportunity to verify that the hugr
@@ -551,27 +551,53 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
 
     /// Validates that `TypeArgs` are valid wrt the [`ExtensionRegistry`] and that nodes
     /// only refer to type variables declared by the closest enclosing `FuncDefn`.
-    fn validate_subtree(
+    ///
+    /// As `FuncDefn`s are children of the module root, we validate each
+    /// module child with no in-scope declarations, then validate all of its
+    /// strict descendants with declarations coming from that child if it is a
+    /// `FuncDefn`.
+    fn validate_subtree(&mut self) -> Result<(), ValidationError<H::Node>> {
+        for child in self.hugr.children(self.hugr.module_root()) {
+            // Module children themselves cannot refer to function-local type variables.
+            self.validate_subtree_node(child, &[])?;
+
+            if let OpType::FuncDefn(fd) = self.hugr.get_optype(child) {
+                let var_decls = fd.signature().params();
+
+                // `descendants` includes `child` itself; skip it.
+                for descendant in self.hugr.descendants(child).skip(1) {
+                    self.validate_subtree_node(descendant, var_decls)?;
+                }
+            } else {
+                assert!(
+                    self.hugr.children(child).next().is_none(),
+                    "non-FuncDefn module child {child} unexpectedly has children"
+                );
+            }
+        }
+
+        Ok(())
+    }
+
+    fn validate_subtree_node(
         &mut self,
         node: H::Node,
         var_decls: &[TypeParam],
     ) -> Result<(), ValidationError<H::Node>> {
         let op_type = self.hugr.get_optype(node);
         // The op_type must be defined only in terms of type variables defined outside the node
-
-        let validate_ext = |ext_op: &ExtensionOp| -> Result<(), ValidationError<H::Node>> {
-            // Check TypeArgs are valid, and if we can, fit the declared TypeParams
-            ext_op
-                .def()
-                .validate_args(ext_op.args(), var_decls)
-                .map_err(|cause| ValidationError::SignatureError {
-                    node,
-                    op: op_type.name(),
-                    cause,
-                })
-        };
         match op_type {
-            OpType::ExtensionOp(ext_op) => validate_ext(ext_op)?,
+            OpType::ExtensionOp(ext_op) => {
+                // Check TypeArgs are valid, and if we can, fit the declared TypeParams
+                ext_op
+                    .def()
+                    .validate_args(ext_op.args(), var_decls)
+                    .map_err(|cause| ValidationError::SignatureError {
+                        node,
+                        op: op_type.name(),
+                        cause,
+                    })?;
+            }
             OpType::OpaqueOp(opaque) => {
                 Err(OpaqueOpError::UnresolvedOp(
                     node,
@@ -603,18 +629,6 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             for port in self.hugr.node_ports(node, dir) {
                 self.validate_port(node, port, op_type, var_decls)?;
             }
-        }
-
-        // For FuncDefn's, only the type variables declared by the FuncDefn can be referred to by nodes
-        // inside the function. (The same would be true for FuncDecl's, but they have no child nodes.)
-        let var_decls = if let OpType::FuncDefn(fd) = op_type {
-            fd.signature().params()
-        } else {
-            var_decls
-        };
-
-        for child in self.hugr.children(node) {
-            self.validate_subtree(child, var_decls)?;
         }
 
         Ok(())
@@ -751,7 +765,7 @@ pub enum ValidationError<N: HugrNode> {
     },
     /// Error in a [`ExtensionOp`] serialized as an [Opaque].
     ///
-    /// [ExtensionOp]: crate::ops::ExtensionOp
+    /// [`ExtensionOp`]: crate::ops::ExtensionOp
     /// [Opaque]: crate::ops::OpaqueOp
     #[error(transparent)]
     OpaqueOpError(#[from] OpaqueOpError<N>),

@@ -67,15 +67,17 @@ as well as anything which cannot - e.g. quantum data.
 A `Const` edge can only carry a `CopyableType`. For
 more details see the [Type System](type-system.md) section.
 
-As well as the type, Dataflow edges are also parametrized by a
-`Locality`, which declares whether the edge crosses levels in the hierarchy. See
-[Edge Locality](#edge-locality) for details.
+As well as the type, `Value` and `Const` edges are also parametrized by a
+`Locality`, which declares whether the edge crosses levels in the hierarchy.
+`Function` edges are always non-local (`Ext`), as they originate from
+module-level `FuncDefn` or `FuncDecl` nodes.
+See [Edge Locality](#edge-locality) for details.
 
 ```haskell
 AnyType ⊃ CopyableType
 
 EdgeKind ::= Value(Locality, AnyType)
-             | Const(Local | Ext, CopyableType) | Function(Local | Ext, PolyFuncType)
+             | Const(Local | Ext, CopyableType) | Function(PolyFuncType)
              | Hierarchy | Order | ControlFlow
 ```
 
@@ -102,6 +104,8 @@ linear types that the value is used exactly once.
 The `Hierarchy` and `ControlFlow` edges from a node
 are ordered (the children of a container node have a linear ordering, as do the
 successors of a `BasicBlock` node).
+
+Static (`Const` or `Function`) edges for a node should come before `ControlFlow` edges, followed by `Order` edges. `Value` edges should come last.
 
 ### `Hierarchy` edges
 
@@ -170,14 +174,43 @@ edges. The following operations are *only* valid as immediate children of a
   edge for each use of the function. The function name is used at link time to
   look up definitions in linked
   modules (other hugr instances specified to the linker).
+  `FuncDecl` nodes have a *visibility*, either `Public` (default) or `Private`;
+  see [Function Visibility](#function-visibility).
 - `AliasDecl`: an external type alias declaration. At link time this can be
   replaced with the definition. An alias declared with `AliasDecl` is equivalent to a
   named opaque type.
 - `FuncDefn` : a function definition. Like `FuncDecl` but with a function body.
   The function body is defined by the sibling graph formed by its children.
   At link time `FuncDecl` nodes are replaced by `FuncDefn`.
+  `FuncDefn` nodes have a *visibility*, either `Public` or `Private` (default);
+  see [Function Visibility](#function-visibility).
 - `AliasDefn`: type alias definition. At link time `AliasDecl` can be replaced with
   `AliasDefn`.
+
+(function-visibility)=
+#### Function Visibility
+
+Both `FuncDefn` and `FuncDecl` nodes carry a **visibility** attribute that
+controls whether the linker treats the function as a cross-module symbol:
+
+- **`Public`**: the function is exported and visible to the linker. Public
+  functions can be called from other modules and are used during linking to
+  resolve `FuncDecl` references. `FuncDecl`s are `Public` unless specified
+  otherwise.
+- **`Private`**: the function is local to the HUGR in which it is defined and
+  is not exposed for linking. Private functions are only callable within the
+  same HUGR. `FuncDefn`s are `Private` unless specified otherwise.
+
+When exporting a HUGR, `Public` functions are identified by their plain name.
+`Private` functions are name-mangled to avoid conflicts with same-named symbols
+in other modules.
+
+Public function names must be unique within a module, with one exception:
+multiple `FuncDecl` nodes may share the same name provided they all have
+identical signatures (this represents multiple declaration sites for the same
+external symbol).
+Any name shared between a `FuncDefn` and another `Public` `FuncDefn` or
+`FuncDecl`, or between two `FuncDecl`s with different signatures, is invalid.
 
 There may also be other [scoped definitions](#scoped-definitions).
 
@@ -188,7 +221,7 @@ The following operations are valid at the module level as well as in dataflow
 regions and control-flow regions:
 
 - `Const<T>` : a static constant value of type T stored in the node
-  weight. Like `FuncDecl` and `FuncDefn` this has one `Const<T>` out-edge per use.
+  weight. This has one `Const<T>` out-edge per use.
 
 A **loadable HUGR** is a module HUGR where all input ports are connected and there are
 no `FuncDecl/AliasDecl` nodes.
@@ -499,7 +532,7 @@ has no parent).
 | Conditional               | **D**                          | `Conditional`      | **C**         | `Case`                   | No edges                                 |
 | **C:** Dataflow container | **D**                          | `TailLoop`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
 | **C**                     | **D**                          | `DFG`              | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
-| **C**                     | `Function`                     | `FuncDefn`         | **C**         |  **D**                   | First(second) is `Input`(`Output`)       |
+| **C**                     | `Function`                     | `FuncDefn`         | `Module`      |  **D**                   | First(second) is `Input`(`Output`)       |
 | **C**                     | `ControlFlow`                  | `DFB`              | CFG           |  **D**                   | First(second) is `Input`(`Output`)       |
 | **C**                     | \-                             | `Case`             | `Conditional` |  **D**                   | First(second) is `Input`(`Output`)       |
 | Root                      | \-                             | `Module`           | none          |  **D**                   | Contains main `FuncDefn` for executable HUGR. |
@@ -523,7 +556,8 @@ The common parent may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 | Hierarchy      | Defines hierarchy; each node has \<=1 parent                                                                                                                                                            |
 | Order, Control | Local (Source + target have same parent) |
 | Value          | Local, Ext or Dom - see [Edge Locality](#edge-locality) |
-| Static         | Local or Ext - see [Edge Locality](#edge-locality) |
+| Const          | Local or Ext - see [Edge Locality](#edge-locality) |
+| Function       | Ext - see [Edge Locality](#edge-locality) |
 
 (edge-locality)=
 ## Edge Locality

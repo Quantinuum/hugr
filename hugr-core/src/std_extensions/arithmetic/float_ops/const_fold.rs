@@ -25,12 +25,12 @@ pub(super) fn set_fold(op: &FloatOps, def: &mut OpDef) {
 fn get_floats<const N: usize>(consts: &[(IncomingPort, ops::Value)]) -> Option<[f64; N]> {
     let consts: [&ops::Value; N] = sorted_consts(consts).try_into().ok()?;
 
-    Some(consts.map(|c| {
-        let const_f64: &ConstF64 = c
-            .get_custom_value()
-            .expect("This function assumes all incoming constants are floats.");
-        const_f64.value()
-    }))
+    let mut floats: [f64; N] = [0.0; N];
+    for (constant, out) in std::iter::zip(consts, &mut floats) {
+        let const_f64 = constant.get_custom_value::<ConstF64>()?;
+        *out = const_f64.value();
+    }
+    Some(floats)
 }
 
 /// Fold binary operations

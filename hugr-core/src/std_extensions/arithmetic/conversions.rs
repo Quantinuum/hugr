@@ -208,10 +208,12 @@ impl HasDef for ConvertOpType {
 #[cfg(test)]
 mod test {
     use rstest::rstest;
+    use strum::IntoEnumIterator;
 
     use crate::IncomingPort;
     use crate::extension::prelude::ConstUsize;
-    use crate::ops::Value;
+    use crate::ops::constant::CustomSerialized;
+    use crate::ops::{OpTrait, OpType, Value};
     use crate::std_extensions::arithmetic::int_types::ConstInt;
 
     use super::*;
@@ -275,6 +277,51 @@ mod test {
             let res_val: &Value = &res.get(i).unwrap().1;
 
             assert_eq!(res_val, expected);
+        }
+    }
+
+    /// Check that opaque constants don't cause panics when they fail to be folded.
+    #[rstest]
+    fn convert_opaque_fold() {
+        for opdef in ConvertOpDef::iter() {
+            let requires_log_width = !opdef
+                .signature()
+                .poly_func_type()
+                .unwrap()
+                .params()
+                .is_empty();
+
+            let op = if requires_log_width {
+                opdef.with_log_width(5)
+            } else {
+                opdef.without_log_width()
+            };
+            let optype = OpType::from(op.clone());
+            let sig = optype.dataflow_signature().unwrap();
+
+            let consts: Vec<_> = sig
+                .input
+                .iter()
+                .enumerate()
+                .map(|(i, typ)| {
+                    let port: IncomingPort = i.into();
+                    let val = Value::extension(CustomSerialized::new(
+                        typ.clone(),
+                        format!("opaque{i}").into(),
+                    ));
+                    (port, val)
+                })
+                .collect();
+
+            let res = op.to_extension_op().unwrap().constant_fold(&consts);
+
+            // Nothing got folded.
+            assert_eq!(
+                res,
+                None,
+                "folding should fail on opaque constants for {}",
+                opdef.opdef_id()
+            );
         }
     }
 }

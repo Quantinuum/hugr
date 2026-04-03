@@ -9,8 +9,16 @@ from graphviz import Digraph
 from typing_extensions import assert_never
 
 from hugr.hugr import Hugr
-from hugr.ops import AsExtOp
-from hugr.tys import CFKind, ConstKind, FunctionKind, Kind, OrderKind, ValueKind
+from hugr.ops import AsExtOp, Case, Custom
+from hugr.tys import (
+    CFKind,
+    ConstKind,
+    FunctionKind,
+    Kind,
+    OrderKind,
+    ValueKind,
+)
+from hugr.utils import name_w_args
 
 from .node_port import InPort, Node, OutPort
 
@@ -243,8 +251,22 @@ class DotRenderer:
     def _out_order_name(self, n: Node) -> str:
         return f"{n.idx}:{self._OUTPUT_PREFIX}None"
 
-    def _viz_node(self, node: Node, hugr: Hugr, graph: Digraph) -> None:
-        """Render a (possibly nested) node to a graphviz graph."""
+    def _viz_node(
+        self,
+        node: Node,
+        hugr: Hugr,
+        graph: Digraph,
+        *,
+        sibling_order: int | None = None,
+    ) -> None:
+        """Render a (possibly nested) node to a graphviz graph.
+
+        Args:
+            node: The node to render.
+            hugr: The HUGR to render.
+            graph: The graphviz graph to render the node to.
+            sibling_order: The order of the node in the region's sibling list.
+        """
         meta = hugr[node].metadata
         if len(meta) > 0 and self.config.display_metadata:
             if self.config.max_metadata_length is not None:
@@ -275,11 +297,15 @@ class DotRenderer:
             else ""
         )
 
-        op = hugr[node].op
-        if isinstance(op, AsExtOp) and not self.config.qualify_op_name:
-            op_name = op.op_def().name
-        else:
-            op_name = op.name()
+        match hugr[node].op:
+            case AsExtOp() as op if not self.config.qualify_op_name:
+                op_name = name_w_args(op.op_def().name, op.type_args())
+            case Case() as op if sibling_order is not None:
+                op_name = f"{op.name()}[{sibling_order}]"
+            case Custom() as op:
+                op_name = name_w_args(op.name(), op.args)
+            case op:
+                op_name = op.name()
 
         if self.config.max_node_label_length is not None:
             op_name = _smart_truncate(
@@ -311,8 +337,8 @@ class DotRenderer:
 
         if hugr.children(node):
             with graph.subgraph(name=f"cluster{node.idx}") as sub:
-                for child in hugr.children(node):
-                    self._viz_node(child, hugr, sub)
+                for sibling_order, child in enumerate(hugr.children(node)):
+                    self._viz_node(child, hugr, sub, sibling_order=sibling_order)
                 html_label = self._format_html_label(**label_config)
                 sub.node(f"{node.idx}", shape="plain", label=f"<{html_label}>")
                 sub.attr(

@@ -5,17 +5,19 @@
 //! the core and model to converge incrementally.
 use std::sync::Arc;
 
-use crate::envelope::description::GeneratorDesc;
-use crate::metadata::{self, Metadata};
-use crate::types::{FuncValueType, TypeRowRV};
+use crate::envelope::description::{ExtensionDesc, GeneratorDesc, ModuleDesc};
+use crate::metadata::{self, Metadata, RawMetadataValue};
+use crate::types::type_param::{SeqPart, TermTypeError, TypeParam};
+use crate::types::{
+    CustomType, FuncValueType, PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, TypeName,
+    TypeRow, TypeRowRV,
+};
 use crate::{
     Direction, Hugr, HugrView, Node, Port,
-    envelope::description::{ExtensionDesc, ModuleDesc},
     extension::{
         ExtensionId, ExtensionRegistry, SignatureError, resolution::ExtensionResolutionError,
     },
     hugr::HugrMut,
-    metadata::RawMetadataValue,
     ops::{
         AliasDecl, AliasDefn, CFG, Call, CallIndirect, Case, Conditional, Const, DFG,
         DataflowBlock, ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType,
@@ -23,14 +25,8 @@ use crate::{
         constant::{CustomConst, CustomSerialized, OpaqueValue},
     },
     package::Package,
-    std_extensions::{
-        arithmetic::{float_types::ConstF64, int_types::ConstInt},
-        collections::array::ArrayValue,
-    },
-    types::{
-        CustomType, PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, TypeName, TypeRow,
-        type_param::{SeqPart, TypeParam},
-    },
+    std_extensions::arithmetic::{float_types::ConstF64, int_types::ConstInt},
+    std_extensions::collections::array::ArrayValue,
 };
 use hugr_model::v0::table;
 use hugr_model::v0::{self as model};

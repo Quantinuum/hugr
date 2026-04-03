@@ -831,7 +831,7 @@ impl<'a> Context<'a> {
             .expect("exporting poly func type outside of local scope");
         let visibility = self.bump.alloc(visibility);
         for (i, param) in params.iter().enumerate() {
-            let name = self.bump.alloc_str(&i.to_string());
+            let name = self.bump.alloc_str(&format!("_{}", i));
             let r#type = self.export_term(param, Some((scope, i as _)));
             let param = table::Param { name, r#type };
             param_vec.push(param);

@@ -4,6 +4,7 @@ use clio::Input;
 use hugr::envelope::description::PackageDesc;
 use hugr::envelope::read_envelope;
 use hugr::extension::ExtensionRegistry;
+use hugr::extension::resolution::WeakExtensionRegistry;
 use hugr::package::Package;
 use hugr::{Extension, Hugr};
 use std::io::{BufReader, Read};
@@ -74,6 +75,7 @@ impl HugrInputArgs {
     ///
     /// If `reader` is `None`, reads from the input specified in the args.
     /// This is a legacy option for reading old HUGR JSON files.
+    #[deprecated(since = "0.27.0")]
     pub(crate) fn get_hugr_with_reader<R: Read>(
         &mut self,
         reader: Option<R>,
@@ -114,12 +116,21 @@ impl HugrInputArgs {
             hugr::std_extensions::STD_REG.to_owned()
         };
 
+        let mut extensions: Vec<Extension> = Vec::with_capacity(self.extensions.len());
         for ext in &self.extensions {
             let f = std::fs::File::open(ext)?;
             let ext: Extension = serde_json::from_reader(f)?;
-            reg.register_updated(ext);
+            extensions.push(ext);
         }
 
+        // After deserialization, we need to update all the internal
+        // `Weak<Extension>` references.
+        let extra_extensions = ExtensionRegistry::new_with_extension_resolution(
+            extensions,
+            &WeakExtensionRegistry::from(&reg),
+        )?;
+
+        reg.extend(extra_extensions);
         Ok(reg)
     }
 }

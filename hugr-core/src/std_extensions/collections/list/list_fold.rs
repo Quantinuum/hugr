@@ -32,7 +32,7 @@ impl ConstFold for PopFold {
         consts: &[(crate::IncomingPort, Value)],
     ) -> ConstFoldResult {
         let [list]: [&Value; 1] = sorted_consts(consts).try_into().ok()?;
-        let list: &ListValue = list.get_custom_value().expect("Should be list value.");
+        let list: &ListValue = list.get_custom_value()?;
         let mut list = list.clone();
 
         if let Some(elem) = list.0.pop() {
@@ -56,7 +56,7 @@ impl ConstFold for PushFold {
         consts: &[(crate::IncomingPort, Value)],
     ) -> ConstFoldResult {
         let [list, elem]: [&Value; 2] = sorted_consts(consts).try_into().ok()?;
-        let list: &ListValue = list.get_custom_value().expect("Should be list value.");
+        let list: &ListValue = list.get_custom_value()?;
         let mut list = list.clone();
         list.0.push(elem.clone());
 
@@ -69,8 +69,8 @@ pub struct GetFold;
 impl ConstFold for GetFold {
     fn fold(&self, _type_args: &[TypeArg], consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
         let [list, index]: [&Value; 2] = sorted_consts(consts).try_into().ok()?;
-        let list: &ListValue = list.get_custom_value().expect("Should be list value.");
-        let index: &ConstUsize = index.get_custom_value().expect("Should be int value.");
+        let list: &ListValue = list.get_custom_value()?;
+        let index: &ConstUsize = index.get_custom_value()?;
         let idx = index.value() as usize;
 
         match list.0.get(idx) {
@@ -85,9 +85,9 @@ pub struct SetFold;
 impl ConstFold for SetFold {
     fn fold(&self, _type_args: &[TypeArg], consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
         let [list, idx, elem]: [&Value; 3] = sorted_consts(consts).try_into().ok()?;
-        let list: &ListValue = list.get_custom_value().expect("Should be list value.");
+        let list: &ListValue = list.get_custom_value()?;
 
-        let idx: &ConstUsize = idx.get_custom_value().expect("Should be int value.");
+        let idx: &ConstUsize = idx.get_custom_value()?;
         let idx = idx.value() as usize;
 
         let mut list = list.clone();
@@ -108,9 +108,9 @@ pub struct InsertFold;
 impl ConstFold for InsertFold {
     fn fold(&self, _type_args: &[TypeArg], consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
         let [list, idx, elem]: [&Value; 3] = sorted_consts(consts).try_into().ok()?;
-        let list: &ListValue = list.get_custom_value().expect("Should be list value.");
+        let list: &ListValue = list.get_custom_value()?;
 
-        let idx: &ConstUsize = idx.get_custom_value().expect("Should be int value.");
+        let idx: &ConstUsize = idx.get_custom_value()?;
         let idx = idx.value() as usize;
 
         let mut list = list.clone();
@@ -130,7 +130,7 @@ pub struct LengthFold;
 impl ConstFold for LengthFold {
     fn fold(&self, _type_args: &[TypeArg], consts: &[(IncomingPort, Value)]) -> ConstFoldResult {
         let [list]: [&Value; 1] = sorted_consts(consts).try_into().ok()?;
-        let list: &ListValue = list.get_custom_value().expect("Should be list value.");
+        let list: &ListValue = list.get_custom_value()?;
         let len = list.0.len();
 
         Some(vec![(0.into(), ConstUsize::new(len as u64).into())])

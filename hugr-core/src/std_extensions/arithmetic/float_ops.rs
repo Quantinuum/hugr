@@ -130,8 +130,13 @@ impl MakeRegisteredOp for FloatOps {
 
 #[cfg(test)]
 mod test {
+    use crate::IncomingPort;
+    use crate::ops::Value;
+    use crate::ops::constant::CustomSerialized;
+    use crate::ops::{OpTrait, OpType};
     use cgmath::AbsDiffEq;
     use rstest::rstest;
+    use strum::IntoEnumIterator;
 
     use super::*;
 
@@ -148,6 +153,7 @@ mod test {
     #[rstest]
     #[case::fadd(FloatOps::fadd, &[0.1, 0.2], &[0.30000000000000004])]
     #[case::fsub(FloatOps::fsub, &[1., 2.], &[-1.])]
+    #[case::fneg(FloatOps::fneg, &[42.42], &[-42.42])]
     #[case::fmul(FloatOps::fmul, &[2., 3.], &[6.])]
     #[case::fdiv(FloatOps::fdiv, &[7., 2.], &[3.5])]
     #[case::fpow(FloatOps::fpow, &[0.5, 3.], &[0.125])]
@@ -183,6 +189,34 @@ mod test {
                 res_val.abs_diff_eq(expected, f64::EPSILON),
                 "expected {expected:?}, got {res_val:?}"
             );
+        }
+    }
+
+    /// Check that opaque constants don't cause panics when they fail to be folded.
+    #[rstest]
+    fn float_opaque_fold() {
+        for op in FloatOps::iter() {
+            let optype = OpType::from(op);
+            let sig = optype.dataflow_signature().unwrap();
+
+            let consts: Vec<_> = sig
+                .input
+                .iter()
+                .enumerate()
+                .map(|(i, typ)| {
+                    let port: IncomingPort = i.into();
+                    let val = Value::extension(CustomSerialized::new(
+                        typ.clone(),
+                        format!("opaque{i}").into(),
+                    ));
+                    (port, val)
+                })
+                .collect();
+
+            let res = op.to_extension_op().unwrap().constant_fold(&consts);
+
+            // Nothing got folded.
+            assert_eq!(res, None);
         }
     }
 }

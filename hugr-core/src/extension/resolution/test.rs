@@ -8,7 +8,7 @@ use itertools::Itertools;
 use rstest::rstest;
 
 use crate::builder::{
-    Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
+    DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
 use crate::envelope::EnvelopeConfig;
 use crate::extension::prelude::{ConstUsize, bool_t, usize_custom_t, usize_t};
@@ -325,9 +325,11 @@ fn resolve_hugr_extensions() {
         &Arc::downgrade(&PRELUDE),
 )))]
 fn resolve_custom_const(#[case] custom_const: impl CustomConst) {
-    let mut module = ModuleBuilder::new();
-    module.add_constant(Value::extension(custom_const));
-    let hugr = module.finish_hugr().unwrap_or_else(|e| panic!("{e}"));
+    let mut dfg_builder = DFGBuilder::new(Signature::new(vec![], vec![])).unwrap();
+    dfg_builder.add_load_const(Value::extension(custom_const));
+    let hugr = dfg_builder
+        .finish_hugr_with_outputs([])
+        .unwrap_or_else(|e| panic!("{e}"));
 
     check_extension_resolution(hugr);
 }

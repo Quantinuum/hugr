@@ -25,18 +25,18 @@ expression: ast
 (define-func
   public
   example.swap
-  (param ?0 core.type)
-  (param ?1 core.type)
-  (core.fn [?0 ?1] [?1 ?0])
-  (dfg [%0 %1] [%1 %0] (signature (core.fn [?0 ?1] [?1 ?0]))))
+  (param ?_0 core.type)
+  (param ?_1 core.type)
+  (core.fn [?_0 ?_1] [?_1 ?_0])
+  (dfg [%0 %1] [%1 %0] (signature (core.fn [?_0 ?_1] [?_1 ?_0]))))
 
 (declare-func
   public
   example.literals
-  (param ?0 core.str)
-  (param ?1 core.nat)
-  (param ?2 core.bytes)
-  (param ?3 core.float)
+  (param ?_0 core.str)
+  (param ?_1 core.nat)
+  (param ?_2 core.bytes)
+  (param ?_3 core.float)
   (core.fn [] []))
 
 (define-func private _5 (core.fn [] [])

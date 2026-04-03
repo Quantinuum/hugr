@@ -909,7 +909,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>MakeTuple</B></FONT></TD></TR>
+                  COLOR="black"><B>MakeTuple&lt;[]&gt;</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -2080,7 +2080,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>idivmod_u</B></FONT></TD></TR>
+                  COLOR="black"><B>idivmod_u&lt;5&gt;</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -2593,7 +2593,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Case</B></FONT></TD></TR>
+                  COLOR="black"><B>Case[0]</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -2661,7 +2661,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>Case</B></FONT></TD></TR>
+                  COLOR="black"><B>Case[1]</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -3102,7 +3102,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>MakeTuple</B></FONT></TD></TR>
+                  COLOR="black"><B>MakeTuple&lt;...&gt;</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>
@@ -3137,7 +3137,7 @@
           <TD>
           <TABLE BORDER="0" CELLBORDER="0">
               <TR><TD><FONT POINT-SIZE="11.0" FACE="monospace"
-                  COLOR="black"><B>UnpackTuple</B></FONT></TD></TR>
+                  COLOR="black"><B>UnpackTuple&lt;...&gt;</B></FONT></TD></TR>
           </TABLE>
           </TD>
       </TR>

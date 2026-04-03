@@ -1,5 +1,93 @@
 # Changelog
 
+## [0.27.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.26.1...hugr-v0.27.0) - 2026-03-31
+
+This release deprecates the JSON serialization format. Now hugrs can be encoded in a readable file
+using the S-expressions format instead.
+
+The release contains multiple bug fixes, including a breaking version bump for
+the public `portgraph` dependency.
+
+### Bug Fixes
+
+- Use valid identifiers when constructing AST model ([#2973](https://github.com/Quantinuum/hugr/pull/2973))
+- Panic on constant folding with opaque consts ([#2986](https://github.com/Quantinuum/hugr/pull/2986))
+
+### New Features
+
+- *(py)* Allow missing ext versions ExtensionDesc metadata ([#2979](https://github.com/Quantinuum/hugr/pull/2979))
+- [**breaking**] Bump public `portgraph` dependency to `0.16.0` ([#2998](https://github.com/Quantinuum/hugr/pull/2998))
+- [**breaking**] Deprecate JSON serialization format ([#2991](https://github.com/Quantinuum/hugr/pull/2991))
+
+### Refactor
+
+- Simplify validate_subtree ([#2969](https://github.com/Quantinuum/hugr/pull/2969))
+- further cleanups to SiblingSubgraph + generalize over trait HugrConvexChecker ([#2957](https://github.com/Quantinuum/hugr/pull/2957))
+
+## [0.26.1](https://github.com/Quantinuum/hugr/compare/hugr-v0.26.0...hugr-v0.26.1) - 2026-03-18
+
+### Bug Fixes
+
+- ConstantFold fails when the module contains function declarations ([#2954](https://github.com/Quantinuum/hugr/pull/2954))
+
+### New Features
+
+- *(hugr-py)* Allow linking packages and modules from Python ([#2947](https://github.com/Quantinuum/hugr/pull/2947))
+
+### Refactor
+
+- start cleaning up SiblingSubgraph convexity checking ([#2956](https://github.com/Quantinuum/hugr/pull/2956))
+
+## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.7...hugr-v0.26.0) - 2026-03-16
+
+This release includes a restructuring of the optimization pass API and a major
+upgrade to LLVM 21, and bumps the MSRV to Rust 1.91.
+
+Composable passes can now be configured with a scope to indicate which parts of the
+Hugr they should be applied to, and which parts they are allowed to modify.
+Implementations of the trait should adhere to this configuration.
+
+The `hugr-passes` crate is no longer reexported from `hugr::algorithms`. It will
+be integrated into `tket` in the future, but it should be used directly
+as `hugr_passes` for now.
+
+Building the crate with the `llvm` feature will now require LLVM 21.1 to be installed.
+See the [DEVELOPMENT.md](https://github.com/Quantinuum/hugr/blob/main/DEVELOPMENT.md) file for updated instructions on setting up the development environment.
+
+### New Features
+
+- [**breaking**] Update remainder of passes to use PassScope, drop default with_scope ([#2871](https://github.com/Quantinuum/hugr/pull/2871))
+- [**breaking**] Make `WithScope` a supertrait of `ComposablePass` ([#2921](https://github.com/Quantinuum/hugr/pull/2921))
+- [**breaking**] Rename ModelText envelope format to SExpression ([#2927](https://github.com/Quantinuum/hugr/pull/2927))
+- Deprecate HugrView::as_petgraph ([#2944](https://github.com/Quantinuum/hugr/pull/2944))
+- [**breaking**] `hugr-passes` is no longer reexported from `hugr::algorithms` ([#2922](https://github.com/Quantinuum/hugr/pull/2922))
+- *(llvm)* [**breaking**] Upgrade to LLVM 21 ([#2901](https://github.com/Quantinuum/hugr/pull/2901))
+- [**breaking**] TypeRow: add impl From array of Type, remove From<Type> ([#2784](https://github.com/Quantinuum/hugr/pull/2784))
+
+### Bug Fixes
+
+- *(hugr-cli)* Keep declared used_extensions in envelope description ([#2932](https://github.com/Quantinuum/hugr/pull/2932))
+- [**breaking**] Fix lower_funcs with custom extensions failing to load ([#2925](https://github.com/Quantinuum/hugr/pull/2925))
+
+### Documentation
+
+- Move `spec/schema` and `spec/std_extensions` to `resources/` ([#2897](https://github.com/Quantinuum/hugr/pull/2897))
+
+### Miscellaneous Tasks
+
+- [**breaking**] Fix new clippy warning on rust 1.94 ([#2912](https://github.com/Quantinuum/hugr/pull/2912))
+
+### Refactor
+
+- [**breaking**] Remove deprecated pass configuration ([#2938](https://github.com/Quantinuum/hugr/pull/2938))
+- [**breaking**] Remove deprecated Value::Function ([#2928](https://github.com/Quantinuum/hugr/pull/2928))
+- [**breaking**] Remove deprecated definitions ([#2930](https://github.com/Quantinuum/hugr/pull/2930))
+
+### Testing
+
+- Fix type_row intos in doctests ([#2941](https://github.com/Quantinuum/hugr/pull/2941))
+- Add missing width arg in model-call example ([#2945](https://github.com/Quantinuum/hugr/pull/2945))
+
 ## [0.25.7](https://github.com/Quantinuum/hugr/compare/hugr-v0.25.6...hugr-v0.25.7) - 2026-03-06
 
 ### Documentation

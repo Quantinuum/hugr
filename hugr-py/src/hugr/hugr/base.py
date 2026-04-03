@@ -1094,11 +1094,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Raises:
             ValueError: If the envelope does not contain exactly one module.
         """
-        hugr = read_envelope_hugr(envelope)
-        if extensions is not None:
-            # TODO: This can be done during deserialization
-            hugr.resolve_extensions(extensions)
-        return hugr
+        return read_envelope_hugr(envelope, resolve_from=extensions)
 
     @staticmethod
     def from_str(envelope: str, extensions: ExtensionRegistry | None = None) -> Hugr:
@@ -1118,15 +1114,13 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Raises:
             ValueError: If the envelope does not contain exactly one module.
         """
-        hugr = read_envelope_hugr_str(envelope)
-        if extensions is not None:
-            # TODO: This can be done during deserialization
-            hugr.resolve_extensions(extensions)
-        return hugr
+        return read_envelope_hugr_str(envelope, resolve_from=extensions)
 
     @staticmethod
     def from_model(module: model.Module) -> Hugr:
         """Import from the hugr model format."""
+        # NOTE: We do not do extension resolution here, as it is done by the
+        # `Package.from_model` caller including any bundled extension definitions.
         from hugr.model.load import ModelImport
 
         loader = ModelImport(module=module)
@@ -1213,7 +1207,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             include_extensions = self.used_extensions().used_extensions
         std = _std_extensions()
         extensions = [
-            ext for ext in include_extensions.extensions.values() if ext.name not in std
+            ext for ext in include_extensions.all_extensions if ext.name not in std
         ]
         return Package(modules=[self], extensions=extensions)
 
@@ -1297,6 +1291,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             {'prelude'}
         """
         from hugr.ext import ExtensionResolutionResult
+        from hugr.std import _std_extensions
+
+        if resolve_from is not None:
+            resolve_from.extend(_std_extensions())
 
         result = ExtensionResolutionResult()
 
