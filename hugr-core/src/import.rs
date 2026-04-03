@@ -1669,8 +1669,18 @@ impl<'a> Context<'a> {
     }
 
     fn import_signature(&mut self, term_id: table::TermId) -> Result<Signature, ImportErrorInner> {
-        let fvt = self.import_func_type(term_id)?;
-        Ok(fvt.try_into()?)
+        (|| {
+            let [inputs, outputs] = self.get_func_type(term_id)?;
+            let inputs = self
+                .import_type_row(inputs)
+                .map_err(|err| error_context!(err, "function inputs"))?;
+            let outputs = self
+                .import_type_row(outputs)
+                .map_err(|err| error_context!(err, "function outputs"))?;
+
+            Ok(Signature::new(inputs, outputs))
+        })()
+        .map_err(|err| error_context!(err, "function type"))
     }
 
     /// Import a closed list as a vector of term ids.
