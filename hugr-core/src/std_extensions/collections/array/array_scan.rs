@@ -62,8 +62,8 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
             TypeParam::new_list_type(TypeBound::Linear),
         ];
         let n = TypeArg::new_var_use(0, TypeParam::max_nat_type());
-        let src_elem = Type::new_var_use(1, TypeBound::Linear);
-        let tgt_elem = Type::new_var_use(2, TypeBound::Linear);
+        let t1 = Type::new_var_use(1, TypeBound::Linear);
+        let t2 = Type::new_var_use(2, TypeBound::Linear);
         let with_rest = |tys: Vec<Type>| {
             TypeRowRV::from(tys).concat(TypeRowRV::just_row_var(3, TypeBound::Linear))
         };
@@ -71,16 +71,15 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
             params,
             FuncValueType::new(
                 with_rest(vec![
-                    AK::instantiate_ty(array_def, n.clone(), src_elem.clone())
+                    AK::instantiate_ty(array_def, n.clone(), t1.clone())
                         .expect("Array type instantiation failed"),
                     Type::new_function(FuncValueType::new(
-                        with_rest(vec![src_elem]),
-                        with_rest(vec![tgt_elem.clone()]),
+                        with_rest(vec![t1]),
+                        with_rest(vec![t2.clone()]),
                     )),
                 ]),
                 with_rest(vec![
-                    AK::instantiate_ty(array_def, n, tgt_elem)
-                        .expect("Array type instantiation failed"),
+                    AK::instantiate_ty(array_def, n, t2).expect("Array type instantiation failed"),
                 ]),
             ),
         )
