@@ -25,7 +25,6 @@ pub(crate) enum SerSimpleType {
     R { i: usize, b: TypeBound },
 }
 
-/// For the things that used to be supported as Types
 impl From<Type> for SerSimpleType {
     fn from(value: Type) -> Self {
         if value == qb_t() {
@@ -51,6 +50,7 @@ impl From<Type> for SerSimpleType {
     }
 }
 
+// Row Variables can also be serialized as "simple types"
 impl TryFrom<Term> for SerSimpleType {
     type Error = TermTypeError;
 
