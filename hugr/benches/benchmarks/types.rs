@@ -1,6 +1,6 @@
 // Required for black_box uses
 #![allow(clippy::unit_arg)]
-use hugr::extension::prelude::{qb_t, usize_t};
+use hugr::extension::prelude::{bool_t, qb_t, usize_t};
 use hugr::types::{Signature, Type};
 
 use criterion::{AxisScale, Criterion, PlotConfiguration, criterion_group};
@@ -13,7 +13,7 @@ fn make_complex_type() -> Type {
     let q_register = Type::new_tuple(vec![qb; 8]);
     let b_register = Type::new_tuple(vec![int; 8]);
     //let q_alias = Type::new_alias(AliasDecl::new("QReg", TypeBound::Linear));
-    let sum = Type::new_sum([[q_register], [b_register.clone()]]);
+    let sum = Type::new_sum([[q_register], [bool_t()]]);
     Type::new_function(Signature::new(vec![sum], vec![b_register]))
 }
 
