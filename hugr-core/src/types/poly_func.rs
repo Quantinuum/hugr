@@ -86,6 +86,22 @@ impl<T> TryFrom<PolyFuncTypeBase<T>> for FuncTypeBase<T> {
 }
 
 impl<T> PolyFuncTypeBase<T> {
+    /// Helper function for the Display implementation
+    fn display_params(&self) -> Cow<'static, str> {
+        if self.params.is_empty() {
+            return Cow::Borrowed("");
+        }
+        let params_list = self
+            .params
+            .iter()
+            .enumerate()
+            .map(|(i, param)| format!("(#{i} : {param})"))
+            .join(" ");
+        Cow::Owned(format!("∀ {params_list}. ",))
+    }
+}
+
+impl<T: Substitutable> PolyFuncTypeBase<T> {
     /// The type parameters, aka binders, over which this type is polymorphic
     pub fn params(&self) -> &[TypeParam] {
         &self.params
@@ -105,29 +121,6 @@ impl<T> PolyFuncTypeBase<T> {
         }
     }
 
-    /// Helper function for the Display implementation
-    fn display_params(&self) -> Cow<'static, str> {
-        if self.params.is_empty() {
-            return Cow::Borrowed("");
-        }
-        let params_list = self
-            .params
-            .iter()
-            .enumerate()
-            .map(|(i, param)| format!("(#{i} : {param})"))
-            .join(" ");
-        Cow::Owned(format!("∀ {params_list}. ",))
-    }
-
-    /// Returns a mutable reference to the body of the function type.
-    pub fn body_mut(&mut self) -> &mut FuncTypeBase<T> {
-        &mut self.body
-    }
-}
-
-// Do not implement Substitutable: we never need to substitute into a PolyFuncType
-// (i.e. under a binder).
-impl<T: Substitutable> PolyFuncTypeBase<T> {
     /// Instantiates an outer [`PolyFuncTypeBase`], i.e. with no free variables
     /// (as ensured by [`Self::validate`]), into a monomorphic type.
     ///
@@ -146,7 +139,15 @@ impl<T: Substitutable> PolyFuncTypeBase<T> {
     pub fn validate(&self) -> Result<(), SignatureError> {
         self.body.validate(&self.params)
     }
+
+    /// Returns a mutable reference to the body of the function type.
+    pub fn body_mut(&mut self) -> &mut FuncTypeBase<T> {
+        &mut self.body
+    }
 }
+
+// Do not implement Substitutable: we never need to substitute into a PolyFuncType
+// (i.e. under a binder).
 
 #[cfg(test)]
 pub(crate) mod test {
@@ -158,18 +159,15 @@ pub(crate) mod test {
     use crate::Extension;
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::extension::{ExtensionId, ExtensionRegistry, SignatureError, TypeDefBound};
-
     use crate::std_extensions::collections::array::{self, array_type_parametric};
     use crate::std_extensions::collections::list;
-
     use crate::types::signature::FuncTypeBase;
     use crate::types::type_param::{TermTypeError, TypeArg, TypeParam};
     use crate::types::{
-        CustomType, FuncValueType, Signature, Substitutable, Term, Type, TypeBound, TypeName,
-        TypeRowRV,
+        CustomType, FuncValueType, PolyFuncTypeBase, Signature, Substitutable, Term, Type,
+        TypeBound, TypeName, TypeRowRV,
     };
 
-    use super::PolyFuncTypeBase;
     mod proptest {
         use proptest::collection::vec;
         use proptest::prelude::{Arbitrary, BoxedStrategy, Strategy, any_with};
@@ -177,9 +175,11 @@ pub(crate) mod test {
         use super::PolyFuncTypeBase;
         use crate::proptest::RecursionDepth;
         use crate::types::proptest_utils::any_serde_type_param;
-        use crate::types::signature::FuncTypeBase;
+        use crate::types::{Substitutable, signature::FuncTypeBase};
 
-        impl<T: Arbitrary<Parameters = RecursionDepth> + 'static> Arbitrary for PolyFuncTypeBase<T> {
+        impl<T: Substitutable + Arbitrary<Parameters = RecursionDepth> + 'static> Arbitrary
+            for PolyFuncTypeBase<T>
+        {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
 
