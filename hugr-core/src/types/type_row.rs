@@ -337,8 +337,8 @@ mod test {
     use crate::{extension::prelude::bool_t, types::Type};
 
     mod proptest {
-        use super::{TypeRow, TypeRowRV};
-        use crate::{proptest::RecursionDepth, types::Type};
+        use crate::proptest::RecursionDepth;
+        use crate::types::{Term, Type, TypeBound, TypeRow, TypeRowRV};
         use ::proptest::prelude::*;
 
         impl Arbitrary for TypeRow {
@@ -364,11 +364,25 @@ mod test {
                 if depth.leaf() {
                     Just(TypeRowRV::default()).boxed()
                 } else {
-                    // TODO ALAN include row variables here too!
-                    vec(any_with::<Type>(depth.descend()), 0..4)
-                        .prop_map(|ts| ts.clone().into())
-                        .boxed()
+                    prop_oneof![
+                        vec(any_with::<Type>(depth.descend()), 0..4)
+                            .prop_map(|ts| ts.clone().into())
+                            .boxed(),
+                        (any::<usize>(), any::<TypeBound>())
+                            .prop_map(|(idx, b)| TypeRowRV::just_row_var(idx, b))
+                            .boxed(),
+                    ]
+                    .boxed()
                 }
+            }
+        }
+
+        proptest! {
+            #[test]
+            fn type_row_rv_term_roundtrip(tr: TypeRowRV) {
+                let t: Term = tr.clone().into();
+                let tr2: TypeRowRV = t.try_into().unwrap();
+                assert_eq!(tr, tr2);
             }
         }
     }
