@@ -146,7 +146,8 @@ impl TypeDef {
                 }
                 least_upper_bound(indices.iter().map(|i| {
                     let ta = args.get(*i);
-                    ta.and_then(|t| t.least_upper_bound())
+                    ta.copied()
+                        .and_then(TypeArg::least_upper_bound)
                         .expect("TypeArg index does not refer to a type.")
                 }))
             }

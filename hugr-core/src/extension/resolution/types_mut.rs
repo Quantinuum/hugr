@@ -211,7 +211,7 @@ pub(super) fn resolve_custom_type_exts(
 /// Update all weak Extension pointers in the [`CustomType`]s inside a [`Type`].
 ///
 /// Adds the extensions used in the type to the `used_extensions` registry.
-pub(crate) fn resolve_type_exts(
+pub(super) fn resolve_type_exts(
     node: Option<Node>,
     typ: &mut Type,
     extensions: &WeakExtensionRegistry,
@@ -227,7 +227,7 @@ pub(crate) fn resolve_type_exts(
 /// Update all weak Extension pointers in the [`CustomType`]s inside a [`Term`].
 ///
 /// Adds the extensions used in the term to the `used_extensions` registry.
-pub(crate) fn resolve_term_exts(
+pub(super) fn resolve_term_exts(
     node: Option<Node>,
     term: &mut Term,
     extensions: &WeakExtensionRegistry,
