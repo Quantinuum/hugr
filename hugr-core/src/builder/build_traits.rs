@@ -4,7 +4,7 @@ use crate::hugr::hugrmut::InsertionResult;
 use crate::hugr::linking::{HugrLinking, NameLinkingPolicy, NodeLinkingDirective};
 use crate::hugr::views::HugrView;
 use crate::metadata::Metadata;
-use crate::ops::{self, OpTag, OpTrait, OpType, Tag, TailLoop};
+use crate::ops::{self, OpType, Tag, TailLoop};
 use crate::utils::collect_array;
 use crate::{Extension, IncomingPort, Node, OutgoingPort};
 
@@ -851,15 +851,14 @@ fn wire_up<T: Dataflow + ?Sized>(
             }
 
             let src_parent = src_parent.expect("Node has no parent");
-            let Some(src_sibling) = iter::successors(dst_parent, |&p| base.get_parent(p))
+            if !iter::successors(dst_parent, |&p| base.get_parent(p))
                 .tuple_windows()
-                .find_map(|(ancestor, ancestor_parent)| {
-                    (ancestor_parent == src_parent ||
+                .any(|(_ancestor, ancestor_parent)| {
+                    ancestor_parent == src_parent ||
                         // Dom edge - in CFGs
-                        Some(ancestor_parent) == src_parent_parent)
-                        .then_some(ancestor)
+                        Some(ancestor_parent) == src_parent_parent
                 })
-            else {
+            {
                 return Err(BuilderWiringError::NoRelationIntergraph {
                     src,
                     src_offset: src_port.into(),
@@ -867,13 +866,6 @@ fn wire_up<T: Dataflow + ?Sized>(
                     dst_offset: dst_port.into(),
                 });
             };
-
-            if !OpTag::ControlFlowChild.is_superset(base.get_optype(src).tag())
-                && !OpTag::ControlFlowChild.is_superset(base.get_optype(src_sibling).tag())
-            {
-                // Add a state order constraint unless one of the nodes is a CFG BasicBlock
-                base.add_other_edge(src, src_sibling);
-            }
         } else if !typ.copyable() & base.linked_ports(src, src_port).next().is_some() {
             // Don't copy linear edges.
             return Err(BuilderWiringError::NoCopyLinear {

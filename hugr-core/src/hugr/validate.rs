@@ -486,19 +486,6 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         {
             if ancestor_parent == from_parent {
                 // External edge.
-                if !is_static {
-                    // Must have an order edge.
-                    self.hugr
-                        .node_connections(from, ancestor)
-                        .find(|&[p, _]| from_optype.port_kind(p) == Some(EdgeKind::StateOrder))
-                        .ok_or(InterGraphEdgeError::MissingOrderEdge {
-                            from,
-                            from_offset,
-                            to,
-                            to_offset,
-                            to_ancestor: ancestor,
-                        })?;
-                }
                 return Ok(());
             } else if Some(ancestor_parent) == from_parent_parent && !is_static {
                 // Dominator edge
@@ -807,6 +794,10 @@ pub enum InterGraphEdgeError<N: HugrNode> {
         to_offset: Port,
         ancestor_parent_op: Box<OpType>,
     },
+    #[deprecated(
+        note = "These edges are not required, error will be removed in future",
+        since = "0.27.0"
+    )]
     /// The sibling ancestors of the external inter-graph edge endpoints must be have an order edge between them.
     #[error(
         "Missing state order between the external inter-graph source {from} and the ancestor of the target {to_ancestor}. In an external inter-graph edge from {from} ({from_offset}) to {to} ({to_offset})."
