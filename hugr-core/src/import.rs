@@ -9,7 +9,7 @@ use crate::envelope::description::{ExtensionDesc, GeneratorDesc, ModuleDesc};
 use crate::metadata::{self, Metadata, RawMetadataValue};
 use crate::types::type_param::{SeqPart, TermTypeError, TypeParam};
 use crate::types::{
-    CustomType, FuncValueType, PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, TypeName,
+    CustomType, FuncTypeBase, PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, TypeName,
     TypeRow, TypeRowRV,
 };
 use crate::{
@@ -315,7 +315,7 @@ impl<'a> Context<'a> {
         let signature = node_data
             .signature
             .ok_or_else(|| error_uninferred!("node signature"))?;
-        self.import_signature(signature)
+        self.import_func_type(signature, Self::import_type_row)
     }
 
     /// Get the node with the given `NodeId`, or return an error if it does not exist.
@@ -688,10 +688,11 @@ impl<'a> Context<'a> {
         }
 
         let signature = self
-            .import_signature(
+            .import_func_type(
                 region_data
                     .signature
                     .ok_or_else(|| error_uninferred!("region signature"))?,
+                Self::import_type_row,
             )
             .map_err(|err| error_context!(err, "signature of dfg region with id {}", region))?;
 
@@ -937,10 +938,11 @@ impl<'a> Context<'a> {
 
         for region in node_data.regions {
             let region_data = self.get_region(*region)?;
-            let signature = self.import_signature(
+            let signature = self.import_func_type(
                 region_data
                     .signature
                     .ok_or_else(|| error_uninferred!("region signature"))?,
+                Self::import_type_row,
             )?;
 
             let case_node = self
@@ -1429,7 +1431,7 @@ impl<'a> Context<'a> {
                 );
             }
 
-            let body = self.import_signature(symbol.signature)?;
+            let body = self.import_func_type(symbol.signature, Self::import_type_row)?;
             in_scope(self, PolyFuncType::new(imported_params, body))
         })()
         .map_err(|err| error_context!(err, "symbol `{}` defined by node {}", symbol.name, node))
@@ -1504,7 +1506,9 @@ impl<'a> Context<'a> {
             }
 
             if let Some([_, _]) = self.match_symbol(term_id, model::CORE_FN)? {
-                let func_type = self.import_func_type(term_id)?;
+                let func_type = self.import_func_type(term_id, |this, term_id| {
+                    Ok(TypeRowRV::try_from(this.import_term(term_id)?)?)
+                })?;
                 return Ok(Type::new_function(func_type).into());
             }
 
@@ -1648,37 +1652,19 @@ impl<'a> Context<'a> {
     ///
     /// Function types are not special-cased in `hugr-model` but are represented
     /// via the `core.fn` term constructor.
-    fn import_func_type(
+    fn import_func_type<T>(
         &mut self,
         term_id: table::TermId,
-    ) -> Result<FuncValueType, ImportErrorInner> {
+        import_io: impl Fn(&mut Self, table::TermId) -> Result<T, ImportErrorInner>,
+    ) -> Result<FuncTypeBase<T>, ImportErrorInner> {
         (|| {
             let [inputs, outputs] = self.get_func_type(term_id)?;
-            let inputs = self
-                .import_term(inputs)
-                .map_err(|err| error_context!(err, "function inputs"))?;
-            let inputs = TypeRowRV::try_from(inputs)?;
-            let outputs = self
-                .import_term(outputs)
-                .map_err(|err| error_context!(err, "function outputs"))?;
-            let outputs = TypeRowRV::try_from(outputs)?;
+            let inputs =
+                import_io(self, inputs).map_err(|err| error_context!(err, "function inputs"))?;
+            let outputs =
+                import_io(self, outputs).map_err(|err| error_context!(err, "function outputs"))?;
 
-            Ok(FuncValueType::new(inputs, outputs))
-        })()
-        .map_err(|err| error_context!(err, "function type"))
-    }
-
-    fn import_signature(&mut self, term_id: table::TermId) -> Result<Signature, ImportErrorInner> {
-        (|| {
-            let [inputs, outputs] = self.get_func_type(term_id)?;
-            let inputs = self
-                .import_type_row(inputs)
-                .map_err(|err| error_context!(err, "function inputs"))?;
-            let outputs = self
-                .import_type_row(outputs)
-                .map_err(|err| error_context!(err, "function outputs"))?;
-
-            Ok(Signature::new(inputs, outputs))
+            Ok(FuncTypeBase::new(inputs, outputs))
         })()
         .map_err(|err| error_context!(err, "function type"))
     }
