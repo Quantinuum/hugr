@@ -59,22 +59,25 @@ impl<T: pv::GraphBase + pv::EdgeCount> pv::EdgeCount for SynEdgeWrapper<T> {
     }
 }
 
-impl<T: pv::GraphBase + pv::Data> pv::Data for SynEdgeWrapper<T> {
+impl<T: pv::Data> pv::Data for SynEdgeWrapper<T> {
     /// Turns out the underlying [FlatRegion] has unit node weights, we may want to fix that.
     ///
     /// [FlatRegion]: portgraph::view::FlatRegion
     type NodeWeight = T::NodeWeight;
 
-    /// Turns out the underlying [FlatRegion] has unit node weights; we may want to fix that,
+    /// Turns out the underlying [FlatRegion] has unit edge weights; we may want to fix that,
     /// but at least this distinguishes synthetic edges from original edges.
     ///
     /// [FlatRegion]: portgraph::view::FlatRegion
     type EdgeWeight = MaybeSynEdge<T::EdgeWeight>;
 }
 
-impl<T: pv::GraphBase + pv::IntoNodeReferences> pv::IntoNodeReferences for &SynEdgeWrapper<T> {
-    type NodeRef = T::NodeRef;
-    type NodeReferences = T::NodeReferences;
+impl<'a, T: pv::Data> pv::IntoNodeReferences for &'a SynEdgeWrapper<T>
+where
+    &'a T: pv::Data<NodeWeight = T::NodeWeight> + pv::IntoNodeReferences<NodeId = T::NodeId>,
+{
+    type NodeRef = <&'a T as pv::IntoNodeReferences>::NodeRef;
+    type NodeReferences = <&'a T as pv::IntoNodeReferences>::NodeReferences;
 
     fn node_references(self) -> Self::NodeReferences {
         self.region_view.node_references()
@@ -143,14 +146,13 @@ impl<W: Copy, ID: Copy> pv::EdgeRef for EdgeRef<W, ID> {
     }
 }
 
-impl<'a, T, W: Copy> pv::IntoEdgeReferences for &'a SynEdgeWrapper<T>
+impl<'a, T: pv::Data<NodeId = NIdx, EdgeWeight: Copy>> pv::IntoEdgeReferences
+    for &'a SynEdgeWrapper<T>
 where
-    T: pv::GraphBase<NodeId = NIdx> + pv::Data<EdgeWeight = W>,
-    &'a T: pv::IntoEdgeReferences<
-            EdgeRef: pv::EdgeRef<NodeId = NIdx, Weight = W, EdgeId = T::EdgeId> + 'a,
-        >,
+    &'a T: pv::Data<EdgeId = T::EdgeId, NodeId = T::NodeId, EdgeWeight = T::EdgeWeight>
+        + pv::IntoEdgeReferences<EdgeRef: pv::EdgeRef<EdgeId = T::EdgeId>>,
 {
-    type EdgeRef = EdgeRef<W, T::EdgeId>;
+    type EdgeRef = EdgeRef<T::EdgeWeight, T::EdgeId>;
     type EdgeReferences = Box<dyn Iterator<Item = Self::EdgeRef> + 'a>;
 
     fn edge_references(self) -> Self::EdgeReferences {
@@ -173,9 +175,8 @@ where
     }
 }
 
-impl<'a, T> pv::IntoNeighborsDirected for &'a SynEdgeWrapper<T>
+impl<'a, T: pv::GraphBase<NodeId = NIdx>> pv::IntoNeighborsDirected for &'a SynEdgeWrapper<T>
 where
-    T: pv::GraphBase<NodeId = NIdx>,
     &'a T: pv::IntoNeighborsDirected<NodeId = NIdx, NeighborsDirected: 'a>,
 {
     type NeighborsDirected = Box<dyn Iterator<Item = NIdx> + 'a>;
@@ -197,7 +198,7 @@ where
     }
 }
 
-impl<T: pv::GraphBase + pv::Visitable> pv::Visitable for SynEdgeWrapper<T> {
+impl<T: pv::Visitable> pv::Visitable for SynEdgeWrapper<T> {
     type Map = T::Map;
 
     fn visit_map(&self) -> Self::Map {
@@ -213,6 +214,7 @@ impl<T: pv::GraphBase + pv::Visitable> pv::Visitable for SynEdgeWrapper<T> {
 mod test {
     use petgraph::visit as pv;
     use petgraph::visit::Walker as _;
+    use portgraph::NodeIndex as NIdx;
     use rstest::rstest;
 
     use crate::builder::test::simple_dfg_hugr;
@@ -220,7 +222,17 @@ mod test {
 
     #[rstest]
     fn test(simple_dfg_hugr: Hugr) {
-        fn check_ref_into_edges<T>(_x: T) where for<'a> &'a T: pv::IntoEdgeReferences {}
+        fn check_ref_into_edges<T>(_x: T)
+        where
+            for<'a> &'a T: pv::IntoEdgeReferences,
+        {
+        }
+        fn check_impl_edgeref_constraints<T: pv::Data<NodeId = NIdx, EdgeWeight: Copy>>(_x: T)
+        where
+            for<'a> &'a T: pv::Data<EdgeId = T::EdgeId, NodeId = T::NodeId, EdgeWeight = T::EdgeWeight>
+                + pv::IntoEdgeReferences<EdgeRef: pv::EdgeRef<EdgeId = T::EdgeId>>,
+        {
+        }
         fn check_into_edges(_x: impl pv::IntoEdgeReferences) {}
         fn check_into_neighbors(_x: impl pv::IntoNeighbors) {}
 
@@ -238,7 +250,7 @@ mod test {
         pv::Topo::new(sg.graph())
             .iter(sg.graph())
             .for_each(|n| println!("Node from graph(): {:?}", n));
-        check_ref_into_edges(sg.graph);
+        check_impl_edgeref_constraints(simple_dfg_hugr.region_portgraph().0);
         //check_into_neighbors(sg);
     }
 }

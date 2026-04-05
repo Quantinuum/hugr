@@ -1541,11 +1541,11 @@ impl<'h, H: HugrView> SchedGraphChecker<'h, H> {
             node_map,
             region_parent,
         } = graph;
-        todo!()/*let checker = convex::TopoConvexChecker::new(graph);
+        todo!() /*let checker = convex::TopoConvexChecker::new(graph);
         Self {
-            node_map,
-            region_parent,
-            checker,
+        node_map,
+        region_parent,
+        checker,
         }*/
     }
 }
@@ -1561,11 +1561,11 @@ impl<H: HugrView> HugrConvexChecker<H::Node> for SchedGraphChecker<'_, H> {
         outputs: &OutgoingPorts<H::Node>,
         function_calls: &IncomingPorts<H::Node>,
     ) -> Result<Vec<H::Node>, InvalidSubgraph<H::Node>> {
-        let node_indices = Vec::new();/*make_pg_subgraph::<H>(
-            self.checker.graph().region_view.clone(),
-            inputs,
-            outputs,
-            &self.node_map,
+        let node_indices = Vec::new(); /*make_pg_subgraph::<H>(
+        self.checker.graph().region_view.clone(),
+        inputs,
+        outputs,
+        &self.node_map,
         )
         .node_identifiers()
         .collect_vec();*/
@@ -1592,7 +1592,7 @@ impl<H: HugrView> HugrConvexChecker<H::Node> for SchedGraphChecker<'_, H> {
         }
 
         //if self.checker.is_node_convex(node_indices) {
-            Ok(nodes)
+        Ok(nodes)
         //} else {
         //    Err(InvalidSubgraph::NotConvex)
         //}
