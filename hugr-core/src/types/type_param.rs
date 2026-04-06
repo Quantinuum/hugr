@@ -584,31 +584,6 @@ impl Term {
     }
 }
 
-fn check_typevar_decl(
-    decls: &[TypeParam],
-    idx: usize,
-    cached_decl: &TypeParam,
-) -> Result<(), SignatureError> {
-    match decls.get(idx) {
-        None => Err(SignatureError::FreeTypeVar {
-            idx,
-            num_decls: decls.len(),
-        }),
-        Some(actual) => {
-            // The cache here just mirrors the declaration. The typevar can be used
-            // anywhere expecting a kind *containing* the decl - see `check_type_arg`.
-            if actual == cached_decl {
-                Ok(())
-            } else {
-                Err(SignatureError::TypeVarDoesNotMatchDeclaration {
-                    cached: Box::new(cached_decl.clone()),
-                    actual: Box::new(actual.clone()),
-                })
-            }
-        }
-    }
-}
-
 impl Transformable for Term {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match self {
@@ -676,9 +651,7 @@ impl Substitutable for Term {
                 lists.iter().try_for_each(|a| a.validate(var_decls))
             }
             TypeArg::TupleConcat(tuples) => tuples.iter().try_for_each(|a| a.validate(var_decls)),
-            Term::Variable(TermVar { idx, cached_decl }) => {
-                check_typevar_decl(var_decls, *idx, cached_decl)
-            }
+            Term::Variable(tv) => tv.check_decl(var_decls),
             Term::RuntimeType { .. } => Ok(()),
             Term::BoundedNatType { .. } => Ok(()),
             Term::StringType => Ok(()),
@@ -756,6 +729,31 @@ impl TermVar {
             return Some(b);
         }
         None
+    }
+
+    /// Check that the cached declaration of this variable matches the actual one (provided).
+    ///
+    /// The cache just mirrors the declaration; the typevar can be used anywhere expecting
+    /// a kind containing the decl - see [check_term_type] / [Term::is_supertype].
+    fn check_decl(&self, decls: &[TypeParam]) -> Result<(), SignatureError> {
+        let idx = self.idx;
+        let cached_decl: &TypeParam = &self.cached_decl;
+        match decls.get(idx) {
+            None => Err(SignatureError::FreeTypeVar {
+                idx,
+                num_decls: decls.len(),
+            }),
+            Some(actual) => {
+                if actual == cached_decl {
+                    Ok(())
+                } else {
+                    Err(SignatureError::TypeVarDoesNotMatchDeclaration {
+                        cached: Box::new(cached_decl.clone()),
+                        actual: Box::new(actual.clone()),
+                    })
+                }
+            }
+        }
     }
 }
 
@@ -1029,22 +1027,20 @@ mod test {
         }
         // Simple cases: Term::RuntimeXXXs are Term::RuntimeType's
         check(usize_t(), &TypeBound::Copyable.into()).unwrap();
-        let seq_param = TypeParam::new_list_type(TypeBound::Copyable);
-        check(usize_t(), &seq_param).unwrap_err();
+        let lst_of_cpy = TypeParam::new_list_type(TypeBound::Copyable);
+        check(usize_t(), &lst_of_cpy).unwrap_err();
         // ...but singleton sequences thereof are lists
         check_seq(&[usize_t()], &TypeBound::Linear.into()).unwrap_err();
 
         // Into a list of type, we can fit a single row var
-        check(rowvar(0, TypeBound::Copyable), &seq_param).unwrap();
+        check(rowvar(0, TypeBound::Copyable), &lst_of_cpy).unwrap();
         // or a list of types, or a "concat" of row vars
-        check([usize_t()], &seq_param).unwrap();
+        check([usize_t()], &lst_of_cpy).unwrap();
         check(
             Term::ListConcat(vec![rowvar(0, TypeBound::Copyable); 2]),
-            &seq_param,
+            &lst_of_cpy,
         )
         .unwrap();
-        // but a *list* of the rowvar is a list of list of types, which is wrong
-        check_seq(&[rowvar(0, TypeBound::Copyable)], &seq_param).unwrap_err();
         check(
             Term::concat_lists([
                 rowvar(1, TypeBound::Linear),
@@ -1054,6 +1050,9 @@ mod test {
             &TypeParam::new_list_type(TypeBound::Linear),
         )
         .unwrap();
+        // but a *list* of the rowvar is a list of list of types, which is wrong
+        check_seq(&[rowvar(0, TypeBound::Copyable)], &lst_of_cpy).unwrap_err();
+
         // Next one fails because a list of Copyable is required
         check(
             Term::concat_lists([
@@ -1061,11 +1060,11 @@ mod test {
                 vec![usize_t()].into(),
                 rowvar(0, TypeBound::Copyable),
             ]),
-            &seq_param,
+            &lst_of_cpy,
         )
         .unwrap_err();
         // seq of seq of types is not allowed
-        check(vec![Term::from(usize_t()), [usize_t()].into()], &seq_param).unwrap_err();
+        check(vec![Term::from(usize_t()), [usize_t()].into()], &lst_of_cpy).unwrap_err();
 
         // Similar for nats (but no equivalent of fancy row vars)
         check(5, &TypeParam::max_nat_type()).unwrap();
@@ -1095,11 +1094,13 @@ mod test {
         )
         .unwrap_err(); // Wrong way around
 
-        let two_types = Term::new_list([TypeBound::Linear.into(), TypeBound::Linear.into()]);
-        let two_types = TypeParam::new_tuple_type(two_types);
+        let two_types = Term::new_tuple_type(Term::new_list([
+            TypeBound::Linear.into(),
+            TypeBound::Linear.into(),
+        ]));
         check(TypeArg::new_var_use(0, two_types.clone()), &two_types).unwrap();
         // not a Row Var which could have any number of elems
-        check(TypeArg::new_var_use(0, seq_param), &two_types).unwrap_err();
+        check(TypeArg::new_var_use(0, lst_of_cpy), &two_types).unwrap_err();
     }
 
     #[test]
@@ -1190,7 +1191,7 @@ mod test {
 
     #[test]
     fn list_from_single_part_item() {
-        // arbitrary, not but worth cost of trying everything in a proptest
+        // arbitrary, but not worth cost of trying everything in a proptest
         let term = Term::new_list([Term::new_string("foo")]);
         assert_eq!(
             Term::List(vec![term.clone()]),
@@ -1200,7 +1201,7 @@ mod test {
 
     #[test]
     fn list_from_single_part_splice() {
-        // arbitrary, not but worth cost of trying everything in a proptest
+        // arbitrary, but not worth cost of trying everything in a proptest
         let term = Term::new_list([Term::new_string("foo")]);
         assert_eq!(
             term.clone(),
@@ -1210,7 +1211,7 @@ mod test {
 
     #[test]
     fn list_concat_single_item() {
-        // arbitrary, not but worth cost of trying everything in a proptest
+        // arbitrary, but not worth cost of trying everything in a proptest
         let term = Term::new_list([Term::new_string("foo")]);
         assert_eq!(term.clone(), Term::concat_lists([term]));
     }
