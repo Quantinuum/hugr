@@ -627,6 +627,10 @@ impl Transformable for Term {
 }
 
 impl Substitutable for Term {
+    /// Checks variables are as declared and [CustomType] arguments fit their parameters.
+    /// Does not check that e.g. list elements all have same type (except inside a
+    /// [CustomType] where we know the element type from the corresponding list parameter)
+    /// - this is left to [check_term_type].
     fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
             Term::RuntimeSum(SumType::General { rows }) => {
@@ -637,17 +641,11 @@ impl Substitutable for Term {
             Term::RuntimeExtension(custy) => custy.validate(var_decls),
             Term::RuntimeFunction(ft) => ft.validate(var_decls),
             Term::List(elems) => {
-                // Full validation might check that the type of the elements agrees.
-                // However we will leave this to a separate check_term_type which knows
-                // the required element type.
                 elems.iter().try_for_each(|a| a.validate(var_decls))
             }
             Term::Tuple(elems) => elems.iter().try_for_each(|a| a.validate(var_decls)),
             Term::BoundedNat(_) | Term::String { .. } | Term::Float(_) | Term::Bytes(_) => Ok(()),
             TypeArg::ListConcat(lists) => {
-                // Full validation might check that each of the lists is indeed a list or
-                // list variable of the correct types. However we will leave this to a
-                // separate check_term_type which knows the required element type.
                 lists.iter().try_for_each(|a| a.validate(var_decls))
             }
             TypeArg::TupleConcat(tuples) => tuples.iter().try_for_each(|a| a.validate(var_decls)),
