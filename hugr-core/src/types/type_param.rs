@@ -178,7 +178,7 @@ pub enum Term {
 }
 
 impl Term {
-    pub(crate) const EMPTY_LIST: Term = Term::List(Vec::new());
+    const EMPTY_LIST: Term = Term::List(Vec::new());
     pub(crate) const EMPTY_LIST_REF: &'static Term = &Self::EMPTY_LIST;
     /// Creates a [`Term::BoundedNatType`] with the maximum bound (`u64::MAX` + 1).
     #[must_use]
@@ -344,7 +344,7 @@ impl From<CustomType> for Term {
     }
 }
 
-/// Variable in a [`Term`]
+/// Variable in a [`Term`], i.e. contents of a [`Term::Variable`].
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize, derive_more::Display,
 )]
@@ -425,15 +425,13 @@ impl Term {
 
     /// Report if this is a copyable runtime type, i.e. an instance
     /// of [Self::RuntimeType]`(`[TypeBound::Copyable]`)`
-    // - i.e.the least upper bound of the type is contained by the copyable bound.
+    // where the least upper bound of the type is contained by the copyable bound.
     pub(crate) fn copyable(&self) -> bool {
-        match self.least_upper_bound() {
-            Some(b) => TypeBound::Copyable.contains(b),
-            None => false,
-        }
+        self.least_upper_bound()
+            .is_some_and(|b| TypeBound::Copyable.contains(b))
     }
 
-    /// Repot if this is a runtime type, i.e. an instance of [Self::RuntimeType] for some bound.
+    /// Report if this is a runtime type, i.e. an instance of [Self::RuntimeType] for some bound.
     ///
     /// If so, [Type::try_from(Type)] will succeed and can be followed by [Type::least_upper_bound] to get the bound.
     pub fn is_runtime_type(&self) -> bool {
