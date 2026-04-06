@@ -135,13 +135,10 @@ pub enum Term {
     #[display("{}", _0.into_inner())]
     Float(OrderedFloat<f64>),
     /// A list of static terms. Instance of [`Term::ListType`].
-    /// Note, not a [TypeRow] because `impl Arbitrary for TypeRow` generates only types.
-    ///
-    /// [TypeRow]: super::TypeRow
     #[display("[{}]", {
         use itertools::Itertools as _;
         //_0.iter().map(|t|t.to_string()).join(",")
-        // extra space matching old Display for Type(Row)
+        // extra space matching old Display for TypeRowRV
         _0.iter().map(|t|t.to_string()).join(", ")
     })]
     List(Vec<Term>),
