@@ -42,7 +42,14 @@ pub type Signature = FuncTypeBase<TypeRow>;
 /// [`OpDef`]: crate::extension::OpDef
 pub type FuncValueType = FuncTypeBase<TypeRowRV>;
 
-impl<T> FuncTypeBase<T> {
+impl<T: Substitutable> FuncTypeBase<T> {
+    pub(crate) fn substitute(&self, subst: &Substitution) -> Self {
+        Self {
+            input: self.input.substitute(subst),
+            output: self.output.substitute(subst),
+        }
+    }
+
     /// Create a new signature with specified inputs and outputs.
     pub fn new(input: impl Into<T>, output: impl Into<T>) -> Self {
         Self {
@@ -70,6 +77,11 @@ impl<T> FuncTypeBase<T> {
     #[must_use]
     pub fn io(&self) -> (&T, &T) {
         (&self.input, &self.output)
+    }
+
+    pub(super) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
+        self.input.validate(var_decls)?;
+        self.output.validate(var_decls)
     }
 }
 
@@ -122,19 +134,6 @@ impl<T: Transformable> Transformable for FuncTypeBase<T> {
     fn transform<U: TypeTransformer>(&mut self, tr: &U) -> Result<bool, U::Err> {
         // TODO handle extension sets?
         Ok(self.input.transform(tr)? | self.output.transform(tr)?)
-    }
-}
-
-impl<T: Substitutable> Substitutable for FuncTypeBase<T> {
-    fn substitute(&self, subst: &Substitution) -> Self {
-        Self {
-            input: self.input.substitute(subst),
-            output: self.output.substitute(subst),
-        }
-    }
-    fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
-        self.input.validate(var_decls)?;
-        self.output.validate(var_decls)
     }
 }
 
@@ -314,9 +313,11 @@ mod test {
         use proptest::prelude::{Arbitrary, BoxedStrategy, Strategy, any_with};
 
         use super::FuncTypeBase;
-        use crate::proptest::RecursionDepth;
+        use crate::{proptest::RecursionDepth, types::Substitutable};
 
-        impl<T: Arbitrary<Parameters = RecursionDepth> + 'static> Arbitrary for FuncTypeBase<T> {
+        impl<T: Substitutable + Arbitrary<Parameters = RecursionDepth> + 'static> Arbitrary
+            for FuncTypeBase<T>
+        {
             type Parameters = RecursionDepth;
             type Strategy = BoxedStrategy<Self>;
 

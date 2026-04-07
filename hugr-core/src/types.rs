@@ -442,6 +442,36 @@ impl Type {
         TypeBound::Copyable.contains(self.least_upper_bound())
     }
 
+    /// Checks all variables used in the type are in the provided list
+    /// of bound variables, and that for each [`CustomType`] the corresponding
+    /// [`TypeDef`] is in the [`ExtensionRegistry`] and the type arguments
+    /// [validate] and fit into the def's declared parameters.
+    ///
+    /// [validate]: crate::types::type_param::TypeArg::validate
+    /// [TypeDef]: crate::extension::TypeDef
+    pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
+        self.0.validate(var_decls)?;
+        // ALAN even this should be only a debug-assert really:
+        // we have no unchecked access from outside crate::types
+        // so it must be a bug in our caching logic if this is wrong:
+        check_term_type(&self.0, &self.1.into())?;
+        debug_assert!(
+            self.1 == TypeBound::Copyable
+                || check_term_type(&self.0, &TypeBound::Copyable.into()).is_err()
+        );
+        Ok(())
+    }
+
+    /// Applies a substitution to a type.
+    ///
+    /// Always produces exactly one type, but may narrow the bound (from
+    /// [TypeBound::Linear] to [TypeBound::Copyable]).
+    fn substitute(&self, s: &Substitution) -> Self {
+        let t = self.0.substitute(s);
+        let b = t.least_upper_bound().unwrap(); // Recompute.
+        Self(t, b)
+    }
+
     /// Returns a registry with the concrete extensions used by this type.
     ///
     /// This includes the extensions of custom types that may be nested
@@ -457,6 +487,16 @@ impl Type {
         } else {
             Err(ExtensionCollectionError::dropped_type(self, missing))
         }
+    }
+}
+
+impl Transformable for Type {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        let res = self.0.transform(tr)?;
+        if res {
+            self.1 = self.0.least_upper_bound().unwrap()
+        }
+        Ok(res)
     }
 }
 
@@ -485,16 +525,6 @@ impl TryFrom<Term> for Type {
 impl From<Type> for Term {
     fn from(t: Type) -> Self {
         t.0
-    }
-}
-
-impl Transformable for Type {
-    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
-        let res = self.0.transform(tr)?;
-        if res {
-            self.1 = self.0.least_upper_bound().unwrap()
-        }
-        Ok(res)
     }
 }
 
@@ -604,29 +634,6 @@ mod internal {
 }
 
 pub(crate) use internal::Substitutable;
-
-impl Substitutable for Type {
-    fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
-        self.0.validate(var_decls)?;
-        // ALAN even this should be only a debug-assert really:
-        // we have no unchecked access from outside crate::types
-        // so it must be a bug in our caching logic if this is wrong:
-        check_term_type(&self.0, &self.1.into())?;
-        debug_assert!(
-            self.1 == TypeBound::Copyable
-                || check_term_type(&self.0, &TypeBound::Copyable.into()).is_err()
-        );
-        Ok(())
-    }
-
-    /// Always produces exactly one type, but may narrow the bound (from
-    /// [TypeBound::Linear] to [TypeBound::Copyable]).
-    fn substitute(&self, s: &Substitution) -> Self {
-        let t = self.0.substitute(s);
-        let b = t.least_upper_bound().unwrap(); // Recompute.
-        Self(t, b)
-    }
-}
 
 #[cfg(test)]
 pub(crate) mod test {

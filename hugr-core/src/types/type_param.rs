@@ -580,56 +580,12 @@ impl Term {
     pub fn into_tuple_parts(self) -> impl Iterator<Item = SeqPart<Self>> {
         TuplePartIter::new(SeqPart::Splice(self))
     }
-}
 
-impl Transformable for Term {
-    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
-        match self {
-            Term::RuntimeExtension(custom_type) => {
-                if let Some(nt) = tr.apply_custom(custom_type)? {
-                    *self = nt.0;
-                    Ok(true)
-                } else {
-                    let args_changed = custom_type.args_mut().transform(tr)?;
-                    if args_changed {
-                        *self = custom_type
-                            .get_type_def(&custom_type.get_extension()?)?
-                            .instantiate(custom_type.args())?
-                            .into();
-                    }
-                    Ok(args_changed)
-                }
-            }
-            Term::RuntimeFunction(fty) => fty.transform(tr),
-            Term::RuntimeSum(sum_type) => sum_type.transform(tr),
-            Term::List(elems) => elems.transform(tr),
-            Term::Tuple(elems) => elems.transform(tr),
-            Term::BoundedNat(_)
-            | Term::String(_)
-            | Term::Variable(_)
-            | Term::Float(_)
-            | Term::Bytes(_) => Ok(false),
-            Term::RuntimeType { .. } => Ok(false),
-            Term::BoundedNatType { .. } => Ok(false),
-            Term::StringType => Ok(false),
-            Term::BytesType => Ok(false),
-            Term::FloatType => Ok(false),
-            Term::ListType(item_type) => item_type.transform(tr),
-            Term::TupleType(item_types) => item_types.transform(tr),
-            Term::StaticType => Ok(false),
-            TypeArg::ListConcat(lists) => lists.transform(tr),
-            TypeArg::TupleConcat(tuples) => tuples.transform(tr),
-            Term::ConstType(ty) => ty.transform(tr),
-        }
-    }
-}
-
-impl Substitutable for Term {
     /// Checks variables are as declared and [CustomType] arguments fit their parameters.
     /// Does not check that e.g. list elements all have same type (except inside a
     /// [CustomType] where we know the element type from the corresponding list parameter)
     /// - this is left to [check_term_type].
-    fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
+    pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
             Term::RuntimeSum(SumType::General { rows }) => {
                 rows.iter().try_for_each(|row| row.validate(var_decls))?;
@@ -656,7 +612,7 @@ impl Substitutable for Term {
         }
     }
 
-    fn substitute(&self, t: &Substitution) -> Self {
+    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
             TypeArg::RuntimeSum(SumType::General { rows }) => {
@@ -700,6 +656,48 @@ impl Substitutable for Term {
             Term::TupleType(item_types) => Term::new_list_type(item_types.substitute(t)),
             Term::StaticType => self.clone(),
             Term::ConstType(ty) => Term::new_const(ty.substitute(t)),
+        }
+    }
+}
+
+impl Transformable for Term {
+    fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        match self {
+            Term::RuntimeExtension(custom_type) => {
+                if let Some(nt) = tr.apply_custom(custom_type)? {
+                    *self = nt.0;
+                    Ok(true)
+                } else {
+                    let args_changed = custom_type.args_mut().transform(tr)?;
+                    if args_changed {
+                        *self = custom_type
+                            .get_type_def(&custom_type.get_extension()?)?
+                            .instantiate(custom_type.args())?
+                            .into();
+                    }
+                    Ok(args_changed)
+                }
+            }
+            Term::RuntimeFunction(fty) => fty.transform(tr),
+            Term::RuntimeSum(sum_type) => sum_type.transform(tr),
+            Term::List(elems) => elems.transform(tr),
+            Term::Tuple(elems) => elems.transform(tr),
+            Term::BoundedNat(_)
+            | Term::String(_)
+            | Term::Variable(_)
+            | Term::Float(_)
+            | Term::Bytes(_) => Ok(false),
+            Term::RuntimeType { .. } => Ok(false),
+            Term::BoundedNatType { .. } => Ok(false),
+            Term::StringType => Ok(false),
+            Term::BytesType => Ok(false),
+            Term::FloatType => Ok(false),
+            Term::ListType(item_type) => item_type.transform(tr),
+            Term::TupleType(item_types) => item_types.transform(tr),
+            Term::StaticType => Ok(false),
+            TypeArg::ListConcat(lists) => lists.transform(tr),
+            TypeArg::TupleConcat(tuples) => tuples.transform(tr),
+            Term::ConstType(ty) => ty.transform(tr),
         }
     }
 }
@@ -943,7 +941,6 @@ mod test {
 
     use super::{Substitution, TypeArg, TypeParam, check_term_type};
     use crate::extension::prelude::{bool_t, usize_t};
-    use crate::types::Substitutable;
     use crate::types::type_param::SeqPart;
     use crate::types::{Term, Type, TypeBound, TypeRow, type_param::TermTypeError};
 

@@ -9,8 +9,8 @@ use crate::envelope::description::{ExtensionDesc, GeneratorDesc, ModuleDesc};
 use crate::metadata::{self, Metadata, RawMetadataValue};
 use crate::types::type_param::{SeqPart, TermTypeError, TypeParam};
 use crate::types::{
-    CustomType, FuncTypeBase, PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, TypeName,
-    TypeRow, TypeRowRV,
+    CustomType, FuncTypeBase, PolyFuncType, Signature, Substitutable, Term, Type, TypeArg,
+    TypeBound, TypeName, TypeRow, TypeRowRV,
 };
 use crate::{
     Direction, Hugr, HugrView, Node, Port,
@@ -1652,7 +1652,7 @@ impl<'a> Context<'a> {
     ///
     /// Function types are not special-cased in `hugr-model` but are represented
     /// via the `core.fn` term constructor.
-    fn import_func_type<T>(
+    fn import_func_type<T: Substitutable>(
         &mut self,
         term_id: table::TermId,
         import_io: impl Fn(&mut Self, table::TermId) -> Result<T, ImportErrorInner>,

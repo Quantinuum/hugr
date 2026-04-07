@@ -854,7 +854,7 @@ impl<'a> Context<'a> {
         self.export_term(t, None)
     }
 
-    pub fn export_func_type<T>(
+    pub fn export_func_type<T: Substitutable>(
         &mut self,
         t: &FuncTypeBase<T>,
         mut export_io: impl FnMut(&mut Self, &T) -> table::TermId,

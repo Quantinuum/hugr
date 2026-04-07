@@ -8,10 +8,9 @@ use crate::Extension;
 use crate::extension::{ExtensionId, SignatureError, TypeDef};
 
 use super::{
-    Substitutable, Substitution, TypeBound,
+    Substitution, Type, TypeBound, TypeName,
     type_param::{TypeArg, TypeParam},
 };
-use super::{Type, TypeName};
 
 /// An opaque type element. Contains the unique identifier of its definition.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
