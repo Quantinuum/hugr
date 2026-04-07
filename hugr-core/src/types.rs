@@ -12,7 +12,7 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_term_exts,
 };
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
-use crate::types::type_param::{TermTypeError, check_term_type};
+use crate::types::type_param::{TermTypeError, check_term_kind};
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
@@ -305,7 +305,7 @@ impl SumType {
             SumType::General { rows } => {
                 if rows
                     .iter()
-                    .all(|t| check_term_type(t, &Term::new_list_type(TypeBound::Copyable)).is_ok())
+                    .all(|t| check_term_kind(t, &Term::new_list_type(TypeBound::Copyable)).is_ok())
                 {
                     TypeBound::Copyable
                 } else {
@@ -455,10 +455,10 @@ impl Type {
         // ALAN even this should be only a debug-assert really:
         // we have no unchecked access from outside crate::types
         // so it must be a bug in our caching logic if this is wrong:
-        check_term_type(&self.0, &self.1.into())?;
+        check_term_kind(&self.0, &self.1.into())?;
         debug_assert!(
             self.1 == TypeBound::Copyable
-                || check_term_type(&self.0, &TypeBound::Copyable.into()).is_err()
+                || check_term_kind(&self.0, &TypeBound::Copyable.into()).is_err()
         );
         Ok(())
     }
@@ -552,7 +552,7 @@ impl<'a> Substitution<'a> {
             .0
             .get(idx)
             .expect("Undeclared type variable - call validate() ?");
-        debug_assert_eq!(check_term_type(arg, decl), Ok(()));
+        debug_assert_eq!(check_term_kind(arg, decl), Ok(()));
         arg.clone()
     }
 }
