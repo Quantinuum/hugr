@@ -186,7 +186,7 @@ pub(crate) fn collect_term_exts(
     missing_extensions: &mut ExtensionSet,
 ) {
     match term {
-        Term::RuntimeExtension(custom) => {
+        Term::ExtensionType(custom) => {
             for arg in custom.args() {
                 collect_term_exts(arg, used_extensions, missing_extensions);
             }
@@ -201,11 +201,11 @@ pub(crate) fn collect_term_exts(
                 }
             }
         }
-        Term::RuntimeFunction(f) => {
+        Term::FunctionType(f) => {
             collect_term_exts(&f.input, used_extensions, missing_extensions);
             collect_term_exts(&f.output, used_extensions, missing_extensions);
         }
-        Term::RuntimeSum(SumType::General { rows }) => {
+        Term::SumType(SumType::General { rows }) => {
             for row in rows {
                 collect_term_exts(row, used_extensions, missing_extensions);
             }
@@ -248,7 +248,7 @@ pub(crate) fn collect_term_exts(
         | Term::String(_)
         | Term::Bytes(_)
         | Term::Float(_)
-        | Term::RuntimeSum(SumType::Unit { .. }) => {}
+        | Term::SumType(SumType::Unit { .. }) => {}
     }
 }
 

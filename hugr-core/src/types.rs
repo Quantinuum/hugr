@@ -371,14 +371,14 @@ impl Type {
     pub const EMPTY_TYPEROW: TypeRow = TypeRow::new();
     /// Unit type (empty tuple).
     pub const UNIT: Self = Self(
-        Term::RuntimeSum(SumType::Unit { size: 1 }),
+        Term::SumType(SumType::Unit { size: 1 }),
         TypeBound::Copyable,
     );
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<FuncValueType>) -> Self {
         Self(
-            Term::RuntimeFunction(Box::new(fun_ty.into())),
+            Term::FunctionType(Box::new(fun_ty.into())),
             TypeBound::Copyable,
         )
     }
@@ -401,7 +401,7 @@ impl Type {
     {
         let st = SumType::new(variants);
         let b = st.bound();
-        Self(Term::RuntimeSum(st), b)
+        Self(Term::SumType(st), b)
     }
 
     /// Initialize a new custom type.
@@ -409,7 +409,7 @@ impl Type {
     #[must_use]
     pub const fn new_extension(opaque: CustomType) -> Self {
         let bound = opaque.bound();
-        Self(Term::RuntimeExtension(opaque), bound)
+        Self(Term::ExtensionType(opaque), bound)
     }
 
     /// New `UnitSum` with empty Tuple variants
@@ -417,7 +417,7 @@ impl Type {
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
         Self(
-            Term::RuntimeSum(SumType::new_unary(size)),
+            Term::SumType(SumType::new_unary(size)),
             TypeBound::Copyable,
         )
     }

@@ -1926,7 +1926,7 @@ impl<'a> Context<'a> {
                 .map(|(value, ty)| self.import_value(*value, *ty))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let Term::RuntimeSum(ty) = self.import_term(type_id)? else {
+            let Term::SumType(ty) = self.import_term(type_id)? else {
                 unreachable!()
             };
 

@@ -111,17 +111,17 @@ pub enum Term {
     //
     // TODO optimise with `Box<CustomType>`?
     // or some static version of this?
-    RuntimeExtension(CustomType),
+    ExtensionType(CustomType),
     /// The type of runtime values that are function pointers.
     /// Instance of [Self::TypeKind]`(`[TypeBound::Copyable]`)`.
     /// Function values may be passed around without knowing their arity
     /// (i.e. with row vars) as long as they are not called.
     #[display("{_0}")]
-    RuntimeFunction(Box<FuncValueType>),
+    FunctionType(Box<FuncValueType>),
     /// The type of runtime values that are sums of products (ADTs)
     /// Instance of [Self::TypeKind]`(bound)` for `bound` calculated from each variant's elements.
     #[display("{_0}")]
-    RuntimeSum(SumType),
+    SumType(SumType),
     /// A 64bit unsigned integer literal. Instance of [`Term::BoundedNatKind`].
     #[display("{_0}")]
     BoundedNat(u64),
@@ -234,9 +234,9 @@ impl Term {
             }
             // The following are not types (they have no instances), so these are just to
             // maintain reflexivity of the relation:
-            (Term::RuntimeSum(t1), Term::RuntimeSum(t2)) => t1 == t2,
-            (Term::RuntimeFunction(f1), Term::RuntimeFunction(f2)) => f1 == f2,
-            (Term::RuntimeExtension(c1), Term::RuntimeExtension(c2)) => c1 == c2,
+            (Term::SumType(t1), Term::SumType(t2)) => t1 == t2,
+            (Term::FunctionType(f1), Term::FunctionType(f2)) => f1 == f2,
+            (Term::ExtensionType(c1), Term::ExtensionType(c2)) => c1 == c2,
             (Term::BoundedNat(n1), Term::BoundedNat(n2)) => n1 == n2,
             (Term::String(s1), Term::String(s2)) => s1 == s2,
             (Term::Bytes(v1), Term::Bytes(v2)) => v1 == v2,
@@ -259,18 +259,18 @@ impl Term {
         }
     }
 
-    /// Returns the inner [`CustomType`] if this `Term` is a [Self::RuntimeExtension]
+    /// Returns the inner [`CustomType`] if this `Term` is a [Self::ExtensionType]
     pub fn as_extension(&self) -> Option<&CustomType> {
         match self {
-            Term::RuntimeExtension(ct) => Some(ct),
+            Term::ExtensionType(ct) => Some(ct),
             _ => None,
         }
     }
 
-    /// Returns the inner [`SumType`] if this `Term` is a [Self::RuntimeSum].
+    /// Returns the inner [`SumType`] if this `Term` is a [Self::SumType].
     pub fn as_sum(&self) -> Option<&SumType> {
         match self {
-            Term::RuntimeSum(s) => Some(s),
+            Term::SumType(s) => Some(s),
             _ => None,
         }
     }
@@ -398,9 +398,9 @@ impl Term {
 
     pub(crate) fn least_upper_bound(&self) -> Option<TypeBound> {
         match self {
-            Self::RuntimeExtension(ct) => Some(ct.bound()),
-            Self::RuntimeSum(st) => Some(st.bound()),
-            Self::RuntimeFunction(_) => Some(TypeBound::Copyable),
+            Self::ExtensionType(ct) => Some(ct.bound()),
+            Self::SumType(st) => Some(st.bound()),
+            Self::FunctionType(_) => Some(TypeBound::Copyable),
             Self::Variable(v) => match &*v.cached_decl {
                 TypeParam::TypeKind(b) => Some(*b),
                 _ => None,
@@ -439,13 +439,13 @@ impl Term {
     /// - this is left to [check_term_type].
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            Term::RuntimeSum(SumType::General { rows }) => {
+            Term::SumType(SumType::General { rows }) => {
                 rows.iter().try_for_each(|row| row.validate(var_decls))?;
                 Ok(())
             }
-            Term::RuntimeSum(SumType::Unit { .. }) => Ok(()), // No leaves there
-            Term::RuntimeExtension(custy) => custy.validate(var_decls),
-            Term::RuntimeFunction(ft) => ft.validate(var_decls),
+            Term::SumType(SumType::Unit { .. }) => Ok(()), // No leaves there
+            Term::ExtensionType(custy) => custy.validate(var_decls),
+            Term::FunctionType(ft) => ft.validate(var_decls),
             Term::List(elems) => elems.iter().try_for_each(|a| a.validate(var_decls)),
             Term::Tuple(elems) => elems.iter().try_for_each(|a| a.validate(var_decls)),
             Term::BoundedNat(_) | Term::String { .. } | Term::Float(_) | Term::Bytes(_) => Ok(()),
@@ -466,14 +466,14 @@ impl Term {
 
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
-            TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
-            TypeArg::RuntimeSum(SumType::General { rows }) => {
+            TypeArg::SumType(SumType::Unit { .. }) => self.clone(),
+            TypeArg::SumType(SumType::General { rows }) => {
                 // A substitution of a row variable for an empty list,
                 // could make the general case into a unary SumType.
-                Term::RuntimeSum(SumType::new(rows.iter().map(|r| r.substitute(t))))
+                Term::SumType(SumType::new(rows.iter().map(|r| r.substitute(t))))
             }
-            TypeArg::RuntimeExtension(cty) => Term::RuntimeExtension(cty.substitute(t)),
-            TypeArg::RuntimeFunction(bf) => Term::RuntimeFunction(Box::new(bf.substitute(t))),
+            TypeArg::ExtensionType(cty) => Term::ExtensionType(cty.substitute(t)),
+            TypeArg::FunctionType(bf) => Term::FunctionType(Box::new(bf.substitute(t))),
 
             TypeArg::BoundedNat(_) | TypeArg::String(_) | TypeArg::Bytes(_) | TypeArg::Float(_) => {
                 self.clone()
@@ -651,7 +651,7 @@ impl Term {
 impl Transformable for Term {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match self {
-            Term::RuntimeExtension(custom_type) => {
+            Term::ExtensionType(custom_type) => {
                 if let Some(nt) = tr.apply_custom(custom_type)? {
                     *self = nt.0;
                     Ok(true)
@@ -665,8 +665,8 @@ impl Transformable for Term {
                     Ok(args_changed)
                 }
             }
-            Term::RuntimeFunction(fty) => fty.transform(tr),
-            Term::RuntimeSum(sum_type) => sum_type.transform(tr),
+            Term::FunctionType(fty) => fty.transform(tr),
+            Term::SumType(sum_type) => sum_type.transform(tr),
             Term::List(elems) => elems.transform(tr),
             Term::Tuple(elems) => elems.transform(tr),
             Term::BoundedNat(_)
@@ -740,9 +740,9 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::Variable(TermVar { cached_decl, .. }), _) if type_.is_supertype(cached_decl) => {
             Ok(())
         }
-        (Term::RuntimeSum(st), Term::TypeKind(bound)) if bound.contains(st.bound()) => Ok(()),
-        (Term::RuntimeFunction(_), Term::TypeKind(_)) => Ok(()), // Function pointers are always Copyable so fit any bound
-        (Term::RuntimeExtension(cty), Term::TypeKind(bound)) if bound.contains(cty.bound()) => {
+        (Term::SumType(st), Term::TypeKind(bound)) if bound.contains(st.bound()) => Ok(()),
+        (Term::FunctionType(_), Term::TypeKind(_)) => Ok(()), // Function pointers are always Copyable so fit any bound
+        (Term::ExtensionType(cty), Term::TypeKind(bound)) if bound.contains(cty.bound()) => {
             Ok(())
         }
         (Term::List(elems), Term::ListKind(item_type)) => elems
@@ -1001,7 +1001,7 @@ mod test {
             let arg = args.iter().cloned().map_into().collect_vec().into();
             check_term_type(&arg, param)
         }
-        // Simple cases: Term::RuntimeXXXs are Term::TypeKind's
+        // Simple cases: Term::XXXTypes are Term::TypeKind's
         check(usize_t(), &TypeBound::Copyable.into()).unwrap();
         let lst_of_cpy = TypeParam::new_list_type(TypeBound::Copyable);
         check(usize_t(), &lst_of_cpy).unwrap_err();
