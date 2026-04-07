@@ -38,7 +38,7 @@ impl From<Type> for SerSimpleType {
             Term::RuntimeFunction(sig) => SerSimpleType::G(sig),
             Term::Variable(tv) => {
                 let i = tv.index();
-                let Term::RuntimeKind(b) = &*tv.cached_decl else {
+                let Term::TypeKind(b) = &*tv.cached_decl else {
                     panic!("Variable with bound {} is not a valid Type", tv.cached_decl);
                 };
                 SerSimpleType::V { i, b: *b }
@@ -56,7 +56,7 @@ impl TryFrom<Term> for SerSimpleType {
     fn try_from(value: Term) -> Result<Self, Self::Error> {
         if let Term::Variable(tv) = &value
             && let Term::ListKind(t) = &*tv.cached_decl
-            && let Term::RuntimeKind(b) = &**t
+            && let Term::TypeKind(b) = &**t
         {
             return Ok(SerSimpleType::R {
                 i: tv.index(),
@@ -153,7 +153,7 @@ pub(super) enum TermSer {
 impl From<Term> for TermSer {
     fn from(value: Term) -> Self {
         match value {
-            Term::RuntimeKind(b) => TermSer::TypeParam(TypeParamSer::Type { b }),
+            Term::TypeKind(b) => TermSer::TypeParam(TypeParamSer::Type { b }),
             Term::StaticKind => TermSer::TypeParam(TypeParamSer::StaticType),
             Term::BoundedNatKind(bound) => TermSer::TypeParam(TypeParamSer::BoundedNat { bound }),
             Term::StringKind => TermSer::TypeParam(TypeParamSer::String),
@@ -175,7 +175,7 @@ impl From<Term> for TermSer {
             Term::Float(value) => TermSer::TypeArg(TypeArgSer::Float { value }),
             Term::List(elems) => TermSer::TypeArg(TypeArgSer::List { elems }),
             Term::Tuple(elems) => TermSer::TypeArg(TypeArgSer::Tuple { elems }),
-            Term::Variable(ref v) if matches!(&*v.cached_decl, Term::RuntimeKind(_)) => {
+            Term::Variable(ref v) if matches!(&*v.cached_decl, Term::TypeKind(_)) => {
                 TermSer::TypeArg(TypeArgSer::Type {
                     ty: value.try_into().unwrap(),
                 })
@@ -192,7 +192,7 @@ impl From<TermSer> for Term {
     fn from(value: TermSer) -> Self {
         match value {
             TermSer::TypeParam(param) => match param {
-                TypeParamSer::Type { b } => Term::RuntimeKind(b),
+                TypeParamSer::Type { b } => Term::TypeKind(b),
                 TypeParamSer::StaticType => Term::StaticKind,
                 TypeParamSer::BoundedNat { bound } => Term::BoundedNatKind(bound),
                 TypeParamSer::String => Term::StringKind,

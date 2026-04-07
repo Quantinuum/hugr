@@ -238,7 +238,7 @@ pub(crate) fn collect_term_exts(
             }
         }
         Term::Variable(_)
-        | Term::RuntimeKind(_)
+        | Term::TypeKind(_)
         | Term::StaticKind
         | Term::BoundedNatKind(_)
         | Term::StringKind

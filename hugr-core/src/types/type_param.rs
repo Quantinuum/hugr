@@ -84,7 +84,7 @@ pub enum Term {
         TypeBound::Linear => String::new(),
         _ => format!("[{_0}]")
     })]
-    RuntimeKind(TypeBound),
+    TypeKind(TypeBound),
     /// The type of static data.
     StaticKind,
     /// The type of static natural numbers up to a given bound.
@@ -107,20 +107,20 @@ pub enum Term {
     #[display("TupleType[{_0}]")]
     TupleKind(Box<Term>),
     /// The type of runtime values defined by an extension type.
-    /// Instance of [Self::RuntimeKind] for some bound.
+    /// Instance of [Self::TypeKind] for some bound.
     //
     // TODO optimise with `Box<CustomType>`?
     // or some static version of this?
     #[display("{_0}")]
     RuntimeExtension(CustomType),
     /// The type of runtime values that are function pointers.
-    /// Instance of [Self::RuntimeKind]`(`[TypeBound::Copyable]`)`.
+    /// Instance of [Self::TypeKind]`(`[TypeBound::Copyable]`)`.
     /// Function values may be passed around without knowing their arity
     /// (i.e. with row vars) as long as they are not called.
     #[display("{_0}")]
     RuntimeFunction(Box<FuncValueType>),
     /// The type of runtime values that are sums of products (ADTs)
-    /// Instance of [Self::RuntimeKind]`(bound)` for `bound` calculated from each variant's elements.
+    /// Instance of [Self::TypeKind]`(bound)` for `bound` calculated from each variant's elements.
     #[display("{_0}")]
     RuntimeSum(SumType),
     /// A 64bit unsigned integer literal. Instance of [`Term::BoundedNatKind`].
@@ -217,7 +217,7 @@ impl Term {
     /// is not a static type) is considered a subtype of itself.
     fn is_supertype(&self, other: &Term) -> bool {
         match (self, other) {
-            (Term::RuntimeKind(b1), Term::RuntimeKind(b2)) => b1.contains(*b2),
+            (Term::TypeKind(b1), Term::TypeKind(b2)) => b1.contains(*b2),
             (Term::BoundedNatKind(b1), Term::BoundedNatKind(b2)) => b1.contains(b2),
             (Term::StringKind, Term::StringKind) => true,
             (Term::StaticKind, Term::StaticKind) => true,
@@ -277,7 +277,7 @@ impl Term {
 
 impl From<TypeBound> for Term {
     fn from(bound: TypeBound) -> Self {
-        Self::RuntimeKind(bound)
+        Self::TypeKind(bound)
     }
 }
 
@@ -341,7 +341,7 @@ impl Term {
     }
 
     /// Makes a `Term` representing a use (occurrence) of a variable whose
-    /// kind is a [Term::ListKind] of [Term::RuntimeKind].
+    /// kind is a [Term::ListKind] of [Term::TypeKind].
     #[must_use]
     pub fn new_row_var_use(idx: usize, b: TypeBound) -> Self {
         Self::new_var_use(idx, Term::new_list_type(b))
@@ -391,7 +391,7 @@ impl Term {
             Self::RuntimeSum(st) => Some(st.bound()),
             Self::RuntimeFunction(_) => Some(TypeBound::Copyable),
             Self::Variable(v) => match &*v.cached_decl {
-                TypeParam::RuntimeKind(b) => Some(*b),
+                TypeParam::TypeKind(b) => Some(*b),
                 _ => None,
             },
             _ => None,
@@ -399,14 +399,14 @@ impl Term {
     }
 
     /// Report if this is a copyable runtime type, i.e. an instance
-    /// of [Self::RuntimeKind]`(`[TypeBound::Copyable]`)`
+    /// of [Self::TypeKind]`(`[TypeBound::Copyable]`)`
     // where the least upper bound of the type is contained by the copyable bound.
     pub(crate) fn copyable(&self) -> bool {
         self.least_upper_bound()
             .is_some_and(|b| TypeBound::Copyable.contains(b))
     }
 
-    /// Report if this is a runtime type, i.e. an instance of [Self::RuntimeKind] for some bound.
+    /// Report if this is a runtime type, i.e. an instance of [Self::TypeKind] for some bound.
     ///
     /// If so, [Type::try_from(Type)] will succeed and can be followed by [Type::least_upper_bound] to get the bound.
     pub fn is_runtime_type(&self) -> bool {
@@ -441,7 +441,7 @@ impl Term {
             TypeArg::ListConcat(lists) => lists.iter().try_for_each(|a| a.validate(var_decls)),
             TypeArg::TupleConcat(tuples) => tuples.iter().try_for_each(|a| a.validate(var_decls)),
             Term::Variable(tv) => tv.check_decl(var_decls),
-            Term::RuntimeKind { .. } => Ok(()),
+            Term::TypeKind { .. } => Ok(()),
             Term::BoundedNatKind { .. } => Ok(()),
             Term::StringKind => Ok(()),
             Term::BytesKind => Ok(()),
@@ -488,7 +488,7 @@ impl Term {
                 )
             }
             TypeArg::Variable(TermVar { idx, cached_decl }) => t.apply_var(*idx, cached_decl),
-            Term::RuntimeKind(_) => self.clone(),
+            Term::TypeKind(_) => self.clone(),
             Term::BoundedNatKind(_) => self.clone(),
             Term::StringKind => self.clone(),
             Term::BytesKind => self.clone(),
@@ -663,7 +663,7 @@ impl Transformable for Term {
             | Term::Variable(_)
             | Term::Float(_)
             | Term::Bytes(_) => Ok(false),
-            Term::RuntimeKind { .. } => Ok(false),
+            Term::TypeKind { .. } => Ok(false),
             Term::BoundedNatKind { .. } => Ok(false),
             Term::StringKind => Ok(false),
             Term::BytesKind => Ok(false),
@@ -690,7 +690,7 @@ impl TermVar {
     #[must_use]
     pub fn bound_if_row_var(&self) -> Option<TypeBound> {
         if let Term::ListKind(item_type) = &*self.cached_decl
-            && let Term::RuntimeKind(b) = **item_type
+            && let Term::TypeKind(b) = **item_type
         {
             return Some(b);
         }
@@ -729,9 +729,9 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::Variable(TermVar { cached_decl, .. }), _) if type_.is_supertype(cached_decl) => {
             Ok(())
         }
-        (Term::RuntimeSum(st), Term::RuntimeKind(bound)) if bound.contains(st.bound()) => Ok(()),
-        (Term::RuntimeFunction(_), Term::RuntimeKind(_)) => Ok(()), // Function pointers are always Copyable so fit any bound
-        (Term::RuntimeExtension(cty), Term::RuntimeKind(bound)) if bound.contains(cty.bound()) => {
+        (Term::RuntimeSum(st), Term::TypeKind(bound)) if bound.contains(st.bound()) => Ok(()),
+        (Term::RuntimeFunction(_), Term::TypeKind(_)) => Ok(()), // Function pointers are always Copyable so fit any bound
+        (Term::RuntimeExtension(cty), Term::TypeKind(bound)) if bound.contains(cty.bound()) => {
             Ok(())
         }
         (Term::List(elems), Term::ListKind(item_type)) => elems
@@ -782,7 +782,7 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::FloatKind, Term::StaticKind) => Ok(()),
         (Term::ListKind { .. }, Term::StaticKind) => Ok(()),
         (Term::TupleKind(_), Term::StaticKind) => Ok(()),
-        (Term::RuntimeKind(_), Term::StaticKind) => Ok(()),
+        (Term::TypeKind(_), Term::StaticKind) => Ok(()),
         (Term::ConstKind(_), Term::StaticKind) => Ok(()),
 
         _ => Err(TermTypeError::TypeMismatch {
@@ -987,7 +987,7 @@ mod test {
         ) -> Result<(), TermTypeError> {
             check_term_type(&Term::new_list(args.to_vec()), param)
         }
-        // Simple cases: Term::RuntimeXXXs are Term::RuntimeKind's
+        // Simple cases: Term::RuntimeXXXs are Term::TypeKind's
         check(usize_t(), &TypeBound::Copyable.into()).unwrap();
         let lst_of_cpy = TypeParam::new_list_type(TypeBound::Copyable);
         check(usize_t(), &lst_of_cpy).unwrap_err();
@@ -1234,7 +1234,7 @@ mod test {
                 strat
                     .or(
                         // TODO this means we have two ways to create variables of type
-                        // `RuntimeKind`, so we probably get more of them than we should`
+                        // `TypeKind`, so we probably get more of them than we should`
                         any_with::<TermVar>(depth).prop_map(Self::Variable).boxed(),
                     )
                     .or(any_with::<Self>(depth)

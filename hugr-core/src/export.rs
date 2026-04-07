@@ -941,7 +941,7 @@ impl<'a> Context<'a> {
         var: Option<(table::NodeId, table::VarIndex)>,
     ) -> table::TermId {
         match t {
-            Term::RuntimeKind(b) => {
+            Term::TypeKind(b) => {
                 if let (Some((node, index)), TypeBound::Copyable) = (var, b) {
                     let term = self.make_term(table::Term::Var(table::VarId(node, index)));
                     let non_linear = self.make_term_apply(model::CORE_NON_LINEAR, &[term]);

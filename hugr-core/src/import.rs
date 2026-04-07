@@ -1469,7 +1469,7 @@ impl<'a> Context<'a> {
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
-                return Ok(TypeParam::RuntimeKind(bound));
+                return Ok(TypeParam::TypeKind(bound));
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_CONSTRAINT)? {
