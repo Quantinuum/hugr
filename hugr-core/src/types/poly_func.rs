@@ -392,7 +392,7 @@ pub(crate) mod test {
         Ok(())
     }
 
-    const TP_ANY: TypeParam = TypeParam::RuntimeKind(TypeBound::Linear);
+    const TP_ANY: TypeParam = TypeParam::TypeKind(TypeBound::Linear);
     #[test]
     fn row_variables_bad_schema() {
         // Mismatched TypeBound (Copyable vs Any)

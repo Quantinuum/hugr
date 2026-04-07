@@ -275,7 +275,7 @@ impl SumType {
     }
 
     /// If the sum matches the convention of `Option[row]`, return the row
-    /// (an instance of [Term::ListKind]([Term::RuntimeKind]).
+    /// (an instance of [Term::ListKind]([Term::TypeKind]).
     #[must_use]
     pub fn as_option(&self) -> Option<&TypeRowRV> {
         match self {
@@ -424,7 +424,7 @@ impl Type {
 
     /// New use (occurrence) of the type variable with specified index.
     /// `bound` must be exactly that with which the variable was declared
-    /// (i.e. as a [`Term::RuntimeKind`]`(bound)`), which may be narrower
+    /// (i.e. as a [`Term::TypeKind`]`(bound)`), which may be narrower
     /// than required for the use.
     #[must_use]
     pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {

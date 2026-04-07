@@ -263,10 +263,10 @@ impl DerefMut for TypeRow {
 /// Row of types and/or row variables, the number of actual types is thus
 /// unknown. Used for opdef signatures, and types of runtime function pointers.
 ///
-/// A [Term] that `check_term_type`s against [Term::ListKind] of [Term::RuntimeKind]
+/// A [Term] that `check_term_type`s against [Term::ListKind] of [Term::TypeKind]
 /// (of a [TypeBound]), i.e. one of
-/// * A [Term::Variable] of type [Term::ListKind] (of [Term::RuntimeKind]...)
-/// * A [Term::List], each of whose elements is of type some [Term::RuntimeKind]
+/// * A [Term::Variable] of type [Term::ListKind] (of [Term::TypeKind]...)
+/// * A [Term::List], each of whose elements is of type some [Term::TypeKind]
 /// * A [Term::ListConcat], each of whose sublists is one of these three
 ///
 /// [TypeBound]: crate::types::TypeBound

@@ -261,7 +261,7 @@ pub(super) fn resolve_term_exts(
             resolve_term_exts(node, item_types.as_mut(), extensions, used_extensions)?;
         }
         Term::Variable(_)
-        | Term::RuntimeKind(_)
+        | Term::TypeKind(_)
         | Term::StaticKind
         | Term::BoundedNatKind(_)
         | Term::StringKind
