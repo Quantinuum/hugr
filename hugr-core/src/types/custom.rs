@@ -27,8 +27,6 @@ pub struct CustomType {
     /// [`TypeDef`]: crate::extension::TypeDef
     id: TypeName,
     /// Arguments that fit the [`TypeParam`]s declared by the typedef
-    ///
-    /// [`TypeParam`]: super::type_param::TypeParam
     args: Vec<TypeArg>,
     /// The [`TypeBound`] describing what can be done to instances of this type
     bound: TypeBound,
