@@ -445,6 +445,84 @@ impl Term {
         }
     }
 
+    /// Checks variables are as declared and [CustomType] arguments fit their parameters.
+    /// Does not check that e.g. list elements all have same type (except inside a
+    /// [CustomType] where we know the element type from the corresponding list parameter)
+    /// - this is left to [check_term_type].
+    pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
+        match self {
+            Term::RuntimeSum(SumType::General { rows }) => {
+                rows.iter().try_for_each(|row| row.validate(var_decls))?;
+                Ok(())
+            }
+            Term::RuntimeSum(SumType::Unit { .. }) => Ok(()), // No leaves there
+            Term::RuntimeExtension(custy) => custy.validate(var_decls),
+            Term::RuntimeFunction(ft) => ft.validate(var_decls),
+            Term::List(elems) => elems.iter().try_for_each(|a| a.validate(var_decls)),
+            Term::Tuple(elems) => elems.iter().try_for_each(|a| a.validate(var_decls)),
+            Term::BoundedNat(_) | Term::String { .. } | Term::Float(_) | Term::Bytes(_) => Ok(()),
+            TypeArg::ListConcat(lists) => lists.iter().try_for_each(|a| a.validate(var_decls)),
+            TypeArg::TupleConcat(tuples) => tuples.iter().try_for_each(|a| a.validate(var_decls)),
+            Term::Variable(tv) => tv.check_decl(var_decls),
+            Term::RuntimeType { .. } => Ok(()),
+            Term::BoundedNatType { .. } => Ok(()),
+            Term::StringType => Ok(()),
+            Term::BytesType => Ok(()),
+            Term::FloatType => Ok(()),
+            Term::ListType(item_type) => item_type.validate(var_decls),
+            Term::TupleType(item_types) => item_types.validate(var_decls),
+            Term::StaticType => Ok(()),
+            Term::ConstType(ty) => ty.validate(var_decls),
+        }
+    }
+
+    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
+        match self {
+            TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
+            TypeArg::RuntimeSum(SumType::General { rows }) => {
+                // A substitution of a row variable for an empty list,
+                // could make the general case into a unary SumType.
+                Term::RuntimeSum(SumType::new(rows.iter().map(|r| r.substitute(t))))
+            }
+            TypeArg::RuntimeExtension(cty) => Term::RuntimeExtension(cty.substitute(t)),
+            TypeArg::RuntimeFunction(bf) => Term::RuntimeFunction(Box::new(bf.substitute(t))),
+
+            TypeArg::BoundedNat(_) | TypeArg::String(_) | TypeArg::Bytes(_) | TypeArg::Float(_) => {
+                self.clone()
+            } // We do not allow variables as bounds on BoundedNat's
+            TypeArg::List(elems) => Self::List(elems.iter().map(|e| e.substitute(t)).collect()),
+            TypeArg::ListConcat(lists) => {
+                // When a substitution instantiates spliced list variables, we
+                // may be able to merge the concatenated lists.
+                Self::new_list_from_parts(
+                    lists.iter().map(|list| SeqPart::Splice(list.substitute(t))),
+                )
+            }
+            Term::Tuple(elems) => {
+                Term::Tuple(elems.iter().map(|elem| elem.substitute(t)).collect())
+            }
+            TypeArg::TupleConcat(tuples) => {
+                // When a substitution instantiates spliced tuple variables,
+                // we may be able to merge the concatenated tuples.
+                Self::new_tuple_from_parts(
+                    tuples
+                        .iter()
+                        .map(|tuple| SeqPart::Splice(tuple.substitute(t))),
+                )
+            }
+            TypeArg::Variable(TermVar { idx, cached_decl }) => t.apply_var(*idx, cached_decl),
+            Term::RuntimeType(_) => self.clone(),
+            Term::BoundedNatType(_) => self.clone(),
+            Term::StringType => self.clone(),
+            Term::BytesType => self.clone(),
+            Term::FloatType => self.clone(),
+            Term::ListType(item_type) => Term::new_list_type(item_type.substitute(t)),
+            Term::TupleType(item_types) => Term::new_list_type(item_types.substitute(t)),
+            Term::StaticType => self.clone(),
+            Term::ConstType(ty) => Term::new_const(ty.substitute(t)),
+        }
+    }
+
     /// Helper method for [`TypeArg::new_list_from_parts`] and [`TypeArg::new_tuple_from_parts`].
     fn new_seq_from_parts(
         parts: impl IntoIterator<Item = SeqPart<Self>>,
@@ -579,84 +657,6 @@ impl Term {
     #[inline]
     pub fn into_tuple_parts(self) -> impl Iterator<Item = SeqPart<Self>> {
         TuplePartIter::new(SeqPart::Splice(self))
-    }
-
-    /// Checks variables are as declared and [CustomType] arguments fit their parameters.
-    /// Does not check that e.g. list elements all have same type (except inside a
-    /// [CustomType] where we know the element type from the corresponding list parameter)
-    /// - this is left to [check_term_type].
-    pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
-        match self {
-            Term::RuntimeSum(SumType::General { rows }) => {
-                rows.iter().try_for_each(|row| row.validate(var_decls))?;
-                Ok(())
-            }
-            Term::RuntimeSum(SumType::Unit { .. }) => Ok(()), // No leaves there
-            Term::RuntimeExtension(custy) => custy.validate(var_decls),
-            Term::RuntimeFunction(ft) => ft.validate(var_decls),
-            Term::List(elems) => elems.iter().try_for_each(|a| a.validate(var_decls)),
-            Term::Tuple(elems) => elems.iter().try_for_each(|a| a.validate(var_decls)),
-            Term::BoundedNat(_) | Term::String { .. } | Term::Float(_) | Term::Bytes(_) => Ok(()),
-            TypeArg::ListConcat(lists) => lists.iter().try_for_each(|a| a.validate(var_decls)),
-            TypeArg::TupleConcat(tuples) => tuples.iter().try_for_each(|a| a.validate(var_decls)),
-            Term::Variable(tv) => tv.check_decl(var_decls),
-            Term::RuntimeType { .. } => Ok(()),
-            Term::BoundedNatType { .. } => Ok(()),
-            Term::StringType => Ok(()),
-            Term::BytesType => Ok(()),
-            Term::FloatType => Ok(()),
-            Term::ListType(item_type) => item_type.validate(var_decls),
-            Term::TupleType(item_types) => item_types.validate(var_decls),
-            Term::StaticType => Ok(()),
-            Term::ConstType(ty) => ty.validate(var_decls),
-        }
-    }
-
-    pub(crate) fn substitute(&self, t: &Substitution) -> Self {
-        match self {
-            TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
-            TypeArg::RuntimeSum(SumType::General { rows }) => {
-                // A substitution of a row variable for an empty list,
-                // could make the general case into a unary SumType.
-                Term::RuntimeSum(SumType::new(rows.iter().map(|r| r.substitute(t))))
-            }
-            TypeArg::RuntimeExtension(cty) => Term::RuntimeExtension(cty.substitute(t)),
-            TypeArg::RuntimeFunction(bf) => Term::RuntimeFunction(Box::new(bf.substitute(t))),
-
-            TypeArg::BoundedNat(_) | TypeArg::String(_) | TypeArg::Bytes(_) | TypeArg::Float(_) => {
-                self.clone()
-            } // We do not allow variables as bounds on BoundedNat's
-            TypeArg::List(elems) => Self::List(elems.iter().map(|e| e.substitute(t)).collect()),
-            TypeArg::ListConcat(lists) => {
-                // When a substitution instantiates spliced list variables, we
-                // may be able to merge the concatenated lists.
-                Self::new_list_from_parts(
-                    lists.iter().map(|list| SeqPart::Splice(list.substitute(t))),
-                )
-            }
-            Term::Tuple(elems) => {
-                Term::Tuple(elems.iter().map(|elem| elem.substitute(t)).collect())
-            }
-            TypeArg::TupleConcat(tuples) => {
-                // When a substitution instantiates spliced tuple variables,
-                // we may be able to merge the concatenated tuples.
-                Self::new_tuple_from_parts(
-                    tuples
-                        .iter()
-                        .map(|tuple| SeqPart::Splice(tuple.substitute(t))),
-                )
-            }
-            TypeArg::Variable(TermVar { idx, cached_decl }) => t.apply_var(*idx, cached_decl),
-            Term::RuntimeType(_) => self.clone(),
-            Term::BoundedNatType(_) => self.clone(),
-            Term::StringType => self.clone(),
-            Term::BytesType => self.clone(),
-            Term::FloatType => self.clone(),
-            Term::ListType(item_type) => Term::new_list_type(item_type.substitute(t)),
-            Term::TupleType(item_types) => Term::new_list_type(item_types.substitute(t)),
-            Term::StaticType => self.clone(),
-            Term::ConstType(ty) => Term::new_const(ty.substitute(t)),
-        }
     }
 }
 
