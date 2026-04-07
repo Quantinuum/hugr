@@ -360,9 +360,9 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
     /// emission of ops with static edges from them. So [`FuncDefn`] are the only
     /// interesting children.
     ///
-    /// If `emit_debug` is true, debug info will be included in the generated IR if
-    /// it is present on the HUGR. If it is false, any debug info on the HUGR will be
-    /// ignored.
+    /// If `emit_debug` is true, debug info will be included in the generated IR to the
+    /// extent it is present in the HUGR. At minimum, a root debug record is required.
+    /// If `emit_debug` is false, any debug info on the HUGR will be ignored.
     pub fn emit_module(
         mut self,
         node: FatNode<'_, hugr_core::ops::Module, H>,

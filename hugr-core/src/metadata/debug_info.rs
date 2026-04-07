@@ -1,15 +1,45 @@
 #![allow(missing_docs)]
 
+use std::any::type_name;
+use std::fmt;
+
 use crate::metadata::Metadata;
 use crate::{HugrView, Node};
-use serde::{Deserialize, Serialize};
+use serde::{Deserialize, Serialize, de::{Deserializer, DeserializeOwned, Visitor, Error as DeError}};
 use thiserror::Error;
+use serde_json::{Value as JsonValue, Error as JsonError};
 
 pub const DEBUGINFO_META_KEY: &str = "core.debug_info";
+
+        
+/// Visitor and wrapper function passed as "deserialize_with" attribute
+/// in order to deserialize a usize from a string using serde_json
+struct JsonStrToIntVisitor;
+
+impl <'de> Visitor<'de> for JsonStrToIntVisitor {
+    type Value = usize;
+
+    fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+        formatter.write_str("a usize or a string convertible with str::parse<usize>()")
+    }
+
+    fn visit_str<E: DeError>(self, s: &str) -> Result<Self::Value, E> {
+        s.parse::<usize>().map_err(E::custom)
+    }
+
+    fn visit_u64<E: DeError>(self, x: u64) -> Result<Self::Value, E> {
+        x.try_into().map_err(E::custom)
+    }
+}
+
+fn deserialize_usize_str<'de, D: Deserializer<'de>>(deserializer: D) -> Result<usize, D::Error> {
+    deserializer.deserialize_any(JsonStrToIntVisitor)
+}
 
 #[derive(Serialize, Deserialize)]
 pub struct CompileUnitRecord {
     pub directory: String,
+    #[serde(deserialize_with = "deserialize_usize_str")]
     pub filename: usize,
     pub file_table: Vec<String>,
 }
@@ -23,16 +53,19 @@ impl Metadata for CompileUnitRecord {
 pub enum DebugInfoError {
     /// There is a specific required mapping between HUGR nodes and debug record types,
     /// if present
-    #[error("Debug info does not match expected type")]
-    DRTypeMismatchError,
+    #[error("Debug metadata does not deserialize to {0}: {1}\n{2}")]
+    DRTypeMismatchError(&'static str, JsonError, JsonValue),
 }
 
 #[derive(Serialize, Deserialize)]
 pub struct SubprogramRecord {
+    #[serde(deserialize_with = "deserialize_usize_str")]
     pub file: usize,
+    #[serde(deserialize_with = "deserialize_usize_str")]
     pub line_no: usize,
     // TODO
     //scope: Option<ScopeRecord>,
+    #[serde(deserialize_with = "deserialize_usize_str")]
     pub scope_line: usize,
 }
 
@@ -43,7 +76,9 @@ impl Metadata for SubprogramRecord {
 
 #[derive(Serialize, Deserialize)]
 pub struct LocationRecord {
+    #[serde(deserialize_with = "deserialize_usize_str")]
     pub column: usize,
+    #[serde(deserialize_with = "deserialize_usize_str")]
     pub line_no: usize,
 }
 
@@ -52,22 +87,19 @@ impl Metadata for LocationRecord {
     const KEY: &'static str = DEBUGINFO_META_KEY;
 }
 
-// TODO: could generalize this to all metadata
 /// Inspect the debug metadata attached to the HUGR node.
 ///
 /// If there is no debug metadata, return Ok(None). If it is present but does not
 /// deserialize into `T`, return DRTypeMismatchError. Otherwise, return the deserialized
 /// Some(`T`).
-pub fn try_get_debug_meta<'h, H: HugrView<Node = Node>, T: Metadata<Type<'h> = T>>(
+pub fn try_get_debug_meta<'h, H: HugrView<Node = Node>, T: Metadata<Type<'h> = T> + DeserializeOwned>(
     hugr: &'h H,
     node: Node,
 ) -> Result<Option<T>, DebugInfoError> {
-    if hugr.get_metadata_any(node, DEBUGINFO_META_KEY).is_some() {
-        if let Some(record) = hugr.get_metadata::<T>(node) {
-            Ok(Some(record))
-        } else {
-            Err(DebugInfoError::DRTypeMismatchError)
-        }
+    if let Some(json) = hugr.get_metadata_any(node, DEBUGINFO_META_KEY) {
+        serde_json::from_value::<T>(json.clone())
+           .map_err(|e| DebugInfoError::DRTypeMismatchError(type_name::<T>(), e, json.clone()))
+           .and_then(|debug_record| Ok(Some(debug_record))) 
     } else {
         Ok(None)
     }

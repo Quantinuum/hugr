@@ -19,7 +19,7 @@ use inkwell::{
         AsDIScope, DICompileUnit, DIFile, DILocation, DISubprogram, DISubroutineType, DIType,
         DWARFEmissionKind, DWARFSourceLanguage, DebugInfoBuilder,
     },
-    module::{Linkage, Module},
+    module::{FlagBehavior, Linkage, Module},
     types::{ArrayType, BasicMetadataTypeEnum, FloatType, FunctionType, IntType},
     values::FunctionValue,
 };
@@ -49,6 +49,10 @@ pub struct DebugInfoContext<'c> {
     type_map: BTreeMap<CString, DIType<'c>>,
     /// Mapping from function type names to DWARF type records
     fn_type_map: BTreeMap<CString, DISubroutineType<'c>>,
+    // NOTE: have_di_loc may not match the Builder's view of things,
+    // see: https://github.com/TheDan64/inkwell/issues/674
+    /// Tracks whether the context currently has a location set
+    have_di_loc: bool
 }
 
 impl<'c> DebugInfoContext<'c> {
@@ -65,6 +69,10 @@ impl<'c> DebugInfoContext<'c> {
             return Ok(None);
         }
         let root_meta = maybe_record.unwrap();
+
+        // TODO: who is using this value?
+        let di_version = iw_module.get_context().i32_type().const_int(3, false);
+        iw_module.add_basic_value_flag("Debug Info Version", FlagBehavior::Warning, di_version);
 
         let prod_str = node
             .hugr()
@@ -105,6 +113,7 @@ impl<'c> DebugInfoContext<'c> {
             file_table,
             type_map: BTreeMap::new(),
             fn_type_map: BTreeMap::new(),
+            have_di_loc: false
         }))
     }
 
@@ -308,22 +317,24 @@ impl<'c> DebugInfoContext<'c> {
 
     /// Set the input location record as the IR builder's debug location.
     /// Returns an error if the IR builder already has a debug location.
-    pub fn set_debug_loc(&self, ir_builder: &Builder, loc: DILocation<'c>) -> Result<()> {
-        if ir_builder.get_current_debug_location().is_some() {
-            Err(anyhow!("Debug location is already set!"))
+    pub fn set_debug_loc(&mut self, ir_builder: &Builder, loc: DILocation<'c>) -> Result<()> {
+        if self.have_di_loc {
+            Err(anyhow!("Debug location is already set"))
         } else {
             ir_builder.set_current_debug_location(loc);
+            self.have_di_loc = true;
             Ok(())
         }
     }
 
     /// Clear the IR builder's current debug location.
     /// Returns an error if the IR builder's debug location is not set.
-    pub fn unset_debug_loc(&self, ir_builder: &Builder) -> Result<()> {
+    pub fn unset_debug_loc(&mut self, ir_builder: &Builder) -> Result<()> {
         if ir_builder.get_current_debug_location().is_none() {
             Err(anyhow!("Debug location is already unset!"))
         } else {
             ir_builder.unset_current_debug_location();
+            self.have_di_loc = false;
             Ok(())
         }
     }
