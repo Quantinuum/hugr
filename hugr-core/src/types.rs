@@ -205,8 +205,8 @@ impl std::fmt::Display for SumType {
                 display_list_with_separator(itertools::repeat_n("[]", *size as usize), f, "+")
             }
             SumType::General { rows } => match rows.len() {
-                1 if rows[0].is_empty_list() => write!(f, "Unit"),
-                2 if rows[0].is_empty_list() && rows[1].is_empty_list() => write!(f, "Bool"),
+                1 if rows[0].is_empty() => write!(f, "Unit"),
+                2 if rows[0].is_empty() && rows[1].is_empty() => write!(f, "Bool"),
                 _ => display_list_with_separator(rows.iter(), f, "+"),
             },
         }
@@ -221,7 +221,7 @@ impl SumType {
     {
         let variants = variants.into_iter().map(V::into).collect_vec();
         let len = variants.len();
-        if u8::try_from(len).is_ok() && variants.iter().all(|tr| tr.is_empty_list()) {
+        if u8::try_from(len).is_ok() && variants.iter().all(TypeRowRV::is_empty) {
             Self::new_unary(len as u8)
         } else {
             Self::General { rows: variants }
@@ -284,9 +284,7 @@ impl SumType {
     pub fn as_option(&self) -> Option<&Term> {
         match self {
             SumType::Unit { size } if *size == 2 => Some(Term::EMPTY_LIST_REF),
-            SumType::General { rows } if rows.len() == 2 && rows[0].is_empty_list() => {
-                Some(&rows[1])
-            }
+            SumType::General { rows } if rows.len() == 2 && rows[0].is_empty() => Some(&rows[1]),
             _ => None,
         }
     }
@@ -393,7 +391,7 @@ impl Type {
     #[inline(always)]
     pub fn new_tuple(types: impl Into<TypeRowRV>) -> Self {
         let row = types.into();
-        match row.is_empty_list() {
+        match row.is_empty() {
             true => Self::UNIT,
             false => Self::new_sum([row]),
         }

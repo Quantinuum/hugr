@@ -266,6 +266,11 @@ impl TypeRowRV {
     pub fn concat(self, other: impl Into<Self>) -> Self {
         Self(Term::concat_lists([self.0, other.into().0]))
     }
+
+    /// Returns `true` if the row contains no types.
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty_list()
+    }
 }
 
 impl Substitutable for TypeRowRV {

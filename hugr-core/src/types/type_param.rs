@@ -252,7 +252,7 @@ impl Term {
     }
 
     /// Returns true if this term is an empty list (contains no elements)
-    pub fn is_empty_list(&self) -> bool {
+    pub(super) fn is_empty_list(&self) -> bool {
         match self {
             Term::List(v) => v.is_empty(),
             // We probably don't need to be this thorough in dealing with unnormalized forms but it's easy enough

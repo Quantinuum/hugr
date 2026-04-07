@@ -114,7 +114,7 @@ impl FuncValueType {
     #[inline(always)]
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.input.is_empty_list() && self.output.is_empty_list()
+        self.input.is_empty() && self.output.is_empty()
     }
 }
 
