@@ -235,10 +235,6 @@ impl SumType {
     }
 
     /// New tuple (single row of variants).
-    ///
-    /// # Panics
-    ///
-    /// If the argument is not of type [Term::ListType]`(`[Term::RuntimeType]`)`
     pub fn new_tuple(types: impl Into<TypeRow>) -> Self {
         Self::new([types.into()])
     }
@@ -293,7 +289,7 @@ impl SumType {
     // "If a sum is an option of a single type, return the type. pub fn as_unary_option(&self) -> Option<&Term>"
     // But of course a Term was not necessarily a single type...
 
-    /// Returns an iterator over the variants, each an instance of [Term::ListType]`(`[Term::RuntimeType]`)`
+    /// Returns an iterator over the variants
     pub fn variants(&self) -> impl Iterator<Item = &TypeRowRV> {
         match self {
             SumType::Unit { size } => {
@@ -398,10 +394,6 @@ impl Type {
     }
 
     /// Initialize a new sum type by providing the possible variant types.
-    ///
-    /// # Panics
-    ///
-    /// If any element is not a type or row variable
     #[inline(always)]
     pub fn new_sum<R>(variants: impl IntoIterator<Item = R>) -> Self
     where
@@ -632,9 +624,7 @@ impl Substitutable for Type {
     /// [TypeBound::Linear] to [TypeBound::Copyable]).
     fn substitute(&self, s: &Substitution) -> Self {
         let t = self.0.substitute(s);
-        // Must succeed and produce a type assuming substitution valid (RHSes
-        // fit within LHS). However, may *narrow* the bound, so recompute.
-        let b = t.least_upper_bound().unwrap();
+        let b = t.least_upper_bound().unwrap(); // Recompute.
         Self(t, b)
     }
 }
