@@ -309,7 +309,7 @@ impl TypeRowLike for TypeRowRV {
     /// Checks that this is indeed a list of runtime types;
     /// and that all variables are as declared in the supplied list of params.
     fn validate(&self, vars: &[TypeParam]) -> Result<(), SignatureError> {
-        check_term_kind(&self.0, &Term::new_list_type(TypeBound::Linear))?;
+        check_term_kind(&self.0, &Term::new_list_kind(TypeBound::Linear))?;
         self.0.validate(vars)
     }
 
@@ -344,7 +344,7 @@ impl TryFrom<Term> for TypeRowRV {
     type Error = TermTypeError;
 
     fn try_from(t: Term) -> Result<Self, Self::Error> {
-        check_term_kind(&t, &Term::new_list_type(TypeBound::Linear))?;
+        check_term_kind(&t, &Term::new_list_kind(TypeBound::Linear))?;
         Ok(Self(t))
     }
 }

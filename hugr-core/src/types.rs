@@ -305,7 +305,7 @@ impl SumType {
             SumType::General { rows } => {
                 if rows
                     .iter()
-                    .all(|t| check_term_kind(t, &Term::new_list_type(TypeBound::Copyable)).is_ok())
+                    .all(|t| check_term_kind(t, &Term::new_list_kind(TypeBound::Copyable)).is_ok())
                 {
                     TypeBound::Copyable
                 } else {
@@ -743,7 +743,7 @@ pub(crate) mod test {
             |t| array_type(10, t),
             |t| {
                 array_type_parametric(
-                    TypeArg::new_var_use(0, TypeParam::bounded_nat_type(3.try_into().unwrap())),
+                    TypeArg::new_var_use(0, TypeParam::bounded_nat_kind(3.try_into().unwrap())),
                     t,
                 )
                 .unwrap()
@@ -767,7 +767,7 @@ pub(crate) mod test {
                 .unwrap();
             e.add_type(
                 COLN,
-                vec![TypeParam::new_list_type(TypeBound::Copyable)],
+                vec![TypeParam::new_list_kind(TypeBound::Copyable)],
                 String::new(),
                 TypeDefBound::copyable(),
                 w,
