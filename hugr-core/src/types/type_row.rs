@@ -22,7 +22,7 @@ use delegate::delegate;
 use derive_more::Display;
 use itertools::Itertools;
 
-/// List of types, used for function signatures.
+/// List of types, of known length, used for node signatures.
 ///
 /// Also allows sharing via `Cow` and static allocation via [type_row!].
 ///
@@ -229,7 +229,7 @@ impl DerefMut for TypeRow {
 }
 
 /// Row of types and/or row variables, the number of actual types is thus
-/// unknown.
+/// unknown. Used for opdef signatures, and types of runtime function pointers.
 ///
 /// A [Term] that `check_term_type`s against [Term::ListType] of [Term::RuntimeType]
 /// (of a [TypeBound]), i.e. one of

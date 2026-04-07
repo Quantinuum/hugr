@@ -640,14 +640,10 @@ impl Substitutable for Term {
             Term::RuntimeSum(SumType::Unit { .. }) => Ok(()), // No leaves there
             Term::RuntimeExtension(custy) => custy.validate(var_decls),
             Term::RuntimeFunction(ft) => ft.validate(var_decls),
-            Term::List(elems) => {
-                elems.iter().try_for_each(|a| a.validate(var_decls))
-            }
+            Term::List(elems) => elems.iter().try_for_each(|a| a.validate(var_decls)),
             Term::Tuple(elems) => elems.iter().try_for_each(|a| a.validate(var_decls)),
             Term::BoundedNat(_) | Term::String { .. } | Term::Float(_) | Term::Bytes(_) => Ok(()),
-            TypeArg::ListConcat(lists) => {
-                lists.iter().try_for_each(|a| a.validate(var_decls))
-            }
+            TypeArg::ListConcat(lists) => lists.iter().try_for_each(|a| a.validate(var_decls)),
             TypeArg::TupleConcat(tuples) => tuples.iter().try_for_each(|a| a.validate(var_decls)),
             Term::Variable(tv) => tv.check_decl(var_decls),
             Term::RuntimeType { .. } => Ok(()),
