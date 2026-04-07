@@ -167,7 +167,7 @@ pub enum ListOp {
 
 impl ListOp {
     /// Type parameter used in the list types.
-    const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
+    const TP: TypeParam = TypeParam::TypeKind(TypeBound::Linear);
 
     /// Instantiate a list operation with an `element_type`.
     #[must_use]

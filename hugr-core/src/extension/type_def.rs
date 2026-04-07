@@ -6,7 +6,7 @@ use super::{Extension, ExtensionId, SignatureError};
 
 use crate::types::{CustomType, TypeName, least_upper_bound};
 
-use crate::types::type_param::{TypeArg, check_term_types};
+use crate::types::type_param::{TypeArg, check_term_kinds};
 
 use crate::types::type_param::TypeParam;
 
@@ -79,7 +79,7 @@ pub struct TypeDef {
 impl TypeDef {
     /// Check provided type arguments are valid against parameters.
     pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        Ok(check_term_types(args, &self.params)?)
+        Ok(check_term_kinds(args, &self.params)?)
     }
 
     /// Check [`CustomType`] is a valid instantiation of this definition.
@@ -102,7 +102,7 @@ impl TypeDef {
             ));
         }
 
-        check_term_types(custom.type_args(), &self.params)?;
+        check_term_kinds(custom.type_args(), &self.params)?;
 
         let calc_bound = self.bound(custom.args());
         if calc_bound == custom.bound() {
@@ -123,7 +123,7 @@ impl TypeDef {
     /// valid instances of the type parameters.
     pub fn instantiate(&self, args: impl Into<Vec<TypeArg>>) -> Result<CustomType, SignatureError> {
         let args = args.into();
-        check_term_types(&args, &self.params)?;
+        check_term_kinds(&args, &self.params)?;
         let bound = self.bound(&args);
         Ok(CustomType::new(
             self.name().clone(),
@@ -249,7 +249,7 @@ mod test {
     fn test_instantiate_typedef() {
         let def = TypeDef {
             name: "MyType".into(),
-            params: vec![TypeParam::RuntimeType(TypeBound::Copyable)],
+            params: vec![TypeParam::TypeKind(TypeBound::Copyable)],
             extension: "MyRsrc".try_into().unwrap(),
             // Dummy extension. Will return `None` when trying to upgrade it into an `Arc`.
             extension_ref: Default::default(),

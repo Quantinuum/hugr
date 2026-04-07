@@ -12,7 +12,7 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_term_exts,
 };
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
-use crate::types::type_param::{TermTypeError, check_term_type};
+use crate::types::type_param::{TermTypeError, check_term_kind};
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
@@ -275,7 +275,7 @@ impl SumType {
     }
 
     /// If the sum matches the convention of `Option[row]`, return the row
-    /// (an instance of [Term::ListType]([Term::RuntimeType]).
+    /// (an instance of [Term::ListKind]([Term::TypeKind]).
     #[must_use]
     pub fn as_option(&self) -> Option<&TypeRowRV> {
         match self {
@@ -305,7 +305,7 @@ impl SumType {
             SumType::General { rows } => {
                 if rows
                     .iter()
-                    .all(|t| check_term_type(t, &Term::new_list_type(TypeBound::Copyable)).is_ok())
+                    .all(|t| check_term_kind(t, &Term::new_list_kind(TypeBound::Copyable)).is_ok())
                 {
                     TypeBound::Copyable
                 } else {
@@ -371,14 +371,14 @@ impl Type {
     pub const EMPTY_TYPEROW: TypeRow = TypeRow::new();
     /// Unit type (empty tuple).
     pub const UNIT: Self = Self(
-        Term::RuntimeSum(SumType::Unit { size: 1 }),
+        Term::SumType(SumType::Unit { size: 1 }),
         TypeBound::Copyable,
     );
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<FuncValueType>) -> Self {
         Self(
-            Term::RuntimeFunction(Box::new(fun_ty.into())),
+            Term::FunctionType(Box::new(fun_ty.into())),
             TypeBound::Copyable,
         )
     }
@@ -401,7 +401,7 @@ impl Type {
     {
         let st = SumType::new(variants);
         let b = st.bound();
-        Self(Term::RuntimeSum(st), b)
+        Self(Term::SumType(st), b)
     }
 
     /// Initialize a new custom type.
@@ -409,7 +409,7 @@ impl Type {
     #[must_use]
     pub const fn new_extension(opaque: CustomType) -> Self {
         let bound = opaque.bound();
-        Self(Term::RuntimeExtension(opaque), bound)
+        Self(Term::ExtensionType(opaque), bound)
     }
 
     /// New `UnitSum` with empty Tuple variants
@@ -417,14 +417,14 @@ impl Type {
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
         Self(
-            Term::RuntimeSum(SumType::new_unary(size)),
+            Term::SumType(SumType::new_unary(size)),
             TypeBound::Copyable,
         )
     }
 
     /// New use (occurrence) of the type variable with specified index.
     /// `bound` must be exactly that with which the variable was declared
-    /// (i.e. as a [`Term::RuntimeType`]`(bound)`), which may be narrower
+    /// (i.e. as a [`Term::TypeKind`]`(bound)`), which may be narrower
     /// than required for the use.
     #[must_use]
     pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
@@ -455,10 +455,10 @@ impl Type {
         // ALAN even this should be only a debug-assert really:
         // we have no unchecked access from outside crate::types
         // so it must be a bug in our caching logic if this is wrong:
-        check_term_type(&self.0, &self.1.into())?;
+        check_term_kind(&self.0, &self.1.into())?;
         debug_assert!(
             self.1 == TypeBound::Copyable
-                || check_term_type(&self.0, &TypeBound::Copyable.into()).is_err()
+                || check_term_kind(&self.0, &TypeBound::Copyable.into()).is_err()
         );
         Ok(())
     }
@@ -552,7 +552,7 @@ impl<'a> Substitution<'a> {
             .0
             .get(idx)
             .expect("Undeclared type variable - call validate() ?");
-        debug_assert_eq!(check_term_type(arg, decl), Ok(()));
+        debug_assert_eq!(check_term_kind(arg, decl), Ok(()));
         arg.clone()
     }
 }
@@ -743,7 +743,7 @@ pub(crate) mod test {
             |t| array_type(10, t),
             |t| {
                 array_type_parametric(
-                    TypeArg::new_var_use(0, TypeParam::bounded_nat_type(3.try_into().unwrap())),
+                    TypeArg::new_var_use(0, TypeParam::bounded_nat_kind(3.try_into().unwrap())),
                     t,
                 )
                 .unwrap()
@@ -767,7 +767,7 @@ pub(crate) mod test {
                 .unwrap();
             e.add_type(
                 COLN,
-                vec![TypeParam::new_list_type(TypeBound::Copyable)],
+                vec![TypeParam::new_list_kind(TypeBound::Copyable)],
                 String::new(),
                 TypeDefBound::copyable(),
                 w,

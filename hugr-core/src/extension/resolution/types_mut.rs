@@ -234,18 +234,18 @@ pub(super) fn resolve_term_exts(
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     match term {
-        Term::RuntimeExtension(custom) => {
+        Term::ExtensionType(custom) => {
             resolve_custom_type_exts(node, custom, extensions, used_extensions)?;
         }
-        Term::RuntimeFunction(f) => {
+        Term::FunctionType(f) => {
             resolve_func_type_exts(node, &mut *f, extensions, used_extensions)?;
         }
-        Term::RuntimeSum(SumType::General { rows }) => {
+        Term::SumType(SumType::General { rows }) => {
             for row in rows.iter_mut() {
                 resolve_typerow_rv_exts(node, row, extensions, used_extensions)?;
             }
         }
-        Term::ConstType(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
+        Term::ConstKind(ty) => resolve_type_exts(node, ty, extensions, used_extensions)?,
         Term::List(children)
         | Term::ListConcat(children)
         | Term::Tuple(children)
@@ -254,24 +254,24 @@ pub(super) fn resolve_term_exts(
                 resolve_term_exts(node, child, extensions, used_extensions)?;
             }
         }
-        Term::ListType(item_type) => {
+        Term::ListKind(item_type) => {
             resolve_term_exts(node, item_type.as_mut(), extensions, used_extensions)?;
         }
-        Term::TupleType(item_types) => {
+        Term::TupleKind(item_types) => {
             resolve_term_exts(node, item_types.as_mut(), extensions, used_extensions)?;
         }
         Term::Variable(_)
-        | Term::RuntimeType(_)
-        | Term::StaticType
-        | Term::BoundedNatType(_)
-        | Term::StringType
-        | Term::BytesType
-        | Term::FloatType
+        | Term::TypeKind(_)
+        | Term::StaticKind
+        | Term::BoundedNatKind(_)
+        | Term::StringKind
+        | Term::BytesKind
+        | Term::FloatKind
         | Term::BoundedNat(_)
         | Term::String(_)
         | Term::Bytes(_)
         | Term::Float(_)
-        | Term::RuntimeSum(SumType::Unit { .. }) => {}
+        | Term::SumType(SumType::Unit { .. }) => {}
     }
     Ok(())
 }

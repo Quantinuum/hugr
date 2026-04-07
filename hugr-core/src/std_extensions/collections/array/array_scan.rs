@@ -56,12 +56,12 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
         // array<N, T1>, (T1, *A -> T2, *A), *A, -> array<N, T2>, *A
         let params = vec![
-            TypeParam::max_nat_type(),
+            TypeParam::max_nat_kind(),
             TypeBound::Linear.into(),
             TypeBound::Linear.into(),
-            TypeParam::new_list_type(TypeBound::Linear),
+            TypeParam::new_list_kind(TypeBound::Linear),
         ];
-        let n = TypeArg::new_var_use(0, TypeParam::max_nat_type());
+        let n = TypeArg::new_var_use(0, TypeParam::max_nat_kind());
         let t1 = Type::new_var_use(1, TypeBound::Linear);
         let t2 = Type::new_var_use(2, TypeBound::Linear);
         let with_rest = |tys: Vec<Type>| {

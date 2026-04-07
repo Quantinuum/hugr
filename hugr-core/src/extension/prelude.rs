@@ -109,8 +109,8 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             .unwrap();
         let panic_exit_sig = PolyFuncTypeRV::new(
             [
-                TypeParam::new_list_type(TypeBound::Linear),
-                TypeParam::new_list_type(TypeBound::Linear),
+                TypeParam::new_list_kind(TypeBound::Linear),
+                TypeParam::new_list_kind(TypeBound::Linear),
             ],
             FuncValueType::new(
                 TypeRowRV::from([Type::new_extension(error_type.clone())])
@@ -624,7 +624,7 @@ impl MakeOpDef for TupleOpDef {
         let rv = TypeRowRV::just_row_var(0, TypeBound::Linear);
         let tuple_type = Type::new_tuple(rv.clone());
 
-        let param = TypeParam::new_list_type(TypeBound::Linear);
+        let param = TypeParam::new_list_kind(TypeBound::Linear);
         match self {
             TupleOpDef::MakeTuple => {
                 PolyFuncTypeRV::new([param], FuncValueType::new(rv, [tuple_type]))
@@ -893,7 +893,7 @@ impl MakeOpDef for BarrierDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
-            vec![TypeParam::new_list_type(TypeBound::Linear)],
+            vec![TypeParam::new_list_kind(TypeBound::Linear)],
             FuncValueType::new_endo(TypeRowRV::just_row_var(0, TypeBound::Linear)),
         )
         .into()
