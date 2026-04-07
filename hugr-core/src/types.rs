@@ -263,12 +263,11 @@ impl SumType {
         }
     }
 
-    /// Returns variant row if there is only one variant
-    /// (will be an instance of [Term::ListType]([Term::RuntimeType]).
+    /// Returns variant row if there is only one variant.
     #[must_use]
-    pub fn as_tuple(&self) -> Option<&Term> {
+    pub fn as_tuple(&self) -> Option<&TypeRowRV> {
         match self {
-            SumType::Unit { size } if *size == 1 => Some(Term::EMPTY_LIST_REF),
+            SumType::Unit { size } if *size == 1 => Some(TypeRowRV::EMPTY_REF),
             SumType::General { rows } if rows.len() == 1 => Some(&rows[0]),
             _ => None,
         }

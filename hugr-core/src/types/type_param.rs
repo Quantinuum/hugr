@@ -178,8 +178,6 @@ pub enum Term {
 }
 
 impl Term {
-    const EMPTY_LIST: Term = Term::List(Vec::new());
-    pub(crate) const EMPTY_LIST_REF: &'static Term = &Self::EMPTY_LIST;
     /// Creates a [`Term::BoundedNatType`] with the maximum bound (`u64::MAX` + 1).
     #[must_use]
     pub const fn max_nat_type() -> Self {
