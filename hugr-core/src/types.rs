@@ -857,7 +857,7 @@ pub(crate) mod test {
 
         use crate::proptest::RecursionDepth;
 
-        use crate::types::{CustomType, FuncValueType, SumType, Term, Type, TypeBound, TypeRow};
+        use crate::types::{CustomType, FuncValueType, SumType, Term, Type, TypeBound, TypeRowRV};
         use proptest::{prelude::*, strategy::Union};
 
         impl Arbitrary for SumType {
@@ -868,7 +868,7 @@ pub(crate) mod test {
                 if depth.leaf() {
                     any::<u8>().prop_map(Self::new_unary).boxed()
                 } else {
-                    vec(any_with::<TypeRow>(depth), 0..3)
+                    vec(any_with::<TypeRowRV>(depth), 0..3)
                         .prop_map(SumType::new)
                         .boxed()
                 }
@@ -930,11 +930,13 @@ pub(super) mod proptest_utils {
             | TypeArgSer::Tuple { elems: terms }
             | TypeArgSer::TupleConcat { tuples: terms } => terms.iter().all(term_is_serde_type_arg),
             TypeArgSer::Variable { v } => term_is_serde_type_param(&v.cached_decl),
-            TypeArgSer::Type { ty } => match Term::from(ty) {
-                Term::RuntimeExtension(cty) => cty.args().iter().all(term_is_serde_type_arg),
-                // Do we need to inspect inside function types? sum types?
-                _ => true,
-            },
+            TypeArgSer::Type { ty } => {
+                if let Some(cty) = ty.as_extension() {
+                    cty.args().iter().all(term_is_serde_type_arg)
+                } else {
+                    true
+                }
+            }
             TypeArgSer::BoundedNat { .. }
             | TypeArgSer::String { .. }
             | TypeArgSer::Bytes { .. }
