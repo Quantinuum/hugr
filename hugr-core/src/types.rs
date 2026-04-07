@@ -281,9 +281,9 @@ impl SumType {
     /// If the sum matches the convention of `Option[row]`, return the row
     /// (an instance of [Term::ListType]([Term::RuntimeType]).
     #[must_use]
-    pub fn as_option(&self) -> Option<&Term> {
+    pub fn as_option(&self) -> Option<&TypeRowRV> {
         match self {
-            SumType::Unit { size } if *size == 2 => Some(Term::EMPTY_LIST_REF),
+            SumType::Unit { size } if *size == 2 => Some(TypeRowRV::EMPTY_REF),
             SumType::General { rows } if rows.len() == 2 && rows[0].is_empty() => Some(&rows[1]),
             _ => None,
         }
@@ -693,13 +693,13 @@ pub(crate) mod test {
 
         assert_eq!(
             opt.as_option().unwrap().clone(),
-            Term::new_list([usize_t().into()])
+            TypeRowRV::from([usize_t()])
         );
         // Two empty variants is like an option of empty.
         // ALAN note there used to be as_unary_option...
         assert_eq!(
             Type::new_unit_sum(2).as_sum().unwrap().as_option(),
-            Some(&Term::new_list([]))
+            Some(TypeRowRV::EMPTY_REF)
         );
 
         assert_eq!(
