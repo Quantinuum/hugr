@@ -330,18 +330,6 @@ impl<const N: usize> From<[Type; N]> for Term {
     }
 }
 
-impl From<SumType> for Term {
-    fn from(value: SumType) -> Self {
-        Self::RuntimeSum(value)
-    }
-}
-
-impl From<CustomType> for Term {
-    fn from(value: CustomType) -> Self {
-        Self::RuntimeExtension(value)
-    }
-}
-
 /// Variable in a [`Term`], i.e. contents of a [`Term::Variable`].
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, serde::Deserialize, serde::Serialize, derive_more::Display,
@@ -670,10 +658,9 @@ impl Transformable for Term {
                 } else {
                     let args_changed = custom_type.args_mut().transform(tr)?;
                     if args_changed {
-                        *self = custom_type
+                        *custom_type = custom_type
                             .get_type_def(&custom_type.get_extension()?)?
-                            .instantiate(custom_type.args())?
-                            .into();
+                            .instantiate(custom_type.args())?;
                     }
                     Ok(args_changed)
                 }
