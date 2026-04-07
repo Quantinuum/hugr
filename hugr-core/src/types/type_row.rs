@@ -7,9 +7,7 @@ use std::{
     ops::{Deref, DerefMut},
 };
 
-use super::{
-    Substitutable, Substitution, Term, Transformable, Type, TypeTransformer, type_param::TypeParam,
-};
+use super::{Substitution, Term, Transformable, Type, TypeTransformer, type_param::TypeParam};
 use crate::{
     extension::SignatureError,
     types::{
@@ -80,7 +78,41 @@ impl TypeRow {
     }
 }
 
-impl Substitutable for TypeRow {
+/// Compared to just `pub(crate) trait`, this avoids a private_bounds
+/// warning when the trait is used as a type bound on a public struct.
+mod internal {
+    use super::{SignatureError, Substitution, Transformable, TypeParam};
+
+    /// Sub-trait of [`Transformable`] implemented by things that represent
+    /// rows of types (fixed-length [`TypeRow`] or variable-length [`TypeRowRV`]).
+    ///
+    /// [`TypeRow`]: super::TypeRow
+    /// [`TypeRowRV`]: super::TypeRowRV
+    pub trait TypeRowLike: Transformable {
+        /// Checks all variables used in `self` are in the provided list of bound
+        /// variables, and that for each [`CustomType`]  the corresponding [`TypeDef`]
+        ///  is in the [`ExtensionRegistry`] and the type arguments validate (recursively)
+        /// and fit into the declared parameters of the [`TypeDef`].
+        ///
+        /// [`TypeDef`]: crate::extension::TypeDef
+        fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError>;
+
+        /// Applies a [`Substitution`] to this instance, returning a new value.
+        ///
+        /// Infallible (assuming the `subst` covers all variables) and will
+        /// not invalidate the instance (assuming all values substituted in are
+        /// valid instances of the variables they replace).
+        ///
+        /// # Panics
+        ///
+        /// If the substitution does not cover all type variables in `self`.
+        fn substitute(&self, s: &Substitution) -> Self;
+    }
+}
+
+pub(crate) use internal::TypeRowLike;
+
+impl TypeRowLike for TypeRow {
     fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.iter().try_for_each(|t| t.validate(var_decls))
     }
@@ -273,7 +305,7 @@ impl TypeRowRV {
     }
 }
 
-impl Substitutable for TypeRowRV {
+impl TypeRowLike for TypeRowRV {
     /// Checks that this is indeed a list of runtime types;
     /// and that all variables are as declared in the supplied list of params.
     fn validate(&self, vars: &[TypeParam]) -> Result<(), SignatureError> {

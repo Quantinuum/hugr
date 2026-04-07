@@ -12,7 +12,7 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_signature_exts,
 };
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
-use crate::types::{Substitutable, TypeRowRV};
+use crate::types::{TypeRowLike, TypeRowRV};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
@@ -42,7 +42,7 @@ pub type Signature = FuncTypeBase<TypeRow>;
 /// [`OpDef`]: crate::extension::OpDef
 pub type FuncValueType = FuncTypeBase<TypeRowRV>;
 
-impl<T: Substitutable> FuncTypeBase<T> {
+impl<T: TypeRowLike> FuncTypeBase<T> {
     pub(crate) fn substitute(&self, subst: &Substitution) -> Self {
         Self {
             input: self.input.substitute(subst),
@@ -313,9 +313,9 @@ mod test {
         use proptest::prelude::{Arbitrary, BoxedStrategy, Strategy, any_with};
 
         use super::FuncTypeBase;
-        use crate::{proptest::RecursionDepth, types::Substitutable};
+        use crate::{proptest::RecursionDepth, types::TypeRowLike};
 
-        impl<T: Substitutable + Arbitrary<Parameters = RecursionDepth> + 'static> Arbitrary
+        impl<T: TypeRowLike + Arbitrary<Parameters = RecursionDepth> + 'static> Arbitrary
             for FuncTypeBase<T>
         {
             type Parameters = RecursionDepth;

@@ -2,7 +2,7 @@
 use crate::Visibility;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
-use crate::types::{FuncTypeBase, PolyFuncTypeBase, Substitutable};
+use crate::types::{FuncTypeBase, PolyFuncTypeBase, TypeRowLike};
 use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
     extension::{ExtensionId, OpDef, SignatureFunc},
@@ -819,7 +819,7 @@ impl<'a> Context<'a> {
     }
 
     /// Exports a polymorphic function type.
-    pub fn export_poly_func_type<T: Substitutable>(
+    pub fn export_poly_func_type<T: TypeRowLike>(
         &mut self,
         name: &'a str,
         visibility: Option<model::Visibility>,
@@ -854,7 +854,7 @@ impl<'a> Context<'a> {
         self.export_term(t, None)
     }
 
-    pub fn export_func_type<T: Substitutable>(
+    pub fn export_func_type<T: TypeRowLike>(
         &mut self,
         t: &FuncTypeBase<T>,
         mut export_io: impl FnMut(&mut Self, &T) -> table::TermId,

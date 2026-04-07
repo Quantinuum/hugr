@@ -20,6 +20,7 @@ pub use poly_func::{PolyFuncType, PolyFuncTypeBase, PolyFuncTypeRV};
 pub use signature::{FuncTypeBase, FuncValueType, Signature};
 use smol_str::SmolStr;
 pub use type_param::{Term, TypeArg};
+pub(crate) use type_row::TypeRowLike;
 pub use type_row::{TypeRow, TypeRowRV};
 
 use itertools::FoldWhile::{Continue, Done};
@@ -603,37 +604,6 @@ impl<E: Transformable> Transformable for [E] {
         Ok(any_change)
     }
 }
-
-/// Compared to just `pub(crate) trait Substitutable: Transformable`, this avoids a
-/// private_bounds warning when the trait is used as a type bound on a public struct.
-mod internal {
-    use super::{SignatureError, Substitution, Transformable, TypeParam};
-
-    /// Sub-trait of [`Transformable`] for types that support substitution of
-    /// type variables and validation of type-variable scopes.
-    pub trait Substitutable: Transformable {
-        /// Checks all variables used in `self` are in the provided list of bound
-        /// variables, and that for each [`CustomType`]  the corresponding [`TypeDef`]
-        ///  is in the [`ExtensionRegistry`] and the type arguments validate (recursively)
-        /// and fit into the declared parameters of the [`TypeDef`].
-        ///
-        /// [`TypeDef`]: crate::extension::TypeDef
-        fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError>;
-
-        /// Applies a [`Substitution`] to this instance, returning a new value.
-        ///
-        /// Infallible (assuming the `subst` covers all variables) and will
-        /// not invalidate the instance (assuming all values substituted in are
-        /// valid instances of the variables they replace).
-        ///
-        /// # Panics
-        ///
-        /// If the substitution does not cover all type variables in `self`.
-        fn substitute(&self, s: &Substitution) -> Self;
-    }
-}
-
-pub(crate) use internal::Substitutable;
 
 #[cfg(test)]
 pub(crate) mod test {

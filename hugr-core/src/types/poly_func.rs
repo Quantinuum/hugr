@@ -6,7 +6,7 @@ use itertools::Itertools;
 
 use crate::{
     extension::SignatureError,
-    types::{Substitutable, TypeRow, TypeRowRV},
+    types::{TypeRow, TypeRowLike, TypeRowRV},
 };
 
 use super::Substitution;
@@ -101,7 +101,7 @@ impl<T> PolyFuncTypeBase<T> {
     }
 }
 
-impl<T: Substitutable> PolyFuncTypeBase<T> {
+impl<T: TypeRowLike> PolyFuncTypeBase<T> {
     /// The type parameters, aka binders, over which this type is polymorphic
     pub fn params(&self) -> &[TypeParam] {
         &self.params
@@ -164,8 +164,8 @@ pub(crate) mod test {
     use crate::types::signature::FuncTypeBase;
     use crate::types::type_param::{TermTypeError, TypeArg, TypeParam};
     use crate::types::{
-        CustomType, FuncValueType, PolyFuncTypeBase, Signature, Substitutable, Term, Type,
-        TypeBound, TypeName, TypeRowRV,
+        CustomType, FuncValueType, PolyFuncTypeBase, Signature, Term, Type, TypeBound, TypeName,
+        TypeRowLike, TypeRowRV,
     };
 
     mod proptest {
@@ -175,9 +175,9 @@ pub(crate) mod test {
         use super::PolyFuncTypeBase;
         use crate::proptest::RecursionDepth;
         use crate::types::proptest_utils::any_serde_type_param;
-        use crate::types::{Substitutable, signature::FuncTypeBase};
+        use crate::types::{TypeRowLike, signature::FuncTypeBase};
 
-        impl<T: Substitutable + Arbitrary<Parameters = RecursionDepth> + 'static> Arbitrary
+        impl<T: TypeRowLike + Arbitrary<Parameters = RecursionDepth> + 'static> Arbitrary
             for PolyFuncTypeBase<T>
         {
             type Parameters = RecursionDepth;
@@ -195,7 +195,7 @@ pub(crate) mod test {
             }
         }
     }
-    impl<T: Substitutable> PolyFuncTypeBase<T> {
+    impl<T: TypeRowLike> PolyFuncTypeBase<T> {
         fn new_validated(
             params: impl Into<Vec<TypeParam>>,
             body: FuncTypeBase<T>,

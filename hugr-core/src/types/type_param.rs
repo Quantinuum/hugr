@@ -15,7 +15,7 @@ use std::sync::Arc;
 use thiserror::Error;
 use tracing::warn;
 
-use super::{Substitutable, Substitution, Transformable, Type, TypeBound, TypeTransformer};
+use super::{Substitution, Transformable, Type, TypeBound, TypeRowLike, TypeTransformer};
 use crate::extension::SignatureError;
 use crate::types::{CustomType, FuncValueType, SumType, TypeRow};
 
