@@ -941,7 +941,7 @@ impl<'a> Context<'a> {
         var: Option<(table::NodeId, table::VarIndex)>,
     ) -> table::TermId {
         match t {
-            Term::RuntimeType(b) => {
+            Term::RuntimeKind(b) => {
                 if let (Some((node, index)), TypeBound::Copyable) = (var, b) {
                     let term = self.make_term(table::Term::Var(table::VarId(node, index)));
                     let non_linear = self.make_term_apply(model::CORE_NON_LINEAR, &[term]);
@@ -950,15 +950,15 @@ impl<'a> Context<'a> {
 
                 self.make_term_apply(model::CORE_TYPE, &[])
             }
-            Term::BoundedNatType(_) => self.make_term_apply(model::CORE_NAT_TYPE, &[]),
-            Term::StringType => self.make_term_apply(model::CORE_STR_TYPE, &[]),
-            Term::BytesType => self.make_term_apply(model::CORE_BYTES_TYPE, &[]),
-            Term::FloatType => self.make_term_apply(model::CORE_FLOAT_TYPE, &[]),
-            Term::ListType(item_type) => {
+            Term::BoundedNatKind(_) => self.make_term_apply(model::CORE_NAT_TYPE, &[]),
+            Term::StringKind => self.make_term_apply(model::CORE_STR_TYPE, &[]),
+            Term::BytesKind => self.make_term_apply(model::CORE_BYTES_TYPE, &[]),
+            Term::FloatKind => self.make_term_apply(model::CORE_FLOAT_TYPE, &[]),
+            Term::ListKind(item_type) => {
                 let item_type = self.export_term(item_type, None);
                 self.make_term_apply(model::CORE_LIST_TYPE, &[item_type])
             }
-            Term::TupleType(item_types) => {
+            Term::TupleKind(item_types) => {
                 let item_types = self.export_term(item_types, None);
                 self.make_term_apply(model::CORE_TUPLE_TYPE, &[item_types])
             }
@@ -1009,8 +1009,8 @@ impl<'a> Context<'a> {
                 self.make_term(table::Term::Tuple(parts))
             }
             Term::Variable(v) => self.export_type_arg_var(v),
-            Term::StaticType => self.make_term_apply(model::CORE_STATIC, &[]),
-            Term::ConstType(ty) => {
+            Term::StaticKind => self.make_term_apply(model::CORE_STATIC, &[]),
+            Term::ConstKind(ty) => {
                 let ty = self.export_type(ty);
                 self.make_term_apply(model::CORE_CONST, &[ty])
             }

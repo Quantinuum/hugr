@@ -210,7 +210,7 @@ pub(crate) fn collect_term_exts(
                 collect_term_exts(row, used_extensions, missing_extensions);
             }
         }
-        Term::ConstType(ty) => collect_term_exts(ty, used_extensions, missing_extensions),
+        Term::ConstKind(ty) => collect_term_exts(ty, used_extensions, missing_extensions),
         Term::List(elems) => {
             for elem in elems.iter() {
                 collect_term_exts(elem, used_extensions, missing_extensions);
@@ -221,10 +221,10 @@ pub(crate) fn collect_term_exts(
                 collect_term_exts(elem, used_extensions, missing_extensions);
             }
         }
-        Term::ListType(item_type) => {
+        Term::ListKind(item_type) => {
             collect_term_exts(item_type, used_extensions, missing_extensions)
         }
-        Term::TupleType(item_types) => {
+        Term::TupleKind(item_types) => {
             collect_term_exts(item_types, used_extensions, missing_extensions)
         }
         Term::ListConcat(lists) => {
@@ -238,12 +238,12 @@ pub(crate) fn collect_term_exts(
             }
         }
         Term::Variable(_)
-        | Term::RuntimeType(_)
-        | Term::StaticType
-        | Term::BoundedNatType(_)
-        | Term::StringType
-        | Term::BytesType
-        | Term::FloatType
+        | Term::RuntimeKind(_)
+        | Term::StaticKind
+        | Term::BoundedNatKind(_)
+        | Term::StringKind
+        | Term::BytesKind
+        | Term::FloatKind
         | Term::BoundedNat(_)
         | Term::String(_)
         | Term::Bytes(_)
