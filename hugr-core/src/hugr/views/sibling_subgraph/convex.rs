@@ -1,22 +1,23 @@
 use petgraph::visit::{
-    IntoNeighborsDirected, IntoNodeIdentifiers, NodeCount, Topo, Visitable, Walker,
+    GraphBase, IntoNeighborsDirected, IntoNodeIdentifiers, NodeCount, Topo, Visitable, Walker,
 };
 use std::collections::BTreeSet;
 
-use portgraph::{NodeIndex, SecondaryMap, UnmanagedDenseMap};
+use portgraph::{SecondaryMap, UnmanagedDenseMap};
 
 /// Convexity checking using a pre-computed topological node order.
-pub(super) struct TopoConvexChecker<G> {
+pub(super) struct TopoConvexChecker<G: GraphBase> {
     graph: G,
     // The nodes in topological order
-    topsort_nodes: Vec<NodeIndex>,
+    topsort_nodes: Vec<G::NodeId>,
     // The index of a node in the topological order (the inverse of topsort_nodes)
-    topsort_ind: UnmanagedDenseMap<NodeIndex, usize>,
+    topsort_ind: UnmanagedDenseMap<G::NodeId, usize>,
 }
 
 impl<G: NodeCount> TopoConvexChecker<G>
 where
-    for<'a> &'a G: IntoNeighborsDirected + IntoNodeIdentifiers + Visitable<NodeId = NodeIndex>,
+    for<'a> &'a G: IntoNeighborsDirected + IntoNodeIdentifiers + Visitable<NodeId = G::NodeId>,
+    G::NodeId: Into<usize> + TryFrom<usize> + Copy,
 {
     /// Create a new ConvexChecker.
     pub fn new(graph: G) -> Self {
@@ -57,7 +58,7 @@ where
     /// that are in the interval between the first and last node of the subgraph
     /// in some topological order. In the worst case this will traverse every
     /// node in the graph and can be improved on in the future.
-    pub fn is_node_convex(&self, nodes: impl IntoIterator<Item = NodeIndex>) -> bool {
+    pub fn is_node_convex(&self, nodes: impl IntoIterator<Item = G::NodeId>) -> bool {
         // The nodes in the subgraph, in topological order.
         let nodes: BTreeSet<_> = nodes.into_iter().map(|n| self.topsort_ind[n]).collect();
         if nodes.len() <= 1 {
