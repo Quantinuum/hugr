@@ -1530,7 +1530,7 @@ pub struct SchedGraphChecker<'h, H: HugrView + 'h> {
     node_map: H::RegionPortgraphNodes,
     region_parent: H::Node,
     checker: convex::TopoConvexChecker<
-        &'h SynEdgeWrapper<portgraph::view::FlatRegion<'h, H::RegionPortgraph<'h>>>,
+        SynEdgeWrapper<portgraph::view::FlatRegion<'h, H::RegionPortgraph<'h>>>,
     >,
 }
 

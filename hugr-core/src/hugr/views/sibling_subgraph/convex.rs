@@ -14,8 +14,9 @@ pub(super) struct TopoConvexChecker<G> {
     topsort_ind: UnmanagedDenseMap<NodeIndex, usize>,
 }
 
-impl<G: NodeCount + Visitable<NodeId = NodeIndex> + IntoNeighborsDirected + IntoNodeIdentifiers>
-    TopoConvexChecker<G>
+impl<G: NodeCount> TopoConvexChecker<G>
+where
+    for<'a> &'a G: IntoNeighborsDirected + IntoNodeIdentifiers + Visitable<NodeId = NodeIndex>,
 {
     /// Create a new ConvexChecker.
     pub fn new(graph: G) -> Self {
