@@ -21,8 +21,8 @@ use inkwell::{
     },
     module::{FlagBehavior, Linkage, Module},
     types::{
-        ArrayType, BasicMetadataTypeEnum, BasicTypeEnum, FloatType, FunctionType,
-        IntType, StructType,
+        ArrayType, BasicMetadataTypeEnum, BasicTypeEnum, FloatType, FunctionType, IntType,
+        StructType,
     },
     values::FunctionValue,
 };
@@ -93,8 +93,8 @@ impl<'c> DebugInfoContext<'c> {
         let (builder, compile_unit) = iw_module.create_debug_info_builder(
             true, // allow_unresolved
             DWARFSourceLanguage::Python,
-            &root_meta.directory,
             &(root_meta.file_table[root_meta.filename]),
+            &root_meta.directory,
             &prod_str,
             false, // is_optimized
             "",    // flags
@@ -102,7 +102,7 @@ impl<'c> DebugInfoContext<'c> {
             "",    // split_name
             DWARFEmissionKind::Full,
             0,     // dwo_id
-            false, // split_debug_inlining
+            true,  // split_debug_inlining
             false, // debug_info_for_profiling
             "",    // sysroot
             "",    // sdk
@@ -284,6 +284,50 @@ impl<'c> DebugInfoContext<'c> {
         }
     }
 
+    /// Common logic for creating function debug info
+    fn add_di_func(
+        &mut self,
+        func: FunctionValue<'c>,
+        file: DIFile<'c>,
+        lno: u32,
+        scope_lno: u32,
+    ) -> Result<()> {
+        if func.get_subprogram().is_some() {
+            return Err(anyhow!("Function already has debug record!"));
+        }
+
+        let name_utf8 = func
+            .get_name()
+            .to_str()
+            .expect("function names should be valid UTF-8");
+        let di_fty = self.create_di_function_type(func.get_type(), file)?;
+        let is_local = func.get_linkage() != Linkage::External;
+
+        let di_func = self.builder.create_function(
+            self.compile_unit.as_debug_info_scope(),
+            name_utf8,
+            Some(name_utf8), // we expect the name to already be mangled at this point. TODO: None instead?
+            file,
+            lno,
+            di_fty,
+            is_local,
+            // currently, hugr-llvm erases FuncDecls during lowering,
+            // so we will never emit a debug record for a declaration.
+            true,
+            scope_lno,
+            0,
+            false,
+        );
+
+        func.set_subprogram(di_func);
+        println!(
+            "SET SUBPROG {:?}->{:?}",
+            func.get_name(),
+            func.get_subprogram().unwrap()
+        );
+        Ok(())
+    }
+
     /// If the FuncDefn/FuncDecl node has a HUGR debug record attached,
     /// construct a corresponding DISubprogram and attach it to `llvm_func`.
     /// It can be retrieved by calling `llvm_func.get_subprogram()`.
@@ -293,10 +337,6 @@ impl<'c> DebugInfoContext<'c> {
         node: FatNode<'_, OT, H>,
         func: FunctionValue<'c>,
     ) -> Result<()> {
-        if func.get_subprogram().is_some() {
-            return Err(anyhow!("Function already has debug record!"));
-        }
-
         let maybe_record = try_get_debug_meta::<_, SubprogramRecord>(node.hugr(), node.node())
             .map_err(|e| anyhow!("Could not get subprogram record: {e}"))?;
         if maybe_record.is_none() {
@@ -305,8 +345,6 @@ impl<'c> DebugInfoContext<'c> {
         let record = maybe_record.unwrap();
 
         let di_file = self.get_di_file(record.file)?;
-        let di_fty = self.create_di_function_type(func.get_type(), di_file)?;
-        let is_local = func.get_linkage() != Linkage::External;
         let lno_u32: u32 = record
             .line_no
             .try_into()
@@ -315,29 +353,13 @@ impl<'c> DebugInfoContext<'c> {
             .scope_line
             .try_into()
             .map_err(|e| anyhow!("Invalid scope_line: {} : {e}", record.scope_line))?;
-        let name_utf8 = func
-            .get_name()
-            .to_str()
-            .expect("function names should be valid UTF-8");
+        self.add_di_func(func, di_file, lno_u32, scope_lno_u32)
+    }
 
-        let di_func = self.builder.create_function(
-            self.compile_unit.as_debug_info_scope(),
-            name_utf8,
-            Some(name_utf8), // we expect the name to already be mangled at this point. TODO: None instead?
-            di_file,
-            lno_u32,
-            di_fty,
-            is_local,
-            // currently, hugr-llvm erases FuncDecls during lowering,
-            // so we will never emit a debug record for a declaration.
-            true,
-            scope_lno_u32,
-            0,
-            false,
-        );
-
-        func.set_subprogram(di_func);
-        Ok(())
+    /// Construct and attach a debug info record for a stub function,
+    /// similar to the above but HUGR debug info is not available
+    pub fn try_add_di_stub(&mut self, func: FunctionValue<'c>) -> Result<()> {
+        self.add_di_func(func, self.compile_unit.get_file(), 0, 0)
     }
 
     /// If a node has an attached DILocation record, return Ok(Some(record)).
@@ -397,8 +419,8 @@ impl<'c> DebugInfoContext<'c> {
         }
     }
 
-    /// Finalize the constructed debug info.
-    pub fn finish(&self) {
+    /// Finalize and drop the underlying DebugInfoBuilder
+    pub fn finish(self) {
         self.builder.finalize();
     }
 }

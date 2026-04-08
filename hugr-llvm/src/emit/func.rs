@@ -345,7 +345,6 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
                 .unwrap()
                 .unset_debug_loc(&self.builder)?;
             self.have_di_loc = false;
-            println!("Unset debug loc");
         }
         Ok(())
     }

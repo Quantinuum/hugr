@@ -260,12 +260,10 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         }
     }
 
-    /// Consumes the `EmitModuleContext` and returns the internal [Module].
-    pub fn finish(self) -> Module<'c> {
-        if self.di_context().is_some() {
-            self.di_context().unwrap().finish();
-        }
-        self.module
+    /// Consumes the `EmitModuleContext` and returns the internal [Module] and
+    /// [DebugInfoContext] (if present).
+    pub fn finish(mut self) -> (Module<'c>, Option<DebugInfoContext<'c>>) {
+        (self.module, self.di_context.take())
     }
 }
 
@@ -428,7 +426,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
     }
 
     /// Consumes the `EmitHugr` and returns the internal [Module].
-    pub fn finish(self) -> Module<'c> {
+    pub fn finish(self) -> (Module<'c>, Option<DebugInfoContext<'c>>) {
         self.module_context.finish()
     }
 }
