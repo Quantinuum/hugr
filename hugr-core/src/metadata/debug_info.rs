@@ -104,7 +104,8 @@ pub fn try_get_debug_meta<
 ) -> Result<Option<T>, DebugInfoError> {
     if let Some(json) = hugr.get_metadata_any(node, DEBUGINFO_META_KEY) {
         serde_json::from_value::<T>(json.clone())
-            .map_err(|e| DebugInfoError::DRTypeMismatchError(type_name::<T>(), e, json.clone())).map(|debug_record| Some(debug_record))
+            .map_err(|e| DebugInfoError::DRTypeMismatchError(type_name::<T>(), e, json.clone()))
+            .map(|debug_record| Some(debug_record))
     } else {
         Ok(None)
     }
