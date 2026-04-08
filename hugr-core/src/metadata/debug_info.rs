@@ -5,18 +5,20 @@ use std::fmt;
 
 use crate::metadata::Metadata;
 use crate::{HugrView, Node};
-use serde::{Deserialize, Serialize, de::{Deserializer, DeserializeOwned, Visitor, Error as DeError}};
+use serde::{
+    Deserialize, Serialize,
+    de::{DeserializeOwned, Deserializer, Error as DeError, Visitor},
+};
+use serde_json::{Error as JsonError, Value as JsonValue};
 use thiserror::Error;
-use serde_json::{Value as JsonValue, Error as JsonError};
 
 pub const DEBUGINFO_META_KEY: &str = "core.debug_info";
 
-        
 /// Visitor and wrapper function passed as "deserialize_with" attribute
 /// in order to deserialize a usize from a string using serde_json
 struct JsonStrToIntVisitor;
 
-impl <'de> Visitor<'de> for JsonStrToIntVisitor {
+impl<'de> Visitor<'de> for JsonStrToIntVisitor {
     type Value = usize;
 
     fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
@@ -92,14 +94,17 @@ impl Metadata for LocationRecord {
 /// If there is no debug metadata, return Ok(None). If it is present but does not
 /// deserialize into `T`, return DRTypeMismatchError. Otherwise, return the deserialized
 /// Some(`T`).
-pub fn try_get_debug_meta<'h, H: HugrView<Node = Node>, T: Metadata<Type<'h> = T> + DeserializeOwned>(
+pub fn try_get_debug_meta<
+    'h,
+    H: HugrView<Node = Node>,
+    T: Metadata<Type<'h> = T> + DeserializeOwned,
+>(
     hugr: &'h H,
     node: Node,
 ) -> Result<Option<T>, DebugInfoError> {
     if let Some(json) = hugr.get_metadata_any(node, DEBUGINFO_META_KEY) {
         serde_json::from_value::<T>(json.clone())
-           .map_err(|e| DebugInfoError::DRTypeMismatchError(type_name::<T>(), e, json.clone()))
-           .and_then(|debug_record| Ok(Some(debug_record))) 
+            .map_err(|e| DebugInfoError::DRTypeMismatchError(type_name::<T>(), e, json.clone())).map(|debug_record| Some(debug_record))
     } else {
         Ok(None)
     }

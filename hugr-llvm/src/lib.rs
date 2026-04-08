@@ -70,8 +70,6 @@ pub mod sum;
 pub mod types;
 pub mod utils;
 
-#[macro_use] extern crate debugit;
-
 #[allow(unreachable_code)]
 #[must_use]
 pub fn llvm_version() -> &'static str {
