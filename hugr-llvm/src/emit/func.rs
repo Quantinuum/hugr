@@ -29,7 +29,6 @@ use super::{EmissionSet, EmitModuleContext, EmitOpArgs};
 mod mailbox;
 pub use mailbox::{RowMailBox, RowPromise};
 
-
 /// A context for emitting an LLVM function.
 ///
 /// One of the primary interfaces for implementing codegen extensions.
@@ -322,17 +321,12 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
     pub(crate) fn try_set_debug_loc<'hugr, OT>(
         &mut self,
         node: &FatNode<'hugr, OT, H>,
-    ) -> Result<()> 
-    {
+    ) -> Result<()> {
         let iw_ctx = self.emit_context.iw_context();
         let builder = &self.builder;
         if let Some(di_func) = self.func.get_subprogram() {
             let di_ctx = self.emit_context.di_context_mut().unwrap();
-            let maybe_loc = di_ctx.try_get_di_location(
-                iw_ctx,
-                node,
-                di_func,
-            )?;
+            let maybe_loc = di_ctx.try_get_di_location(iw_ctx, node, di_func)?;
 
             if let Some(loc) = maybe_loc {
                 di_ctx.set_debug_loc(builder, loc)?;
@@ -346,7 +340,10 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
     /// Otherwise do nothing.
     pub(crate) fn try_unset_debug_loc(&mut self) -> Result<()> {
         if self.have_di_loc {
-            self.emit_context.di_context_mut().unwrap().unset_debug_loc(&self.builder)?;
+            self.emit_context
+                .di_context_mut()
+                .unwrap()
+                .unset_debug_loc(&self.builder)?;
             self.have_di_loc = false;
             println!("Unset debug loc");
         }

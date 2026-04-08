@@ -20,11 +20,19 @@ use inkwell::{
         DWARFEmissionKind, DWARFSourceLanguage, DebugInfoBuilder,
     },
     module::{FlagBehavior, Linkage, Module},
-    types::{ArrayType, BasicMetadataTypeEnum, FloatType, FunctionType, IntType},
+    types::{
+        ArrayType, BasicMetadataTypeEnum, BasicTypeEnum, FloatType, FunctionType,
+        IntType, StructType,
+    },
     values::FunctionValue,
 };
 
 use crate::utils::fat::FatNode;
+
+// alignment for all types
+const DEBUG_TYPE_ALIGNMENT: u32 = 8;
+// TODO: get this from TargetMachine
+const POINTER_BYTES: u64 = 8;
 
 #[expect(dead_code, reason = "Currently unused types")]
 enum DWARFTypeCode {
@@ -51,8 +59,10 @@ pub struct DebugInfoContext<'c> {
     fn_type_map: BTreeMap<CString, DISubroutineType<'c>>,
     // NOTE: have_di_loc may not match the Builder's view of things,
     // see: https://github.com/TheDan64/inkwell/issues/674
-    /// Tracks whether the context currently has a location set
-    have_di_loc: bool
+    /// Tracks whether the builder currently has a location set
+    have_di_loc: bool,
+    /// Size of a pointer on this architecture
+    ptr_size: u64,
 }
 
 impl<'c> DebugInfoContext<'c> {
@@ -113,8 +123,25 @@ impl<'c> DebugInfoContext<'c> {
             file_table,
             type_map: BTreeMap::new(),
             fn_type_map: BTreeMap::new(),
-            have_di_loc: false
+            have_di_loc: false,
+            ptr_size: POINTER_BYTES, //(iw_module.get_context().ptr_sized_int().get_bit_width() / 8).into()
         }))
+    }
+
+    /// Get the size of a BasicTypeEnum
+    fn get_basic_type_size(&self, ty: BasicTypeEnum<'c>) -> u64 {
+        match ty {
+            BasicTypeEnum::ArrayType(array_ty) => {
+                array_ty.len() as u64 * self.get_basic_type_size(array_ty.get_element_type())
+            }
+            BasicTypeEnum::FloatType(float_ty) => (float_ty.get_bit_width() / 8).into(),
+            BasicTypeEnum::IntType(int_ty) => (int_ty.get_bit_width() / 8).into(),
+            BasicTypeEnum::PointerType(_) => self.ptr_size,
+            BasicTypeEnum::StructType(struct_ty) => struct_ty
+                .get_field_types_iter()
+                .fold(0, |len, elem_ty| len + self.get_basic_type_size(elem_ty)),
+            _ => panic!("Unexpected type in `get_basic_type_size`: {ty}"),
+        }
     }
 
     fn get_di_file(&self, idx: usize) -> Result<DIFile<'c>> {
@@ -165,6 +192,36 @@ impl<'c> DebugInfoContext<'c> {
             .as_type())
     }
 
+    fn create_di_struct_type(&mut self, struct_ty: StructType<'c>) -> Result<DIType<'c>> {
+        let mut struct_len: u64 = 0;
+        let mut elem_tys = Vec::default();
+        for llvm_ty in struct_ty.get_field_types_iter() {
+            elem_tys.push(self.get_basic_di_type(llvm_ty.into())?);
+            struct_len += self.get_basic_type_size(llvm_ty);
+        }
+
+        Ok(self
+            .builder
+            .create_struct_type(
+                self.compile_unit.as_debug_info_scope(), // all structs have global scope
+                struct_ty
+                    .print_to_string()
+                    .to_str()
+                    .expect("type name is utf-8"),
+                self.compile_unit.get_file(), // TODO: this is probably supposed to be the decl
+                0,                            // line_no
+                struct_len,
+                DEBUG_TYPE_ALIGNMENT,
+                0,    // flags
+                None, // derived_from
+                &elem_tys,
+                0,    // runtime_language // TODO: find this enum
+                None, // vtable_holder
+                "",   // unique_id
+            )
+            .as_type())
+    }
+
     /// Get a DWARF type record for context-free LLVM types,
     /// creating it if it does not yet exist.
     fn get_basic_di_type(&mut self, llvm_ty: BasicMetadataTypeEnum<'c>) -> Result<DIType<'c>> {
@@ -177,6 +234,7 @@ impl<'c> DebugInfoContext<'c> {
             BasicMetadataTypeEnum::ArrayType(arr_ty) => self.create_di_arr_type(arr_ty),
             BasicMetadataTypeEnum::FloatType(flt_ty) => self.create_di_float_type(flt_ty),
             BasicMetadataTypeEnum::IntType(int_ty) => self.create_di_int_type(int_ty),
+            BasicMetadataTypeEnum::StructType(struct_ty) => self.create_di_struct_type(struct_ty),
             _ => Err(anyhow!(
                 "Type not supported by get_basic_di_type: {llvm_ty:#}"
             )),
