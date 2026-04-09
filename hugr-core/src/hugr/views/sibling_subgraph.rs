@@ -1123,11 +1123,8 @@ pub struct PortgraphCheckerWithNodes<'g, Base: HugrView, Checker> {
     node_map: Base::RegionPortgraphNodes,
 }
 
-#[deprecated(
-    note = "Use SchedGraphChecker or LineConvexChecker instead",
-    since = "0.27.1"
-)]
-/// Use [SchedGraphChecker] or [LineConvexChecker] instead
+#[deprecated(note = "Use PortgraphCheckerWithNodes instead", since = "0.27.1")]
+/// Use [PortgraphCheckerWithNodes]
 pub type ConvexChecker<'g, Base, Checker> = PortgraphCheckerWithNodes<'g, Base, Checker>;
 
 impl<'g, Base, Checker> PortgraphCheckerWithNodes<'g, Base, Checker>
