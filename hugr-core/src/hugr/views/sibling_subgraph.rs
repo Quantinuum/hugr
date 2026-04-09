@@ -599,23 +599,19 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             }
             // Note we used to check exp_nodes == nodes *before* the convexity check
             None => {
-                #[expect(deprecated)]
-                // TODO somehow we will need to keep region_portgraph as private
-                let (region, node_map) = hugr.region_portgraph(subgraph_parent);
-                // Alternatively, we can do this (ignoring the synthetic edges, as we don't want them to compute the nodes)
-                if false {
+                let (region, node_map) = if true {
+                    #[expect(deprecated)]
+                    // TODO somehow we will need to keep region_portgraph as private
+                    hugr.region_portgraph(subgraph_parent)
+                } else {
+                    // Alternatively, we can do this (ignoring the synthetic edges, as we don't want them to compute the nodes)
                     let SchedulingGraph {
-                        graph:
-                            SynEdgeWrapper {
-                                region_view: region,
-                                ..
-                            },
+                        graph: SynEdgeWrapper { region_view, .. },
                         node_map,
                         ..
                     } = hugr.scheduling_graph(subgraph_parent);
-                    let _ = region;
-                    let _ = node_map;
-                }
+                    (region_view, node_map)
+                };
                 make_pg_subgraph::<H>(region, &self.inputs, &self.outputs, &node_map)
                     .nodes_iter()
                     .map(|n| node_map.from_portgraph(n))
@@ -1141,18 +1137,28 @@ where
 {
     /// Create a new convexity checker.
     pub fn new(base: &'g Base, region_parent: Base::Node) -> Self {
-        #[expect(deprecated)] // TODO somehow we will need to keep region_portgraph as private
-        let (region, node_map) = base.region_portgraph(region_parent);
+        let (region, node_map) = if true {
+            #[expect(deprecated)] // TODO somehow we will need to keep region_portgraph as private
+            base.region_portgraph(region_parent)
+        } else {
+            // Alternatively, if region_portgraph is removed, we can have a back door
+            // something like this, if we still want to support LineConvexChecker.
+            let SchedulingGraph {
+                graph:
+                    SynEdgeWrapper {
+                        syn_edges,
+                        region_view,
+                    },
+                node_map,
+                ..
+            } = base.scheduling_graph(region_parent);
+            assert!(
+                syn_edges.is_empty(),
+                "Portgraph algorithms do not support synthetic edges."
+            );
+            (region_view, node_map)
+        };
         let checker = Checker::new_convex_checker(region);
-        // Alternatively, if region_portgraph is removed, we can have a back door
-        // something like this, if we still want to support LineConvexChecker.
-        /*let SchedulingGraph {
-            graph: SynEdgeWrapper {syn_edges, region_view},
-            node_map,
-            ..
-        } = base.scheduling_graph(region_parent);
-        assert!(syn_edges.is_empty(), "Portgraph algorithms do not support synthetic edges.");
-        let checker = Checker::new_convex_checker(region_view);*/
         Self {
             base,
             region_parent,
