@@ -581,8 +581,8 @@ impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
         self.region_parent
     }
 
-    /// Allows translating between the [V::Node]s of the original Hugr and the
-    /// [portgraph::NodeIndex]es of [Self::graph()]
+    /// Allows translating between the `V::Node`s of the original Hugr and the
+    /// [portgraph::NodeIndex]es of [Self::petgraph()]
     pub fn node_map(&self) -> &V::RegionPortgraphNodes {
         &self.node_map
     }
