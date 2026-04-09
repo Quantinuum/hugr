@@ -128,7 +128,7 @@ fn construct_simple_replacement() -> Result<(), InvalidSubgraph> {
     let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
         RootChecked::try_new(&func).expect("Root should be FuncDefn."),
     )?;
-    assert!(sub.validate(&func, Default::default()).is_ok());
+    assert!(sub.validate_default(&func).is_ok());
 
     let empty_dfg = {
         let builder = DFGBuilder::new(Signature::new_endo([qb_t(), qb_t(), qb_t()])).unwrap();
@@ -177,7 +177,7 @@ fn test_signature() -> Result<(), InvalidSubgraph> {
     let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
         RootChecked::try_new(&func).expect("Root should be FuncDefn."),
     )?;
-    assert!(sub.validate(&func, Default::default()).is_ok());
+    assert!(sub.validate_default(&func).is_ok());
     assert_eq!(
         sub.signature(&func),
         Signature::new_endo([qb_t(), qb_t(), qb_t()])
@@ -233,15 +233,14 @@ fn with_checker() {
         .inserted_entrypoint;
     hugr.validate().unwrap();
 
-    let checker1 = TopoConvexChecker::new(&hugr, func_root);
-    let checker2 = TopoConvexChecker::new(&hugr, func2);
+    let checker1 = SchedGraphChecker::new(hugr.scheduling_graph(func_root));
+    let checker2 = SchedGraphChecker::new(hugr.scheduling_graph(func2));
     let sub1 = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
         RootChecked::try_new(&hugr).expect("Root should be FuncDefn."),
     )
     .unwrap();
-    sub1.validate(&hugr, ValidationMode::WithChecker(&checker1))
-        .unwrap();
-    let e = sub1.validate(&hugr, ValidationMode::WithChecker(&checker2));
+    sub1.validate_with_checker(&hugr, Some(&checker1)).unwrap();
+    let e = sub1.validate_with_checker(&hugr, Some(&checker2));
     assert_eq!(
         e,
         Err(InvalidSubgraph::MismatchedCheckerParent {
@@ -649,7 +648,7 @@ fn test_try_from_nodes_with_intervals() {
 fn test_validate() {
     let (hugr, func_root) = build_3not_hugr().unwrap();
     let func = hugr.with_entrypoint(func_root);
-    let checker = TopoConvexChecker::new(&func, func_root);
+    let checker = SchedGraphChecker::new(func.scheduling_graph(func_root));
     let [inp, _out] = hugr.get_io(func_root).unwrap();
     let not1 = hugr.output_neighbours(inp).exactly_one().ok().unwrap();
     let not2 = hugr.output_neighbours(not1).exactly_one().ok().unwrap();
@@ -662,12 +661,9 @@ fn test_validate() {
         vec![],
         vec![not1, not2],
     );
-    assert_eq!(sub.validate(&func, ValidationMode::SkipConvexity), Ok(()));
-    assert_eq!(sub.validate(&func, ValidationMode::CheckConvexity), Ok(()));
-    assert_eq!(
-        sub.validate(&func, ValidationMode::WithChecker(&checker)),
-        Ok(())
-    );
+    assert_eq!(sub.validate_skip_convexity(&func), Ok(()));
+    assert_eq!(sub.validate_skip_convexity(&func), Ok(()));
+    assert_eq!(sub.validate_with_checker(&func, Some(&checker)), Ok(()));
 
     // A valid boundary, but not convex
     let sub = SiblingSubgraph::new_unchecked(
@@ -676,13 +672,10 @@ fn test_validate() {
         vec![],
         vec![not1, not3],
     );
-    assert_eq!(sub.validate(&func, ValidationMode::SkipConvexity), Ok(()));
+    assert_eq!(sub.validate_skip_convexity(&func), Ok(()));
+    assert_eq!(sub.validate_default(&func), Err(InvalidSubgraph::NotConvex));
     assert_eq!(
-        sub.validate(&func, ValidationMode::CheckConvexity),
-        Err(InvalidSubgraph::NotConvex)
-    );
-    assert_eq!(
-        sub.validate(&func, ValidationMode::WithChecker(&checker)),
+        sub.validate_with_checker(&func, Some(&checker)),
         Err(InvalidSubgraph::NotConvex)
     );
 
@@ -694,7 +687,7 @@ fn test_validate() {
         vec![not1, not3],
     );
     assert_eq!(
-        sub.validate(&func, ValidationMode::SkipConvexity),
+        sub.validate_skip_convexity(&func),
         Err(InvalidSubgraph::InvalidNodeSet)
     );
 }
