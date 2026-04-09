@@ -3,7 +3,6 @@
 //! Views into convex subgraphs of HUGRs within a single level of the
 //! hierarchy, i.e. within a sibling graph. Convex subgraph are always
 //! induced subgraphs, i.e. they are defined by a subset of the sibling nodes.
-#![expect(deprecated)] // ALAN TODO use scheduling_graph instead of region_portgraph
 use std::collections::{BTreeSet, HashSet};
 use std::mem;
 
@@ -53,7 +52,7 @@ pub trait HugrConvexChecker<N: HugrNode> {
     ) -> Result<Vec<N>, InvalidSubgraph<N>>;
 }
 
-impl<'a, H, CC> HugrConvexChecker<H::Node> for ConvexChecker<'a, H, CC>
+impl<'a, H, CC> HugrConvexChecker<H::Node> for PortgraphCheckerWithNodes<'a, H, CC>
 where
     H: HugrView,
     CC: CreateConvexChecker<CheckerRegion<'a, H>, NodeIndexBase = u32, PortIndexBase = u32>,
@@ -258,7 +257,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         let parent = hugr
             .get_parent(node)
             .ok_or(InvalidSubgraph::OrphanNode { orphan: node })?;
-        let checker = TopoConvexChecker::new(hugr, parent);
+        let checker = SchedGraphChecker::new(hugr.scheduling_graph(parent));
         Self::try_new_with_checker(inputs, outputs, hugr, &checker)
     }
 
@@ -358,7 +357,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             .get_parent(*node)
             .ok_or(InvalidSubgraph::OrphanNode { orphan: *node })?;
 
-        let checker = TopoConvexChecker::new(hugr, parent);
+        let checker = SchedGraphChecker::new(hugr.scheduling_graph(parent));
         Self::try_from_nodes_with_checker(nodes, hugr, &checker)
     }
 
@@ -520,48 +519,103 @@ impl<N: HugrNode> SiblingSubgraph<N> {
 
     /// Check the validity of the subgraph, as described in the docs of
     /// [`SiblingSubgraph::try_new`].
-    ///
-    /// The `mode` parameter controls the convexity check:
-    ///  - [`ValidationMode::CheckConvexity`] will create a new convexity
-    ///    checker for the subgraph and use it to check convexity of the
-    ///    subgraph.
-    ///  - [`ValidationMode::WithChecker`] will use the given convexity checker
-    ///    to check convexity of the subgraph.
-    ///  - [`ValidationMode::SkipConvexity`] will skip the convexity check.
+    #[deprecated(
+        note = "Use `validate_with_checker`, `validate_default` or `validate_skip_convexity`",
+        since = "0.27.1"
+    )]
+    #[expect(deprecated)] // Remove with ValidationMode
     pub fn validate<'h, H: HugrView<Node = N>>(
         &self,
         hugr: &'h H,
         mode: ValidationMode<'_, 'h, H>,
     ) -> Result<(), InvalidSubgraph<N>> {
+        match mode {
+            ValidationMode::WithChecker(checker) => self.validate_with_checker(hugr, Some(checker)),
+            ValidationMode::CheckConvexity => self.validate_default(hugr),
+            ValidationMode::SkipConvexity => self.validate_skip_convexity(hugr),
+        }
+    }
+
+    /// Check the validity of the subgraph, as described in the docs of
+    /// [`SiblingSubgraph::try_new`], using a new [`SchedGraphChecker`] for the convexity check.
+    pub fn validate_default(
+        &self,
+        hugr: &impl HugrView<Node = N>,
+    ) -> Result<(), InvalidSubgraph<N>> {
+        let parent = check_parent(hugr, &self.inputs, &self.outputs)?;
+        self.validate_with_checker(
+            hugr,
+            Some(&SchedGraphChecker::new(hugr.scheduling_graph(parent))),
+        )
+    }
+
+    /// Check the validity of the subgraph, as described in the docs of
+    /// [`SiblingSubgraph::try_new`], but do not check convexity.    
+    pub fn validate_skip_convexity(
+        &self,
+        hugr: &impl HugrView<Node = N>,
+    ) -> Result<(), InvalidSubgraph<N>> {
+        enum NoChecker {}
+        impl<N: HugrNode> HugrConvexChecker<N> for NoChecker {
+            fn region_parent(&self) -> N {
+                match *self {}
+            }
+
+            fn nodes_if_convex(
+                &self,
+                _hugr: &impl HugrView<Node = N>,
+                _inputs: &IncomingPorts<N>,
+                _outputs: &OutgoingPorts<N>,
+                _function_calls: &IncomingPorts<N>,
+            ) -> Result<Vec<N>, InvalidSubgraph<N>> {
+                match *self {}
+            }
+        }
+        let no_checker: Option<&NoChecker> = None;
+        self.validate_with_checker(hugr, no_checker)
+    }
+
+    /// Check the validity of the subgraph, as described in the docs of
+    /// [`SiblingSubgraph::try_new`], with a given convexity checker
+    /// (or `None` to skip convexity checks).
+    ///
+    /// See also convenience methods [Self::validate_default] and [Self::validate_skip_convexity].
+    pub fn validate_with_checker<H: HugrView<Node = N>>(
+        &self,
+        hugr: &H,
+        checker: Option<&impl HugrConvexChecker<N>>,
+    ) -> Result<(), InvalidSubgraph<N>> {
         let subgraph_parent = check_parent(hugr, &self.inputs, &self.outputs)?;
-        let checker;
-        let checker_ref = match mode {
-            ValidationMode::WithChecker(c) => {
+
+        let mut exp_nodes = match checker {
+            Some(c) => {
                 if c.region_parent() != subgraph_parent {
                     return Err(InvalidSubgraph::MismatchedCheckerParent {
                         checker_parent: c.region_parent(),
                         subgraph_parent,
                     });
                 }
-                Some(c)
+                c.nodes_if_convex(hugr, &self.inputs, &self.outputs, &self.function_calls)?
             }
-            ValidationMode::CheckConvexity => {
-                checker = TopoConvexChecker::new(hugr, subgraph_parent);
-                Some(&checker)
-            }
-            ValidationMode::SkipConvexity => None,
-        };
-
-        let mut exp_nodes = match checker_ref {
-            Some(checker_ref) => checker_ref.nodes_if_convex(
-                hugr,
-                &self.inputs,
-                &self.outputs,
-                &self.function_calls,
-            )?,
             // Note we used to check exp_nodes == nodes *before* the convexity check
             None => {
+                #[expect(deprecated)]
+                // TODO somehow we will need to keep region_portgraph as private
                 let (region, node_map) = hugr.region_portgraph(subgraph_parent);
+                // Alternatively, we can do this (ignoring the synthetic edges, as we don't want them to compute the nodes)
+                if false {
+                    let SchedulingGraph {
+                        graph:
+                            SynEdgeWrapper {
+                                region_view: region,
+                                ..
+                            },
+                        node_map,
+                        ..
+                    } = hugr.scheduling_graph(subgraph_parent);
+                    let _ = region;
+                    let _ = node_map;
+                }
                 make_pg_subgraph::<H>(region, &self.inputs, &self.outputs, &node_map)
                     .nodes_iter()
                     .map(|n| node_map.from_portgraph(n))
@@ -789,17 +843,28 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 }
 
-/// Specify the checks to perform for [`SiblingSubgraph::validate`].
-#[derive(Default)]
-pub enum ValidationMode<'t, 'h, H: HugrView> {
-    /// Check convexity with the given checker.
-    WithChecker(&'t TopoConvexChecker<'h, H>),
-    /// Construct a checker and check convexity.
-    #[default]
-    CheckConvexity,
-    /// Skip convexity check.
-    SkipConvexity,
+mod hidden {
+    #![expect(deprecated)] // Remove enum along with TopoConvexChecker
+    use super::*;
+    /// Specify the checks to perform for [`SiblingSubgraph::validate`].
+    #[deprecated(
+        note = "Call validate_with_checker or validate_default instead",
+        since = "0.27.1"
+    )]
+    #[derive(Default)]
+    pub enum ValidationMode<'t, 'h, H: HugrView> {
+        /// Check convexity with the given checker.
+        WithChecker(&'t TopoConvexChecker<'h, H>),
+        /// Construct a checker and check convexity.
+        #[default]
+        CheckConvexity,
+        /// Skip convexity check.
+        SkipConvexity,
+    }
 }
+
+#[expect(deprecated)] // Remove along with TopoConvexChecker
+pub use hidden::ValidationMode;
 
 fn make_pg_subgraph<'h, H: HugrView>(
     region: CheckerRegion<'h, H>,
@@ -1009,6 +1074,7 @@ fn make_boundary<'a, H: HugrView>(
     )
 }
 
+// I'd deprecate this if it were `pub` but it isn't, so, fine
 type CheckerRegion<'g, Base> =
     portgraph::view::FlatRegion<'g, <Base as HugrInternals>::RegionPortgraph<'g>>;
 
@@ -1018,8 +1084,15 @@ type CheckerRegion<'g, Base> =
 /// convexity checking.
 ///
 /// This a good default choice for most convexity checking use cases.
-pub type TopoConvexChecker<'g, Base> =
-    ConvexChecker<'g, Base, portgraph::algorithms::TopoConvexChecker<CheckerRegion<'g, Base>>>;
+#[deprecated(
+    note = "Use SchedGraphChecker or LineConvexChecker instead",
+    since = "0.27.1"
+)]
+pub type TopoConvexChecker<'g, Base> = PortgraphCheckerWithNodes<
+    'g,
+    Base,
+    portgraph::algorithms::TopoConvexChecker<CheckerRegion<'g, Base>>,
+>;
 
 /// Precompute convexity information for a HUGR.
 ///
@@ -1028,19 +1101,22 @@ pub type TopoConvexChecker<'g, Base> =
 ///
 /// This is a good choice for checking convexity of circuit-like graphs,
 /// particularly when many checks must be performed.
-pub type LineConvexChecker<'g, Base> =
-    ConvexChecker<'g, Base, portgraph::algorithms::LineConvexChecker<CheckerRegion<'g, Base>>>;
+pub type LineConvexChecker<'g, Base> = PortgraphCheckerWithNodes<
+    'g,
+    Base,
+    portgraph::algorithms::LineConvexChecker<CheckerRegion<'g, Base>>,
+>;
 
-/// Precompute convexity information for a HUGR.
+/// Precompute convexity information for a Portgraph view of a Hugr.
 ///
 /// This can be used when constructing multiple sibling subgraphs to speed up
 /// convexity checking.
 ///
 /// This type is generic over the convexity checker used. If checking convexity
-/// for circuit-like graphs, use [`LineConvexChecker`], otherwise use
+/// for circuit-like graphs, use [`LineConvexChecker`]. Alternatively, use [SchedGraphChecker].
 /// [`TopoConvexChecker`].
 #[derive(Clone)]
-pub struct ConvexChecker<'g, Base: HugrView, Checker> {
+pub struct PortgraphCheckerWithNodes<'g, Base: HugrView, Checker> {
     /// The base HUGR to check convexity on.
     base: &'g Base,
     /// The parent of the region where we are checking convexity.
@@ -1051,15 +1127,32 @@ pub struct ConvexChecker<'g, Base: HugrView, Checker> {
     node_map: Base::RegionPortgraphNodes,
 }
 
-impl<'g, Base, Checker> ConvexChecker<'g, Base, Checker>
+#[deprecated(
+    note = "Use SchedGraphChecker or LineConvexChecker instead",
+    since = "0.27.1"
+)]
+/// Use [SchedGraphChecker] or [LineConvexChecker] instead
+pub type ConvexChecker<'g, Base, Checker> = PortgraphCheckerWithNodes<'g, Base, Checker>;
+
+impl<'g, Base, Checker> PortgraphCheckerWithNodes<'g, Base, Checker>
 where
     Base: HugrView,
     Checker: CreateConvexChecker<CheckerRegion<'g, Base>>,
 {
     /// Create a new convexity checker.
     pub fn new(base: &'g Base, region_parent: Base::Node) -> Self {
+        #[expect(deprecated)] // TODO somehow we will need to keep region_portgraph as private
         let (region, node_map) = base.region_portgraph(region_parent);
         let checker = Checker::new_convex_checker(region);
+        // Alternatively, if region_portgraph is removed, we can have a back door
+        // something like this, if we still want to support LineConvexChecker.
+        /*let SchedulingGraph {
+            graph: SynEdgeWrapper {syn_edges, region_view},
+            node_map,
+            ..
+        } = base.scheduling_graph(region_parent);
+        assert!(syn_edges.is_empty(), "Portgraph algorithms do not support synthetic edges.");
+        let checker = Checker::new_convex_checker(region_view);*/
         Self {
             base,
             region_parent,
@@ -1081,7 +1174,8 @@ where
     }
 }
 
-impl<'g, Base, Checker> portgraph::algorithms::ConvexChecker for ConvexChecker<'g, Base, Checker>
+impl<'g, Base, Checker> portgraph::algorithms::ConvexChecker
+    for PortgraphCheckerWithNodes<'g, Base, Checker>
 where
     Base: HugrView,
     Checker: CreateConvexChecker<CheckerRegion<'g, Base>, NodeIndexBase = u32, PortIndexBase = u32>,
@@ -1526,6 +1620,7 @@ fn has_unique_linear_ports<H: HugrView>(host: &H, ports: &OutgoingPorts<H::Node>
     linear_ports.len() == unique_ports.len()
 }
 
+/// A [HugrConvexChecker] that works on a [SchedulingGraph]
 pub struct SchedGraphChecker<'h, H: HugrView + 'h> {
     node_map: H::RegionPortgraphNodes,
     region_parent: H::Node,
@@ -1535,6 +1630,8 @@ pub struct SchedGraphChecker<'h, H: HugrView + 'h> {
 }
 
 impl<'h, H: HugrView> SchedGraphChecker<'h, H> {
+    /// Creates a new instance from a [SchedulingGraph]. This performs some precomputation,
+    /// so it is more efficient to reuse the same instance for multiple checks on the same graph.
     pub fn new(graph: SchedulingGraph<'h, H>) -> Self {
         let SchedulingGraph {
             graph,
@@ -1561,6 +1658,11 @@ impl<H: HugrView> HugrConvexChecker<H::Node> for SchedGraphChecker<'_, H> {
         outputs: &OutgoingPorts<H::Node>,
         function_calls: &IncomingPorts<H::Node>,
     ) -> Result<Vec<H::Node>, InvalidSubgraph<H::Node>> {
+        // Compute the nodes inside the boundary ignoring synthetic edges -
+        // there is no way to specify a synthetic edge as part of the boundary,
+        // and if there are any nonlocal edges not part of the boundary (the condition
+        // that would lead to needing those synthetic edges) then the subgraph is invalid
+        // (nodes would not share the same parent)!
         let node_indices = make_pg_subgraph::<H>(
             self.checker.graph().region_view.clone(),
             inputs,
@@ -1574,20 +1676,16 @@ impl<H: HugrView> HugrConvexChecker<H::Node> for SchedGraphChecker<'_, H> {
             .iter()
             .map(|&pg_node| self.node_map.from_portgraph(pg_node))
             .collect_vec();
-        validate_boundary(hugr, &nodes, inputs, &outputs, function_calls)?;
+        validate_boundary(hugr, &nodes, inputs, outputs, function_calls)?;
 
         if nodes.len() <= 1 {
             return Ok(nodes);
         }
         let post_outputs: BTreeSet<_> = outputs
-            .into_iter()
+            .iter()
             .flat_map(|(n, p)| hugr.linked_inputs(*n, *p))
             .collect();
-        if inputs
-            .into_iter()
-            .flatten()
-            .any(|p| post_outputs.contains(&p))
-        {
+        if inputs.iter().flatten().any(|p| post_outputs.contains(p)) {
             return Err(InvalidSubgraph::NotConvex);
         }
 
