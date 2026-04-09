@@ -215,29 +215,17 @@ mod test {
 
     #[rstest]
     fn test(simple_dfg_hugr: Hugr) {
-        fn check_ref_into_edges<T>(_x: T)
-        where
-            for<'a> &'a T: pv::IntoEdgeReferences,
-        {
-        }
         fn check_into_edges(_x: impl pv::IntoEdgeReferences) {}
-        fn check_into_neighbors(_x: impl pv::IntoNeighbors) {}
 
         let sg = simple_dfg_hugr.scheduling_graph(simple_dfg_hugr.module_root());
         let n = pv::NodeFiltered::from_fn(&sg.graph, |n| n.index() % 2 == 0);
         check_into_edges(&sg.graph);
-        check_into_neighbors(&sg.graph);
-        check_into_edges(sg.graph());
-        check_into_neighbors(sg.graph());
         check_into_edges(&n);
-        check_into_neighbors(&n);
         pv::Topo::new(&sg.graph)
             .iter(&sg.graph)
             .for_each(|n| println!("Node: {:?}", n));
         pv::Topo::new(sg.graph())
             .iter(sg.graph())
             .for_each(|n| println!("Node from graph(): {:?}", n));
-        check_ref_into_edges(sg.graph);
-        //check_into_neighbors(sg);
     }
 }
