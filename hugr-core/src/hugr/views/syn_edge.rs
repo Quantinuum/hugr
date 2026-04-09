@@ -1,4 +1,4 @@
-//! Implementations of petgraph's traits for Hugr Region views.
+//! Contains a wrapper allowing to add extra edges to a Hugr Region view.
 use petgraph::visit as pv;
 use portgraph::{LinkView, NodeIndex as NIdx, PortOffset};
 
@@ -201,31 +201,5 @@ impl<T: LinkView + pv::Visitable<Map: pv::VisitMap<NIdx<T::NodeIndexBase>>>> pv:
 
     fn reset_map(&self, map: &mut Self::Map) {
         self.region_view.reset_map(map);
-    }
-}
-
-#[cfg(test)]
-mod test {
-    use petgraph::visit as pv;
-    use petgraph::visit::Walker as _;
-    use rstest::rstest;
-
-    use crate::builder::test::simple_dfg_hugr;
-    use crate::{Hugr, HugrView};
-
-    #[rstest]
-    fn test(simple_dfg_hugr: Hugr) {
-        fn check_into_edges(_x: impl pv::IntoEdgeReferences) {}
-
-        let sg = simple_dfg_hugr.scheduling_graph(simple_dfg_hugr.module_root());
-        let n = pv::NodeFiltered::from_fn(&sg.graph, |n| n.index() % 2 == 0);
-        check_into_edges(&sg.graph);
-        check_into_edges(&n);
-        pv::Topo::new(&sg.graph)
-            .iter(&sg.graph)
-            .for_each(|n| println!("Node: {:?}", n));
-        pv::Topo::new(sg.petgraph())
-            .iter(sg.petgraph())
-            .for_each(|n| println!("Node from graph(): {:?}", n));
     }
 }
