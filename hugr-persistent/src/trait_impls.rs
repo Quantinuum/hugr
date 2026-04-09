@@ -425,7 +425,6 @@ mod tests {
     use super::*;
 
     use petgraph::visit::NodeCount;
-    use portgraph::PortView;
     use rstest::rstest;
 
     #[rstest]
