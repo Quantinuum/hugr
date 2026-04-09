@@ -599,19 +599,9 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             }
             // Note we used to check exp_nodes == nodes *before* the convexity check
             None => {
-                let (region, node_map) = if true {
-                    #[expect(deprecated)]
-                    // TODO somehow we will need to keep region_portgraph as private
-                    hugr.region_portgraph(subgraph_parent)
-                } else {
-                    // Alternatively, we can do this (ignoring the synthetic edges, as we don't want them to compute the nodes)
-                    let SchedulingGraph {
-                        graph: SynEdgeWrapper { region_view, .. },
-                        node_map,
-                        ..
-                    } = hugr.scheduling_graph(subgraph_parent);
-                    (region_view, node_map)
-                };
+                let (region, node_map) = hugr
+                    .scheduling_graph(subgraph_parent)
+                    .portgraph_no_syn_edges();
                 make_pg_subgraph::<H>(region, &self.inputs, &self.outputs, &node_map)
                     .nodes_iter()
                     .map(|n| node_map.from_portgraph(n))
@@ -1134,27 +1124,9 @@ where
 {
     /// Create a new convexity checker.
     pub fn new(base: &'g Base, region_parent: Base::Node) -> Self {
-        let (region, node_map) = if true {
-            #[expect(deprecated)] // TODO somehow we will need to keep region_portgraph as private
-            base.region_portgraph(region_parent)
-        } else {
-            // Alternatively, if region_portgraph is removed, we can have a back door
-            // something like this, if we still want to support LineConvexChecker.
-            let SchedulingGraph {
-                graph:
-                    SynEdgeWrapper {
-                        syn_edges,
-                        region_view,
-                    },
-                node_map,
-                ..
-            } = base.scheduling_graph(region_parent);
-            assert!(
-                syn_edges.is_empty(),
-                "Portgraph algorithms do not support synthetic edges."
-            );
-            (region_view, node_map)
-        };
+        let (region, node_map) = base
+            .scheduling_graph(region_parent)
+            .portgraph_no_syn_edges();
         let checker = Checker::new_convex_checker(region);
         Self {
             base,
