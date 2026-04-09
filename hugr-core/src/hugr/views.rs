@@ -593,7 +593,7 @@ impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
     }
 
     /// Access to the graph, sufficient to allow [pv::Topo]
-    pub fn graph(
+    pub fn petgraph(
         &self,
     ) -> impl pv::NodeCount
     + pv::IntoNodeIdentifiers

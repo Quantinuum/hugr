@@ -71,8 +71,8 @@ where
         debug_assert!(o.in_value_types().count() == self.outputs.as_ref().unwrap().len());
 
         let sg = node.hugr().scheduling_graph(node.node());
-        let topo = Topo::new(sg.graph());
-        for n in topo.iter(sg.graph()) {
+        let topo = Topo::new(sg.petgraph());
+        for n in topo.iter(sg.petgraph()) {
             let node = node.hugr().fat_optype(sg.node_map().from_portgraph(n));
             let inputs_rmb = context.node_ins_rmb(node)?;
             let inputs = inputs_rmb.read(context.builder(), [])?;

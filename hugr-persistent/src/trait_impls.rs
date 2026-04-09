@@ -574,7 +574,7 @@ mod tests {
         let sg = hugr.scheduling_graph(hugr.entrypoint());
 
         assert_eq!(
-            sg.graph().node_count(),
+            sg.petgraph().node_count(),
             hugr.children(hugr.entrypoint()).count()
         );
 

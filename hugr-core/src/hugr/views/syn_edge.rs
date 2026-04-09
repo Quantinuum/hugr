@@ -224,8 +224,8 @@ mod test {
         pv::Topo::new(&sg.graph)
             .iter(&sg.graph)
             .for_each(|n| println!("Node: {:?}", n));
-        pv::Topo::new(sg.graph())
-            .iter(sg.graph())
+        pv::Topo::new(sg.petgraph())
+            .iter(sg.petgraph())
             .for_each(|n| println!("Node from graph(): {:?}", n));
     }
 }
