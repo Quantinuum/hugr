@@ -43,6 +43,7 @@ pub trait HugrInternals {
     // needed if we want to use petgraph's algorithms on the region graph).
     // This won't be solvable until we do the big petgraph refactor -.-
     // In the meantime, just wrap the portgraph in a `FlatRegion` as needed.
+    #[deprecated(note = "Use scheduling_graph instead", since = "0.27.0")]
     fn region_portgraph(
         &self,
         parent: Self::Node,

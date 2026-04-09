@@ -11,6 +11,7 @@ macro_rules! hugr_internal_methods {
     ($arg:ident, $e:expr) => {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
+                #[expect(deprecated)] // Remove delegate along with region_portgraph
                 fn region_portgraph(&self, parent: Self::Node) -> (portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>, Self::RegionPortgraphNodes);
                 fn node_metadata_map(&self, node: Self::Node) -> &crate::hugr::NodeMetadataMap;
             }
