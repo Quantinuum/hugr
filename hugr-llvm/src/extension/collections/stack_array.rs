@@ -138,7 +138,7 @@ impl<CCG: ArrayCodegen> CodegenExtension for ArrayCodegenExtension<CCG> {
                     let [TypeArg::BoundedNat(n), ty] = hugr_type.args() else {
                         return Err(anyhow!("Invalid type args for array type"));
                     };
-                    let ty = ty.clone().try_into().expect("Array elements not a type");
+                    let ty = ty.clone().try_into()?;
                     let elem_ty = ts.llvm_type(&ty)?;
                     Ok(ccg.array_type(&ts, elem_ty, *n).as_basic_type_enum())
                 }
