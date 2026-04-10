@@ -12,7 +12,7 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_term_exts,
 };
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
-use crate::types::type_param::{TermTypeError, check_term_type};
+use crate::types::type_param::{TermTypeError, TermVar, check_term_type};
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
@@ -323,7 +323,7 @@ impl SumType {
         }
     }
 
-    fn bound(&self) -> TypeBound {
+    const fn bound(&self) -> TypeBound {
         match self {
             SumType::Unit { .. } => TypeBound::Copyable,
             SumType::General(GeneralSum { bound, .. }) => *bound,
@@ -385,23 +385,17 @@ impl From<SumType> for Type {
 /// let func_type: Type = Type::new_function(Signature::new_endo([]));
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 /// ```
-pub struct Type(Term, TypeBound);
+pub struct Type(Term);
 
 impl Type {
     /// An empty `TypeRow` or `TypeRowRV`. Provided here for convenience
     pub const EMPTY_TYPEROW: TypeRow = TypeRow::new();
     /// Unit type (empty tuple).
-    pub const UNIT: Self = Self(
-        Term::RuntimeSum(SumType::Unit { size: 1 }),
-        TypeBound::Copyable,
-    );
+    pub const UNIT: Self = Self(Term::RuntimeSum(SumType::Unit { size: 1 }));
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<FuncValueType>) -> Self {
-        Self(
-            Term::RuntimeFunction(Box::new(fun_ty.into())),
-            TypeBound::Copyable,
-        )
+        Self(Term::RuntimeFunction(Box::new(fun_ty.into())))
     }
 
     /// Initialize a new tuple type by providing the elements.
@@ -421,26 +415,21 @@ impl Type {
         R: Into<TypeRowRV>,
     {
         let st = SumType::new(variants);
-        let b = st.bound();
-        Self(Term::RuntimeSum(st), b)
+        Self(Term::RuntimeSum(st))
     }
 
     /// Initialize a new custom type.
     // TODO remove? Extensions/TypeDefs should just provide `Type` directly
     #[must_use]
     pub const fn new_extension(opaque: CustomType) -> Self {
-        let bound = opaque.bound();
-        Self(Term::RuntimeExtension(opaque), bound)
+        Self(Term::RuntimeExtension(opaque))
     }
 
     /// New `UnitSum` with empty Tuple variants
     #[must_use]
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(
-            Term::RuntimeSum(SumType::new_unary(size)),
-            TypeBound::Copyable,
-        )
+        Self(Term::RuntimeSum(SumType::new_unary(size)))
     }
 
     /// New use (occurrence) of the type variable with specified index.
@@ -449,13 +438,13 @@ impl Type {
     /// than required for the use.
     #[must_use]
     pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
-        Self(Term::new_var_use(idx, bound), bound)
+        Self(Term::new_var_use(idx, bound))
     }
 
     /// Report the least upper [`TypeBound`]
     #[inline(always)]
     pub const fn least_upper_bound(&self) -> TypeBound {
-        self.1
+        self.0.least_upper_bound().unwrap()
     }
 
     /// Report if the type is copyable - i.e.the least upper bound of the type
@@ -473,14 +462,6 @@ impl Type {
     /// [TypeDef]: crate::extension::TypeDef
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.0.validate(var_decls)?;
-        // ALAN even this should be only a debug-assert really:
-        // we have no unchecked access from outside crate::types
-        // so it must be a bug in our caching logic if this is wrong:
-        check_term_type(&self.0, &self.1.into())?;
-        debug_assert!(
-            self.1 == TypeBound::Copyable
-                || check_term_type(&self.0, &TypeBound::Copyable.into()).is_err()
-        );
         Ok(())
     }
 
@@ -489,9 +470,7 @@ impl Type {
     /// Always produces exactly one type, but may narrow the bound (from
     /// [TypeBound::Linear] to [TypeBound::Copyable]).
     fn substitute(&self, s: &Substitution) -> Self {
-        let t = self.0.substitute(s);
-        let b = t.least_upper_bound().unwrap(); // Recompute.
-        Self(t, b)
+        Self(self.0.substitute(s))
     }
 
     /// Returns a registry with the concrete extensions used by this type.
@@ -514,11 +493,7 @@ impl Type {
 
 impl Transformable for Type {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
-        let res = self.0.transform(tr)?;
-        if res {
-            self.1 = self.0.least_upper_bound().unwrap()
-        }
-        Ok(res)
+        self.0.transform(tr)
     }
 }
 
@@ -534,13 +509,13 @@ impl TryFrom<Term> for Type {
     type Error = TermTypeError;
 
     fn try_from(t: Term) -> Result<Self, TermTypeError> {
-        match t.least_upper_bound() {
-            Some(b) => Ok(Self(t, b)),
-            None => Err(TermTypeError::TypeMismatch {
-                term: Box::new(t),
-                type_: Box::new(TypeBound::Linear.into()),
-            }),
+        if t.is_runtime_type() {
+            return Ok(Self(t));
         }
+        Err(TermTypeError::TypeMismatch {
+            term: Box::new(t),
+            type_: Box::new(TypeBound::Linear.into()),
+        })
     }
 }
 
