@@ -2,7 +2,7 @@
 use crate::Visibility;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
-use crate::types::type_param::Term;
+use crate::types::{FuncTypeBase, PolyFuncTypeBase, TypeRowLike};
 use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
     extension::{ExtensionId, OpDef, SignatureFunc},
@@ -14,10 +14,8 @@ use crate::{
         arithmetic::{float_types::ConstF64, int_types::ConstInt},
         collections::array::ArrayValue,
     },
-    types::{
-        CustomType, EdgeKind, FuncTypeBase, MaybeRV, PolyFuncTypeBase, RowVariable, SumType,
-        TypeBase, TypeBound, TypeEnum, type_param::TermVar, type_row::TypeRowBase,
-    },
+    types::type_param::{Term, TermVar},
+    types::{CustomType, EdgeKind, SumType, Type, TypeBound, TypeRow},
 };
 
 use hugr_model::v0::bumpalo;
@@ -342,10 +340,12 @@ impl<'a> Context<'a> {
             OpType::FuncDefn(func) => self.with_local_scope(node_id, |this| {
                 let symbol_name = this.export_func_name(node, &mut meta);
 
+                let sig = func.signature();
                 let symbol = this.export_poly_func_type(
                     symbol_name,
                     Some(func.visibility().clone().into()),
-                    func.signature(),
+                    sig,
+                    Self::export_type_row,
                 );
                 regions = this.bump.alloc_slice_copy(&[this.export_dfg(
                     node,
@@ -358,11 +358,12 @@ impl<'a> Context<'a> {
 
             OpType::FuncDecl(func) => self.with_local_scope(node_id, |this| {
                 let symbol_name = this.export_func_name(node, &mut meta);
-
+                let sig = func.signature();
                 let symbol = this.export_poly_func_type(
                     symbol_name,
                     Some(func.visibility().clone().into()),
-                    func.signature(),
+                    sig,
+                    Self::export_type_row,
                 );
                 table::Operation::DeclareFunc(symbol)
             }),
@@ -507,7 +508,7 @@ impl<'a> Context<'a> {
                 Some(signature) => {
                     let num_inputs = signature.input_types().len();
                     let num_outputs = signature.output_types().len();
-                    let signature = self.export_func_type(signature);
+                    let signature = self.export_func_type(signature, Self::export_type_row);
                     (Some(signature), num_inputs, num_outputs)
                 }
                 None => (None, 0, 0),
@@ -559,7 +560,9 @@ impl<'a> Context<'a> {
 
         let symbol = self.with_local_scope(node, |this| {
             let name = this.make_qualified_name(opdef.extension_id(), opdef.name());
-            this.export_poly_func_type(name, None, poly_func_type)
+            this.export_poly_func_type(name, None, poly_func_type, |this, trv| {
+                this.export_term(trv, None)
+            })
         });
 
         let meta = {
@@ -816,11 +819,12 @@ impl<'a> Context<'a> {
     }
 
     /// Exports a polymorphic function type.
-    pub fn export_poly_func_type<RV: MaybeRV>(
+    pub fn export_poly_func_type<T: TypeRowLike>(
         &mut self,
         name: &'a str,
         visibility: Option<model::Visibility>,
-        t: &PolyFuncTypeBase<RV>,
+        t: &PolyFuncTypeBase<T>,
+        export_io: impl FnMut(&mut Self, &T) -> table::TermId,
     ) -> &'a table::Symbol<'a> {
         let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
         let scope = self
@@ -835,7 +839,7 @@ impl<'a> Context<'a> {
         }
 
         let constraints = self.bump.alloc_slice_copy(&self.local_constraints);
-        let body = self.export_func_type(t.body());
+        let body = self.export_func_type(t.body(), export_io);
 
         self.bump.alloc(table::Symbol {
             visibility,
@@ -846,30 +850,18 @@ impl<'a> Context<'a> {
         })
     }
 
-    pub fn export_type<RV: MaybeRV>(&mut self, t: &TypeBase<RV>) -> table::TermId {
-        self.export_type_enum(t.as_type_enum())
+    pub fn export_type(&mut self, t: &Type) -> table::TermId {
+        self.export_term(t, None)
     }
 
-    pub fn export_type_enum<RV: MaybeRV>(&mut self, t: &TypeEnum<RV>) -> table::TermId {
-        match t {
-            TypeEnum::Extension(ext) => self.export_custom_type(ext),
-            TypeEnum::Alias(alias) => {
-                let symbol = self.resolve_symbol(self.bump.alloc_str(alias.name()));
-                self.make_term(table::Term::Apply(symbol, &[]))
-            }
-            TypeEnum::Function(func) => self.export_func_type(func),
-            TypeEnum::Variable(index, _) => {
-                let node = self.local_scope.expect("local variable out of scope");
-                self.make_term(table::Term::Var(table::VarId(node, *index as _)))
-            }
-            TypeEnum::RowVar(rv) => self.export_row_var(rv.as_rv()),
-            TypeEnum::Sum(sum) => self.export_sum_type(sum),
-        }
-    }
-
-    pub fn export_func_type<RV: MaybeRV>(&mut self, t: &FuncTypeBase<RV>) -> table::TermId {
-        let inputs = self.export_type_row(t.input());
-        let outputs = self.export_type_row(t.output());
+    pub fn export_func_type<T: TypeRowLike>(
+        &mut self,
+        t: &FuncTypeBase<T>,
+        mut export_io: impl FnMut(&mut Self, &T) -> table::TermId,
+    ) -> table::TermId {
+        let inputs = export_io(self, t.input());
+        let outputs = export_io(self, t.output());
+        // To use CORE_FN here, the input/output should each be a core List or ListConcat
         self.make_term_apply(model::CORE_FN, &[inputs, outputs])
     }
 
@@ -888,11 +880,6 @@ impl<'a> Context<'a> {
         self.make_term(table::Term::Var(table::VarId(node, var.index() as _)))
     }
 
-    pub fn export_row_var(&mut self, t: &RowVariable) -> table::TermId {
-        let node = self.local_scope.expect("local variable out of scope");
-        self.make_term(table::Term::Var(table::VarId(node, t.0 as _)))
-    }
-
     pub fn export_sum_variants(&mut self, t: &SumType) -> table::TermId {
         match t {
             SumType::Unit { size } => {
@@ -905,7 +892,7 @@ impl<'a> Context<'a> {
             SumType::General { rows } => {
                 let parts = self.bump.alloc_slice_fill_iter(
                     rows.iter()
-                        .map(|row| table::SeqPart::Item(self.export_type_row(row))),
+                        .map(|row| table::SeqPart::Item(self.export_term(row, None))),
                 );
                 self.make_term(table::Term::List(parts))
             }
@@ -918,27 +905,20 @@ impl<'a> Context<'a> {
     }
 
     #[inline]
-    pub fn export_type_row<RV: MaybeRV>(&mut self, row: &TypeRowBase<RV>) -> table::TermId {
+    pub fn export_type_row(&mut self, row: &TypeRow) -> table::TermId {
         self.export_type_row_with_tail(row, None)
     }
 
-    pub fn export_type_row_with_tail<RV: MaybeRV>(
+    pub fn export_type_row_with_tail(
         &mut self,
-        row: &TypeRowBase<RV>,
+        row: &TypeRow,
         tail: Option<table::TermId>,
     ) -> table::TermId {
         let mut parts =
             BumpVec::with_capacity_in(row.len() + usize::from(tail.is_some()), self.bump);
 
         for t in row.iter() {
-            match t.as_type_enum() {
-                TypeEnum::RowVar(var) => {
-                    parts.push(table::SeqPart::Splice(self.export_row_var(var.as_rv())));
-                }
-                _ => {
-                    parts.push(table::SeqPart::Item(self.export_type(t)));
-                }
-            }
+            parts.push(table::SeqPart::Item(self.export_type(t)));
         }
 
         if let Some(tail) = tail {
@@ -982,7 +962,16 @@ impl<'a> Context<'a> {
                 let item_types = self.export_term(item_types, None);
                 self.make_term_apply(model::CORE_TUPLE_TYPE, &[item_types])
             }
-            Term::Runtime(ty) => self.export_type(ty),
+            Term::RuntimeExtension(ext) => self.export_custom_type(ext),
+            /*TypeEnum::Alias(alias) => {
+                let symbol = self.resolve_symbol(self.bump.alloc_str(alias.name()));
+                self.make_term(table::Term::Apply(symbol, &[]))
+            }*/
+            Term::RuntimeFunction(func) => {
+                self.export_func_type(func, |this, trv| this.export_term(trv, None))
+            }
+            Term::RuntimeSum(sum) => self.export_sum_type(sum),
+
             Term::BoundedNat(value) => self.make_term(model::Literal::Nat(*value).into()),
             Term::String(value) => self.make_term(model::Literal::Str(value.into()).into()),
             Term::Float(value) => self.make_term(model::Literal::Float(*value).into()),

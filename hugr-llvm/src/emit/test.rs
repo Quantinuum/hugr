@@ -849,7 +849,7 @@ mod test_fns {
     #[case::long(&"x".repeat(PANIC_MSG_BUFFER_LEN + 100))]
     fn test_exec_panic(mut exec_ctx: TestContext, #[case] msg: &str) {
         let panic_op = PRELUDE
-            .instantiate_extension_op(&EXIT_OP_ID, [Term::new_list([]), Term::new_list([])])
+            .instantiate_extension_op(&EXIT_OP_ID, [Term::EMPTY_LIST, Term::EMPTY_LIST])
             .unwrap();
 
         let hugr = SimpleHugrConfig::new()

@@ -180,8 +180,9 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayCloneDef<AK> {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] if ty.copyable() => {
-                Ok(GenericArrayClone::new(ty.clone(), *n).unwrap())
+            [TypeArg::BoundedNat(n), ty] if ty.copyable() => {
+                let ty = Type::try_from(ty.clone()).unwrap(); // succeeds as copyable
+                Ok(GenericArrayClone::new(ty, *n).unwrap())
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }

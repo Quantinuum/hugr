@@ -1,12 +1,12 @@
 //! Handles to nodes in HUGR.
 use crate::Node;
 use crate::core::HugrNode;
-use crate::types::{Type, TypeBound};
+use crate::types::TypeBound;
 
 use derive_more::From as DerFrom;
 use smol_str::SmolStr;
 
-use super::{AliasDecl, OpTag};
+use super::OpTag;
 
 /// Common trait for handles to a node.
 /// Typically wrappers around [`Node`].
@@ -89,10 +89,11 @@ impl<const DEF: bool, N> AliasID<DEF, N> {
         Self { node, name, bound }
     }
 
-    /// Construct new `AliasID`
-    pub fn get_alias_type(&self) -> Type {
-        Type::new_alias(AliasDecl::new(self.name.clone(), self.bound))
-    }
+    // Construct new `AliasID`
+    //pub fn get_alias_type(&self) -> Type {
+    //    Type::new_alias(AliasDecl::new(self.name.clone(), self.bound))
+    //}
+
     /// Retrieve the underlying core type
     pub fn get_name(&self) -> &SmolStr {
         &self.name

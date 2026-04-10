@@ -3,11 +3,14 @@ use std::iter;
 use crate::{
     Wire,
     builder::{BuildError, BuildHandle, Dataflow, DataflowSubContainer, SubContainer},
-    extension::prelude::{ConstError, PANIC_OP_ID},
+    extension::{
+        SignatureError,
+        prelude::{ConstError, PANIC_OP_ID},
+    },
     ops::handle::DataflowOpID,
     types::{SumType, Type, TypeArg, TypeRow},
 };
-use itertools::{Itertools as _, zip_eq};
+use itertools::zip_eq;
 
 use super::PRELUDE;
 
@@ -21,16 +24,8 @@ pub trait UnwrapBuilder: Dataflow {
         inputs: impl IntoIterator<Item = (Wire, Type)>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let (input_wires, input_types): (Vec<_>, Vec<_>) = inputs.into_iter().unzip();
-        let input_arg: TypeArg = input_types
-            .into_iter()
-            .map(<TypeArg as From<_>>::from)
-            .collect_vec()
-            .into();
-        let output_arg: TypeArg = output_row
-            .into_iter()
-            .map(<TypeArg as From<_>>::from)
-            .collect_vec()
-            .into();
+        let input_arg = TypeArg::new_list(input_types);
+        let output_arg = TypeArg::new_list(output_row);
         let op = PRELUDE.instantiate_extension_op(&PANIC_OP_ID, [input_arg, output_arg])?;
         let err = self.add_load_value(err);
         self.add_dataflow_op(op, iter::once(err).chain(input_wires))
@@ -74,7 +69,8 @@ pub trait UnwrapBuilder: Dataflow {
                 let tr_rv = sum_type.get_variant(i).unwrap().to_owned();
                 TypeRow::try_from(tr_rv)
             })
-            .collect::<Result<_, _>>()?;
+            .collect::<Result<_, _>>()
+            .map_err(SignatureError::from)?;
 
         // TODO don't panic if tag >= num_variants
         let output_row = variants.get(tag).unwrap();
