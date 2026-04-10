@@ -2,7 +2,7 @@
 use crate::Visibility;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::HugrInternals;
-use crate::types::{FuncTypeBase, PolyFuncTypeBase, TypeRowLike};
+use crate::types::{FuncTypeBase, GeneralSum, PolyFuncTypeBase, TypeRowLike};
 use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
     extension::{ExtensionId, OpDef, SignatureFunc},
@@ -889,7 +889,7 @@ impl<'a> Context<'a> {
                 );
                 self.make_term(table::Term::List(parts))
             }
-            SumType::General { rows } => {
+            SumType::General(GeneralSum { rows, .. }) => {
                 let parts = self.bump.alloc_slice_fill_iter(
                     rows.iter()
                         .map(|row| table::SeqPart::Item(self.export_term(row, None))),
