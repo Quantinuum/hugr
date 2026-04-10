@@ -384,7 +384,7 @@ impl Term {
         }
     }
 
-    pub(crate) fn least_upper_bound(&self) -> Option<TypeBound> {
+    pub(crate) const fn least_upper_bound(&self) -> Option<TypeBound> {
         match self {
             Self::RuntimeExtension(ct) => Some(ct.bound()),
             Self::RuntimeSum(st) => Some(st.bound()),
