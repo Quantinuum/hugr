@@ -461,7 +461,7 @@ pub(crate) mod test {
 
         let inner3 = Type::new_function(Signature::new_endo([usize_t(), bool_t(), usize_t()]));
         let t3 = pf
-            .instantiate(&[[usize_t(), bool_t(), usize_t()].into()])
+            .instantiate(&[Term::new_list([usize_t(), bool_t(), usize_t()])])
             .unwrap();
         assert_eq!(
             t3,

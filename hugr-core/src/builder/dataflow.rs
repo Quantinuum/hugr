@@ -943,7 +943,7 @@ pub(crate) mod test {
         )?;
         let rv: Term = rv.into();
         // But cannot eval it...
-        let ev = e.instantiate_extension_op("eval", [vec![usize_t()].into(), rv.clone()]);
+        let ev = e.instantiate_extension_op("eval", [Term::new_list([usize_t()]), rv.clone()]);
         assert_eq!(
             ev,
             Err(SignatureError::TypeArgMismatch(
@@ -951,7 +951,10 @@ pub(crate) mod test {
             ))
         );
 
-        let ev = e.instantiate_extension_op("eval", [vec![usize_t()].into(), [rv.clone()].into()]);
+        let ev = e.instantiate_extension_op(
+            "eval",
+            [Term::new_list([usize_t()]), Term::new_list([rv.clone()])],
+        );
         assert_eq!(
             ev,
             Err(SignatureError::TypeArgMismatch(

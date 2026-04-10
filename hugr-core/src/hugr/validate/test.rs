@@ -527,7 +527,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
 #[test]
 fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     fn uint_seq(i: usize) -> Term {
-        vec![usize_t(); i].into()
+        Term::new_list(vec![usize_t(); i])
     }
     let e = extension_with_eval_parallel();
     let mut dfb = DFGBuilder::new(inout_sig(
@@ -578,9 +578,9 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
         "parallel",
         [
             tv.clone(),
-            [usize_t()].into(),
+            Term::new_list([usize_t()]),
             tv.clone(),
-            [usize_t()].into(),
+            Term::new_list([usize_t()]),
         ],
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;

@@ -17,7 +17,7 @@ use tracing::warn;
 
 use super::{Substitution, Transformable, Type, TypeBound, TypeRowLike, TypeTransformer};
 use crate::extension::SignatureError;
-use crate::types::{CustomType, FuncValueType, SumType, TypeRow};
+use crate::types::{CustomType, FuncValueType, SumType};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -310,21 +310,9 @@ impl From<Vec<Term>> for Term {
     }
 }
 
-impl From<Vec<Type>> for Term {
-    fn from(value: Vec<Type>) -> Self {
-        TypeRow::from(value).into()
-    }
-}
-
 impl<const N: usize> From<[Term; N]> for Term {
     fn from(value: [Term; N]) -> Self {
         Self::new_list(value)
-    }
-}
-
-impl<const N: usize> From<[Type; N]> for Term {
-    fn from(value: [Type; N]) -> Self {
-        TypeRow::from(value).into()
     }
 }
 
@@ -1008,7 +996,7 @@ mod test {
         // Into a list of type, we can fit a single row var
         check(rowvar(0, TypeBound::Copyable), &lst_of_cpy).unwrap();
         // or a list of types, or a "concat" of row vars
-        check([usize_t()], &lst_of_cpy).unwrap();
+        check(Term::new_list([usize_t()]), &lst_of_cpy).unwrap();
         check(
             Term::ListConcat(vec![rowvar(0, TypeBound::Copyable); 2]),
             &lst_of_cpy,
@@ -1017,7 +1005,7 @@ mod test {
         check(
             Term::concat_lists([
                 rowvar(1, TypeBound::Linear),
-                vec![usize_t()].into(),
+                Term::new_list([usize_t()]),
                 rowvar(0, TypeBound::Copyable),
             ]),
             &TypeParam::new_list_type(TypeBound::Linear),
@@ -1030,14 +1018,18 @@ mod test {
         check(
             Term::concat_lists([
                 rowvar(1, TypeBound::Linear),
-                vec![usize_t()].into(),
+                Term::new_list([usize_t()]),
                 rowvar(0, TypeBound::Copyable),
             ]),
             &lst_of_cpy,
         )
         .unwrap_err();
         // seq of seq of types is not allowed
-        check(vec![Term::from(usize_t()), [usize_t()].into()], &lst_of_cpy).unwrap_err();
+        check(
+            vec![Term::from(usize_t()), Term::new_list([usize_t()])],
+            &lst_of_cpy,
+        )
+        .unwrap_err();
 
         // Similar for nats (but no equivalent of fancy row vars)
         check(5, &TypeParam::max_nat_type()).unwrap();
@@ -1077,7 +1069,7 @@ mod test {
     #[test]
     fn type_arg_subst_row() {
         let row_param = Term::new_list_type(TypeBound::Copyable);
-        let row_arg: Term = vec![bool_t(), Type::UNIT].into();
+        let row_arg: Term = Term::new_list([bool_t(), Type::UNIT]);
         check_term_type(&row_arg, &row_param).unwrap();
 
         // Now say a row variable referring to *that* row was used
@@ -1090,7 +1082,10 @@ mod test {
         check_term_type(&outer_arg, &outer_param).unwrap();
 
         let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg]));
-        assert_eq!(outer_arg2, vec![bool_t(), Type::UNIT, usize_t()].into());
+        assert_eq!(
+            outer_arg2,
+            Term::new_list([bool_t(), Type::UNIT, usize_t()])
+        );
 
         // Of course this is still valid (as substitution is guaranteed to preserve validity)
         check_term_type(&outer_arg2, &outer_param).unwrap();
@@ -1103,7 +1098,7 @@ mod test {
         let row_var_use = Term::new_var_use(0, row_var_decl.clone());
         let good_arg = Term::new_list([
             // The row variables here refer to `row_var_decl` above
-            vec![usize_t()].into(),
+            Term::new_list([usize_t()]),
             row_var_use.clone(),
             Term::concat_lists([row_var_use, Term::new_list([usize_t()])]),
         ]);
@@ -1125,16 +1120,16 @@ mod test {
         );
 
         // Now substitute a list of two types for that row-variable
-        let row_var_arg = vec![usize_t(), bool_t()].into();
+        let row_var_arg = Term::new_list([usize_t(), bool_t()]);
         check_term_type(&row_var_arg, &row_var_decl).unwrap();
         let subst_arg = good_arg.substitute(&Substitution(std::slice::from_ref(&row_var_arg)));
         check_term_type(&subst_arg, &outer_param).unwrap(); // invariance of substitution
         assert_eq!(
             subst_arg,
             Term::new_list([
-                [usize_t()].into(),
+                Term::new_list([usize_t()]),
                 row_var_arg,
-                [usize_t(), bool_t(), usize_t()].into()
+                Term::new_list([usize_t(), bool_t(), usize_t()])
             ])
         );
     }
