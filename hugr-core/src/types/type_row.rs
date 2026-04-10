@@ -52,7 +52,7 @@ impl TypeRow {
 
     /// Returns a new `TypeRow` with `xs` concatenated onto `self`.
     pub fn extend<'a>(&'a self, rest: impl IntoIterator<Item = &'a Type>) -> Self {
-        self.iter().chain(rest).cloned().collect_vec().into()
+        self.iter().chain(rest).cloned().collect()
     }
 
     /// Returns a reference to the types in the row.
@@ -240,6 +240,12 @@ impl DerefMut for TypeRow {
     }
 }
 
+impl FromIterator<Type> for TypeRow {
+    fn from_iter<T: IntoIterator<Item = Type>>(iter: T) -> Self {
+        Self::from(iter.into_iter().collect_vec())
+    }
+}
+
 /// Row of types and/or row variables, the number of actual types is thus
 /// unknown. Used for opdef signatures, and types of runtime function pointers.
 ///
@@ -367,11 +373,11 @@ impl<const N: usize> From<[Type; N]> for TypeRowRV {
     }
 }
 
-/*impl FromIterator<Type> for TypeRowRV {
+impl FromIterator<Type> for TypeRowRV {
     fn from_iter<T: IntoIterator<Item = Type>>(iter: T) -> Self {
-        Self(Term::new_list(iter.into_iter().map_into()))
+        Self(Term::new_list(iter))
     }
-}*/
+}
 
 #[cfg(test)]
 mod test {

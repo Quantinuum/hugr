@@ -362,7 +362,7 @@ pub fn const_left_tuple(
     ty_right: impl Into<TypeRowRV>,
 ) -> Value {
     let values = values.into_iter().collect_vec();
-    let types: TypeRowRV = values.iter().map(Value::get_type).collect_vec().into();
+    let types: TypeRowRV = values.iter().map(Value::get_type).collect();
     let typ = either_type(types, ty_right);
     Value::sum(0, values, typ).unwrap()
 }
@@ -386,7 +386,7 @@ pub fn const_right_tuple(
     values: impl IntoIterator<Item = Value>,
 ) -> Value {
     let values = values.into_iter().collect_vec();
-    let types: TypeRowRV = values.iter().map(Value::get_type).collect_vec().into();
+    let types: TypeRowRV = values.iter().map(Value::get_type).collect();
     let typ = either_type(ty_left, types);
     Value::sum(1, values, typ).unwrap()
 }
