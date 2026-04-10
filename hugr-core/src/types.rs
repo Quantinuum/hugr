@@ -177,8 +177,34 @@ pub enum SumType {
     #[allow(missing_docs)]
     Unit { size: u8 },
     /// General case of a Sum type.
-    #[allow(missing_docs)]
-    General { rows: Vec<TypeRowRV> },
+    General(GeneralSum),
+}
+
+/// The general case of a [SumType].
+///
+/// Can store any sum type, including those that can be more efficiently
+/// represented as a [SumType::Unit].
+#[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
+pub struct GeneralSum {
+    /// The types of the variants of the sum. Each variant is a row of types.
+    pub rows: Vec<TypeRowRV>,
+    #[serde(skip)]
+    bound: TypeBound,
+}
+
+impl GeneralSum {
+    /// Initialize a new `GeneralSum` with the given rows.
+    pub fn new(rows: Vec<TypeRowRV>) -> Self {
+        let bound = if rows
+            .iter()
+            .all(|row| check_term_type(row, &Term::new_list_type(TypeBound::Copyable)).is_ok())
+        {
+            TypeBound::Copyable
+        } else {
+            TypeBound::Linear
+        };
+        Self { rows, bound }
+    }
 }
 
 impl std::hash::Hash for SumType {
@@ -205,7 +231,7 @@ impl std::fmt::Display for SumType {
             SumType::Unit { size } => {
                 display_list_with_separator(itertools::repeat_n("[]", *size as usize), f, "+")
             }
-            SumType::General { rows } => match rows.len() {
+            SumType::General(GeneralSum { rows, .. }) => match rows.len() {
                 1 if rows[0].is_empty() => write!(f, "Unit"),
                 2 if rows[0].is_empty() && rows[1].is_empty() => write!(f, "Bool"),
                 _ => display_list_with_separator(rows.iter(), f, "+"),
@@ -225,7 +251,7 @@ impl SumType {
         if u8::try_from(len).is_ok() && variants.iter().all(TypeRowRV::is_empty) {
             Self::new_unary(len as u8)
         } else {
-            Self::General { rows: variants }
+            Self::General(GeneralSum::new(variants))
         }
     }
 
@@ -250,7 +276,7 @@ impl SumType {
     pub fn get_variant(&self, tag: usize) -> Option<&TypeRowRV> {
         match self {
             SumType::Unit { size } if tag < (*size as usize) => Some(TypeRowRV::EMPTY_REF),
-            SumType::General { rows } => rows.get(tag),
+            SumType::General(GeneralSum { rows, .. }) => rows.get(tag),
             _ => None,
         }
     }
@@ -260,7 +286,7 @@ impl SumType {
     pub fn num_variants(&self) -> usize {
         match self {
             SumType::Unit { size } => *size as usize,
-            SumType::General { rows } => rows.len(),
+            SumType::General(general) => general.rows.len(),
         }
     }
 
@@ -269,7 +295,7 @@ impl SumType {
     pub fn as_tuple(&self) -> Option<&TypeRowRV> {
         match self {
             SumType::Unit { size } if *size == 1 => Some(TypeRowRV::EMPTY_REF),
-            SumType::General { rows } if rows.len() == 1 => Some(&rows[0]),
+            SumType::General(general) if general.rows.len() == 1 => Some(&general.rows[0]),
             _ => None,
         }
     }
@@ -280,7 +306,9 @@ impl SumType {
     pub fn as_option(&self) -> Option<&TypeRowRV> {
         match self {
             SumType::Unit { size } if *size == 2 => Some(TypeRowRV::EMPTY_REF),
-            SumType::General { rows } if rows.len() == 2 && rows[0].is_empty() => Some(&rows[1]),
+            SumType::General(GeneralSum { rows, .. }) if rows.len() == 2 && rows[0].is_empty() => {
+                Some(&rows[1])
+            }
             _ => None,
         }
     }
@@ -291,23 +319,14 @@ impl SumType {
             SumType::Unit { size } => {
                 Either::Left(itertools::repeat_n(TypeRowRV::EMPTY_REF, *size as usize))
             }
-            SumType::General { rows } => Either::Right(rows.iter()),
+            SumType::General(general) => Either::Right(general.rows.iter()),
         }
     }
 
     fn bound(&self) -> TypeBound {
         match self {
             SumType::Unit { .. } => TypeBound::Copyable,
-            SumType::General { rows } => {
-                if rows
-                    .iter()
-                    .all(|t| check_term_type(t, &Term::new_list_type(TypeBound::Copyable)).is_ok())
-                {
-                    TypeBound::Copyable
-                } else {
-                    TypeBound::Linear
-                }
-            }
+            SumType::General(GeneralSum { bound, .. }) => *bound,
         }
     }
 }
@@ -316,7 +335,13 @@ impl Transformable for SumType {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
         match self {
             SumType::Unit { .. } => Ok(false),
-            SumType::General { rows } => rows.transform(tr),
+            SumType::General(general) => {
+                let changed = general.rows.transform(tr)?;
+                if changed {
+                    *general = GeneralSum::new(std::mem::take(&mut general.rows));
+                }
+                Ok(changed)
+            }
         }
     }
 }
@@ -325,7 +350,7 @@ impl From<SumType> for Type {
     fn from(sum: SumType) -> Self {
         match sum {
             SumType::Unit { size } => Type::new_unit_sum(size),
-            SumType::General { rows } => Type::new_sum(rows),
+            SumType::General(GeneralSum { rows, .. }) => Type::new_sum(rows),
         }
     }
 }
@@ -701,7 +726,7 @@ pub(crate) mod test {
         let empty_rows = vec![TypeRowRV::new(); 3];
         let sum_unary = SumType::new_unary(3);
         assert_eq!(empty_rows, sum_unary.variants().cloned().collect_vec());
-        let sum_general = SumType::General { rows: empty_rows };
+        let sum_general = SumType::General(GeneralSum::new(empty_rows));
         assert_eq!(sum_general, sum_unary);
 
         let mut hasher_general = std::hash::DefaultHasher::new();

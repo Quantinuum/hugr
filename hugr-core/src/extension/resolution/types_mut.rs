@@ -9,7 +9,9 @@ use super::types::collect_term_exts;
 use super::{ExtensionResolutionError, WeakExtensionRegistry};
 use crate::extension::ExtensionSet;
 use crate::ops::{OpType, Value};
-use crate::types::{CustomType, FuncValueType, Signature, SumType, Term, Type, TypeRow, TypeRowRV};
+use crate::types::{
+    CustomType, FuncValueType, GeneralSum, Signature, SumType, Term, Type, TypeRow, TypeRowRV,
+};
 use crate::{Extension, Node};
 
 /// Replace the dangling extension pointer in the [`CustomType`]s inside an
@@ -240,7 +242,7 @@ pub(super) fn resolve_term_exts(
         Term::RuntimeFunction(f) => {
             resolve_func_type_exts(node, &mut *f, extensions, used_extensions)?;
         }
-        Term::RuntimeSum(SumType::General { rows }) => {
+        Term::RuntimeSum(SumType::General(GeneralSum { rows, .. })) => {
             for row in rows.iter_mut() {
                 resolve_typerow_rv_exts(node, row, extensions, used_extensions)?;
             }
@@ -302,7 +304,7 @@ pub(super) fn resolve_value_exts(
             }
         }
         Value::Sum(s) => {
-            if let SumType::General { rows } = &mut s.sum_type {
+            if let SumType::General(GeneralSum { rows, .. }) = &mut s.sum_type {
                 for row in rows.iter_mut() {
                     resolve_typerow_rv_exts(node, row, extensions, used_extensions)?;
                 }
