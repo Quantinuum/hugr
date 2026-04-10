@@ -94,7 +94,6 @@ impl<AK: ArrayKind> GenericArrayValue<AK> {
 
         // constant can only hold classic type.
         let ty = match typ.args() {
-            // ALAN checking copyable here might be a bugfix but sounds like we should?
             [TypeArg::BoundedNat(n), ty] if *n as usize == self.values.len() && ty.copyable() => {
                 Type::try_from(ty.clone()).unwrap() // succeeds as copyable
             }
