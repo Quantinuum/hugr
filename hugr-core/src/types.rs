@@ -12,7 +12,7 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_term_exts,
 };
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
-use crate::types::type_param::{TermTypeError, TermVar, check_term_type};
+use crate::types::type_param::{TermTypeError, check_term_type};
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
