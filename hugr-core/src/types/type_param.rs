@@ -135,12 +135,7 @@ pub enum Term {
     #[display("{}", _0.into_inner())]
     Float(OrderedFloat<f64>),
     /// A list of static terms. Instance of [`Term::ListType`].
-    #[display("[{}]", {
-        use itertools::Itertools as _;
-        //_0.iter().map(|t|t.to_string()).join(",")
-        // extra space matching old Display for TypeRowRV
-        _0.iter().map(|t|t.to_string()).join(", ")
-    })]
+    #[display("[{}]", _0.iter().map(|t|t.to_string()).join(", "))]
     List(Vec<Term>),
     /// Instance of [`TypeParam::List`] defined by a sequence of concatenated lists of the same type.
     #[display("[{}]", {
@@ -366,7 +361,9 @@ impl Term {
         Self::String(str.to_string())
     }
 
-    /// Creates a new concatenated list.
+    /// Creates or returns a term equivalent to concatenating a number of lists.
+    ///
+    /// If there is only one list, returns it directly.
     #[inline]
     pub fn concat_lists(lists: impl IntoIterator<Item = Self>) -> Self {
         match lists.into_iter().exactly_one() {
@@ -750,7 +747,7 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
             .try_for_each(|elem| check_term_type(elem, item_type)),
         (Term::ListConcat(lists), Term::ListType(_)) => lists
             .iter()
-            .try_for_each(|list| check_term_type(list, type_)), // ALAN this used the element type, which seems very wrong
+            .try_for_each(|list| check_term_type(list, type_)),
         (TypeArg::Tuple(_) | TypeArg::TupleConcat(_), TypeParam::TupleType(item_types)) => {
             let term_parts: Vec<_> = term.clone().into_tuple_parts().collect();
             let type_parts: Vec<_> = item_types.clone().into_list_parts().collect();

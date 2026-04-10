@@ -285,10 +285,6 @@ impl SumType {
         }
     }
 
-    // ALAN removing as_unary_option.
-    // "If a sum is an option of a single type, return the type. pub fn as_unary_option(&self) -> Option<&Term>"
-    // But of course a Term was not necessarily a single type...
-
     /// Returns an iterator over the variants
     pub fn variants(&self) -> impl Iterator<Item = &TypeRowRV> {
         match self {
@@ -662,7 +658,6 @@ pub(crate) mod test {
             TypeRowRV::from([usize_t()])
         );
         // Two empty variants is like an option of empty.
-        // ALAN note there used to be as_unary_option...
         assert_eq!(
             Type::new_unit_sum(2).as_sum().unwrap().as_option(),
             Some(TypeRowRV::EMPTY_REF)
