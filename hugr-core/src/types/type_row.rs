@@ -176,14 +176,6 @@ impl TryFrom<Vec<Term>> for TypeRow {
     }
 }
 
-impl TryFrom<TypeRowRV> for TypeRow {
-    type Error = TermTypeError;
-
-    fn try_from(value: TypeRowRV) -> Result<Self, Self::Error> {
-        value.0.try_into()
-    }
-}
-
 impl<const N: usize> From<[Type; N]> for TypeRow {
     fn from(types: [Type; N]) -> Self {
         Self::from(Vec::from(types))
@@ -210,12 +202,6 @@ impl PartialEq<Term> for TypeRow {
     }
 }
 
-impl PartialEq<TypeRowRV> for TypeRow {
-    fn eq(&self, other: &TypeRowRV) -> bool {
-        self == &other.0
-    }
-}
-
 /// Fallibly convert a [Term] to a [TypeRow].
 ///
 /// This will fail if `arg` is not a [Term::List] or any of the elements are not [Type]s
@@ -237,12 +223,6 @@ impl TryFrom<Term> for TypeRow {
 impl From<TypeRow> for Term {
     fn from(value: TypeRow) -> Self {
         Term::new_list(value.into_owned())
-    }
-}
-
-impl From<TypeRow> for TypeRowRV {
-    fn from(value: TypeRow) -> Self {
-        Self(Term::from(value))
     }
 }
 
@@ -316,6 +296,26 @@ impl TypeRowLike for TypeRowRV {
     fn substitute(&self, s: &Substitution) -> Self {
         // Substitution cannot make this invalid if it was valid previously
         Self::new_unchecked(self.0.substitute(s))
+    }
+}
+
+impl TryFrom<TypeRowRV> for TypeRow {
+    type Error = TermTypeError;
+
+    fn try_from(value: TypeRowRV) -> Result<Self, Self::Error> {
+        value.0.try_into()
+    }
+}
+
+impl PartialEq<TypeRowRV> for TypeRow {
+    fn eq(&self, other: &TypeRowRV) -> bool {
+        self == &other.0
+    }
+}
+
+impl From<TypeRow> for TypeRowRV {
+    fn from(value: TypeRow) -> Self {
+        Self(Term::from(value))
     }
 }
 
