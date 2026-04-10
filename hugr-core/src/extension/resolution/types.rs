@@ -10,7 +10,7 @@ use super::{ExtensionCollectionError, WeakExtensionRegistry};
 use crate::Node;
 use crate::extension::{ExtensionRegistry, ExtensionSet};
 use crate::ops::{DataflowOpTrait, OpType, Value};
-use crate::types::{FuncValueType, Signature, SumType, Term, TypeRow};
+use crate::types::{FuncValueType, GeneralSum, Signature, SumType, Term, TypeRow};
 
 /// Collects every extension used to define the types in an operation.
 ///
@@ -205,7 +205,7 @@ pub(crate) fn collect_term_exts(
             collect_term_exts(&f.input, used_extensions, missing_extensions);
             collect_term_exts(&f.output, used_extensions, missing_extensions);
         }
-        Term::RuntimeSum(SumType::General { rows }) => {
+        Term::RuntimeSum(SumType::General(GeneralSum { rows, .. })) => {
             for row in rows {
                 collect_term_exts(row, used_extensions, missing_extensions);
             }
@@ -271,7 +271,7 @@ fn collect_value_exts(
             collect_term_exts(&typ, used_extensions, missing_extensions);
         }
         Value::Sum(s) => {
-            if let SumType::General { rows } = &s.sum_type {
+            if let SumType::General(GeneralSum { rows, .. }) = &s.sum_type {
                 for row in rows {
                     collect_term_exts(row, used_extensions, missing_extensions);
                 }
