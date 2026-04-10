@@ -355,9 +355,14 @@ impl From<TypeRowRV> for Term {
     }
 }
 
-// This allows an easy syntax for building TypeRowRV's which are all Types
-impl<T: IntoIterator<Item = Type>> From<T> for TypeRowRV {
-    fn from(value: T) -> Self {
+impl From<Vec<Type>> for TypeRowRV {
+    fn from(value: Vec<Type>) -> Self {
+        Self(Term::new_list(value))
+    }
+}
+
+impl<const N: usize> From<[Type; N]> for TypeRowRV {
+    fn from(value: [Type; N]) -> Self {
         Self(Term::new_list(value))
     }
 }
