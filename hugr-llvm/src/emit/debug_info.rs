@@ -32,7 +32,7 @@ use crate::utils::fat::FatNode;
 // alignment for all types
 const DEBUG_TYPE_ALIGNMENT: u32 = 8;
 // TODO: get this from TargetMachine
-const POINTER_BYTES: u64 = 8;
+const POINTER_BITS: u64 = 64;
 
 #[expect(dead_code, reason = "Currently unused types")]
 enum DWARFTypeCode {
@@ -57,12 +57,13 @@ pub struct DebugInfoContext<'c> {
     type_map: BTreeMap<CString, DIType<'c>>,
     /// Mapping from function type names to DWARF type records
     fn_type_map: BTreeMap<CString, DISubroutineType<'c>>,
+    // TODO: replace this with HUGR debug types once available
+    /// Fixed opaque pointer type
+    ptr_type: DIType<'c>,
     // NOTE: have_di_loc may not match the Builder's view of things,
     // see: https://github.com/TheDan64/inkwell/issues/674
     /// Tracks whether the builder currently has a location set
     have_di_loc: bool,
-    /// Size of a pointer on this architecture
-    ptr_size: u64,
 }
 
 impl<'c> DebugInfoContext<'c> {
@@ -117,14 +118,20 @@ impl<'c> DebugInfoContext<'c> {
             )
             .collect();
 
+        // note that this is not a DIPointerType, because
+        // it should be void* but Inkwell may not support creating void
+        let ptr_type = builder
+            .create_basic_type("ptr", POINTER_BITS, DWARFTypeCode::Address as u32, 0)?
+            .as_type();
+
         Ok(Some(Self {
             builder,
             compile_unit,
             file_table,
             type_map: BTreeMap::new(),
             fn_type_map: BTreeMap::new(),
+            ptr_type,
             have_di_loc: false,
-            ptr_size: POINTER_BYTES, //(iw_module.get_context().ptr_sized_int().get_bit_width() / 8).into()
         }))
     }
 
@@ -136,7 +143,7 @@ impl<'c> DebugInfoContext<'c> {
             }
             BasicTypeEnum::FloatType(float_ty) => (float_ty.get_bit_width() / 8).into(),
             BasicTypeEnum::IntType(int_ty) => (int_ty.get_bit_width() / 8).into(),
-            BasicTypeEnum::PointerType(_) => self.ptr_size,
+            BasicTypeEnum::PointerType(_) => self.ptr_type.get_size_in_bits() / 8,
             BasicTypeEnum::StructType(struct_ty) => struct_ty
                 .get_field_types_iter()
                 .fold(0, |len, elem_ty| len + self.get_basic_type_size(elem_ty)),
@@ -235,6 +242,7 @@ impl<'c> DebugInfoContext<'c> {
             BasicMetadataTypeEnum::FloatType(flt_ty) => self.create_di_float_type(flt_ty),
             BasicMetadataTypeEnum::IntType(int_ty) => self.create_di_int_type(int_ty),
             BasicMetadataTypeEnum::StructType(struct_ty) => self.create_di_struct_type(struct_ty),
+            BasicMetadataTypeEnum::PointerType(_) => Ok(self.ptr_type),
             _ => Err(anyhow!(
                 "Type not supported by get_basic_di_type: {llvm_ty:#}"
             )),
@@ -320,11 +328,6 @@ impl<'c> DebugInfoContext<'c> {
         );
 
         func.set_subprogram(di_func);
-        println!(
-            "SET SUBPROG {:?}->{:?}",
-            func.get_name(),
-            func.get_subprogram().unwrap()
-        );
         Ok(())
     }
 
