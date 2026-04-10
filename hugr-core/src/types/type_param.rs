@@ -17,7 +17,7 @@ use tracing::warn;
 
 use super::{Substitution, Transformable, Type, TypeBound, TypeRowLike, TypeTransformer};
 use crate::extension::SignatureError;
-use crate::types::{CustomType, FuncValueType, SumType};
+use crate::types::{CustomType, FuncValueType, GeneralSum, SumType};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -384,7 +384,7 @@ impl Term {
         }
     }
 
-    pub(crate) fn least_upper_bound(&self) -> Option<TypeBound> {
+    pub(crate) const fn least_upper_bound(&self) -> Option<TypeBound> {
         match self {
             Self::RuntimeExtension(ct) => Some(ct.bound()),
             Self::RuntimeSum(st) => Some(st.bound()),
@@ -427,8 +427,16 @@ impl Term {
     /// - this is left to [check_term_type].
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            Term::RuntimeSum(SumType::General { rows }) => {
+            Term::RuntimeSum(SumType::General(GeneralSum { rows, bound })) => {
                 rows.iter().try_for_each(|row| row.validate(var_decls))?;
+                debug_assert!(
+                    bound == &TypeBound::Linear
+                        || rows.iter().all(|row| check_term_type(
+                            row,
+                            &Term::new_list_type(*bound)
+                        )
+                        .is_ok())
+                );
                 Ok(())
             }
             Term::RuntimeSum(SumType::Unit { .. }) => Ok(()), // No leaves there
@@ -455,7 +463,7 @@ impl Term {
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),
-            TypeArg::RuntimeSum(SumType::General { rows }) => {
+            TypeArg::RuntimeSum(SumType::General(GeneralSum { rows, .. })) => {
                 // A substitution of a row variable for an empty list,
                 // could make the general case into a unary SumType.
                 Term::RuntimeSum(SumType::new(rows.iter().map(|r| r.substitute(t))))
