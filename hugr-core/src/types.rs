@@ -781,7 +781,7 @@ pub(crate) mod test {
 
         let coln = e.get_type(&COLN).unwrap();
         let c_of_cpy = coln
-            .instantiate([Term::new_list([Type::from(cpy.clone()).into()])])
+            .instantiate([Term::new_list([Type::from(cpy.clone())])])
             .unwrap();
 
         let mut t = Type::new_extension(c_of_cpy.clone());
@@ -794,7 +794,7 @@ pub(crate) mod test {
         );
 
         let mut t = Type::new_extension(
-            coln.instantiate([Term::new_list([mk_opt(Type::from(cpy.clone())).into()])])
+            coln.instantiate([Term::new_list([mk_opt(Type::from(cpy.clone()))])])
                 .unwrap(),
         );
         assert_eq!(
@@ -811,14 +811,14 @@ pub(crate) mod test {
             (ct == &c_of_cpy).then_some(usize_t())
         });
         let mut t = Type::new_extension(
-            coln.instantiate([Term::new_list(vec![Type::from(c_of_cpy.clone()).into(); 2])])
+            coln.instantiate([Term::new_list(vec![Type::from(c_of_cpy.clone()); 2])])
                 .unwrap(),
         );
         assert_eq!(t.transform(&cpy_to_qb2), Ok(true));
         assert_eq!(
             t,
             Type::new_extension(
-                coln.instantiate([Term::new_list([usize_t().into(), usize_t().into()])])
+                coln.instantiate([Term::new_list([usize_t(), usize_t()])])
                     .unwrap()
             )
         );

@@ -236,7 +236,7 @@ impl TryFrom<Term> for TypeRow {
 
 impl From<TypeRow> for Term {
     fn from(value: TypeRow) -> Self {
-        Term::new_list(value.into_owned().into_iter().map_into())
+        Term::new_list(value.into_owned())
     }
 }
 
@@ -275,7 +275,7 @@ impl DerefMut for TypeRow {
 pub struct TypeRowRV(pub(super) Term);
 
 impl TypeRowRV {
-    const EMPTY: TypeRowRV = Self(Term::List(vec![]));
+    const EMPTY: TypeRowRV = Self(Term::EMPTY_LIST);
     pub(super) const EMPTY_REF: &TypeRowRV = &Self::EMPTY;
 
     /// Create a new empty row.
@@ -358,7 +358,7 @@ impl From<TypeRowRV> for Term {
 // This allows an easy syntax for building TypeRowRV's which are all Types
 impl<T: IntoIterator<Item = Type>> From<T> for TypeRowRV {
     fn from(value: T) -> Self {
-        Self(Term::new_list(value.into_iter().map_into()))
+        Self(Term::new_list(value))
     }
 }
 
@@ -428,7 +428,7 @@ mod test {
     fn test_try_from_term_to_typerow() {
         // Test successful conversion with List
         let types = vec![Type::new_unit_sum(1), bool_t()];
-        let term = Term::new_list(types.iter().cloned().map_into());
+        let term = Term::new_list(types.clone());
         assert_eq!(
             TypeRow::try_from(term.clone()),
             Ok(TypeRow::from(types.clone()))

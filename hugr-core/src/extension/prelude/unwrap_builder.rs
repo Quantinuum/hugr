@@ -10,7 +10,7 @@ use crate::{
     ops::handle::DataflowOpID,
     types::{SumType, Type, TypeArg, TypeRow},
 };
-use itertools::{Itertools as _, zip_eq};
+use itertools::zip_eq;
 
 use super::PRELUDE;
 
@@ -24,16 +24,8 @@ pub trait UnwrapBuilder: Dataflow {
         inputs: impl IntoIterator<Item = (Wire, Type)>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let (input_wires, input_types): (Vec<_>, Vec<_>) = inputs.into_iter().unzip();
-        let input_arg: TypeArg = input_types
-            .into_iter()
-            .map(<TypeArg as From<_>>::from)
-            .collect_vec()
-            .into();
-        let output_arg: TypeArg = output_row
-            .into_iter()
-            .map(<TypeArg as From<_>>::from)
-            .collect_vec()
-            .into();
+        let input_arg = TypeArg::new_list(input_types);
+        let output_arg = TypeArg::new_list(output_row);
         let op = PRELUDE.instantiate_extension_op(&PANIC_OP_ID, [input_arg, output_arg])?;
         let err = self.add_load_value(err);
         self.add_dataflow_op(op, iter::once(err).chain(input_wires))

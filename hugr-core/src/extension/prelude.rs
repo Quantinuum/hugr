@@ -694,7 +694,7 @@ impl MakeExtensionOp for MakeTuple {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![Term::new_list(self.0.iter().map(|t| t.clone().into()))]
+        vec![self.0.clone().into()]
     }
 }
 
@@ -742,7 +742,7 @@ impl MakeExtensionOp for UnpackTuple {
     }
 
     fn type_args(&self) -> Vec<Term> {
-        vec![Term::new_list(self.0.iter().map(|t| t.clone().into()))]
+        vec![self.0.clone().into()]
     }
 }
 
@@ -960,9 +960,7 @@ impl MakeExtensionOp for Barrier {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::new_list(
-            self.type_row.iter().map(|t| t.clone().into()),
-        )]
+        vec![self.type_row.clone().into()]
     }
 }
 
@@ -1107,7 +1105,7 @@ mod test {
         let err = b.add_load_value(error_val);
 
         let op = PRELUDE
-            .instantiate_extension_op(&EXIT_OP_ID, [Term::new_list([]), Term::new_list([])])
+            .instantiate_extension_op(&EXIT_OP_ID, [Term::EMPTY_LIST, Term::EMPTY_LIST])
             .unwrap();
 
         b.add_dataflow_op(op, [err]).unwrap();
@@ -1122,7 +1120,7 @@ mod test {
             .instantiate_extension_op(&MAKE_ERROR_OP_ID, [])
             .unwrap();
         let panic_op = PRELUDE
-            .instantiate_extension_op(&EXIT_OP_ID, [Term::new_list([]), Term::new_list([])])
+            .instantiate_extension_op(&EXIT_OP_ID, [Term::EMPTY_LIST, Term::EMPTY_LIST])
             .unwrap();
 
         let mut b =

@@ -4,8 +4,6 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
-use itertools::Itertools;
-
 use crate::Extension;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
@@ -184,7 +182,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayScan<AK> {
             self.size.into(),
             self.src_ty.clone().into(),
             self.tgt_ty.clone().into(),
-            TypeArg::new_list(self.acc_tys.clone().into_iter().map_into()),
+            TypeArg::new_list(self.acc_tys.clone()),
         ]
     }
 }
