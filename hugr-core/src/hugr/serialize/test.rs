@@ -578,8 +578,8 @@ fn polyfunctype1() -> PolyFuncType {
 }
 
 fn polyfunctype2() -> PolyFuncTypeRV {
-    let tv0 = TypeRowRV::just_row_var(0, TypeBound::Linear);
-    let tv1 = TypeRowRV::just_row_var(1, TypeBound::Copyable);
+    let tv0 = TypeRowRV::new_var_use(0, TypeBound::Linear);
+    let tv1 = TypeRowRV::new_var_use(1, TypeBound::Copyable);
     let params = [TypeBound::Linear, TypeBound::Copyable].map(TypeParam::new_list_type);
     let inputs = TypeRowRV::from([Type::new_function(FuncValueType::new(
         tv0.clone(),
@@ -602,7 +602,7 @@ fn polyfunctype2() -> PolyFuncTypeRV {
 #[case(PolyFuncType::new([TypeParam::new_tuple_type([TypeBound::Linear.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], Signature::new_endo(type_row![])))]
 #[case(PolyFuncType::new(
     [TypeParam::new_list_type(TypeBound::Linear)],
-    Signature::new_endo([Type::new_tuple(TypeRowRV::just_row_var(0, TypeBound::Linear))])))]
+    Signature::new_endo([Type::new_tuple(TypeRowRV::new_var_use(0, TypeBound::Linear))])))]
 fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
     check_testing_roundtrip(poly_func_type);
 }
@@ -615,7 +615,7 @@ fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
 #[case(PolyFuncTypeRV::new([TypeParam::new_tuple_type([TypeBound::Linear.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], FuncValueType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new(
     [TypeParam::new_list_type(TypeBound::Linear)],
-    FuncValueType::new_endo(TypeRowRV::just_row_var(0, TypeBound::Linear))))]
+    FuncValueType::new_endo(TypeRowRV::new_var_use(0, TypeBound::Linear))))]
 #[case(polyfunctype2())]
 fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
     check_testing_roundtrip(poly_func_type);

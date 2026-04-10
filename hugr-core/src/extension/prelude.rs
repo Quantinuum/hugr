@@ -114,8 +114,8 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             ],
             FuncValueType::new(
                 TypeRowRV::from([Type::new_extension(error_type.clone())])
-                    .concat(TypeRowRV::just_row_var(0, TypeBound::Linear)),
-                TypeRowRV::just_row_var(1, TypeBound::Linear),
+                    .concat(TypeRowRV::new_var_use(0, TypeBound::Linear)),
+                TypeRowRV::new_var_use(1, TypeBound::Linear),
             ),
         );
         prelude
@@ -621,7 +621,7 @@ impl MakeOpDef for TupleOpDef {
     }
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
-        let rv = TypeRowRV::just_row_var(0, TypeBound::Linear);
+        let rv = TypeRowRV::new_var_use(0, TypeBound::Linear);
         let tuple_type = Type::new_tuple(rv.clone());
 
         let param = TypeParam::new_list_type(TypeBound::Linear);
@@ -894,7 +894,7 @@ impl MakeOpDef for BarrierDef {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
             vec![TypeParam::new_list_type(TypeBound::Linear)],
-            FuncValueType::new_endo(TypeRowRV::just_row_var(0, TypeBound::Linear)),
+            FuncValueType::new_endo(TypeRowRV::new_var_use(0, TypeBound::Linear)),
         )
         .into()
     }

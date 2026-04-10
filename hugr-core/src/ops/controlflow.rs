@@ -376,7 +376,7 @@ mod test {
     #[test]
     fn test_subst_conditional() {
         let tv1 = Type::new_var_use(1, TypeBound::Linear);
-        let tup_ty = Type::new_tuple(TypeRowRV::just_row_var(0, TypeBound::Linear));
+        let tup_ty = Type::new_tuple(TypeRowRV::new_var_use(0, TypeBound::Linear));
         let cond = Conditional {
             sum_rows: vec![[usize_t()].into(), [tv1.clone()].into()],
             other_inputs: vec![tup_ty].into(),

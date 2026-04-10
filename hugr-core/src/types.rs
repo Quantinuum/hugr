@@ -693,7 +693,7 @@ pub(crate) mod test {
     fn sum_variants() {
         let variants: Vec<TypeRowRV> = vec![
             [Type::UNIT].into(),
-            TypeRowRV::just_row_var(0, TypeBound::Linear),
+            TypeRowRV::new_var_use(0, TypeBound::Linear),
         ];
         let t = SumType::new(variants.clone());
         assert_eq!(variants, t.variants().cloned().collect_vec());

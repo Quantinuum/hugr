@@ -495,8 +495,8 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
     let rowp = TypeParam::new_list_type(TypeBound::Linear);
     Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
-        let inputs = TypeRowRV::just_row_var(0, TypeBound::Linear);
-        let outputs = TypeRowRV::just_row_var(1, TypeBound::Linear);
+        let inputs = TypeRowRV::new_var_use(0, TypeBound::Linear);
+        let outputs = TypeRowRV::new_var_use(1, TypeBound::Linear);
         let evaled_fn = Type::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone()],
@@ -505,7 +505,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
         ext.add_op("eval".into(), String::new(), pf, extension_ref)
             .unwrap();
 
-        let rv = |idx| TypeRowRV::just_row_var(idx, TypeBound::Linear);
+        let rv = |idx| TypeRowRV::new_var_use(idx, TypeBound::Linear);
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
             Signature::new(
@@ -554,7 +554,7 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
-    let tv_row = TypeRowRV::just_row_var(0, TypeBound::Linear);
+    let tv_row = TypeRowRV::new_var_use(0, TypeBound::Linear);
     let tv = Term::from(tv_row.clone());
     let inner_ft = Type::new_function(FuncValueType::new_endo(tv_row.clone()));
     let ft_usz = Type::new_function(FuncValueType::new_endo(tv_row.concat([usize_t()])));

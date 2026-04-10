@@ -65,7 +65,7 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
         let t1 = Type::new_var_use(1, TypeBound::Linear);
         let t2 = Type::new_var_use(2, TypeBound::Linear);
         let with_rest = |tys: Vec<Type>| {
-            TypeRowRV::from(tys).concat(TypeRowRV::just_row_var(3, TypeBound::Linear))
+            TypeRowRV::from(tys).concat(TypeRowRV::new_var_use(3, TypeBound::Linear))
         };
         PolyFuncTypeRV::new(
             params,

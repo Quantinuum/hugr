@@ -290,7 +290,7 @@ impl TypeRowRV {
 
     /// Creates a singleton row with just a row variable
     /// (a variable ranging over lists of types of any length)
-    pub fn just_row_var(idx: usize, b: TypeBound) -> Self {
+    pub fn new_var_use(idx: usize, b: TypeBound) -> Self {
         Self(Term::new_row_var_use(idx, b))
     }
 
@@ -406,7 +406,7 @@ mod test {
                             .prop_map(|ts| ts.clone().into())
                             .boxed(),
                         (any::<usize>(), any::<TypeBound>())
-                            .prop_map(|(idx, b)| TypeRowRV::just_row_var(idx, b))
+                            .prop_map(|(idx, b)| TypeRowRV::new_var_use(idx, b))
                             .boxed(),
                     ]
                     .boxed()
