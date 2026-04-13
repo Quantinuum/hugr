@@ -304,17 +304,35 @@ impl<'c> DebugInfoContext<'c> {
             return Err(anyhow!("Function already has debug record!"));
         }
 
-        let name_utf8 = func
+        let name = func
             .get_name()
             .to_str()
             .expect("function names should be valid UTF-8");
         let di_fty = self.create_di_function_type(func.get_type(), file)?;
         let is_local = func.get_linkage() != Linkage::External;
 
+        // we expect a "mangled" name in the following form:
+        // __hugr__.<Python module>.<guppy identifier>.<node ID>, where the Guppy
+        // identifier can be a Python identifier path with multiple dot components.
+        //
+        // so we try to make the pretty name by removing the first two and the final dot
+        // components. If this is unsuccessful (not enough dots) we leave the original name.
+        let lpar = name
+            .match_indices('.')
+            .nth(1)
+            .map(|idx_slice| idx_slice.0)
+            .unwrap_or(0);
+        let rpar = name.rfind('.').unwrap_or(name.len());
+        let pretty_name = if lpar + 1 < rpar {
+            &name[(lpar + 1)..rpar]
+        } else {
+            name
+        };
+
         let di_func = self.builder.create_function(
             self.compile_unit.as_debug_info_scope(),
-            name_utf8,
-            Some(name_utf8), // we expect the name to already be mangled at this point. TODO: None instead?
+            pretty_name, // name
+            Some(name),  // linkage_name
             file,
             lno,
             di_fty,
