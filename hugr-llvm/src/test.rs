@@ -1,8 +1,14 @@
 use std::rc::Rc;
 
 use hugr_core::{
-    Hugr,
+    Hugr, HugrView, Node,
     builder::{Dataflow, DataflowSubContainer, HugrBuilder, ModuleBuilder},
+    envelope::description::GeneratorDesc,
+    hugr::hugrmut::HugrMut,
+    metadata::{
+        HugrGenerator,
+        debug_info::{CompileUnitRecord, DEBUGINFO_META_KEY, LocationRecord, SubprogramRecord},
+    },
     ops::{OpTrait, OpType},
     types::PolyFuncType,
 };
@@ -11,6 +17,11 @@ use inkwell::{
     types::{BasicType, BasicTypeEnum},
 };
 use itertools::Itertools as _;
+use rand::{
+    RngExt, SeedableRng,
+    distr::{Alphabetic, SampleString},
+    rngs::SmallRng,
+};
 use rstest::fixture;
 
 use crate::{
@@ -169,7 +180,8 @@ impl TestContext {
     /// by `entry_point` in the inner module.
     ///
     /// That function must take no arguments and return FFI-compatible type `T`.
-    pub fn exec_hugr<T>(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> T {
+    pub fn exec_hugr<T>(&self, mut hugr: THugrView, entry_point: impl AsRef<str>) -> T {
+        add_random_debug_info(&mut hugr);
         let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
         emission.verify().unwrap();
 
@@ -288,4 +300,101 @@ pub fn single_op_hugr(op: OpType) -> Hugr {
         func_builder.finish_with_outputs(op.outputs()).unwrap()
     };
     module_builder.finish_hugr().unwrap()
+}
+
+/// Fixed seed for random debug info
+const RAND_DEBUGINFO_SEED: u64 = 0xfeabfaec;
+/// Maximum length of a randomly-generated path component
+const MAX_RAND_COMPONENT_LEN: usize = 32;
+/// Maximum number of components in a randomly-generated path
+const MAX_RAND_PATH_LEN: usize = 8;
+/// Probability of creating a new random file path for a debug info entry
+const NEW_RAND_FILE_PROB: f64 = 0.1;
+/// Maximum random line number
+const MAX_RAND_LNO: usize = 32768;
+/// Maximum random column number
+const MAX_RAND_COLNO: usize = 512;
+
+fn rand_path(rng: &mut SmallRng, suffix: &str) -> String {
+    let mut s = String::new();
+    let ncomp = rng.random_range(1..MAX_RAND_PATH_LEN);
+    for _ in 1..ncomp {
+        s.push('/');
+        let comp_len = rng.random_range(1..MAX_RAND_COMPONENT_LEN);
+        s.push_str(&Alphabetic.sample_string(rng, comp_len))
+    }
+    s.push_str(suffix);
+    s
+}
+
+/// Probabilistically get or create a random file and return its index in file_tab
+fn rand_indexed_file(rng: &mut SmallRng, file_tab: &mut Vec<String>) -> usize {
+    if file_tab.is_empty() || rng.random_bool(NEW_RAND_FILE_PROB) {
+        let i = file_tab.len();
+        file_tab.push(rand_path(rng, ".gpy.py"));
+        i
+    } else {
+        rng.random_range(0..file_tab.len())
+    }
+}
+
+/// Add random, format-appropriate debug info to a node
+fn node_random_debug_info(
+    hugr: &mut Hugr,
+    node: &Node,
+    rng: &mut SmallRng,
+    file_tab: &mut Vec<String>,
+) {
+    match hugr.get_optype(*node) {
+        OpType::FuncDefn(_) => {
+            let lno = rng.random_range(1..MAX_RAND_LNO);
+            hugr.set_metadata::<SubprogramRecord>(
+                *node,
+                SubprogramRecord {
+                    file: rand_indexed_file(rng, file_tab),
+                    line_no: lno,
+                    scope_line: lno + 1,
+                },
+            );
+        }
+        OpType::ExtensionOp(_) | OpType::OpaqueOp(_) => {
+            hugr.set_metadata::<LocationRecord>(
+                *node,
+                LocationRecord {
+                    column: rng.random_range(1..MAX_RAND_COLNO),
+                    line_no: rng.random_range(1..MAX_RAND_LNO),
+                },
+            );
+        }
+        _ => (),
+    }
+}
+
+/// Add random, format-appropriate debug info to a Hugr
+pub fn add_random_debug_info(hugr: &mut Hugr) {
+    let mut rng = SmallRng::seed_from_u64(RAND_DEBUGINFO_SEED);
+    let mut file_tab = Vec::new();
+    let root = hugr.module_root();
+
+    let node_vec: Vec<Node> = hugr.nodes().collect();
+    for node in node_vec.iter() {
+        if *node == root {
+            continue;
+        }
+        dbg!(node);
+        node_random_debug_info(hugr, node, &mut rng, &mut file_tab);
+        dbg!(hugr.get_metadata_any(*node, DEBUGINFO_META_KEY));
+    }
+
+    // need to populate the root metadata last, since it contains the file table.
+    hugr.set_metadata::<CompileUnitRecord>(
+        root,
+        CompileUnitRecord {
+            directory: rand_path(&mut rng, ""),
+            filename: rand_indexed_file(&mut rng, &mut file_tab),
+            file_table: file_tab,
+        },
+    );
+    // debug info emission requires that a generator string is present
+    hugr.set_metadata::<HugrGenerator>(root, GeneratorDesc::new_unversioned("hugr_llvm_test"));
 }
