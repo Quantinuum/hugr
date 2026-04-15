@@ -57,9 +57,14 @@ pub struct DebugInfoContext<'c> {
     type_map: BTreeMap<CString, DIType<'c>>,
     /// Mapping from function type names to DWARF type records
     fn_type_map: BTreeMap<CString, DISubroutineType<'c>>,
-    // TODO: replace this with HUGR debug types once available
+    // TODO: replace this with HUGR debug types after second milestone
     /// Fixed opaque pointer type
     ptr_type: DIType<'c>,
+    /// Placeholder DIFile for compiler-generated code
+    compgen_file: DIFile<'c>,
+    /// Counts the number of compiler-generated functions so far,
+    /// used to give each one a unique location record
+    num_compgen: u32,
     // NOTE: have_di_loc may not match the Builder's view of things,
     // see: https://github.com/TheDan64/inkwell/issues/674
     /// Tracks whether the builder currently has a location set
@@ -113,13 +118,19 @@ impl<'c> DebugInfoContext<'c> {
             .file_table
             .iter()
             .map(
-                // TODO: parse directory?
+                // TODO: parse directory? relative paths?
                 |path| builder.create_file(path, ""),
             )
             .collect();
 
+        // NOTE: LLVM has purpose-built constructs to represent this
+        // (DebugLoc::getCompilerGenerated etc), but they are not exposed
+        // through the C API. Internally they appear to just be records with null
+        // metadata ptrs, but Inkwell currently doesn't let us construct those either.
+        let compgen_file = builder.create_file("COMPILER_GENERATED_CODE", "");
+
         // note that this is not a DIPointerType, because
-        // it should be void* but Inkwell may not support creating void
+        // it should be void* but Inkwell may not support creating a void DIType
         let ptr_type = builder
             .create_basic_type("ptr", POINTER_BITS, DWARFTypeCode::Address as u32, 0)?
             .as_type();
@@ -131,6 +142,8 @@ impl<'c> DebugInfoContext<'c> {
             type_map: BTreeMap::new(),
             fn_type_map: BTreeMap::new(),
             ptr_type,
+            compgen_file,
+            num_compgen: 0,
             have_di_loc: false,
         }))
     }
@@ -162,7 +175,7 @@ impl<'c> DebugInfoContext<'c> {
     fn create_di_int_type(&mut self, int_ty: IntType<'c>) -> Result<DIType<'c>> {
         let width = int_ty.get_bit_width() as u64;
         let name = format!("i{width}");
-        // TODO: how to handle signs
+        // TODO: need HUGR type to get information about signedness
         Ok(self
             .builder
             .create_basic_type(&name, width, DWARFTypeCode::Unsigned as u32, 0)
@@ -377,10 +390,27 @@ impl<'c> DebugInfoContext<'c> {
         self.add_di_func(func, di_file, lno_u32, scope_lno_u32)
     }
 
-    /// Construct and attach a debug info record for a stub function,
-    /// similar to the above but HUGR debug info is not available
-    pub fn try_add_di_stub(&mut self, func: FunctionValue<'c>) -> Result<()> {
-        self.add_di_func(func, self.compile_unit.get_file(), 0, 0)
+    /// Construct and attach a debug info record for a compiler-generated function and
+    /// set the location to a special placeholder value. This is needed if `func` calls
+    /// inlined functions with attached debug info, otherwise the
+    /// callees' debug information will be lost.
+    pub fn set_compiler_generated(
+        &mut self,
+        func: FunctionValue<'c>,
+        iw_ctx: &'c Context,
+        ir_builder: &Builder,
+    ) -> Result<()> {
+        self.add_di_func(func, self.compgen_file, 0, 0)?;
+        let loc = self.builder.create_debug_location(
+            iw_ctx,
+            self.num_compgen,
+            0,
+            func.get_subprogram().unwrap().as_debug_info_scope(),
+            None,
+        );
+        self.set_debug_loc(ir_builder, loc)?;
+        self.num_compgen += 1;
+        Ok(())
     }
 
     /// If a node has an attached DILocation record, return Ok(Some(record)).
@@ -447,13 +477,12 @@ impl<'c> DebugInfoContext<'c> {
 }
 
 /// We test debug info generation by adding random info to all HUGRs generated and compiled for other
-/// tests (see `exec_hugr` and `check_emission`). There are also external end-to-end tests in qis-compiler.
+/// hugr-llvm tests (see `exec_hugr` and `check_emission`). There are also external end-to-end tests in qis-compiler.
 #[cfg(any(test, feature = "test-utils"))]
 pub(crate) mod test {
     use super::*;
     use hugr_core::{
-        Hugr, envelope::description::GeneratorDesc, hugr::hugrmut::HugrMut,
-        metadata::debug_info::DEBUGINFO_META_KEY, ops::OpType,
+        Hugr, envelope::description::GeneratorDesc, hugr::hugrmut::HugrMut, ops::OpType,
     };
     use rand::{
         RngExt, SeedableRng,
@@ -545,9 +574,7 @@ pub(crate) mod test {
 
         let node_vec: Vec<Node> = hugr.nodes().collect();
         for node in node_vec.iter() {
-            dbg!(node);
             node_random_debug_info(hugr, node, &mut rng, &mut file_tab);
-            dbg!(hugr.get_metadata_any(*node, DEBUGINFO_META_KEY));
         }
 
         // need to populate the root metadata last, since it contains the file table.

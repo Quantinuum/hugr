@@ -372,7 +372,6 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
         for c in node.children() {
             match c.as_ref() {
                 OpType::FuncDefn(fd) => {
-                    dbg!(fd);
                     let fat_ot = c.into_ot(fd);
                     self = self.emit_func(fat_ot)?;
                 }
