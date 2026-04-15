@@ -477,9 +477,11 @@ impl<'c> DebugInfoContext<'c> {
 }
 
 /// We test debug info generation by adding random info to all HUGRs generated and compiled for other
-/// hugr-llvm tests (see `exec_hugr` and `check_emission`). There are also external end-to-end tests in qis-compiler.
+/// hugr-llvm tests (see `exec_hugr` and `check_emission`).
+///
+/// There are also external end-to-end tests in qis-compiler.
 #[cfg(any(test, feature = "test-utils"))]
-pub(crate) mod test {
+pub mod test {
     use super::*;
     use hugr_core::{
         Hugr, envelope::description::GeneratorDesc, hugr::hugrmut::HugrMut, ops::OpType,
@@ -567,7 +569,7 @@ pub(crate) mod test {
     }
 
     /// Add random, format-appropriate debug info to a Hugr
-    pub(crate) fn add_random_debug_info(hugr: &mut Hugr) {
+    pub fn add_random_debug_info(hugr: &mut Hugr) {
         let mut rng = SmallRng::seed_from_u64(RAND_DEBUGINFO_SEED);
         let mut file_tab = Vec::new();
         let root = hugr.module_root();
