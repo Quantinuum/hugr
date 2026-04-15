@@ -181,8 +181,10 @@ impl TestContext {
     ///
     /// That function must take no arguments and return FFI-compatible type `T`.
     pub fn exec_hugr<T>(&self, mut hugr: THugrView, entry_point: impl AsRef<str>) -> T {
+        // We add random debug info to all test HUGRs for coverage.
         add_random_debug_info(&mut hugr);
-        let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
+        let emission =
+            Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr(), true).unwrap();
         emission.verify().unwrap();
 
         emission.jit_exec::<T>(entry_point).unwrap()
@@ -238,8 +240,11 @@ impl TestContext {
     ///
     /// For this to work, [`Emission::exec_panicking`] must be used together with the
     /// [`crate::emit::test::PanicTestPreludeCodegen`].
-    pub fn exec_hugr_panicking(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> String {
-        let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
+    pub fn exec_hugr_panicking(&self, mut hugr: THugrView, entry_point: impl AsRef<str>) -> String {
+        // We add random debug info to all test HUGRs for coverage.
+        add_random_debug_info(&mut hugr);
+        let emission =
+            Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr(), true).unwrap();
         emission.verify().unwrap();
 
         emission.exec_panicking(entry_point).unwrap()
@@ -345,6 +350,11 @@ fn node_random_debug_info(
     rng: &mut SmallRng,
     file_tab: &mut Vec<String>,
 ) {
+    let children: Vec<_> = hugr.children(*node).collect();
+    for c in children {
+        node_random_debug_info(hugr, &c, rng, file_tab);
+    }
+    // the root CompileUnit record is generated last, in the calling function
     match hugr.get_optype(*node) {
         OpType::FuncDefn(_) => {
             let lno = rng.random_range(1..MAX_RAND_LNO);
@@ -357,7 +367,10 @@ fn node_random_debug_info(
                 },
             );
         }
-        OpType::ExtensionOp(_) | OpType::OpaqueOp(_) => {
+        OpType::ExtensionOp(_)
+        | OpType::OpaqueOp(_)
+        | OpType::Call(_)
+        | OpType::CallIndirect(_) => {
             hugr.set_metadata::<LocationRecord>(
                 *node,
                 LocationRecord {
@@ -378,9 +391,6 @@ pub fn add_random_debug_info(hugr: &mut Hugr) {
 
     let node_vec: Vec<Node> = hugr.nodes().collect();
     for node in node_vec.iter() {
-        if *node == root {
-            continue;
-        }
         dbg!(node);
         node_random_debug_info(hugr, node, &mut rng, &mut file_tab);
         dbg!(hugr.get_metadata_any(*node, DEBUGINFO_META_KEY));

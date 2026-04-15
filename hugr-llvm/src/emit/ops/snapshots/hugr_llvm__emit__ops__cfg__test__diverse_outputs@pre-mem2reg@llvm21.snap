@@ -5,7 +5,7 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define internal i8 @_hl.main.1(i8 %0, i8 %1) {
+define internal i8 @_hl.main.1(i8 %0, i8 %1) !dbg !3 {
 alloca_block:
   %"0" = alloca i8, align 1
   %"2_0" = alloca i8, align 1
@@ -36,9 +36,9 @@ entry_block:                                      ; preds = %alloca_block
   store i8 %"7_15", ptr %"7_1", align 1
   %"7_06" = load i8, ptr %"7_0", align 1
   %"7_17" = load i8, ptr %"7_1", align 1
-  %3 = insertvalue { i8, i8 } poison, i8 %"7_06", 0
-  %4 = insertvalue { i8, i8 } %3, i8 %"7_17", 1
-  store { i8, i8 } %4, ptr %"9_0", align 1
+  %3 = insertvalue { i8, i8 } poison, i8 %"7_06", 0, !dbg !8
+  %4 = insertvalue { i8, i8 } %3, i8 %"7_17", 1, !dbg !8
+  store { i8, i8 } %4, ptr %"9_0", align 1, !dbg !8
   %"9_08" = load { i8, i8 }, ptr %"9_0", align 1
   store { i8, i8 } %"9_08", ptr %"9_0", align 1
   %"9_09" = load { i8, i8 }, ptr %"9_0", align 1
@@ -89,3 +89,16 @@ entry_block:                                      ; preds = %alloca_block
   %"019" = load i8, ptr %"0", align 1
   ret i8 %"019"
 }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/JrSnVYeXFfvzCkHdtWCCnkJ/PKiWSKICgZuRNRvRJmbrf/qoqpIlPNzlVLC.gpy.py", directory: "/HeDgUnyeIVwAutKJHaZEPSZwPXP/ycUvnujGxZKPRCTcNfs/EGLoPGCKHhMq")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 26394, type: !5, scopeLine: 26395, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/JrSnVYeXFfvzCkHdtWCCnkJ/PKiWSKICgZuRNRvRJmbrf/qoqpIlPNzlVLC.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{!7, !7, !7}
+!7 = !DIBasicType(name: "i8", size: 8, encoding: DW_ATE_unsigned)
+!8 = !DILocation(line: 30006, column: 330, scope: !3)

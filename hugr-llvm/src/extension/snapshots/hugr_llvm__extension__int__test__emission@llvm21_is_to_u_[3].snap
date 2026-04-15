@@ -8,23 +8,23 @@ source_filename = "test_context"
 @0 = private unnamed_addr constant [33 x i8] c"is_to_u called on negative value\00", align 1
 @prelude.panic_template = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
 
-define internal i8 @_hl.main.1(i8 %0) {
+define internal i8 @_hl.main.1(i8 %0) !dbg !3 {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %bounds_check = icmp sge i8 %0, 0
-  br label %panic_if_0
+  %bounds_check = icmp sge i8 %0, 0, !dbg !8
+  br label %panic_if_0, !dbg !8
 
 panic_if_0:                                       ; preds = %entry_block
   switch i1 %bounds_check, label %panic [
     i1 true, label %exit
-  ]
+  ], !dbg !8
 
 panic:                                            ; preds = %panic_if_0
-  %1 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 2, ptr @0)
-  call void @abort()
-  br label %exit
+  %1 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 2, ptr @0), !dbg !8
+  call void @abort(), !dbg !8
+  br label %exit, !dbg !8
 
 exit:                                             ; preds = %panic_if_0, %panic
   ret i8 %0
@@ -33,3 +33,16 @@ exit:                                             ; preds = %panic_if_0, %panic
 declare i32 @printf(ptr, ...)
 
 declare void @abort()
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/JrSnVYeXFfvzCkHdtWCCnkJ/PKiWSKICgZuRNRvRJmbrf/qoqpIlPNzlVLC.gpy.py", directory: "/hvZsHeDgUnyeIVwAutKJHaZEPSZ/PXPeycUvnujGxZKPRCTcNfsTEGLoP/CKHhM/mzeCBZoPGeHBxpWCFCAIgmDOGX/yQmUZGJneRvyjSLkxZjvaVMrckAfo/SeQfNL")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 26394, type: !5, scopeLine: 26395, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/JrSnVYeXFfvzCkHdtWCCnkJ/PKiWSKICgZuRNRvRJmbrf/qoqpIlPNzlVLC.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{!7, !7}
+!7 = !DIBasicType(name: "i8", size: 8, encoding: DW_ATE_unsigned)
+!8 = !DILocation(line: 5299, column: 65, scope: !3)

@@ -8,34 +8,47 @@ source_filename = "test_context"
 @0 = private unnamed_addr constant [24 x i8] c"Attempted division by 0\00", align 1
 @prelude.panic_template = private unnamed_addr constant [34 x i8] c"Program panicked (signal %i): %s\0A\00", align 1
 
-define internal i8 @_hl.main.1(i8 %0, i8 %1) {
+define internal i8 @_hl.main.1(i8 %0, i8 %1) !dbg !3 {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %valid_div = icmp ne i8 %1, 0
-  br label %panic_if_0
+  %valid_div = icmp ne i8 %1, 0, !dbg !8
+  br label %panic_if_0, !dbg !8
 
 panic_if_0:                                       ; preds = %entry_block
   switch i1 %valid_div, label %panic [
     i1 true, label %exit
-  ]
+  ], !dbg !8
 
 panic:                                            ; preds = %panic_if_0
-  %2 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 2, ptr @0)
-  call void @abort()
-  br label %exit
+  %2 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 2, ptr @0), !dbg !8
+  call void @abort(), !dbg !8
+  br label %exit, !dbg !8
 
 exit:                                             ; preds = %panic_if_0, %panic
-  %quotient = udiv i8 %0, %1
-  %remainder = urem i8 %0, %1
-  %3 = insertvalue { i8, i8 } poison, i8 %quotient, 0
-  %4 = insertvalue { i8, i8 } %3, i8 %remainder, 1
-  %5 = extractvalue { i8, i8 } %4, 0
-  %6 = extractvalue { i8, i8 } %4, 1
+  %quotient = udiv i8 %0, %1, !dbg !8
+  %remainder = urem i8 %0, %1, !dbg !8
+  %3 = insertvalue { i8, i8 } poison, i8 %quotient, 0, !dbg !8
+  %4 = insertvalue { i8, i8 } %3, i8 %remainder, 1, !dbg !8
+  %5 = extractvalue { i8, i8 } %4, 0, !dbg !8
+  %6 = extractvalue { i8, i8 } %4, 1, !dbg !8
   ret i8 %6
 }
 
 declare i32 @printf(ptr, ...)
 
 declare void @abort()
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/JrSnVYeXFfvzCkHdtWCCnkJ/PKiWSKICgZuRNRvRJmbrf/qoqpIlPNzlVLC.gpy.py", directory: "/hvZsHeDgUnyeIVwAutKJHaZEPSZ/PXPeycUvnujGxZKPRCTcNfsTEGLoP/CKHhM/mzeCBZoPGeHBxpWCFCAIgmDOGX/yQmUZGJneRvyjSLkxZjvaVMrckAfo/SeQfNL")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 26394, type: !5, scopeLine: 26395, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/JrSnVYeXFfvzCkHdtWCCnkJ/PKiWSKICgZuRNRvRJmbrf/qoqpIlPNzlVLC.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{!7, !7, !7}
+!7 = !DIBasicType(name: "i8", size: 8, encoding: DW_ATE_unsigned)
+!8 = !DILocation(line: 5299, column: 65, scope: !3)

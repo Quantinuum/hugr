@@ -5,21 +5,41 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define internal { ptr, { i1, i16 } } @_hl.main.1(ptr %0, i64 %1, i16 %2) {
+define internal { ptr, { i1, i16 } } @_hl.main.1(ptr %0, i64 %1, i16 %2) !dbg !3 {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %3 = alloca i16, align 2
-  store i16 %2, ptr %3, align 2
-  %4 = call i1 @__rt__list__set(ptr %0, i64 %1, ptr %3)
-  %5 = load i16, ptr %3, align 2
-  %6 = insertvalue { i1, i16 } { i1 false, i16 poison }, i16 %5, 1
-  %7 = insertvalue { i1, i16 } { i1 true, i16 poison }, i16 %2, 1
-  %8 = select i1 %4, { i1, i16 } %7, { i1, i16 } %6
+  %3 = alloca i16, align 2, !dbg !15
+  store i16 %2, ptr %3, align 2, !dbg !15
+  %4 = call i1 @__rt__list__set(ptr %0, i64 %1, ptr %3), !dbg !15
+  %5 = load i16, ptr %3, align 2, !dbg !15
+  %6 = insertvalue { i1, i16 } { i1 false, i16 poison }, i16 %5, 1, !dbg !15
+  %7 = insertvalue { i1, i16 } { i1 true, i16 poison }, i16 %2, 1, !dbg !15
+  %8 = select i1 %4, { i1, i16 } %7, { i1, i16 } %6, !dbg !15
   %mrv = insertvalue { ptr, { i1, i16 } } poison, ptr %0, 0
   %mrv8 = insertvalue { ptr, { i1, i16 } } %mrv, { i1, i16 } %8, 1
   ret { ptr, { i1, i16 } } %mrv8
 }
 
 declare i1 @__rt__list__set(ptr, i64, ptr)
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/JrSnVYeXFfvzCkHdtWCCnkJ/PKiWSKICgZuRNRvRJmbrf/qoqpIlPNzlVLC.gpy.py", directory: "/hvZsHeDgUnyeIVwAutKJHaZEPSZ/PXPeycUvnujGxZKPRCTcNfsTEGLoP/CKHhM/mzeCBZoPGeHBxpWCFCAIgmDOGX/yQmUZGJneRvyjSLkxZjvaVMrckAfo/SeQfNL")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 26394, type: !5, scopeLine: 26395, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/JrSnVYeXFfvzCkHdtWCCnkJ/PKiWSKICgZuRNRvRJmbrf/qoqpIlPNzlVLC.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{!7, !9, !14, !13}
+!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ ptr, { i1, i16 } }", file: !2, size: 10, align: 8, elements: !8)
+!8 = !{!9, !10}
+!9 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
+!10 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, i16 }", file: !2, size: 2, align: 8, elements: !11)
+!11 = !{!12, !13}
+!12 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
+!13 = !DIBasicType(name: "i16", size: 16, encoding: DW_ATE_unsigned)
+!14 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!15 = !DILocation(line: 5299, column: 65, scope: !3)

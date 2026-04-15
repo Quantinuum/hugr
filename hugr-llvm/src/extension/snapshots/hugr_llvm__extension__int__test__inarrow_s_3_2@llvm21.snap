@@ -7,16 +7,36 @@ source_filename = "test_context"
 
 @0 = private unnamed_addr constant [25 x i8] c"Can't narrow into bounds\00", align 1
 
-define internal { i1, { i32, ptr }, i8 } @_hl.main.1(i8 %0) {
+define internal { i1, { i32, ptr }, i8 } @_hl.main.1(i8 %0) !dbg !3 {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %upper_bounds_check = icmp sgt i8 %0, 7
-  %lower_bounds_check = icmp slt i8 %0, -8
-  %outside_range = or i1 %upper_bounds_check, %lower_bounds_check
-  %inbounds = xor i1 %outside_range, true
-  %1 = insertvalue { i1, { i32, ptr }, i8 } { i1 true, { i32, ptr } poison, i8 poison }, i8 %0, 2
-  %2 = select i1 %inbounds, { i1, { i32, ptr }, i8 } %1, { i1, { i32, ptr }, i8 } { i1 false, { i32, ptr } { i32 2, ptr @0 }, i8 poison }
+  %upper_bounds_check = icmp sgt i8 %0, 7, !dbg !15
+  %lower_bounds_check = icmp slt i8 %0, -8, !dbg !15
+  %outside_range = or i1 %upper_bounds_check, %lower_bounds_check, !dbg !15
+  %inbounds = xor i1 %outside_range, true, !dbg !15
+  %1 = insertvalue { i1, { i32, ptr }, i8 } { i1 true, { i32, ptr } poison, i8 poison }, i8 %0, 2, !dbg !15
+  %2 = select i1 %inbounds, { i1, { i32, ptr }, i8 } %1, { i1, { i32, ptr }, i8 } { i1 false, { i32, ptr } { i32 2, ptr @0 }, i8 poison }, !dbg !15
   ret { i1, { i32, ptr }, i8 } %2
 }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/JrSnVYeXFfvzCkHdtWCCnkJ/PKiWSKICgZuRNRvRJmbrf/qoqpIlPNzlVLC.gpy.py", directory: "/hvZsHeDgUnyeIVwAutKJHaZEPSZ/PXPeycUvnujGxZKPRCTcNfsTEGLoP/CKHhM/mzeCBZoPGeHBxpWCFCAIgmDOGX/yQmUZGJneRvyjSLkxZjvaVMrckAfo/SeQfNL")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 26394, type: !5, scopeLine: 26395, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/JrSnVYeXFfvzCkHdtWCCnkJ/PKiWSKICgZuRNRvRJmbrf/qoqpIlPNzlVLC.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{!7, !14}
+!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, { i32, ptr }, i8 }", file: !2, size: 13, align: 8, elements: !8)
+!8 = !{!9, !10, !14}
+!9 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
+!10 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i32, ptr }", file: !2, size: 12, align: 8, elements: !11)
+!11 = !{!12, !13}
+!12 = !DIBasicType(name: "i32", size: 32, encoding: DW_ATE_unsigned)
+!13 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
+!14 = !DIBasicType(name: "i8", size: 8, encoding: DW_ATE_unsigned)
+!15 = !DILocation(line: 5299, column: 65, scope: !3)

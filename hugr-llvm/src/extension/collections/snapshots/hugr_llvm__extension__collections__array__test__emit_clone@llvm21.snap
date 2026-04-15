@@ -5,32 +5,32 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define internal void @_hl.main.1() {
+define internal void @_hl.main.1() !dbg !3 {
 alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %0 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)
-  %1 = call ptr @malloc(i64 %0)
-  %2 = insertvalue { ptr, i64 } poison, ptr %1, 0
-  %3 = insertvalue { ptr, i64 } %2, i64 0, 1
-  %4 = getelementptr inbounds i64, ptr %1, i64 0
-  store i64 1, ptr %4, align 4
-  %5 = getelementptr inbounds i64, ptr %1, i64 1
-  store i64 2, ptr %5, align 4
-  %array_ptr = extractvalue { ptr, i64 } %3, 0
-  %array_offset = extractvalue { ptr, i64 } %3, 1
-  %6 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)
-  %7 = call ptr @malloc(i64 %6)
-  %8 = insertvalue { ptr, i64 } poison, ptr %7, 0
-  %9 = insertvalue { ptr, i64 } %8, i64 0, 1
-  %10 = getelementptr inbounds i64, ptr %array_ptr, i64 %array_offset
-  %11 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)
-  call void @llvm.memcpy.p0.p0.i64(ptr %7, ptr %10, i64 %11, i1 false)
-  %array_ptr5 = extractvalue { ptr, i64 } %9, 0
-  call void @free(ptr %array_ptr5)
-  %array_ptr7 = extractvalue { ptr, i64 } %3, 0
-  call void @free(ptr %array_ptr7)
+  %0 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !6
+  %1 = call ptr @malloc(i64 %0), !dbg !6
+  %2 = insertvalue { ptr, i64 } poison, ptr %1, 0, !dbg !6
+  %3 = insertvalue { ptr, i64 } %2, i64 0, 1, !dbg !6
+  %4 = getelementptr inbounds i64, ptr %1, i64 0, !dbg !6
+  store i64 1, ptr %4, align 4, !dbg !6
+  %5 = getelementptr inbounds i64, ptr %1, i64 1, !dbg !6
+  store i64 2, ptr %5, align 4, !dbg !6
+  %array_ptr = extractvalue { ptr, i64 } %3, 0, !dbg !7
+  %array_offset = extractvalue { ptr, i64 } %3, 1, !dbg !7
+  %6 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !7
+  %7 = call ptr @malloc(i64 %6), !dbg !7
+  %8 = insertvalue { ptr, i64 } poison, ptr %7, 0, !dbg !7
+  %9 = insertvalue { ptr, i64 } %8, i64 0, 1, !dbg !7
+  %10 = getelementptr inbounds i64, ptr %array_ptr, i64 %array_offset, !dbg !7
+  %11 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !7
+  call void @llvm.memcpy.p0.p0.i64(ptr %7, ptr %10, i64 %11, i1 false), !dbg !7
+  %array_ptr5 = extractvalue { ptr, i64 } %9, 0, !dbg !8
+  call void @free(ptr %array_ptr5), !dbg !8
+  %array_ptr7 = extractvalue { ptr, i64 } %3, 0, !dbg !9
+  call void @free(ptr %array_ptr7), !dbg !9
   ret void
 }
 
@@ -42,3 +42,17 @@ declare void @llvm.memcpy.p0.p0.i64(ptr noalias writeonly captures(none), ptr no
 declare void @free(ptr)
 
 attributes #0 = { nocallback nofree nounwind willreturn memory(argmem: readwrite) }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/eXFfvzCkHdtWCCn/JhPKiWSKICgZuRNRvRJmbr.gpy.py", directory: "")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !2, line: 10060, type: !4, scopeLine: 10061, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DISubroutineType(types: !5)
+!5 = !{null}
+!6 = !DILocation(line: 13582, column: 372, scope: !3)
+!7 = !DILocation(line: 1712, column: 109, scope: !3)
+!8 = !DILocation(line: 21129, column: 412, scope: !3)
+!9 = !DILocation(line: 352, column: 366, scope: !3)
