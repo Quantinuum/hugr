@@ -313,7 +313,7 @@ macro_rules! check_emission {
     // Call the macro with a snapshot name.
     ($snapshot_name:expr, $hugr: ident, $test_ctx:ident) => {{
         // We add random debug info to all test HUGRs for coverage.
-        $crate::test::add_random_debug_info(&mut $hugr);
+        $crate::emit::debug_info::test::add_random_debug_info(&mut $hugr);
         let root = $crate::utils::fat::FatExt::fat_root(&$hugr).unwrap();
         let emission =
             $crate::emit::test::Emission::emit_hugr(root, $test_ctx.get_emit_hugr(), true).unwrap();
