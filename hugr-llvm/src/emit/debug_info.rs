@@ -590,4 +590,102 @@ pub mod test {
         // debug info emission requires that a generator string is present
         hugr.set_metadata::<HugrGenerator>(root, GeneratorDesc::new_unversioned("hugr_llvm_test"));
     }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use crate::custom::CodegenExtsBuilder;
+        use crate::emit::test::{DFGW, Emission, SimpleHugrConfig};
+        use crate::test::{TestContext, llvm_ctx};
+        use crate::utils::fat::FatExt;
+        use hugr_core::HugrView;
+        use hugr_core::builder::{Dataflow, DataflowHugr};
+        use hugr_core::std_extensions::STD_REG;
+        use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
+        use hugr_core::std_extensions::arithmetic::int_types::int_type;
+        use rstest::rstest;
+
+        /// Build a HUGR with a simple integer add function, with all three supported
+        /// debug info record types attached: `CompileUnitRecord` on the module root,
+        /// `SubprogramRecord` on the `FuncDefn`, and `LocationRecord` on the `ExtensionOp`.
+        fn build_hugr_with_all_debug_info() -> Hugr {
+            let int64 = int_type(6);
+            let mut hugr = SimpleHugrConfig::new()
+                .with_ins([int64.clone(), int64.clone()])
+                .with_outs([int64])
+                .with_extensions(STD_REG.to_owned())
+                .finish(|mut builder: DFGW| {
+                    let [a, b] = builder.input_wires_arr();
+                    let add = builder
+                        .add_dataflow_op(IntOpDef::iadd.with_log_width(6), [a, b])
+                        .unwrap();
+                    builder.finish_hugr_with_outputs(add.outputs()).unwrap()
+                });
+
+            let file_table = vec!["test_source.py".to_string()];
+            let root = hugr.module_root();
+
+            let func_node = hugr
+                .children(root)
+                .find(|&n| matches!(hugr.get_optype(n), OpType::FuncDefn(_)))
+                .unwrap();
+            hugr.set_metadata::<SubprogramRecord>(
+                func_node,
+                SubprogramRecord {
+                    file: 0,
+                    line_no: 10,
+                    scope_line: 10,
+                },
+            );
+
+            let ext_op_node = hugr
+                .nodes()
+                .find(|&n| matches!(hugr.get_optype(n), OpType::ExtensionOp(_)))
+                .unwrap();
+            hugr.set_metadata::<LocationRecord>(
+                ext_op_node,
+                LocationRecord {
+                    line_no: 11,
+                    column: 4,
+                },
+            );
+
+            hugr.set_metadata::<CompileUnitRecord>(
+                root,
+                CompileUnitRecord {
+                    directory: "/test/src".to_string(),
+                    filename: 0,
+                    file_table,
+                },
+            );
+            hugr.set_metadata::<HugrGenerator>(
+                root,
+                GeneratorDesc::new_unversioned("hugr_llvm_debug_test"),
+            );
+
+            hugr
+        }
+
+        /// Test that a HUGR with all debug info record types compiles successfully
+        /// when debug info emission is enabled.
+        #[rstest]
+        fn test_debug_info_enabled(mut llvm_ctx: TestContext) {
+            llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
+            let hugr = build_hugr_with_all_debug_info();
+            let root = hugr.fat_root().unwrap();
+            let emission = Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).unwrap();
+            emission.verify().unwrap();
+        }
+
+        /// Test that a HUGR with all debug info record types compiles successfully
+        /// when debug info emission is disabled.
+        #[rstest]
+        fn test_debug_info_disabled(mut llvm_ctx: TestContext) {
+            llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
+            let hugr = build_hugr_with_all_debug_info();
+            let root = hugr.fat_root().unwrap();
+            let emission = Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), false).unwrap();
+            emission.verify().unwrap();
+        }
+    }
 }
