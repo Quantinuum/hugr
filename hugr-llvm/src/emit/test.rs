@@ -19,6 +19,10 @@ use super::EmitHugr;
 
 mod panic_runtime;
 
+// currently all our targets have the same pointer size.
+// used for debug info.
+const TEST_PTR_SIZE: u32 = 64;
+
 #[allow(clippy::upper_case_acronyms)]
 pub type DFGW = DFGWrapper<Hugr, BuildHandle<FuncID<true>>>;
 
@@ -40,7 +44,7 @@ impl<'c> Emission<'c> {
         eh: EmitHugr<'c, 'a, H>,
         emit_debug: bool,
     ) -> Result<Self> where {
-        let (module, _) = eh.emit_module(hugr, emit_debug)?.finish();
+        let (module, _) = eh.emit_module(hugr, emit_debug, TEST_PTR_SIZE)?.finish();
         Ok(Self { module })
     }
 

@@ -31,8 +31,6 @@ use crate::utils::fat::FatNode;
 
 // alignment for all types
 const DEBUG_TYPE_ALIGNMENT: u32 = 8;
-// TODO: get this from TargetMachine
-const POINTER_BITS: u64 = 64;
 
 #[expect(dead_code, reason = "Currently unused types")]
 enum DWARFTypeCode {
@@ -79,6 +77,7 @@ impl<'c> DebugInfoContext<'c> {
     pub fn try_from_hugr_module<H: HugrView<Node = Node>>(
         node: FatNode<'_, hugr_core::ops::Module, H>,
         iw_module: &Module<'c>,
+        ptr_bits: u32,
     ) -> Result<Option<Self>> {
         let maybe_record = try_get_debug_meta::<_, CompileUnitRecord>(node.hugr(), node.node())?;
         if maybe_record.is_none() {
@@ -126,13 +125,13 @@ impl<'c> DebugInfoContext<'c> {
         // NOTE: LLVM has purpose-built constructs to represent this
         // (DebugLoc::getCompilerGenerated etc), but they are not exposed
         // through the C API. Internally they appear to just be records with null
-        // metadata ptrs, but Inkwell currently doesn't let us construct those either.
+        // metadata ptrs, but Inkwell doesn't seem to let us construct those either.
         let compgen_file = builder.create_file("COMPILER_GENERATED_CODE", "");
 
         // note that this is not a DIPointerType, because
         // it should be void* but Inkwell may not support creating a void DIType
         let ptr_type = builder
-            .create_basic_type("ptr", POINTER_BITS, DWARFTypeCode::Address as u32, 0)?
+            .create_basic_type("ptr", ptr_bits as u64, DWARFTypeCode::Address as u32, 0)?
             .as_type();
 
         Ok(Some(Self {

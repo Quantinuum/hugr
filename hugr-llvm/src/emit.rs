@@ -84,11 +84,12 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
     pub fn try_di_init<HV: HugrView<Node = Node>>(
         &mut self,
         node: FatNode<'_, hugr_core::ops::Module, HV>,
+        ptr_bits: u32,
     ) -> Result<()> {
         if self.di_context.is_some() {
             Err(anyhow!("Debug context already present"))
         } else {
-            self.di_context = DebugInfoContext::try_from_hugr_module(node, &self.module)?;
+            self.di_context = DebugInfoContext::try_from_hugr_module(node, &self.module, ptr_bits)?;
             Ok(())
         }
     }
@@ -346,8 +347,12 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
     }
 
     /// Self-owning wrapper for `EmitModuleContext::try_di_init`
-    fn try_di_init(mut self, node: FatNode<'_, hugr_core::ops::Module, H>) -> Result<Self> {
-        self.module_context.try_di_init(node)?;
+    fn try_di_init(
+        mut self,
+        node: FatNode<'_, hugr_core::ops::Module, H>,
+        ptr_bits: u32,
+    ) -> Result<Self> {
+        self.module_context.try_di_init(node, ptr_bits)?;
         Ok(self)
     }
 
@@ -365,9 +370,10 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
         mut self,
         node: FatNode<'_, hugr_core::ops::Module, H>,
         emit_debug: bool,
+        ptr_bits: u32,
     ) -> Result<Self> {
         if emit_debug {
-            self = self.try_di_init(node)?;
+            self = self.try_di_init(node, ptr_bits)?;
         }
         for c in node.children() {
             match c.as_ref() {
