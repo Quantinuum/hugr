@@ -693,19 +693,8 @@ pub mod test {
         #[rstest]
         fn test_wrong_debug_info_on_module(mut llvm_ctx: TestContext) {
             llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
-            let int64 = int_type(6);
-            let mut hugr = SimpleHugrConfig::new()
-                .with_ins([int64.clone(), int64.clone()])
-                .with_outs([int64])
-                .with_extensions(STD_REG.to_owned())
-                .finish(|mut builder: DFGW| {
-                    let [a, b] = builder.input_wires_arr();
-                    let add = builder
-                        .add_dataflow_op(IntOpDef::iadd.with_log_width(6), [a, b])
-                        .unwrap();
-                    builder.finish_hugr_with_outputs(add.outputs()).unwrap()
-                });
-            // Attach a SubprogramRecord where a CompileUnitRecord is expected
+            let mut hugr = build_hugr_with_all_debug_info();
+            // Replace the correct CompileUnitRecord with a SubprogramRecord
             let root = hugr.module_root();
             hugr.set_metadata::<SubprogramRecord>(
                 root,
@@ -714,10 +703,6 @@ pub mod test {
                     line_no: 1,
                     scope_line: 1,
                 },
-            );
-            hugr.set_metadata::<HugrGenerator>(
-                root,
-                GeneratorDesc::new_unversioned("hugr_llvm_debug_test"),
             );
             let root = hugr.fat_root().unwrap();
             assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
@@ -728,20 +713,9 @@ pub mod test {
         #[rstest]
         fn test_wrong_debug_info_on_funcdefn(mut llvm_ctx: TestContext) {
             llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
-            let int64 = int_type(6);
-            let mut hugr = SimpleHugrConfig::new()
-                .with_ins([int64.clone(), int64.clone()])
-                .with_outs([int64])
-                .with_extensions(STD_REG.to_owned())
-                .finish(|mut builder: DFGW| {
-                    let [a, b] = builder.input_wires_arr();
-                    let add = builder
-                        .add_dataflow_op(IntOpDef::iadd.with_log_width(6), [a, b])
-                        .unwrap();
-                    builder.finish_hugr_with_outputs(add.outputs()).unwrap()
-                });
+            let mut hugr = build_hugr_with_all_debug_info();
+            // Replace the correct SubprogramRecord with a LocationRecord
             let root = hugr.module_root();
-            // Attach a LocationRecord where a SubprogramRecord is expected
             let func_node = hugr
                 .children(root)
                 .find(|&n| matches!(hugr.get_optype(n), OpType::FuncDefn(_)))
@@ -753,18 +727,6 @@ pub mod test {
                     column: 1,
                 },
             );
-            hugr.set_metadata::<CompileUnitRecord>(
-                root,
-                CompileUnitRecord {
-                    directory: "/test/src".to_string(),
-                    filename: 0,
-                    file_table: vec!["test_source.py".to_string()],
-                },
-            );
-            hugr.set_metadata::<HugrGenerator>(
-                root,
-                GeneratorDesc::new_unversioned("hugr_llvm_debug_test"),
-            );
             let root = hugr.fat_root().unwrap();
             assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
         }
@@ -774,24 +736,8 @@ pub mod test {
         #[rstest]
         fn test_wrong_debug_info_on_extension_op(mut llvm_ctx: TestContext) {
             llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
-            let int64 = int_type(6);
-            let mut hugr = SimpleHugrConfig::new()
-                .with_ins([int64.clone(), int64.clone()])
-                .with_outs([int64])
-                .with_extensions(STD_REG.to_owned())
-                .finish(|mut builder: DFGW| {
-                    let [a, b] = builder.input_wires_arr();
-                    let add = builder
-                        .add_dataflow_op(IntOpDef::iadd.with_log_width(6), [a, b])
-                        .unwrap();
-                    builder.finish_hugr_with_outputs(add.outputs()).unwrap()
-                });
-            let root = hugr.module_root();
-            let func_node = hugr
-                .children(root)
-                .find(|&n| matches!(hugr.get_optype(n), OpType::FuncDefn(_)))
-                .unwrap();
-            // Attach a SubprogramRecord where a LocationRecord is expected
+            let mut hugr = build_hugr_with_all_debug_info();
+            // Replace the correct LocationRecord with a SubprogramRecord
             let ext_op_node = hugr
                 .nodes()
                 .find(|&n| matches!(hugr.get_optype(n), OpType::ExtensionOp(_)))
@@ -803,26 +749,6 @@ pub mod test {
                     line_no: 1,
                     scope_line: 1,
                 },
-            );
-            hugr.set_metadata::<SubprogramRecord>(
-                func_node,
-                SubprogramRecord {
-                    file: 0,
-                    line_no: 10,
-                    scope_line: 10,
-                },
-            );
-            hugr.set_metadata::<CompileUnitRecord>(
-                root,
-                CompileUnitRecord {
-                    directory: "/test/src".to_string(),
-                    filename: 0,
-                    file_table: vec!["test_source.py".to_string()],
-                },
-            );
-            hugr.set_metadata::<HugrGenerator>(
-                root,
-                GeneratorDesc::new_unversioned("hugr_llvm_debug_test"),
             );
             let root = hugr.fat_root().unwrap();
             assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
