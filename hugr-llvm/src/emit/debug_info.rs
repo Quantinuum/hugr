@@ -596,6 +596,8 @@ pub mod test {
         use crate::utils::fat::FatExt;
         use hugr_core::HugrView;
         use hugr_core::builder::{Dataflow, DataflowHugr};
+        use hugr_core::hugr::hugrmut::HugrMut;
+        use hugr_core::metadata::debug_info::DEBUGINFO_META_KEY;
         use hugr_core::std_extensions::STD_REG;
         use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
         use hugr_core::std_extensions::arithmetic::int_types::int_type;
@@ -745,6 +747,61 @@ pub mod test {
                     line_no: 1,
                     scope_line: 1,
                 },
+            );
+            let root = hugr.fat_root().unwrap();
+            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+        }
+
+        /// Test that compilation fails when invalid JSON (not matching CompileUnitRecord's
+        /// schema) is attached to the Module root node.
+        #[rstest]
+        fn test_invalid_json_on_module(mut llvm_ctx: TestContext) {
+            llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
+            let mut hugr = build_hugr_with_all_debug_info();
+            let root = hugr.module_root();
+            hugr.set_metadata_any(
+                root,
+                DEBUGINFO_META_KEY,
+                serde_json::json!({"not_a_valid_field": true}),
+            );
+            let root = hugr.fat_root().unwrap();
+            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+        }
+
+        /// Test that compilation fails when invalid JSON (not matching SubprogramRecord's
+        /// schema) is attached to a FuncDefn node.
+        #[rstest]
+        fn test_invalid_json_on_funcdefn(mut llvm_ctx: TestContext) {
+            llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
+            let mut hugr = build_hugr_with_all_debug_info();
+            let root = hugr.module_root();
+            let func_node = hugr
+                .children(root)
+                .find(|&n| matches!(hugr.get_optype(n), OpType::FuncDefn(_)))
+                .unwrap();
+            hugr.set_metadata_any(
+                func_node,
+                DEBUGINFO_META_KEY,
+                serde_json::json!({"not_a_valid_field": true}),
+            );
+            let root = hugr.fat_root().unwrap();
+            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+        }
+
+        /// Test that compilation fails when invalid JSON (not matching LocationRecord's
+        /// schema) is attached to an ExtensionOp node.
+        #[rstest]
+        fn test_invalid_json_on_extension_op(mut llvm_ctx: TestContext) {
+            llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
+            let mut hugr = build_hugr_with_all_debug_info();
+            let ext_op_node = hugr
+                .nodes()
+                .find(|&n| matches!(hugr.get_optype(n), OpType::ExtensionOp(_)))
+                .unwrap();
+            hugr.set_metadata_any(
+                ext_op_node,
+                DEBUGINFO_META_KEY,
+                serde_json::json!({"not_a_valid_field": true}),
             );
             let root = hugr.fat_root().unwrap();
             assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
