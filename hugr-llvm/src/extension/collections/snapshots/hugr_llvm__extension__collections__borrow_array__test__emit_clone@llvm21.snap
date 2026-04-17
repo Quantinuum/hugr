@@ -13,35 +13,35 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %array_size = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !6
-  %0 = call ptr @malloc(i64 %array_size), !dbg !6
-  %1 = call ptr @malloc(i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)), !dbg !6
-  call void @llvm.memset.p0.i64(ptr %1, i8 0, i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i1 false), !dbg !6
-  %2 = insertvalue { ptr, ptr, i64 } poison, ptr %0, 0, !dbg !6
-  %3 = insertvalue { ptr, ptr, i64 } %2, ptr %1, 1, !dbg !6
-  %4 = insertvalue { ptr, ptr, i64 } %3, i64 0, 2, !dbg !6
-  %5 = getelementptr inbounds i64, ptr %0, i64 0, !dbg !6
-  store i64 1, ptr %5, align 4, !dbg !6
-  %6 = getelementptr inbounds i64, ptr %0, i64 1, !dbg !6
-  store i64 2, ptr %6, align 4, !dbg !6
-  %array_ptr = extractvalue { ptr, ptr, i64 } %4, 0, !dbg !7
-  %array_mask_ptr = extractvalue { ptr, ptr, i64 } %4, 1, !dbg !7
-  %array_offset = extractvalue { ptr, ptr, i64 } %4, 2, !dbg !7
-  call void @__barray_check_none_borrowed(ptr %array_mask_ptr, i64 %array_offset, i64 2), !dbg !7
-  %array_size4 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !7
-  %7 = call ptr @malloc(i64 %array_size4), !dbg !7
-  %8 = call ptr @malloc(i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)), !dbg !7
-  call void @llvm.memset.p0.i64(ptr %8, i8 0, i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i1 false), !dbg !7
-  %9 = insertvalue { ptr, ptr, i64 } poison, ptr %7, 0, !dbg !7
-  %10 = insertvalue { ptr, ptr, i64 } %9, ptr %8, 1, !dbg !7
-  %11 = insertvalue { ptr, ptr, i64 } %10, i64 0, 2, !dbg !7
-  %12 = getelementptr inbounds i64, ptr %array_ptr, i64 %array_offset, !dbg !7
-  %13 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !7
-  call void @llvm.memcpy.p0.p0.i64(ptr %7, ptr %12, i64 %13, i1 false), !dbg !7
-  %array_ptr6 = extractvalue { ptr, ptr, i64 } %11, 0, !dbg !8
-  call void @free(ptr %array_ptr6), !dbg !8
-  %array_ptr8 = extractvalue { ptr, ptr, i64 } %4, 0, !dbg !9
-  call void @free(ptr %array_ptr8), !dbg !9
+  %array_size = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !7
+  %0 = call ptr @malloc(i64 %array_size), !dbg !7
+  %1 = call ptr @malloc(i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)), !dbg !7
+  call void @llvm.memset.p0.i64(ptr %1, i8 0, i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i1 false), !dbg !7
+  %2 = insertvalue { ptr, ptr, i64 } poison, ptr %0, 0, !dbg !7
+  %3 = insertvalue { ptr, ptr, i64 } %2, ptr %1, 1, !dbg !7
+  %4 = insertvalue { ptr, ptr, i64 } %3, i64 0, 2, !dbg !7
+  %5 = getelementptr inbounds i64, ptr %0, i64 0, !dbg !7
+  store i64 1, ptr %5, align 4, !dbg !7
+  %6 = getelementptr inbounds i64, ptr %0, i64 1, !dbg !7
+  store i64 2, ptr %6, align 4, !dbg !7
+  %array_ptr = extractvalue { ptr, ptr, i64 } %4, 0, !dbg !8
+  %array_mask_ptr = extractvalue { ptr, ptr, i64 } %4, 1, !dbg !8
+  %array_offset = extractvalue { ptr, ptr, i64 } %4, 2, !dbg !8
+  call void @__barray_check_none_borrowed(ptr %array_mask_ptr, i64 %array_offset, i64 2), !dbg !8
+  %array_size4 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !8
+  %7 = call ptr @malloc(i64 %array_size4), !dbg !8
+  %8 = call ptr @malloc(i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)), !dbg !8
+  call void @llvm.memset.p0.i64(ptr %8, i8 0, i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i1 false), !dbg !8
+  %9 = insertvalue { ptr, ptr, i64 } poison, ptr %7, 0, !dbg !8
+  %10 = insertvalue { ptr, ptr, i64 } %9, ptr %8, 1, !dbg !8
+  %11 = insertvalue { ptr, ptr, i64 } %10, i64 0, 2, !dbg !8
+  %12 = getelementptr inbounds i64, ptr %array_ptr, i64 %array_offset, !dbg !8
+  %13 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !8
+  call void @llvm.memcpy.p0.p0.i64(ptr %7, ptr %12, i64 %13, i1 false), !dbg !8
+  %array_ptr6 = extractvalue { ptr, ptr, i64 } %11, 0, !dbg !9
+  call void @free(ptr %array_ptr6), !dbg !9
+  %array_ptr8 = extractvalue { ptr, ptr, i64 } %4, 0, !dbg !10
+  call void @free(ptr %array_ptr8), !dbg !10
   ret void
 }
 
@@ -51,53 +51,53 @@ declare ptr @malloc(i64)
 declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #0
 
 define internal void @__barray_check_none_borrowed(ptr %0, i64 %1, i64 %2) {
-  %4 = udiv i64 %1, 64, !dbg !7
-  %5 = getelementptr inbounds i64, ptr %0, i64 %4, !dbg !7
-  %6 = load i64, ptr %5, align 4, !dbg !7
-  %7 = urem i64 %1, 64, !dbg !7
-  %8 = shl i64 -1, %7, !dbg !7
-  %9 = and i64 %6, %8, !dbg !7
-  store i64 %9, ptr %5, align 4, !dbg !7
-  %10 = add i64 %1, %2, !dbg !7
-  %last_valid = sub i64 %10, 1, !dbg !7
-  %11 = udiv i64 %last_valid, 64, !dbg !7
-  %12 = getelementptr inbounds i64, ptr %0, i64 %11, !dbg !7
-  %13 = load i64, ptr %12, align 4, !dbg !7
-  %14 = urem i64 %last_valid, 64, !dbg !7
-  %15 = add i64 %14, 1, !dbg !7
-  %16 = sub i64 64, %15, !dbg !7
-  %17 = lshr i64 -1, %16, !dbg !7
-  %18 = and i64 %13, %17, !dbg !7
-  store i64 %18, ptr %12, align 4, !dbg !7
-  %19 = udiv i64 %1, 64, !dbg !7
-  %20 = udiv i64 %last_valid, 64, !dbg !7
-  %21 = sub i64 %20, %19, !dbg !7
-  %22 = add i64 %21, 1, !dbg !7
-  br label %23, !dbg !7
+  %4 = udiv i64 %1, 64, !dbg !8
+  %5 = getelementptr inbounds i64, ptr %0, i64 %4, !dbg !8
+  %6 = load i64, ptr %5, align 4, !dbg !8
+  %7 = urem i64 %1, 64, !dbg !8
+  %8 = shl i64 -1, %7, !dbg !8
+  %9 = and i64 %6, %8, !dbg !8
+  store i64 %9, ptr %5, align 4, !dbg !8
+  %10 = add i64 %1, %2, !dbg !8
+  %last_valid = sub i64 %10, 1, !dbg !8
+  %11 = udiv i64 %last_valid, 64, !dbg !8
+  %12 = getelementptr inbounds i64, ptr %0, i64 %11, !dbg !8
+  %13 = load i64, ptr %12, align 4, !dbg !8
+  %14 = urem i64 %last_valid, 64, !dbg !8
+  %15 = add i64 %14, 1, !dbg !8
+  %16 = sub i64 64, %15, !dbg !8
+  %17 = lshr i64 -1, %16, !dbg !8
+  %18 = and i64 %13, %17, !dbg !8
+  store i64 %18, ptr %12, align 4, !dbg !8
+  %19 = udiv i64 %1, 64, !dbg !8
+  %20 = udiv i64 %last_valid, 64, !dbg !8
+  %21 = sub i64 %20, %19, !dbg !8
+  %22 = add i64 %21, 1, !dbg !8
+  br label %23, !dbg !8
 
 23:                                               ; preds = %mask_block_ok, %3
-  %.0 = phi i64 [ 0, %3 ], [ %32, %mask_block_ok ], !dbg !7
-  %24 = icmp ult i64 %.0, %22, !dbg !7
-  br i1 %24, label %25, label %30, !dbg !7
+  %.0 = phi i64 [ 0, %3 ], [ %32, %mask_block_ok ], !dbg !8
+  %24 = icmp ult i64 %.0, %22, !dbg !8
+  br i1 %24, label %25, label %30, !dbg !8
 
 25:                                               ; preds = %23
-  %26 = add i64 %.0, %19, !dbg !7
-  %27 = getelementptr inbounds i64, ptr %0, i64 %26, !dbg !7
-  %28 = load i64, ptr %27, align 4, !dbg !7
-  %29 = icmp eq i64 %28, 0, !dbg !7
-  br i1 %29, label %mask_block_ok, label %mask_block_err, !dbg !7
+  %26 = add i64 %.0, %19, !dbg !8
+  %27 = getelementptr inbounds i64, ptr %0, i64 %26, !dbg !8
+  %28 = load i64, ptr %27, align 4, !dbg !8
+  %29 = icmp eq i64 %28, 0, !dbg !8
+  br i1 %29, label %mask_block_ok, label %mask_block_err, !dbg !8
 
 30:                                               ; preds = %23
-  ret void, !dbg !7
+  ret void, !dbg !8
 
 mask_block_err:                                   ; preds = %25
-  %31 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 2, ptr @0), !dbg !7
-  call void @abort(), !dbg !7
-  unreachable, !dbg !7
+  %31 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 2, ptr @0), !dbg !8
+  call void @abort(), !dbg !8
+  unreachable, !dbg !8
 
 mask_block_ok:                                    ; preds = %25
-  %32 = add i64 %.0, 1, !dbg !7
-  br label %23, !dbg !7
+  %32 = add i64 %.0, 1, !dbg !8
+  br label %23, !dbg !8
 }
 
 declare i32 @printf(ptr, ...)
@@ -117,11 +117,12 @@ attributes #1 = { nocallback nofree nounwind willreturn memory(argmem: readwrite
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
 !1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "/eXFfvzCkHdtWCCn/JhPKiWSKICgZuRNRvRJmbr.gpy.py", directory: "")
-!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !2, line: 10060, type: !4, scopeLine: 10061, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
-!4 = !DISubroutineType(types: !5)
-!5 = !{null}
-!6 = !DILocation(line: 13582, column: 372, scope: !3)
-!7 = !DILocation(line: 1712, column: 109, scope: !3)
-!8 = !DILocation(line: 21129, column: 412, scope: !3)
-!9 = !DILocation(line: 352, column: 366, scope: !3)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/LClAphFGIyrhv/sHeDgUnyeIVwAutK/HaZEPS/wPXPeycUvnujGxZK/RCTcNfsTEG")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{null}
+!7 = !DILocation(line: 27062, column: 402, scope: !3)
+!8 = !DILocation(line: 5388, column: 404, scope: !3)
+!9 = !DILocation(line: 32551, column: 131, scope: !3)
+!10 = !DILocation(line: 10060, column: 368, scope: !3)

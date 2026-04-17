@@ -19,33 +19,33 @@ entry_block:                                      ; preds = %alloca_block
   store i64 1, ptr %"5_0", align 4
   %"5_01" = load i64, ptr %"5_0", align 4
   %"7_02" = load i64, ptr %"7_0", align 4
-  %0 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !6
-  %1 = call ptr @malloc(i64 %0), !dbg !6
-  %2 = insertvalue { ptr, i64 } poison, ptr %1, 0, !dbg !6
-  %3 = insertvalue { ptr, i64 } %2, i64 0, 1, !dbg !6
-  %4 = getelementptr inbounds i64, ptr %1, i64 0, !dbg !6
-  store i64 %"5_01", ptr %4, align 4, !dbg !6
-  %5 = getelementptr inbounds i64, ptr %1, i64 1, !dbg !6
-  store i64 %"7_02", ptr %5, align 4, !dbg !6
-  store { ptr, i64 } %3, ptr %"8_0", align 8, !dbg !6
+  %0 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !7
+  %1 = call ptr @malloc(i64 %0), !dbg !7
+  %2 = insertvalue { ptr, i64 } poison, ptr %1, 0, !dbg !7
+  %3 = insertvalue { ptr, i64 } %2, i64 0, 1, !dbg !7
+  %4 = getelementptr inbounds i64, ptr %1, i64 0, !dbg !7
+  store i64 %"5_01", ptr %4, align 4, !dbg !7
+  %5 = getelementptr inbounds i64, ptr %1, i64 1, !dbg !7
+  store i64 %"7_02", ptr %5, align 4, !dbg !7
+  store { ptr, i64 } %3, ptr %"8_0", align 8, !dbg !7
   %"8_03" = load { ptr, i64 }, ptr %"8_0", align 8
-  %array_ptr = extractvalue { ptr, i64 } %"8_03", 0, !dbg !7
-  %array_offset = extractvalue { ptr, i64 } %"8_03", 1, !dbg !7
-  %6 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !7
-  %7 = call ptr @malloc(i64 %6), !dbg !7
-  %8 = insertvalue { ptr, i64 } poison, ptr %7, 0, !dbg !7
-  %9 = insertvalue { ptr, i64 } %8, i64 0, 1, !dbg !7
-  %10 = getelementptr inbounds i64, ptr %array_ptr, i64 %array_offset, !dbg !7
-  %11 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !7
-  call void @llvm.memcpy.p0.p0.i64(ptr %7, ptr %10, i64 %11, i1 false), !dbg !7
-  store { ptr, i64 } %"8_03", ptr %"9_0", align 8, !dbg !7
-  store { ptr, i64 } %9, ptr %"9_1", align 8, !dbg !7
+  %array_ptr = extractvalue { ptr, i64 } %"8_03", 0, !dbg !8
+  %array_offset = extractvalue { ptr, i64 } %"8_03", 1, !dbg !8
+  %6 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !8
+  %7 = call ptr @malloc(i64 %6), !dbg !8
+  %8 = insertvalue { ptr, i64 } poison, ptr %7, 0, !dbg !8
+  %9 = insertvalue { ptr, i64 } %8, i64 0, 1, !dbg !8
+  %10 = getelementptr inbounds i64, ptr %array_ptr, i64 %array_offset, !dbg !8
+  %11 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !8
+  call void @llvm.memcpy.p0.p0.i64(ptr %7, ptr %10, i64 %11, i1 false), !dbg !8
+  store { ptr, i64 } %"8_03", ptr %"9_0", align 8, !dbg !8
+  store { ptr, i64 } %9, ptr %"9_1", align 8, !dbg !8
   %"9_14" = load { ptr, i64 }, ptr %"9_1", align 8
-  %array_ptr5 = extractvalue { ptr, i64 } %"9_14", 0, !dbg !8
-  call void @free(ptr %array_ptr5), !dbg !8
+  %array_ptr5 = extractvalue { ptr, i64 } %"9_14", 0, !dbg !9
+  call void @free(ptr %array_ptr5), !dbg !9
   %"9_06" = load { ptr, i64 }, ptr %"9_0", align 8
-  %array_ptr7 = extractvalue { ptr, i64 } %"9_06", 0, !dbg !9
-  call void @free(ptr %array_ptr7), !dbg !9
+  %array_ptr7 = extractvalue { ptr, i64 } %"9_06", 0, !dbg !10
+  call void @free(ptr %array_ptr7), !dbg !10
   ret void
 }
 
@@ -63,11 +63,12 @@ attributes #0 = { nocallback nofree nounwind willreturn memory(argmem: readwrite
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
 !1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "/eXFfvzCkHdtWCCn/JhPKiWSKICgZuRNRvRJmbr.gpy.py", directory: "")
-!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !2, line: 10060, type: !4, scopeLine: 10061, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
-!4 = !DISubroutineType(types: !5)
-!5 = !{null}
-!6 = !DILocation(line: 13582, column: 372, scope: !3)
-!7 = !DILocation(line: 1712, column: 109, scope: !3)
-!8 = !DILocation(line: 21129, column: 412, scope: !3)
-!9 = !DILocation(line: 352, column: 366, scope: !3)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/LClAphFGIyrhv/sHeDgUnyeIVwAutK/HaZEPS/wPXPeycUvnujGxZK/RCTcNfsTEG")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{null}
+!7 = !DILocation(line: 27062, column: 402, scope: !3)
+!8 = !DILocation(line: 5388, column: 404, scope: !3)
+!9 = !DILocation(line: 32551, column: 131, scope: !3)
+!10 = !DILocation(line: 10060, column: 368, scope: !3)

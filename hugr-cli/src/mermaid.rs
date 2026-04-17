@@ -8,6 +8,7 @@ use clap::Parser;
 use clio::Output;
 use hugr::HugrView;
 use hugr::hugr::views::render::NodeLabel;
+use hugr::metadata::debug_info::DEBUGINFO_META_KEY;
 use hugr::package::PackageValidationError;
 
 /// Dump the standard extensions.
@@ -76,9 +77,8 @@ impl MermaidArgs {
 
         for hugr in package.modules {
             let mmd_fmt = if self.debug_info {
-                // TODO: hardcoded key
                 hugr.mermaid_format()
-                    .with_node_labels(NodeLabel::MetadataKey("core.debug_info".to_string()))
+                    .with_node_labels(NodeLabel::MetadataKey(DEBUGINFO_META_KEY.to_string()))
             } else {
                 hugr.mermaid_format()
             };

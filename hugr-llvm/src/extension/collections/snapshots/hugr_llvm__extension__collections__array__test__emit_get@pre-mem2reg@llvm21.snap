@@ -71,11 +71,11 @@ declare void @free(ptr)
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
 !1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "/VYeXFfvzCkHdtWCCnkJhPKiW/KICgZuRNRvRJ.gpy.py", directory: "/ClAphFG/yrhvZs")
-!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25761, type: !5, scopeLine: 25762, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
-!4 = !DIFile(filename: "/VYeXFfvzCkHdtWCCnkJhPKiW/KICgZuRNRvRJ.gpy.py", directory: "")
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/lVLClAphFGIyrhvZsHeDgUnyeIVwAut")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
 !5 = !DISubroutineType(types: !6)
 !6 = !{null}
-!7 = !DILocation(line: 8376, column: 157, scope: !3)
-!8 = !DILocation(line: 23594, column: 85, scope: !3)
-!9 = !DILocation(line: 23807, column: 508, scope: !3)
+!7 = !DILocation(line: 5388, column: 404, scope: !3)
+!8 = !DILocation(line: 27062, column: 402, scope: !3)
+!9 = !DILocation(line: 10060, column: 368, scope: !3)

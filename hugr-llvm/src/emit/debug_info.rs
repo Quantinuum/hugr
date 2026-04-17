@@ -80,10 +80,9 @@ impl<'c> DebugInfoContext<'c> {
         ptr_bits: u32,
     ) -> Result<Option<Self>> {
         let maybe_record = try_get_debug_meta::<_, CompileUnitRecord>(node.hugr(), node.node())?;
-        if maybe_record.is_none() {
+        let Some(root_meta) = maybe_record else {
             return Ok(None);
-        }
-        let root_meta = maybe_record.unwrap();
+        };
 
         // TODO: who is using this value?
         let di_version = iw_module.get_context().i32_type().const_int(3, false);
@@ -92,8 +91,8 @@ impl<'c> DebugInfoContext<'c> {
         let prod_str = node
             .hugr()
             .get_metadata::<HugrGenerator>(node.node())
-            .ok_or(anyhow!("Root node missing generator metadata"))?
-            .to_string();
+            .map(|genmeta| genmeta.to_string())
+            .unwrap_or("unknown_hugr_generator".to_string());
 
         let (builder, compile_unit) = iw_module.create_debug_info_builder(
             true, // allow_unresolved
@@ -156,6 +155,8 @@ impl<'c> DebugInfoContext<'c> {
             BasicTypeEnum::FloatType(float_ty) => (float_ty.get_bit_width() / 8).into(),
             BasicTypeEnum::IntType(int_ty) => (int_ty.get_bit_width() / 8).into(),
             BasicTypeEnum::PointerType(_) => self.ptr_type.get_size_in_bits() / 8,
+            // TODO: this does not respect alignment. not that important until we have
+            // support for values in debug info.
             BasicTypeEnum::StructType(struct_ty) => struct_ty
                 .get_field_types_iter()
                 .fold(0, |len, elem_ty| len + self.get_basic_type_size(elem_ty)),
@@ -199,7 +200,7 @@ impl<'c> DebugInfoContext<'c> {
         let arr_len_i64: i64 = arr_len
             .try_into()
             .expect("Arrays should have length < 2^63");
-        let arr_subscripts = 0..(arr_len_i64 - 1);
+        let arr_subscripts = 0..arr_len_i64;
         Ok(self
             .builder
             .create_array_type(
@@ -241,7 +242,7 @@ impl<'c> DebugInfoContext<'c> {
             .as_type())
     }
 
-    /// Get a DWARF type record for context-free LLVM types,
+    /// Get a DWARF type record for a LLVM data type,
     /// creating it if it does not yet exist.
     fn get_basic_di_type(&mut self, llvm_ty: BasicMetadataTypeEnum<'c>) -> Result<DIType<'c>> {
         let name = llvm_ty.print_to_string();
@@ -372,10 +373,9 @@ impl<'c> DebugInfoContext<'c> {
     ) -> Result<()> {
         let maybe_record = try_get_debug_meta::<_, SubprogramRecord>(node.hugr(), node.node())
             .map_err(|e| anyhow!("Could not get subprogram record: {e}"))?;
-        if maybe_record.is_none() {
+        let Some(record) = maybe_record else {
             return Ok(());
-        }
-        let record = maybe_record.unwrap();
+        };
 
         let di_file = self.get_di_file(record.file)?;
         let lno_u32: u32 = record
@@ -460,7 +460,7 @@ impl<'c> DebugInfoContext<'c> {
     /// Clear the IR builder's current debug location.
     /// Returns an error if the IR builder's debug location is not set.
     pub fn unset_debug_loc(&mut self, ir_builder: &Builder) -> Result<()> {
-        if ir_builder.get_current_debug_location().is_none() {
+        if !self.have_di_loc {
             Err(anyhow!("Debug location is already unset!"))
         } else {
             ir_builder.unset_current_debug_location();
@@ -534,10 +534,6 @@ pub mod test {
         rng: &mut SmallRng,
         file_tab: &mut Vec<String>,
     ) {
-        let children: Vec<_> = hugr.children(*node).collect();
-        for c in children {
-            node_random_debug_info(hugr, &c, rng, file_tab);
-        }
         // the root CompileUnit record is generated last, in the calling function
         match hugr.get_optype(*node) {
             OpType::FuncDefn(_) => {

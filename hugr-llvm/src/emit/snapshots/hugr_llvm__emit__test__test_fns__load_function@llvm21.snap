@@ -20,8 +20,8 @@ declare void @_hl.target_func.1()
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
 !1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/PNzlVLClAphFGIyrhvZsHeD")
-!3 = distinct !DISubprogram(name: "_hl.main.2", linkageName: "_hl.main.2", scope: null, file: !4, line: 25761, type: !5, scopeLine: 25762, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/pIlPNzlVLClAphFGIyrhvZsHeD/UnyeIVwAutKJHaZEPSZw/XPeycUvnuj/xZKP/CTcNfsTEGLo")
+!3 = distinct !DISubprogram(name: "_hl.main.2", linkageName: "_hl.main.2", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
 !4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
 !5 = !DISubroutineType(types: !6)
 !6 = !{!7}

@@ -44,7 +44,10 @@ impl<'c> Emission<'c> {
         eh: EmitHugr<'c, 'a, H>,
         emit_debug: bool,
     ) -> Result<Self> where {
-        let (module, _) = eh.emit_module(hugr, emit_debug, TEST_PTR_SIZE)?.finish();
+        let (module, maybe_di_ctx) = eh.emit_module(hugr, emit_debug, TEST_PTR_SIZE)?.finish();
+        if let Some(di_ctx) = maybe_di_ctx {
+            di_ctx.finish();
+        }
         Ok(Self { module })
     }
 

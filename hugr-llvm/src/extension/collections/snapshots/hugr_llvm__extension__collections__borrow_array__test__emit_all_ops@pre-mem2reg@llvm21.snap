@@ -28,7 +28,7 @@ alloca_block:
   %"14_1" = alloca i64, align 8
   %"8_0" = alloca i64, align 8
   %"18_0" = alloca { i1, { ptr, ptr, i64 } }, align 8
-  %"0" = alloca { i1, { ptr, ptr, i64 } }, align 8, !dbg !6
+  %"0" = alloca { i1, { ptr, ptr, i64 } }, align 8, !dbg !7
   %"19_0" = alloca { ptr, ptr, i64 }, align 8
   %"015" = alloca { ptr, ptr, i64 }, align 8
   %"017" = alloca { ptr, ptr, i64 }, align 8
@@ -39,8 +39,8 @@ alloca_block:
   %"27_0" = alloca { ptr, ptr, i64 }, align 8
   %"29_0" = alloca { i1, i64 }, align 8
   %"29_1" = alloca { ptr, ptr, i64 }, align 8
-  %"030" = alloca { i1, i64 }, align 8, !dbg !7
-  %"1" = alloca { ptr, ptr, i64 }, align 8, !dbg !7
+  %"030" = alloca { i1, i64 }, align 8, !dbg !8
+  %"1" = alloca { ptr, ptr, i64 }, align 8, !dbg !8
   %"31_0" = alloca i64, align 8
   %"034" = alloca i64, align 8
   %"36_0" = alloca { i32, ptr }, align 8
@@ -48,7 +48,7 @@ alloca_block:
   %"038" = alloca i64, align 8
   %"39_0" = alloca i64, align 8
   %"41_0" = alloca { i1, { ptr, ptr, i64 }, i64 }, align 8
-  %"047" = alloca { i1, { ptr, ptr, i64 }, i64 }, align 8, !dbg !8
+  %"047" = alloca { i1, { ptr, ptr, i64 }, i64 }, align 8, !dbg !9
   %"42_0" = alloca i64, align 8
   %"42_1" = alloca { ptr, ptr, i64 }, align 8
   %"050" = alloca i64, align 8
@@ -95,81 +95,81 @@ entry_block:                                      ; preds = %alloca_block
   store i64 1, ptr %"10_0", align 4
   %"10_01" = load i64, ptr %"10_0", align 4
   %"12_02" = load i64, ptr %"12_0", align 4
-  %array_size = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !9
-  %0 = call ptr @malloc(i64 %array_size), !dbg !9
-  %1 = call ptr @malloc(i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)), !dbg !9
-  call void @llvm.memset.p0.i64(ptr %1, i8 0, i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i1 false), !dbg !9
-  %2 = insertvalue { ptr, ptr, i64 } poison, ptr %0, 0, !dbg !9
-  %3 = insertvalue { ptr, ptr, i64 } %2, ptr %1, 1, !dbg !9
-  %4 = insertvalue { ptr, ptr, i64 } %3, i64 0, 2, !dbg !9
-  %5 = getelementptr inbounds i64, ptr %0, i64 0, !dbg !9
-  store i64 %"10_01", ptr %5, align 4, !dbg !9
-  %6 = getelementptr inbounds i64, ptr %0, i64 1, !dbg !9
-  store i64 %"12_02", ptr %6, align 4, !dbg !9
-  store { ptr, ptr, i64 } %4, ptr %"15_0", align 8, !dbg !9
+  %array_size = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !10
+  %0 = call ptr @malloc(i64 %array_size), !dbg !10
+  %1 = call ptr @malloc(i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)), !dbg !10
+  call void @llvm.memset.p0.i64(ptr %1, i8 0, i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i1 false), !dbg !10
+  %2 = insertvalue { ptr, ptr, i64 } poison, ptr %0, 0, !dbg !10
+  %3 = insertvalue { ptr, ptr, i64 } %2, ptr %1, 1, !dbg !10
+  %4 = insertvalue { ptr, ptr, i64 } %3, i64 0, 2, !dbg !10
+  %5 = getelementptr inbounds i64, ptr %0, i64 0, !dbg !10
+  store i64 %"10_01", ptr %5, align 4, !dbg !10
+  %6 = getelementptr inbounds i64, ptr %0, i64 1, !dbg !10
+  store i64 %"12_02", ptr %6, align 4, !dbg !10
+  store { ptr, ptr, i64 } %4, ptr %"15_0", align 8, !dbg !10
   %"10_03" = load i64, ptr %"10_0", align 4
   %"12_04" = load i64, ptr %"12_0", align 4
-  %array_size5 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !10
-  %7 = call ptr @malloc(i64 %array_size5), !dbg !10
-  %8 = call ptr @malloc(i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)), !dbg !10
-  call void @llvm.memset.p0.i64(ptr %8, i8 0, i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i1 false), !dbg !10
-  %9 = insertvalue { ptr, ptr, i64 } poison, ptr %7, 0, !dbg !10
-  %10 = insertvalue { ptr, ptr, i64 } %9, ptr %8, 1, !dbg !10
-  %11 = insertvalue { ptr, ptr, i64 } %10, i64 0, 2, !dbg !10
-  %12 = getelementptr inbounds i64, ptr %7, i64 0, !dbg !10
-  store i64 %"10_03", ptr %12, align 4, !dbg !10
-  %13 = getelementptr inbounds i64, ptr %7, i64 1, !dbg !10
-  store i64 %"12_04", ptr %13, align 4, !dbg !10
-  store { ptr, ptr, i64 } %11, ptr %"13_0", align 8, !dbg !10
+  %array_size5 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !11
+  %7 = call ptr @malloc(i64 %array_size5), !dbg !11
+  %8 = call ptr @malloc(i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)), !dbg !11
+  call void @llvm.memset.p0.i64(ptr %8, i8 0, i64 ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), i1 false), !dbg !11
+  %9 = insertvalue { ptr, ptr, i64 } poison, ptr %7, 0, !dbg !11
+  %10 = insertvalue { ptr, ptr, i64 } %9, ptr %8, 1, !dbg !11
+  %11 = insertvalue { ptr, ptr, i64 } %10, i64 0, 2, !dbg !11
+  %12 = getelementptr inbounds i64, ptr %7, i64 0, !dbg !11
+  store i64 %"10_03", ptr %12, align 4, !dbg !11
+  %13 = getelementptr inbounds i64, ptr %7, i64 1, !dbg !11
+  store i64 %"12_04", ptr %13, align 4, !dbg !11
+  store { ptr, ptr, i64 } %11, ptr %"13_0", align 8, !dbg !11
   %"13_06" = load { ptr, ptr, i64 }, ptr %"13_0", align 8
-  %array_ptr = extractvalue { ptr, ptr, i64 } %"13_06", 0, !dbg !11
-  %array_mask_ptr = extractvalue { ptr, ptr, i64 } %"13_06", 1, !dbg !11
-  %array_offset = extractvalue { ptr, ptr, i64 } %"13_06", 2, !dbg !11
-  %14 = add i64 %array_offset, 0, !dbg !11
-  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr, i64 %14), !dbg !11
-  %15 = getelementptr inbounds i64, ptr %array_ptr, i64 %14, !dbg !11
-  %16 = load i64, ptr %15, align 4, !dbg !11
-  %17 = add i64 %array_offset, 1, !dbg !11
-  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr, i64 %17), !dbg !11
-  %18 = getelementptr inbounds i64, ptr %array_ptr, i64 %17, !dbg !11
-  %19 = load i64, ptr %18, align 4, !dbg !11
-  store i64 %16, ptr %"14_0", align 4, !dbg !11
-  store i64 %19, ptr %"14_1", align 4, !dbg !11
+  %array_ptr = extractvalue { ptr, ptr, i64 } %"13_06", 0, !dbg !12
+  %array_mask_ptr = extractvalue { ptr, ptr, i64 } %"13_06", 1, !dbg !12
+  %array_offset = extractvalue { ptr, ptr, i64 } %"13_06", 2, !dbg !12
+  %14 = add i64 %array_offset, 0, !dbg !12
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr, i64 %14), !dbg !12
+  %15 = getelementptr inbounds i64, ptr %array_ptr, i64 %14, !dbg !12
+  %16 = load i64, ptr %15, align 4, !dbg !12
+  %17 = add i64 %array_offset, 1, !dbg !12
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr, i64 %17), !dbg !12
+  %18 = getelementptr inbounds i64, ptr %array_ptr, i64 %17, !dbg !12
+  %19 = load i64, ptr %18, align 4, !dbg !12
+  store i64 %16, ptr %"14_0", align 4, !dbg !12
+  store i64 %19, ptr %"14_1", align 4, !dbg !12
   store i64 0, ptr %"8_0", align 4
   %"15_07" = load { ptr, ptr, i64 }, ptr %"15_0", align 8
   %"8_08" = load i64, ptr %"8_0", align 4
   %"10_09" = load i64, ptr %"10_0", align 4
-  %array_ptr10 = extractvalue { ptr, ptr, i64 } %"15_07", 0, !dbg !6
-  %array_mask_ptr11 = extractvalue { ptr, ptr, i64 } %"15_07", 1, !dbg !6
-  %array_offset12 = extractvalue { ptr, ptr, i64 } %"15_07", 2, !dbg !6
-  %20 = icmp ult i64 %"8_08", 2, !dbg !6
-  %21 = icmp ult i64 %"10_09", 2, !dbg !6
-  %22 = and i1 %20, %21, !dbg !6
-  br i1 %22, label %25, label %23, !dbg !6
+  %array_ptr10 = extractvalue { ptr, ptr, i64 } %"15_07", 0, !dbg !7
+  %array_mask_ptr11 = extractvalue { ptr, ptr, i64 } %"15_07", 1, !dbg !7
+  %array_offset12 = extractvalue { ptr, ptr, i64 } %"15_07", 2, !dbg !7
+  %20 = icmp ult i64 %"8_08", 2, !dbg !7
+  %21 = icmp ult i64 %"10_09", 2, !dbg !7
+  %22 = and i1 %20, %21, !dbg !7
+  br i1 %22, label %25, label %23, !dbg !7
 
 23:                                               ; preds = %entry_block
-  %24 = insertvalue { i1, { ptr, ptr, i64 } } { i1 false, { ptr, ptr, i64 } poison }, { ptr, ptr, i64 } %"15_07", 1, !dbg !6
-  store { i1, { ptr, ptr, i64 } } %24, ptr %"0", align 8, !dbg !6
-  br label %33, !dbg !6
+  %24 = insertvalue { i1, { ptr, ptr, i64 } } { i1 false, { ptr, ptr, i64 } poison }, { ptr, ptr, i64 } %"15_07", 1, !dbg !7
+  store { i1, { ptr, ptr, i64 } } %24, ptr %"0", align 8, !dbg !7
+  br label %33, !dbg !7
 
 25:                                               ; preds = %entry_block
-  %26 = add i64 %"8_08", %array_offset12, !dbg !6
-  %27 = add i64 %"10_09", %array_offset12, !dbg !6
-  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr11, i64 %26), !dbg !6
-  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr11, i64 %27), !dbg !6
-  %28 = getelementptr inbounds i64, ptr %array_ptr10, i64 %26, !dbg !6
-  %29 = load i64, ptr %28, align 4, !dbg !6
-  %30 = getelementptr inbounds i64, ptr %array_ptr10, i64 %27, !dbg !6
-  %31 = load i64, ptr %30, align 4, !dbg !6
-  store i64 %31, ptr %28, align 4, !dbg !6
-  store i64 %29, ptr %30, align 4, !dbg !6
-  %32 = insertvalue { i1, { ptr, ptr, i64 } } { i1 true, { ptr, ptr, i64 } poison }, { ptr, ptr, i64 } %"15_07", 1, !dbg !6
-  store { i1, { ptr, ptr, i64 } } %32, ptr %"0", align 8, !dbg !6
-  br label %33, !dbg !6
+  %26 = add i64 %"8_08", %array_offset12, !dbg !7
+  %27 = add i64 %"10_09", %array_offset12, !dbg !7
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr11, i64 %26), !dbg !7
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr11, i64 %27), !dbg !7
+  %28 = getelementptr inbounds i64, ptr %array_ptr10, i64 %26, !dbg !7
+  %29 = load i64, ptr %28, align 4, !dbg !7
+  %30 = getelementptr inbounds i64, ptr %array_ptr10, i64 %27, !dbg !7
+  %31 = load i64, ptr %30, align 4, !dbg !7
+  store i64 %31, ptr %28, align 4, !dbg !7
+  store i64 %29, ptr %30, align 4, !dbg !7
+  %32 = insertvalue { i1, { ptr, ptr, i64 } } { i1 true, { ptr, ptr, i64 } poison }, { ptr, ptr, i64 } %"15_07", 1, !dbg !7
+  store { i1, { ptr, ptr, i64 } } %32, ptr %"0", align 8, !dbg !7
+  br label %33, !dbg !7
 
 33:                                               ; preds = %23, %25
-  %"013" = load { i1, { ptr, ptr, i64 } }, ptr %"0", align 8, !dbg !6
-  store { i1, { ptr, ptr, i64 } } %"013", ptr %"18_0", align 8, !dbg !6
+  %"013" = load { i1, { ptr, ptr, i64 } }, ptr %"0", align 8, !dbg !7
+  store { i1, { ptr, ptr, i64 } } %"013", ptr %"18_0", align 8, !dbg !7
   %"18_014" = load { i1, { ptr, ptr, i64 } }, ptr %"18_0", align 8
   %34 = extractvalue { i1, { ptr, ptr, i64 } } %"18_014", 0
   switch i1 %34, label %35 [
@@ -192,11 +192,11 @@ cond_19_case_0:                                   ; preds = %35
   store { ptr, ptr, i64 } %"018", ptr %"21_0", align 8
   %"24_019" = load { i32, ptr }, ptr %"24_0", align 8
   %"21_020" = load { ptr, ptr, i64 }, ptr %"21_0", align 8
-  %39 = extractvalue { i32, ptr } %"24_019", 0, !dbg !12
-  %40 = extractvalue { i32, ptr } %"24_019", 1, !dbg !12
-  %41 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.1, i32 %39, ptr %40), !dbg !12
-  call void @abort(), !dbg !12
-  store { ptr, ptr, i64 } zeroinitializer, ptr %"25_0", align 8, !dbg !12
+  %39 = extractvalue { i32, ptr } %"24_019", 0, !dbg !13
+  %40 = extractvalue { i32, ptr } %"24_019", 1, !dbg !13
+  %41 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.1, i32 %39, ptr %40), !dbg !13
+  call void @abort(), !dbg !13
+  store { ptr, ptr, i64 } zeroinitializer, ptr %"25_0", align 8, !dbg !13
   %"25_021" = load { ptr, ptr, i64 }, ptr %"25_0", align 8
   store { ptr, ptr, i64 } %"25_021", ptr %"015", align 8
   br label %cond_exit_19
@@ -213,32 +213,32 @@ cond_exit_19:                                     ; preds = %cond_19_case_1, %co
   store { ptr, ptr, i64 } %"016", ptr %"19_0", align 8
   %"19_025" = load { ptr, ptr, i64 }, ptr %"19_0", align 8
   %"8_026" = load i64, ptr %"8_0", align 4
-  %array_ptr27 = extractvalue { ptr, ptr, i64 } %"19_025", 0, !dbg !7
-  %array_mask_ptr28 = extractvalue { ptr, ptr, i64 } %"19_025", 1, !dbg !7
-  %array_offset29 = extractvalue { ptr, ptr, i64 } %"19_025", 2, !dbg !7
-  %42 = icmp ult i64 %"8_026", 2, !dbg !7
-  br i1 %42, label %44, label %43, !dbg !7
+  %array_ptr27 = extractvalue { ptr, ptr, i64 } %"19_025", 0, !dbg !8
+  %array_mask_ptr28 = extractvalue { ptr, ptr, i64 } %"19_025", 1, !dbg !8
+  %array_offset29 = extractvalue { ptr, ptr, i64 } %"19_025", 2, !dbg !8
+  %42 = icmp ult i64 %"8_026", 2, !dbg !8
+  br i1 %42, label %44, label %43, !dbg !8
 
 43:                                               ; preds = %cond_exit_19
-  store { i1, i64 } { i1 false, i64 poison }, ptr %"030", align 4, !dbg !7
-  store { ptr, ptr, i64 } %"19_025", ptr %"1", align 8, !dbg !7
-  br label %49, !dbg !7
+  store { i1, i64 } { i1 false, i64 poison }, ptr %"030", align 4, !dbg !8
+  store { ptr, ptr, i64 } %"19_025", ptr %"1", align 8, !dbg !8
+  br label %49, !dbg !8
 
 44:                                               ; preds = %cond_exit_19
-  %45 = add i64 %"8_026", %array_offset29, !dbg !7
-  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr28, i64 %45), !dbg !7
-  %46 = getelementptr inbounds i64, ptr %array_ptr27, i64 %45, !dbg !7
-  %47 = load i64, ptr %46, align 4, !dbg !7
-  %48 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %47, 1, !dbg !7
-  store { i1, i64 } %48, ptr %"030", align 4, !dbg !7
-  store { ptr, ptr, i64 } %"19_025", ptr %"1", align 8, !dbg !7
-  br label %49, !dbg !7
+  %45 = add i64 %"8_026", %array_offset29, !dbg !8
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr28, i64 %45), !dbg !8
+  %46 = getelementptr inbounds i64, ptr %array_ptr27, i64 %45, !dbg !8
+  %47 = load i64, ptr %46, align 4, !dbg !8
+  %48 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %47, 1, !dbg !8
+  store { i1, i64 } %48, ptr %"030", align 4, !dbg !8
+  store { ptr, ptr, i64 } %"19_025", ptr %"1", align 8, !dbg !8
+  br label %49, !dbg !8
 
 49:                                               ; preds = %43, %44
-  %"031" = load { i1, i64 }, ptr %"030", align 4, !dbg !7
-  %"132" = load { ptr, ptr, i64 }, ptr %"1", align 8, !dbg !7
-  store { i1, i64 } %"031", ptr %"29_0", align 4, !dbg !7
-  store { ptr, ptr, i64 } %"132", ptr %"29_1", align 8, !dbg !7
+  %"031" = load { i1, i64 }, ptr %"030", align 4, !dbg !8
+  %"132" = load { ptr, ptr, i64 }, ptr %"1", align 8, !dbg !8
+  store { i1, i64 } %"031", ptr %"29_0", align 4, !dbg !8
+  store { ptr, ptr, i64 } %"132", ptr %"29_1", align 8, !dbg !8
   %"29_033" = load { i1, i64 }, ptr %"29_0", align 4
   %50 = extractvalue { i1, i64 } %"29_033", 0
   switch i1 %50, label %51 [
@@ -256,11 +256,11 @@ cond_exit_19:                                     ; preds = %cond_19_case_1, %co
 cond_31_case_0:                                   ; preds = %51
   store { i32, ptr } { i32 1, ptr @2 }, ptr %"36_0", align 8
   %"36_036" = load { i32, ptr }, ptr %"36_0", align 8
-  %54 = extractvalue { i32, ptr } %"36_036", 0, !dbg !13
-  %55 = extractvalue { i32, ptr } %"36_036", 1, !dbg !13
-  %56 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.2, i32 %54, ptr %55), !dbg !13
-  call void @abort(), !dbg !13
-  store i64 0, ptr %"37_0", align 4, !dbg !13
+  %54 = extractvalue { i32, ptr } %"36_036", 0, !dbg !14
+  %55 = extractvalue { i32, ptr } %"36_036", 1, !dbg !14
+  %56 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.2, i32 %54, ptr %55), !dbg !14
+  call void @abort(), !dbg !14
+  store i64 0, ptr %"37_0", align 4, !dbg !14
   %"37_037" = load i64, ptr %"37_0", align 4
   store i64 %"37_037", ptr %"034", align 4
   br label %cond_exit_31
@@ -278,32 +278,32 @@ cond_exit_31:                                     ; preds = %cond_31_case_1, %co
   %"29_141" = load { ptr, ptr, i64 }, ptr %"29_1", align 8
   %"10_042" = load i64, ptr %"10_0", align 4
   %"31_043" = load i64, ptr %"31_0", align 4
-  %array_ptr44 = extractvalue { ptr, ptr, i64 } %"29_141", 0, !dbg !8
-  %array_mask_ptr45 = extractvalue { ptr, ptr, i64 } %"29_141", 1, !dbg !8
-  %array_offset46 = extractvalue { ptr, ptr, i64 } %"29_141", 2, !dbg !8
-  %57 = icmp ult i64 %"10_042", 2, !dbg !8
-  br i1 %57, label %61, label %58, !dbg !8
+  %array_ptr44 = extractvalue { ptr, ptr, i64 } %"29_141", 0, !dbg !9
+  %array_mask_ptr45 = extractvalue { ptr, ptr, i64 } %"29_141", 1, !dbg !9
+  %array_offset46 = extractvalue { ptr, ptr, i64 } %"29_141", 2, !dbg !9
+  %57 = icmp ult i64 %"10_042", 2, !dbg !9
+  br i1 %57, label %61, label %58, !dbg !9
 
 58:                                               ; preds = %cond_exit_31
-  %59 = insertvalue { i1, { ptr, ptr, i64 }, i64 } { i1 false, { ptr, ptr, i64 } poison, i64 poison }, i64 %"31_043", 2, !dbg !8
-  %60 = insertvalue { i1, { ptr, ptr, i64 }, i64 } %59, { ptr, ptr, i64 } %"29_141", 1, !dbg !8
-  store { i1, { ptr, ptr, i64 }, i64 } %60, ptr %"047", align 8, !dbg !8
-  br label %67, !dbg !8
+  %59 = insertvalue { i1, { ptr, ptr, i64 }, i64 } { i1 false, { ptr, ptr, i64 } poison, i64 poison }, i64 %"31_043", 2, !dbg !9
+  %60 = insertvalue { i1, { ptr, ptr, i64 }, i64 } %59, { ptr, ptr, i64 } %"29_141", 1, !dbg !9
+  store { i1, { ptr, ptr, i64 }, i64 } %60, ptr %"047", align 8, !dbg !9
+  br label %67, !dbg !9
 
 61:                                               ; preds = %cond_exit_31
-  %62 = add i64 %"10_042", %array_offset46, !dbg !8
-  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr45, i64 %62), !dbg !8
-  %63 = getelementptr inbounds i64, ptr %array_ptr44, i64 %62, !dbg !8
-  %64 = load i64, ptr %63, align 4, !dbg !8
-  store i64 %"31_043", ptr %63, align 4, !dbg !8
-  %65 = insertvalue { i1, { ptr, ptr, i64 }, i64 } { i1 true, { ptr, ptr, i64 } poison, i64 poison }, i64 %64, 2, !dbg !8
-  %66 = insertvalue { i1, { ptr, ptr, i64 }, i64 } %65, { ptr, ptr, i64 } %"29_141", 1, !dbg !8
-  store { i1, { ptr, ptr, i64 }, i64 } %66, ptr %"047", align 8, !dbg !8
-  br label %67, !dbg !8
+  %62 = add i64 %"10_042", %array_offset46, !dbg !9
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr45, i64 %62), !dbg !9
+  %63 = getelementptr inbounds i64, ptr %array_ptr44, i64 %62, !dbg !9
+  %64 = load i64, ptr %63, align 4, !dbg !9
+  store i64 %"31_043", ptr %63, align 4, !dbg !9
+  %65 = insertvalue { i1, { ptr, ptr, i64 }, i64 } { i1 true, { ptr, ptr, i64 } poison, i64 poison }, i64 %64, 2, !dbg !9
+  %66 = insertvalue { i1, { ptr, ptr, i64 }, i64 } %65, { ptr, ptr, i64 } %"29_141", 1, !dbg !9
+  store { i1, { ptr, ptr, i64 }, i64 } %66, ptr %"047", align 8, !dbg !9
+  br label %67, !dbg !9
 
 67:                                               ; preds = %58, %61
-  %"048" = load { i1, { ptr, ptr, i64 }, i64 }, ptr %"047", align 8, !dbg !8
-  store { i1, { ptr, ptr, i64 }, i64 } %"048", ptr %"41_0", align 8, !dbg !8
+  %"048" = load { i1, { ptr, ptr, i64 }, i64 }, ptr %"047", align 8, !dbg !9
+  store { i1, { ptr, ptr, i64 }, i64 } %"048", ptr %"41_0", align 8, !dbg !9
   %"41_049" = load { i1, { ptr, ptr, i64 }, i64 }, ptr %"41_0", align 8
   %68 = extractvalue { i1, { ptr, ptr, i64 }, i64 } %"41_049", 0
   switch i1 %68, label %69 [
@@ -333,12 +333,12 @@ cond_42_case_0:                                   ; preds = %69
   %"47_058" = load { i32, ptr }, ptr %"47_0", align 8
   %"44_059" = load i64, ptr %"44_0", align 4
   %"44_160" = load { ptr, ptr, i64 }, ptr %"44_1", align 8
-  %75 = extractvalue { i32, ptr } %"47_058", 0, !dbg !14
-  %76 = extractvalue { i32, ptr } %"47_058", 1, !dbg !14
-  %77 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.3, i32 %75, ptr %76), !dbg !14
-  call void @abort(), !dbg !14
-  store i64 0, ptr %"48_0", align 4, !dbg !14
-  store { ptr, ptr, i64 } zeroinitializer, ptr %"48_1", align 8, !dbg !14
+  %75 = extractvalue { i32, ptr } %"47_058", 0, !dbg !15
+  %76 = extractvalue { i32, ptr } %"47_058", 1, !dbg !15
+  %77 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.3, i32 %75, ptr %76), !dbg !15
+  call void @abort(), !dbg !15
+  store i64 0, ptr %"48_0", align 4, !dbg !15
+  store { ptr, ptr, i64 } zeroinitializer, ptr %"48_1", align 8, !dbg !15
   %"48_061" = load i64, ptr %"48_0", align 4
   %"48_162" = load { ptr, ptr, i64 }, ptr %"48_1", align 8
   store i64 %"48_061", ptr %"050", align 4
@@ -362,19 +362,19 @@ cond_exit_42:                                     ; preds = %cond_42_case_1, %co
   store i64 %"052", ptr %"42_0", align 4
   store { ptr, ptr, i64 } %"153", ptr %"42_1", align 8
   %"42_169" = load { ptr, ptr, i64 }, ptr %"42_1", align 8
-  %array_ptr70 = extractvalue { ptr, ptr, i64 } %"42_169", 0, !dbg !15
-  %array_mask_ptr71 = extractvalue { ptr, ptr, i64 } %"42_169", 1, !dbg !15
-  %array_offset72 = extractvalue { ptr, ptr, i64 } %"42_169", 2, !dbg !15
-  %new_offset = add i64 %array_offset72, 1, !dbg !15
-  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr71, i64 %array_offset72), !dbg !15
-  %78 = getelementptr inbounds i64, ptr %array_ptr70, i64 %array_offset72, !dbg !15
-  %79 = load i64, ptr %78, align 4, !dbg !15
-  %80 = insertvalue { ptr, ptr, i64 } poison, ptr %array_ptr70, 0, !dbg !15
-  %81 = insertvalue { ptr, ptr, i64 } %80, ptr %array_mask_ptr71, 1, !dbg !15
-  %82 = insertvalue { ptr, ptr, i64 } %81, i64 %new_offset, 2, !dbg !15
-  %83 = insertvalue { i1, { ptr, ptr, i64 }, i64 } { i1 true, { ptr, ptr, i64 } poison, i64 poison }, i64 %79, 2, !dbg !15
-  %84 = insertvalue { i1, { ptr, ptr, i64 }, i64 } %83, { ptr, ptr, i64 } %82, 1, !dbg !15
-  store { i1, { ptr, ptr, i64 }, i64 } %84, ptr %"52_0", align 8, !dbg !15
+  %array_ptr70 = extractvalue { ptr, ptr, i64 } %"42_169", 0, !dbg !16
+  %array_mask_ptr71 = extractvalue { ptr, ptr, i64 } %"42_169", 1, !dbg !16
+  %array_offset72 = extractvalue { ptr, ptr, i64 } %"42_169", 2, !dbg !16
+  %new_offset = add i64 %array_offset72, 1, !dbg !16
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr71, i64 %array_offset72), !dbg !16
+  %78 = getelementptr inbounds i64, ptr %array_ptr70, i64 %array_offset72, !dbg !16
+  %79 = load i64, ptr %78, align 4, !dbg !16
+  %80 = insertvalue { ptr, ptr, i64 } poison, ptr %array_ptr70, 0, !dbg !16
+  %81 = insertvalue { ptr, ptr, i64 } %80, ptr %array_mask_ptr71, 1, !dbg !16
+  %82 = insertvalue { ptr, ptr, i64 } %81, i64 %new_offset, 2, !dbg !16
+  %83 = insertvalue { i1, { ptr, ptr, i64 }, i64 } { i1 true, { ptr, ptr, i64 } poison, i64 poison }, i64 %79, 2, !dbg !16
+  %84 = insertvalue { i1, { ptr, ptr, i64 }, i64 } %83, { ptr, ptr, i64 } %82, 1, !dbg !16
+  store { i1, { ptr, ptr, i64 }, i64 } %84, ptr %"52_0", align 8, !dbg !16
   %"52_073" = load { i1, { ptr, ptr, i64 }, i64 }, ptr %"52_0", align 8
   %85 = extractvalue { i1, { ptr, ptr, i64 }, i64 } %"52_073", 0
   switch i1 %85, label %86 [
@@ -394,12 +394,12 @@ cond_exit_42:                                     ; preds = %cond_42_case_1, %co
 cond_53_case_0:                                   ; preds = %86
   store { i32, ptr } { i32 1, ptr @4 }, ptr %"58_0", align 8
   %"58_078" = load { i32, ptr }, ptr %"58_0", align 8
-  %90 = extractvalue { i32, ptr } %"58_078", 0, !dbg !16
-  %91 = extractvalue { i32, ptr } %"58_078", 1, !dbg !16
-  %92 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.4, i32 %90, ptr %91), !dbg !16
-  call void @abort(), !dbg !16
-  store i64 0, ptr %"59_0", align 4, !dbg !16
-  store { ptr, ptr, i64 } zeroinitializer, ptr %"59_1", align 8, !dbg !16
+  %90 = extractvalue { i32, ptr } %"58_078", 0, !dbg !17
+  %91 = extractvalue { i32, ptr } %"58_078", 1, !dbg !17
+  %92 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.4, i32 %90, ptr %91), !dbg !17
+  call void @abort(), !dbg !17
+  store i64 0, ptr %"59_0", align 4, !dbg !17
+  store { ptr, ptr, i64 } zeroinitializer, ptr %"59_1", align 8, !dbg !17
   %"59_079" = load i64, ptr %"59_0", align 4
   %"59_180" = load { ptr, ptr, i64 }, ptr %"59_1", align 8
   store i64 %"59_079", ptr %"074", align 4
@@ -423,19 +423,19 @@ cond_exit_53:                                     ; preds = %cond_53_case_1, %co
   store i64 %"076", ptr %"53_0", align 4
   store { ptr, ptr, i64 } %"177", ptr %"53_1", align 8
   %"53_187" = load { ptr, ptr, i64 }, ptr %"53_1", align 8
-  %array_ptr88 = extractvalue { ptr, ptr, i64 } %"53_187", 0, !dbg !17
-  %array_mask_ptr89 = extractvalue { ptr, ptr, i64 } %"53_187", 1, !dbg !17
-  %array_offset90 = extractvalue { ptr, ptr, i64 } %"53_187", 2, !dbg !17
-  %93 = add i64 %array_offset90, 0, !dbg !17
-  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr89, i64 %93), !dbg !17
-  %94 = getelementptr inbounds i64, ptr %array_ptr88, i64 %93, !dbg !17
-  %95 = load i64, ptr %94, align 4, !dbg !17
-  %96 = insertvalue { ptr, ptr, i64 } poison, ptr %array_ptr88, 0, !dbg !17
-  %97 = insertvalue { ptr, ptr, i64 } %96, ptr %array_mask_ptr89, 1, !dbg !17
-  %98 = insertvalue { ptr, ptr, i64 } %97, i64 %array_offset90, 2, !dbg !17
-  %99 = insertvalue { i1, { ptr, ptr, i64 }, i64 } { i1 true, { ptr, ptr, i64 } poison, i64 poison }, i64 %95, 2, !dbg !17
-  %100 = insertvalue { i1, { ptr, ptr, i64 }, i64 } %99, { ptr, ptr, i64 } %98, 1, !dbg !17
-  store { i1, { ptr, ptr, i64 }, i64 } %100, ptr %"63_0", align 8, !dbg !17
+  %array_ptr88 = extractvalue { ptr, ptr, i64 } %"53_187", 0, !dbg !18
+  %array_mask_ptr89 = extractvalue { ptr, ptr, i64 } %"53_187", 1, !dbg !18
+  %array_offset90 = extractvalue { ptr, ptr, i64 } %"53_187", 2, !dbg !18
+  %93 = add i64 %array_offset90, 0, !dbg !18
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr89, i64 %93), !dbg !18
+  %94 = getelementptr inbounds i64, ptr %array_ptr88, i64 %93, !dbg !18
+  %95 = load i64, ptr %94, align 4, !dbg !18
+  %96 = insertvalue { ptr, ptr, i64 } poison, ptr %array_ptr88, 0, !dbg !18
+  %97 = insertvalue { ptr, ptr, i64 } %96, ptr %array_mask_ptr89, 1, !dbg !18
+  %98 = insertvalue { ptr, ptr, i64 } %97, i64 %array_offset90, 2, !dbg !18
+  %99 = insertvalue { i1, { ptr, ptr, i64 }, i64 } { i1 true, { ptr, ptr, i64 } poison, i64 poison }, i64 %95, 2, !dbg !18
+  %100 = insertvalue { i1, { ptr, ptr, i64 }, i64 } %99, { ptr, ptr, i64 } %98, 1, !dbg !18
+  store { i1, { ptr, ptr, i64 }, i64 } %100, ptr %"63_0", align 8, !dbg !18
   %"63_091" = load { i1, { ptr, ptr, i64 }, i64 }, ptr %"63_0", align 8
   %101 = extractvalue { i1, { ptr, ptr, i64 }, i64 } %"63_091", 0
   switch i1 %101, label %102 [
@@ -455,12 +455,12 @@ cond_exit_53:                                     ; preds = %cond_53_case_1, %co
 cond_64_case_0:                                   ; preds = %102
   store { i32, ptr } { i32 1, ptr @5 }, ptr %"69_0", align 8
   %"69_096" = load { i32, ptr }, ptr %"69_0", align 8
-  %106 = extractvalue { i32, ptr } %"69_096", 0, !dbg !18
-  %107 = extractvalue { i32, ptr } %"69_096", 1, !dbg !18
-  %108 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.5, i32 %106, ptr %107), !dbg !18
-  call void @abort(), !dbg !18
-  store i64 0, ptr %"70_0", align 4, !dbg !18
-  store { ptr, ptr, i64 } zeroinitializer, ptr %"70_1", align 8, !dbg !18
+  %106 = extractvalue { i32, ptr } %"69_096", 0, !dbg !19
+  %107 = extractvalue { i32, ptr } %"69_096", 1, !dbg !19
+  %108 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template.5, i32 %106, ptr %107), !dbg !19
+  call void @abort(), !dbg !19
+  store i64 0, ptr %"70_0", align 4, !dbg !19
+  store { ptr, ptr, i64 } zeroinitializer, ptr %"70_1", align 8, !dbg !19
   %"70_097" = load i64, ptr %"70_0", align 4
   %"70_198" = load { ptr, ptr, i64 }, ptr %"70_1", align 8
   store i64 %"70_097", ptr %"092", align 4
@@ -484,11 +484,11 @@ cond_exit_64:                                     ; preds = %cond_64_case_1, %co
   store i64 %"094", ptr %"64_0", align 4
   store { ptr, ptr, i64 } %"195", ptr %"64_1", align 8
   %"64_1105" = load { ptr, ptr, i64 }, ptr %"64_1", align 8
-  %array_ptr106 = extractvalue { ptr, ptr, i64 } %"64_1105", 0, !dbg !19
-  %array_mask_ptr107 = extractvalue { ptr, ptr, i64 } %"64_1105", 1, !dbg !19
-  %array_offset108 = extractvalue { ptr, ptr, i64 } %"64_1105", 2, !dbg !19
-  call void @free(ptr %array_ptr106), !dbg !19
-  call void @free(ptr %array_mask_ptr107), !dbg !19
+  %array_ptr106 = extractvalue { ptr, ptr, i64 } %"64_1105", 0, !dbg !20
+  %array_mask_ptr107 = extractvalue { ptr, ptr, i64 } %"64_1105", 1, !dbg !20
+  %array_offset108 = extractvalue { ptr, ptr, i64 } %"64_1105", 2, !dbg !20
+  call void @free(ptr %array_ptr106), !dbg !20
+  call void @free(ptr %array_mask_ptr107), !dbg !20
   ret void
 }
 
@@ -498,21 +498,21 @@ declare ptr @malloc(i64)
 declare void @llvm.memset.p0.i64(ptr writeonly captures(none), i8, i64, i1 immarg) #0
 
 define internal void @__barray_mask_check_not_borrowed(ptr %0, i64 %1) {
-  %3 = udiv i64 %1, 64, !dbg !11
-  %4 = getelementptr inbounds i64, ptr %0, i64 %3, !dbg !11
-  %5 = load i64, ptr %4, align 4, !dbg !11
-  %6 = urem i64 %1, 64, !dbg !11
-  %7 = lshr i64 %5, %6, !dbg !11
-  %8 = trunc i64 %7 to i1, !dbg !11
-  br i1 %8, label %panic, label %ok, !dbg !11
+  %3 = udiv i64 %1, 64, !dbg !12
+  %4 = getelementptr inbounds i64, ptr %0, i64 %3, !dbg !12
+  %5 = load i64, ptr %4, align 4, !dbg !12
+  %6 = urem i64 %1, 64, !dbg !12
+  %7 = lshr i64 %5, %6, !dbg !12
+  %8 = trunc i64 %7 to i1, !dbg !12
+  br i1 %8, label %panic, label %ok, !dbg !12
 
 panic:                                            ; preds = %2
-  %9 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 2, ptr @0), !dbg !11
-  call void @abort(), !dbg !11
-  unreachable, !dbg !11
+  %9 = call i32 (ptr, ...) @printf(ptr @prelude.panic_template, i32 2, ptr @0), !dbg !12
+  call void @abort(), !dbg !12
+  unreachable, !dbg !12
 
 ok:                                               ; preds = %2
-  ret void, !dbg !11
+  ret void, !dbg !12
 }
 
 declare i32 @printf(ptr, ...)
@@ -528,21 +528,22 @@ attributes #0 = { nocallback nofree nounwind willreturn memory(argmem: write) }
 
 !0 = !{i32 2, !"Debug Info Version", i32 3}
 !1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
-!2 = !DIFile(filename: "/iWSKICg/uRNRvRJmbrfVqoq.gpy.py", directory: "")
-!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !2, line: 25090, type: !4, scopeLine: 25091, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
-!4 = !DISubroutineType(types: !5)
-!5 = !{null}
-!6 = !DILocation(line: 18148, column: 188, scope: !3)
-!7 = !DILocation(line: 25736, column: 110, scope: !3)
-!8 = !DILocation(line: 26616, column: 125, scope: !3)
-!9 = !DILocation(line: 1644, column: 171, scope: !3)
-!10 = !DILocation(line: 16024, column: 485, scope: !3)
-!11 = !DILocation(line: 9757, column: 105, scope: !3)
-!12 = !DILocation(line: 4122, column: 47, scope: !3)
-!13 = !DILocation(line: 21009, column: 70, scope: !3)
-!14 = !DILocation(line: 16261, column: 17, scope: !3)
-!15 = !DILocation(line: 9829, column: 395, scope: !3)
-!16 = !DILocation(line: 25937, column: 483, scope: !3)
-!17 = !DILocation(line: 1858, column: 218, scope: !3)
-!18 = !DILocation(line: 24181, column: 323, scope: !3)
-!19 = !DILocation(line: 9155, column: 38, scope: !3)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/nyeIVwAutKJHa/EPSZwPXPeycUvnuj/xZKP/CTcNfsTEGLo")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{null}
+!7 = !DILocation(line: 32551, column: 131, scope: !3)
+!8 = !DILocation(line: 1712, column: 109, scope: !3)
+!9 = !DILocation(line: 21129, column: 412, scope: !3)
+!10 = !DILocation(line: 10060, column: 368, scope: !3)
+!11 = !DILocation(line: 27062, column: 402, scope: !3)
+!12 = !DILocation(line: 5388, column: 404, scope: !3)
+!13 = !DILocation(line: 13582, column: 372, scope: !3)
+!14 = !DILocation(line: 352, column: 366, scope: !3)
+!15 = !DILocation(line: 4112, column: 51, scope: !3)
+!16 = !DILocation(line: 31810, column: 83, scope: !3)
+!17 = !DILocation(line: 21101, column: 431, scope: !3)
+!18 = !DILocation(line: 16173, column: 468, scope: !3)
+!19 = !DILocation(line: 4687, column: 439, scope: !3)
+!20 = !DILocation(line: 2116, column: 303, scope: !3)
