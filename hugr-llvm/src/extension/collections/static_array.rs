@@ -402,7 +402,7 @@ mod test {
             ceb.add_default_static_array_extensions()
                 .add_default_prelude_extensions()
         });
-        let hugr = single_op_hugr(op);
+        let mut hugr = single_op_hugr(op);
         check_emission!(hugr, llvm_ctx);
     }
 
@@ -422,7 +422,7 @@ mod test {
                 .add_float_extensions()
         });
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_outs([value.get_type()])
             .with_extensions(ExtensionRegistry::new(vec![
                 static_array::EXTENSION.to_owned(),
@@ -521,7 +521,7 @@ mod test {
             ceb.add_default_static_array_extensions()
                 .add_default_prelude_extensions()
         });
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_outs([usize_t()])
             .with_extensions(ExtensionRegistry::new(vec![
                 static_array::EXTENSION.to_owned(),

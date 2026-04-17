@@ -17,6 +17,7 @@ use inkwell::{
 };
 use itertools::{Itertools, zip_eq};
 
+use crate::emit::debug_info::DebugInfoContext;
 use crate::types::{HugrFuncType, HugrSumType, HugrType, TypingSession};
 use crate::{custom::CodegenExtsMap, types::LLVMSumType, utils::fat::FatNode};
 use delegate::delegate;
@@ -55,6 +56,7 @@ where
     builder: Builder<'c>,
     prologue_bb: BasicBlock<'c>,
     launch_bb: BasicBlock<'c>,
+    have_di_loc: bool,
 }
 
 impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
@@ -102,6 +104,9 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
             /// If a global with the given name exists but the type or constant-ness
             /// does not match then an error will be returned.
             pub fn get_global(&self, symbol: impl AsRef<str>, typ: impl BasicType<'c>, constant: bool) -> Result<GlobalValue<'c>>;
+            /// Returns the [DebugInfoContext] for the module if it exists.
+            pub fn di_context(&self) -> Option<&DebugInfoContext<'c>>;
+            pub fn di_context_mut(&mut self) -> Option<&mut DebugInfoContext<'c>>;
         }
     }
 
@@ -167,6 +172,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
         let launch_bb = emit_context
             .iw_context()
             .append_basic_block(func, "entry_block");
+
         let builder = emit_context.iw_context().create_builder();
         builder.position_at_end(launch_bb);
         Ok(Self {
@@ -177,6 +183,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
             builder,
             prologue_bb,
             launch_bb,
+            have_di_loc: false,
         })
     }
 
@@ -308,19 +315,61 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
             .emit_load_constant(self, v)
     }
 
+    /// If debug emission is enabled for the current function,
+    /// and the node contains location metadata,
+    /// set the builder's current debug location.
+    pub(crate) fn try_set_debug_loc<'hugr, OT>(
+        &mut self,
+        node: &FatNode<'hugr, OT, H>,
+    ) -> Result<()> {
+        let iw_ctx = self.emit_context.iw_context();
+        let builder = &self.builder;
+        if let Some(di_func) = self.func.get_subprogram() {
+            let di_ctx = self.emit_context.di_context_mut().unwrap();
+            let maybe_loc = di_ctx.try_get_di_location(iw_ctx, node, di_func)?;
+
+            if let Some(loc) = maybe_loc {
+                di_ctx.set_debug_loc(builder, loc)?;
+                self.have_di_loc = true;
+            }
+        }
+        Ok(())
+    }
+
+    /// If `self.have_di_loc` is true, unset the current debug location.
+    /// Otherwise do nothing.
+    pub(crate) fn try_unset_debug_loc(&mut self) -> Result<()> {
+        if self.have_di_loc {
+            self.emit_context
+                .di_context_mut()
+                .unwrap()
+                .unset_debug_loc(&self.builder)?;
+            self.have_di_loc = false;
+        }
+        Ok(())
+    }
+
     pub(crate) fn emit_extension_op(
         &mut self,
         args: EmitOpArgs<'c, '_, ExtensionOp, H>,
     ) -> Result<()> {
+        self.try_set_debug_loc(&args.node)?;
         let exts = self.extensions();
         exts.as_ref()
             .extension_op_handlers
-            .emit_extension_op(self, args)
+            .emit_extension_op(self, args)?;
+        self.try_unset_debug_loc()
     }
 
     /// Consumes the `EmitFuncContext` and returns both the inner
     /// [`EmitModuleContext`] and the scoped [`FuncDefn`]s that were encountered.
     pub fn finish(self) -> Result<(EmitModuleContext<'c, 'a, H>, EmissionSet)> {
+        if self.have_di_loc {
+            return Err(anyhow!(
+                "Should not have a debug location set at the end of a function!"
+            ));
+        }
+
         self.builder.position_at_end(self.prologue_bb);
         self.builder.build_unconditional_branch(self.launch_bb)?;
         Ok((self.emit_context, self.todo))

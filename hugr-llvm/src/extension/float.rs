@@ -205,7 +205,7 @@ mod test {
     #[rstest]
     fn const_float(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_float_extensions);
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_outs([float64_type()])
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
@@ -231,7 +231,7 @@ mod test {
     #[case::fround(FloatOps::fround)]
     fn float_operations(mut llvm_ctx: TestContext, #[case] op: FloatOps) {
         let name: &str = op.into();
-        let hugr = test_float_op(op);
+        let mut hugr = test_float_op(op);
         llvm_ctx.add_extensions(add_float_extensions);
         check_emission!(name, hugr, llvm_ctx);
     }
