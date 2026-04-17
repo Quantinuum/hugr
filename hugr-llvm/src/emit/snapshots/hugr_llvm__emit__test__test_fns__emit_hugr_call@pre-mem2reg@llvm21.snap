@@ -25,7 +25,7 @@ entry_block:                                      ; preds = %alloca_block
   store i1 %0, ptr %"6_0", align 1
   %"6_01" = load i1, ptr %"6_0", align 1
   %1 = call i1 @_hl.main_unary.5(i1 %"6_01"), !dbg !12
-  store i1 %1, ptr %"8_0", align 1
+  store i1 %1, ptr %"8_0", align 1, !dbg !12
   %"8_02" = load i1, ptr %"8_0", align 1
   store i1 %"8_02", ptr %"0", align 1
   %"03" = load i1, ptr %"0", align 1
@@ -50,8 +50,8 @@ entry_block:                                      ; preds = %alloca_block
   %2 = call { i1, i1 } @_hl.main_binary.9(i1 %"10_01", i1 %"10_12"), !dbg !17
   %3 = extractvalue { i1, i1 } %2, 0, !dbg !17
   %4 = extractvalue { i1, i1 } %2, 1, !dbg !17
-  store i1 %3, ptr %"12_0", align 1
-  store i1 %4, ptr %"12_1", align 1
+  store i1 %3, ptr %"12_0", align 1, !dbg !17
+  store i1 %4, ptr %"12_1", align 1, !dbg !17
   %"12_03" = load i1, ptr %"12_0", align 1
   %"12_14" = load i1, ptr %"12_1", align 1
   store i1 %"12_03", ptr %"0", align 1

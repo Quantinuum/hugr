@@ -346,16 +346,6 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
         Ok(self)
     }
 
-    /// Self-owning wrapper for `EmitModuleContext::try_di_init`
-    fn try_di_init(
-        mut self,
-        node: FatNode<'_, hugr_core::ops::Module, H>,
-        ptr_bits: u32,
-    ) -> Result<Self> {
-        self.module_context.try_di_init(node, ptr_bits)?;
-        Ok(self)
-    }
-
     /// Emits all children of a hugr [Module](hugr_core::ops::Module).
     ///
     /// Note that type aliases are not supported, and that [`hugr_core::ops::Const`]
@@ -364,8 +354,9 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
     /// interesting children.
     ///
     /// If `emit_debug` is true, debug info will be included in the generated IR to the
-    /// extent it is present in the HUGR. At minimum, a root debug record is required.
-    /// If `emit_debug` is false, any debug info on the HUGR will be ignored.
+    /// extent it is present in the HUGR. If `emit_debug` is false, any debug info on
+    /// the HUGR will be ignored. `ptr_bits` gives the number of bits in a pointer on
+    /// target architecture - it is used only for generating debug info types.
     pub fn emit_module(
         mut self,
         node: FatNode<'_, hugr_core::ops::Module, H>,
@@ -373,7 +364,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
         ptr_bits: u32,
     ) -> Result<Self> {
         if emit_debug {
-            self = self.try_di_init(node, ptr_bits)?;
+            self.module_context.try_di_init(node, ptr_bits)?;
         }
         for c in node.children() {
             match c.as_ref() {
@@ -391,24 +382,14 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
         Ok(self)
     }
 
-    /// Self-owning wrapper for `DebugInfoContext::try_add_di_func`
-    fn try_add_di_func(
-        mut self,
-        node: FatNode<'_, FuncDefn, H>,
-        func: FunctionValue<'c>,
-    ) -> Result<Self> {
-        self.module_context
-            .di_context_mut()
-            .map_or(Ok(()), |di_ctx| di_ctx.try_add_di_func(node, func))?;
-        Ok(self)
-    }
-
     fn emit_func_impl(mut self, node: FatNode<'_, FuncDefn, H>) -> Result<(Self, EmissionSet)> {
         if !self.emitted.insert(node.node()) {
             return Ok((self, EmissionSet::default()));
         }
         let func = self.module_context.get_func_defn(node)?;
-        self = self.try_add_di_func(node, func)?;
+        self.module_context
+            .di_context_mut()
+            .map_or(Ok(()), |di_ctx| di_ctx.try_add_di_func(node, func))?;
 
         let mut func_ctx = EmitFuncContext::new(self.module_context, func)?;
         let ret_rmb = func_ctx.new_row_mail_box(node.signature().body().output.iter(), "ret")?;

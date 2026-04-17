@@ -250,8 +250,8 @@ fn emit_call<'c, H: HugrView<Node = Node>>(
     let builder = context.builder();
     let call = builder.build_call(func?, inputs.as_slice(), "")?;
     let call_results = deaggregate_call_result(builder, call, args.outputs.len())?;
-    context.try_unset_debug_loc()?;
-    args.outputs.finish(context.builder(), call_results)
+    args.outputs.finish(context.builder(), call_results)?;
+    context.try_unset_debug_loc()
 }
 
 fn emit_call_indirect<'c, H: HugrView<Node = Node>>(
@@ -269,8 +269,7 @@ fn emit_call_indirect<'c, H: HugrView<Node = Node>>(
     let call = builder.build_indirect_call(func_ty, func_ptr, inputs.as_slice(), "")?;
     let call_results = deaggregate_call_result(builder, call, args.outputs.len())?;
     args.outputs.finish(builder, call_results)?;
-    context.try_unset_debug_loc()?;
-    Ok(())
+    context.try_unset_debug_loc()
 }
 
 fn emit_load_function<'c, H: HugrView<Node = Node>>(

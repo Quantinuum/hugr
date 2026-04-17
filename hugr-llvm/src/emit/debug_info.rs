@@ -85,7 +85,7 @@ impl<'c> DebugInfoContext<'c> {
             return Ok(None);
         };
 
-        // TODO: who is using this value?
+        // LLVM debug info version
         let di_version = iw_module.get_context().i32_type().const_int(3, false);
         iw_module.add_basic_value_flag("Debug Info Version", FlagBehavior::Warning, di_version);
 

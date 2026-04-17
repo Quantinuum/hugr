@@ -358,8 +358,7 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitFuncContext<'c, 'a, H> {
         exts.as_ref()
             .extension_op_handlers
             .emit_extension_op(self, args)?;
-        self.try_unset_debug_loc()?;
-        Ok(())
+        self.try_unset_debug_loc()
     }
 
     /// Consumes the `EmitFuncContext` and returns both the inner
