@@ -596,15 +596,13 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         };
                         let nval = n.value_u();
                         let mval = m.value_u();
-                        let out_const: Value = if mval == 0 {
-                            err_value()
-                        } else {
-                            let qval = nval / mval;
-                            let rval = nval % mval;
-                            Value::tuple(vec![
+
+                        let out_const = match (nval.checked_div(mval), nval.checked_rem(mval)) {
+                            (Some(qval), Some(rval)) => Value::tuple(vec![
                                 Value::extension(ConstInt::new_u(logwidth0, qval).unwrap()),
                                 Value::extension(ConstInt::new_u(logwidth0, rval).unwrap()),
-                            ])
+                            ]),
+                            _ => err_value(),
                         };
                         Some(vec![(0.into(), out_const)])
                     }
@@ -715,10 +713,11 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                         };
                         let nval = n.value_u();
                         let mval = m.value_u();
-                        let out_const: Value = if mval == 0 {
-                            err_value()
-                        } else {
-                            Value::extension(ConstInt::new_u(logwidth0, nval / mval).unwrap())
+                        let out_const: Value = match nval.checked_div(mval) {
+                            Some(qval) => {
+                                Value::extension(ConstInt::new_u(logwidth0, qval).unwrap())
+                            }
+                            _ => err_value(),
                         };
                         Some(vec![(0.into(), out_const)])
                     }
