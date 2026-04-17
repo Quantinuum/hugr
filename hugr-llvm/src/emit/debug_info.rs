@@ -1,4 +1,3 @@
-#![allow(missing_docs)]
 use anyhow::{Result, anyhow};
 use std::collections::BTreeMap;
 use std::ffi::CString;
@@ -44,6 +43,8 @@ enum DWARFTypeCode {
     Unsigned = 7,
 }
 
+/// This type wraps the Inkwell DebugInfoBuilder and is responsible for converting HUGR
+/// debug info into the format expected by Inkwell/LLVM.
 pub struct DebugInfoContext<'c> {
     /// Debug info builder
     builder: DebugInfoBuilder<'c>,
@@ -477,8 +478,6 @@ impl<'c> DebugInfoContext<'c> {
 
 /// We test debug info generation by adding random info to all HUGRs generated and compiled for other
 /// hugr-llvm tests (see `exec_hugr` and `check_emission`).
-///
-/// There are also external end-to-end tests in qis-compiler.
 #[cfg(any(test, feature = "test-utils"))]
 pub mod test {
     use super::*;
@@ -564,6 +563,7 @@ pub mod test {
     }
 
     /// Add random, format-appropriate debug info to a Hugr
+    /// This needs to be `pub` for non-crate callers of `emit::test::check_emission`
     pub fn add_random_debug_info(hugr: &mut Hugr) {
         let mut rng = SmallRng::seed_from_u64(RAND_DEBUGINFO_SEED);
         let mut file_tab = Vec::new();
