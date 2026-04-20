@@ -43,6 +43,31 @@ enum DWARFTypeCode {
     Unsigned = 7,
 }
 
+/// Try to produce a human-readable name from an internal HUGR function name.
+///
+/// We expect a "mangled" name in the following form:
+/// `__hugr__.<Python module>.<guppy identifier>.<node ID>`, where the Guppy
+/// identifier can be a Python identifier path with multiple dot components.
+///
+/// The pretty name is obtained by removing the first two dot components (`__hugr__` and
+/// the Python module) and the final dot component (the node ID).  If there are not
+/// enough dot components to do this (fewer than three dots total), the original name is
+/// returned unchanged.
+fn unmangle_hugr_func_name(name: &str) -> &str {
+    // Index of the dot that starts the third component (after __hugr__ and module).
+    let Some(lpar) = name.match_indices('.').nth(1).map(|(i, _)| i) else {
+        return name;
+    };
+    // Index of the last dot (separates the guppy identifier from the node ID).
+    // `unwrap` is safe: we already know there are at least two dots.
+    let rpar = name.rfind('.').unwrap();
+    if lpar < rpar {
+        &name[(lpar + 1)..rpar]
+    } else {
+        name
+    }
+}
+
 /// This type wraps the Inkwell DebugInfoBuilder and is responsible for converting HUGR
 /// debug info into the format expected by Inkwell/LLVM.
 pub struct DebugInfoContext<'c> {
@@ -156,8 +181,8 @@ impl<'c> DebugInfoContext<'c> {
             BasicTypeEnum::FloatType(float_ty) => (float_ty.get_bit_width() / 8).into(),
             BasicTypeEnum::IntType(int_ty) => (int_ty.get_bit_width() / 8).into(),
             BasicTypeEnum::PointerType(_) => self.ptr_type.get_size_in_bits() / 8,
-            // TODO: this does not respect alignment. not that important until we have
-            // support for values in debug info.
+            // TODO: this does not respect inter-member alignment. not that important
+            // until we have support for values in debug info.
             BasicTypeEnum::StructType(struct_ty) => struct_ty
                 .get_field_types_iter()
                 .fold(0, |len, elem_ty| len + self.get_basic_type_size(elem_ty)),
@@ -325,23 +350,7 @@ impl<'c> DebugInfoContext<'c> {
         let di_fty = self.create_di_function_type(func.get_type(), file)?;
         let is_local = func.get_linkage() != Linkage::External;
 
-        // we expect a "mangled" name in the following form:
-        // __hugr__.<Python module>.<guppy identifier>.<node ID>, where the Guppy
-        // identifier can be a Python identifier path with multiple dot components.
-        //
-        // so we try to make the pretty name by removing the first two and the final dot
-        // components. If this is unsuccessful (not enough dots) we leave the original name.
-        let lpar = name
-            .match_indices('.')
-            .nth(1)
-            .map(|idx_slice| idx_slice.0)
-            .unwrap_or(0);
-        let rpar = name.rfind('.').unwrap_or(name.len());
-        let pretty_name = if lpar + 1 < rpar {
-            &name[(lpar + 1)..rpar]
-        } else {
-            name
-        };
+        let pretty_name = unmangle_hugr_func_name(name);
 
         let di_func = self.builder.create_function(
             self.compile_unit.as_debug_info_scope(),
@@ -786,6 +795,41 @@ pub mod test {
             );
             let root = hugr.fat_root().unwrap();
             assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+        }
+
+        /// Test that `unmangle_hugr_func_name` correctly strips the prefix and suffix
+        /// components from a well-formed mangled name.
+        #[test]
+        fn test_unmangle_hugr_func_name_valid() {
+            // Basic form: __hugr__.<module>.<ident>.<node_id>
+            assert_eq!(
+                unmangle_hugr_func_name("__hugr__.my_module.my_func.0"),
+                "my_func"
+            );
+            // Guppy identifier is a dotted path (multiple components between module and node ID)
+            assert_eq!(
+                unmangle_hugr_func_name("__hugr__.my_module.pkg.subpkg.my_func.0"),
+                "pkg.subpkg.my_func"
+            );
+            // Module name with underscores and digits
+            assert_eq!(
+                unmangle_hugr_func_name("__hugr__.mod_1.foo.bar.42"),
+                "foo.bar"
+            );
+        }
+
+        /// Test that `unmangle_hugr_func_name` returns the original name unchanged when
+        /// the name is not in the expected form, even if it contains dots.
+        #[test]
+        fn test_unmangle_hugr_func_name_preserves_non_mangled() {
+            // No dots at all
+            assert_eq!(unmangle_hugr_func_name("plain_name"), "plain_name");
+            // Only one dot — not enough components
+            assert_eq!(unmangle_hugr_func_name("a.b"), "a.b");
+            // Two dots, but the middle section is empty so lpar+1 == rpar
+            assert_eq!(unmangle_hugr_func_name("a..b"), "a..b");
+            // Exactly two dots — middle slice would be empty (lpar+1 == rpar)
+            assert_eq!(unmangle_hugr_func_name("a.b.c"), "a.b.c");
         }
 
         /// Test that compilation fails when invalid JSON (not matching LocationRecord's
