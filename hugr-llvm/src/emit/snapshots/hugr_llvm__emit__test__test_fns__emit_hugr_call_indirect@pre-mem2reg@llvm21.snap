@@ -13,7 +13,7 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   store ptr @_hl.main_void.1, ptr %"4_0", align 8
   %"4_01" = load ptr, ptr %"4_0", align 8
-  call void %"4_01"(), !dbg !7
+  notail call void %"4_01"(), !dbg !7
   ret void
 }
 
@@ -30,7 +30,7 @@ entry_block:                                      ; preds = %alloca_block
   store i1 %0, ptr %"7_0", align 1
   %"9_01" = load ptr, ptr %"9_0", align 8
   %"7_02" = load i1, ptr %"7_0", align 1
-  %1 = call i1 %"9_01"(i1 %"7_02"), !dbg !12
+  %1 = notail call i1 %"9_01"(i1 %"7_02"), !dbg !12
   store i1 %1, ptr %"10_0", align 1, !dbg !12
   %"10_03" = load i1, ptr %"10_0", align 1
   store i1 %"10_03", ptr %"0", align 1
@@ -56,7 +56,7 @@ entry_block:                                      ; preds = %alloca_block
   %"14_01" = load ptr, ptr %"14_0", align 8
   %"12_02" = load i1, ptr %"12_0", align 1
   %"12_13" = load i1, ptr %"12_1", align 1
-  %2 = call { i1, i1 } %"14_01"(i1 %"12_02", i1 %"12_13"), !dbg !17
+  %2 = notail call { i1, i1 } %"14_01"(i1 %"12_02", i1 %"12_13"), !dbg !17
   %3 = extractvalue { i1, i1 } %2, 0, !dbg !17
   %4 = extractvalue { i1, i1 } %2, 1, !dbg !17
   store i1 %3, ptr %"15_0", align 1, !dbg !17

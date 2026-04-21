@@ -21,6 +21,7 @@ use inkwell::builder::{Builder, BuilderError};
 use inkwell::types::{BasicType, BasicTypeEnum};
 use inkwell::values::{
     ArrayValue, BasicValue as _, BasicValueEnum, CallableValue, IntValue, PointerValue,
+    LLVMTailCallKind
 };
 use itertools::Itertools;
 
@@ -668,6 +669,7 @@ fn emit_repeat_op<'c, H: HugrView<Node = Node>>(
             .try_as_basic_value()
             .basic()
             .ok_or(anyhow!("ArrayOpDef::repeat function must return a value"))?;
+        v.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
         let elem_addr = unsafe { builder.build_in_bounds_gep(ptr, &[idx], "")? };
         builder.build_store(elem_addr, v)?;
         Ok(())
@@ -715,6 +717,7 @@ fn emit_scan_op<'c, H: HugrView<Node = Node>>(
             args.push(builder.build_load(*ptr, "")?.into());
         }
         let call = builder.build_call(func_ptr, args.as_slice(), "")?;
+        call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
         let call_results = deaggregate_call_result(builder, call, 1 + acc_tys.len())?;
         let tgt_elem_addr = unsafe { builder.build_in_bounds_gep(tgt_ptr, &[idx], "")? };
         builder.build_store(tgt_elem_addr, call_results[0])?;

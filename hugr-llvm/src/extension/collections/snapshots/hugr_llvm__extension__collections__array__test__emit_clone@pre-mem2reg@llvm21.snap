@@ -37,7 +37,7 @@ entry_block:                                      ; preds = %alloca_block
   %9 = insertvalue { ptr, i64 } %8, i64 0, 1, !dbg !8
   %10 = getelementptr inbounds i64, ptr %array_ptr, i64 %array_offset, !dbg !8
   %11 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !8
-  call void @llvm.memcpy.p0.p0.i64(ptr %7, ptr %10, i64 %11, i1 false), !dbg !8
+  notail call void @llvm.memcpy.p0.p0.i64(ptr %7, ptr %10, i64 %11, i1 false), !dbg !8
   store { ptr, i64 } %"8_03", ptr %"9_0", align 8, !dbg !8
   store { ptr, i64 } %9, ptr %"9_1", align 8, !dbg !8
   %"9_14" = load { ptr, i64 }, ptr %"9_1", align 8
