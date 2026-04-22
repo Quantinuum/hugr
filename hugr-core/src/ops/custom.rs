@@ -246,7 +246,7 @@ pub struct OpaqueOp {
 }
 
 /// Qualifies an operation name with its extension, e.g. 'iadd' -> 'arithmetic.iadd'.
-pub fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
+pub(crate) fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
     format!("{res_id}.{name}").into()
 }
 
