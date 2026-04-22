@@ -548,6 +548,7 @@ pub mod test {
                 hugr.set_metadata::<SubprogramRecord>(
                     *node,
                     SubprogramRecord {
+                        kind: "subprogram".into(),
                         file: rand_indexed_file(rng, file_tab),
                         line_no: lno,
                         scope_line: lno + 1,
@@ -561,6 +562,7 @@ pub mod test {
                 hugr.set_metadata::<LocationRecord>(
                     *node,
                     LocationRecord {
+                        kind: "location".into(),
                         column: rng.random_range(1..MAX_RAND_COLNO),
                         line_no: rng.random_range(1..MAX_RAND_LNO),
                     },
@@ -586,6 +588,7 @@ pub mod test {
         hugr.set_metadata::<CompileUnitRecord>(
             root,
             CompileUnitRecord {
+                kind: "compile_unit".into(),
                 directory: rand_path(&mut rng, ""),
                 filename: rand_indexed_file(&mut rng, &mut file_tab),
                 file_table: file_tab,
@@ -638,6 +641,7 @@ pub mod test {
             hugr.set_metadata::<SubprogramRecord>(
                 func_node,
                 SubprogramRecord {
+                    kind: "subprogram".into(),
                     file: 0,
                     line_no: 10,
                     scope_line: 10,
@@ -651,6 +655,7 @@ pub mod test {
             hugr.set_metadata::<LocationRecord>(
                 ext_op_node,
                 LocationRecord {
+                    kind: "location".into(),
                     line_no: 11,
                     column: 4,
                 },
@@ -659,6 +664,7 @@ pub mod test {
             hugr.set_metadata::<CompileUnitRecord>(
                 root,
                 CompileUnitRecord {
+                    kind: "compile_unit".into(),
                     directory: "/test/src".to_string(),
                     filename: 0,
                     file_table,
@@ -705,6 +711,7 @@ pub mod test {
             hugr.set_metadata::<SubprogramRecord>(
                 root,
                 SubprogramRecord {
+                    kind: "subprogram".into(),
                     file: 0,
                     line_no: 1,
                     scope_line: 1,
@@ -729,6 +736,7 @@ pub mod test {
             hugr.set_metadata::<LocationRecord>(
                 func_node,
                 LocationRecord {
+                    kind: "location".into(),
                     line_no: 1,
                     column: 1,
                 },
@@ -751,6 +759,7 @@ pub mod test {
             hugr.set_metadata::<SubprogramRecord>(
                 ext_op_node,
                 SubprogramRecord {
+                    kind: "subprogram".into(),
                     file: 0,
                     line_no: 1,
                     scope_line: 1,
