@@ -1,5 +1,3 @@
-#![allow(missing_docs)]
-
 use std::any::type_name;
 use std::fmt;
 
@@ -12,10 +10,11 @@ use serde::{
 use serde_json::{Error as JsonError, Value as JsonValue};
 use thiserror::Error;
 
+/// The HUGR metadata key for debug records
 pub const DEBUGINFO_META_KEY: &str = "core.debug_info";
 
 /// Visitor and wrapper function passed as "deserialize_with" attribute
-/// in order to deserialize a usize from a string using serde_json
+/// which try to deserialize a usize from either a string or number
 struct JsonStrToIntVisitor;
 
 impl<'de> Visitor<'de> for JsonStrToIntVisitor {
@@ -38,11 +37,15 @@ fn deserialize_usize_str<'de, D: Deserializer<'de>>(deserializer: D) -> Result<u
     deserializer.deserialize_any(JsonStrToIntVisitor)
 }
 
+/// JSON-format HUGR debug record for a compilation unit (module)
 #[derive(Serialize, Deserialize)]
 pub struct CompileUnitRecord {
+    /// Working directory of the compiler
     pub directory: String,
+    /// Index of the root file of the compilation unit in the file table
     #[serde(deserialize_with = "deserialize_usize_str")]
     pub filename: usize,
+    /// Table of filenames used referenced in the debug info module
     pub file_table: Vec<String>,
 }
 
@@ -51,6 +54,7 @@ impl Metadata for CompileUnitRecord {
     const KEY: &'static str = DEBUGINFO_META_KEY;
 }
 
+/// Errors related to debug info metadata
 #[derive(Debug, Error)]
 pub enum DebugInfoError {
     /// There is a specific required mapping between HUGR nodes and debug record types,
@@ -59,14 +63,18 @@ pub enum DebugInfoError {
     DRTypeMismatchError(&'static str, JsonError, JsonValue),
 }
 
+/// JSON-format HUGR debug record for a subprogram (function)
 #[derive(Serialize, Deserialize)]
 pub struct SubprogramRecord {
+    /// file_tab index of the file where this function is defined
     #[serde(deserialize_with = "deserialize_usize_str")]
     pub file: usize,
+    /// Line number where this function's declaration begins
     #[serde(deserialize_with = "deserialize_usize_str")]
     pub line_no: usize,
-    // TODO
+    // TODO: waiting on scopes in milestone 2
     //scope: Option<ScopeRecord>,
+    /// Line number where this function's body begins
     #[serde(deserialize_with = "deserialize_usize_str")]
     pub scope_line: usize,
 }
@@ -76,10 +84,13 @@ impl Metadata for SubprogramRecord {
     const KEY: &'static str = DEBUGINFO_META_KEY;
 }
 
+/// JSON-format HUGR debug record for a source code location
 #[derive(Serialize, Deserialize)]
 pub struct LocationRecord {
+    /// Column number of the location
     #[serde(deserialize_with = "deserialize_usize_str")]
     pub column: usize,
+    /// Line number of the location
     #[serde(deserialize_with = "deserialize_usize_str")]
     pub line_no: usize,
 }

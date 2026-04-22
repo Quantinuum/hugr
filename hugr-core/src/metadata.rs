@@ -22,7 +22,12 @@
 //! let payload = hugr.get_metadata::<SomeMetadata>(hugr.module_root());
 //! assert_eq!(payload, Some("payload"));
 //! ```
-pub mod debug_info;
+mod debug_info;
+
+#[doc(inline)]
+pub use self::debug_info::{
+    CompileUnitRecord, DEBUGINFO_META_KEY, LocationRecord, SubprogramRecord, try_get_debug_meta,
+};
 //
 // When adding new metadata keys, they should be re-exported by the python bindings.
 // See hugr-py/rust/metadata.rs

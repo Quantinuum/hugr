@@ -5,9 +5,8 @@ use std::ops::Deref;
 
 use hugr_core::{
     HugrView, Node,
-    metadata::HugrGenerator,
-    metadata::debug_info::{
-        CompileUnitRecord, LocationRecord, SubprogramRecord, try_get_debug_meta,
+    metadata::{
+        CompileUnitRecord, HugrGenerator, LocationRecord, SubprogramRecord, try_get_debug_meta,
     },
 };
 
@@ -606,7 +605,7 @@ pub mod test {
         use hugr_core::HugrView;
         use hugr_core::builder::{Dataflow, DataflowHugr};
         use hugr_core::hugr::hugrmut::HugrMut;
-        use hugr_core::metadata::debug_info::DEBUGINFO_META_KEY;
+        use hugr_core::metadata::DEBUGINFO_META_KEY;
         use hugr_core::std_extensions::STD_REG;
         use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
         use hugr_core::std_extensions::arithmetic::int_types::int_type;

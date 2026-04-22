@@ -8,7 +8,7 @@ use clap::Parser;
 use clio::Output;
 use hugr::HugrView;
 use hugr::hugr::views::render::NodeLabel;
-use hugr::metadata::debug_info::DEBUGINFO_META_KEY;
+use hugr::metadata::DEBUGINFO_META_KEY;
 use hugr::package::PackageValidationError;
 
 /// Dump the standard extensions.
