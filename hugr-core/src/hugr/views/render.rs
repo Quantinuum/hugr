@@ -1,6 +1,7 @@
 //! Helper methods to compute the node/edge/port style when rendering a HUGR
 //! into dot or mermaid format.
 
+use itertools::Itertools;
 use std::collections::HashMap;
 
 use portgraph::render::{EdgeStyle, NodeStyle, PortStyle, PresentationStyle};
@@ -179,8 +180,12 @@ pub enum NodeLabel<N: HugrNode = Node> {
     /// Display the node index as a number.
     #[default]
     Numeric,
-    /// Display the node index and JSON metadata for a given key.
-    MetadataKey(String),
+    /// Display the numeric node index and a list of metadata keys and their JSON values.
+    /// Prints "null" if a key is not present on a node.
+    MetadataValues {
+        /// List of metadata keys to display
+        print_keys: Vec<String>,
+    },
     /// Display the labels corresponding to the node indices.
     Custom(HashMap<N, String>),
 }
@@ -227,28 +232,30 @@ pub(in crate::hugr) fn node_style<'a>(
                 NodeStyle::boxed(node_name(h, n))
             }
         }),
-        NodeLabel::MetadataKey(label) => Box::new(move |n| {
-            let metadata = serde_json::to_string(
-                h.get_metadata_any(n.into(), &label)
-                    .unwrap_or(&serde_json::Value::Null),
-            )
-            .expect("Could not render JSON metadata");
-            // mermaid renderer in portgraph does not like double quotes or newlines
-            let metadata_clean = metadata.replace('\n', " ").replace('"', "\'");
+        NodeLabel::MetadataValues { print_keys } => Box::new(move |n| {
+            let kv_str = print_keys
+                .iter()
+                .filter_map(|key| {
+                    h.get_metadata_any(n.into(), key).map(|json_value| {
+                        format!(
+                            "{key}={}",
+                            serde_json::to_string(json_value)
+                                .expect("JSON metadata should be serializable")
+                                // the mermaid renderer in portgraph generates verbose escapes
+                                // for double quotes and newlines, so we replace them with
+                                // single quotes and spaces
+                                .replace('\n', " ")
+                                .replace('"', "\'")
+                        )
+                    })
+                })
+                .join("; ");
 
             if Some(n) == entrypoint {
-                NodeStyle::boxed(format!(
-                    "{} <{}>",
-                    numeric_label(h, n, true),
-                    metadata_clean
-                ))
-                .with_attrs(entrypoint_style.clone())
+                NodeStyle::boxed(format!("{}; {kv_str}", numeric_label(h, n, true)))
+                    .with_attrs(entrypoint_style.clone())
             } else {
-                NodeStyle::boxed(format!(
-                    "{} <{}>",
-                    numeric_label(h, n, false),
-                    metadata_clean
-                ))
+                NodeStyle::boxed(format!("{}; {kv_str}", numeric_label(h, n, false)))
             }
         }),
         NodeLabel::Custom(labels) => Box::new(move |n| {

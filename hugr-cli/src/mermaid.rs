@@ -78,7 +78,9 @@ impl MermaidArgs {
         for hugr in package.modules {
             let mmd_fmt = if self.debug_info {
                 hugr.mermaid_format()
-                    .with_node_labels(NodeLabel::MetadataKey(DEBUGINFO_META_KEY.to_string()))
+                    .with_node_labels(NodeLabel::MetadataValues {
+                        print_keys: [DEBUGINFO_META_KEY.to_string()].into(),
+                    })
             } else {
                 hugr.mermaid_format()
             };
