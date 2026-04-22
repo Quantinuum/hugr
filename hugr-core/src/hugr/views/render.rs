@@ -229,7 +229,7 @@ pub(in crate::hugr) fn node_style<'a>(
         }),
         NodeLabel::MetadataKey(label) => Box::new(move |n| {
             let metadata = serde_json::to_string(
-                h.get_metadata_any(Node::from_portgraph(n), &label)
+                h.get_metadata_any(n.into(), &label)
                     .unwrap_or(&serde_json::Value::Null),
             )
             .expect("Could not render JSON metadata");

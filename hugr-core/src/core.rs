@@ -86,10 +86,6 @@ impl Node {
     pub(crate) fn into_portgraph(self) -> portgraph::NodeIndex {
         self.index
     }
-
-    pub(crate) fn from_portgraph(index: portgraph::NodeIndex) -> Self {
-        Self { index }
-    }
 }
 
 impl Port {

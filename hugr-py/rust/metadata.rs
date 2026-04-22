@@ -23,7 +23,6 @@ pub mod metadata {
     #[pymodule_export]
     const HUGR_USED_EXTENSIONS: &str = hugr_core::metadata::HugrUsedExtensions::KEY;
 
-    // TODO: Get from rust implementation once it exists.
     #[pymodule_export]
-    const HUGR_DEBUG_INFO: &str = "core.debug_info";
+    const HUGR_DEBUG_INFO: &str = hugr_core::metadata::DEBUGINFO_META_KEY;
 }
