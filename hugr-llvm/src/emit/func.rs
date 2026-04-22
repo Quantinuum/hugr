@@ -13,7 +13,7 @@ use inkwell::{
     context::Context,
     module::{Linkage, Module},
     types::{BasicType, BasicTypeEnum, FunctionType, PointerType},
-    values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue, IntValue, LLVMTailCallKind},
+    values::{BasicValue, BasicValueEnum, FunctionValue, GlobalValue, IntValue},
 };
 use itertools::{Itertools, zip_eq};
 
@@ -469,7 +469,6 @@ pub fn get_or_make_function<'c, H: HugrView<Node = Node>, const N: usize>(
     let call_site =
         ctx.builder()
             .build_call(func, &args.iter().map(|&a| a.into()).collect_vec(), "")?;
-    call_site.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
     let result = call_site.try_as_basic_value().basic();
     Ok(result)
 }

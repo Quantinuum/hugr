@@ -10,7 +10,7 @@ use hugr_core::{
     types::{SumType, Type, TypeEnum},
 };
 use inkwell::types::BasicTypeEnum;
-use inkwell::values::{BasicValueEnum, LLVMTailCallKind};
+use inkwell::values::BasicValueEnum;
 use itertools::{Itertools, zip_eq};
 use petgraph::visit::Walker;
 
@@ -249,7 +249,6 @@ fn emit_call<'c, H: HugrView<Node = Node>>(
     let inputs = args.inputs.into_iter().map_into().collect_vec();
     let builder = context.builder();
     let call = builder.build_call(func?, inputs.as_slice(), "")?;
-    call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
     let call_results = deaggregate_call_result(builder, call, args.outputs.len())?;
     args.outputs.finish(context.builder(), call_results)?;
     context.try_unset_debug_loc()
@@ -268,7 +267,6 @@ fn emit_call_indirect<'c, H: HugrView<Node = Node>>(
     let inputs = args.inputs.into_iter().skip(1).map_into().collect_vec();
     let builder = context.builder();
     let call = builder.build_indirect_call(func_ty, func_ptr, inputs.as_slice(), "")?;
-    call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
     let call_results = deaggregate_call_result(builder, call, args.outputs.len())?;
     args.outputs.finish(builder, call_results)?;
     context.try_unset_debug_loc()

@@ -33,9 +33,7 @@ use inkwell::intrinsics::Intrinsic;
 use inkwell::types::{
     BasicMetadataTypeEnum, BasicType, BasicTypeEnum, FunctionType, IntType, StructType,
 };
-use inkwell::values::{
-    BasicValue as _, BasicValueEnum, IntValue, LLVMTailCallKind, PointerValue, StructValue,
-};
+use inkwell::values::{BasicValue as _, BasicValueEnum, IntValue, PointerValue, StructValue};
 use itertools::Itertools;
 
 use crate::emit::emit_value;
@@ -761,7 +759,7 @@ pub fn emit_clone_op<'c, H: HugrView<Node = Node>>(
             &[ptr_ty.into(), ptr_ty.into(), size_value.get_type().into()],
         )
         .unwrap();
-    let call = ctx.builder().build_call(
+    ctx.builder().build_call(
         memcpy,
         &[
             other_ptr.into(),
@@ -771,7 +769,6 @@ pub fn emit_clone_op<'c, H: HugrView<Node = Node>>(
         ],
         "",
     )?;
-    call.set_tail_call_kind(LLVMTailCallKind::LLVMTailCallKindNoTail);
     Ok((array_v, other_array_v.into()))
 }
 

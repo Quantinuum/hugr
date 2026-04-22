@@ -35,7 +35,7 @@ entry_block:                                      ; preds = %alloca_block
 
 9:                                                ; preds = %entry_block
   %10 = add i64 1, %array_offset, !dbg !8
-  notail call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr, i64 %10), !dbg !8
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr, i64 %10), !dbg !8
   %11 = getelementptr inbounds i64, ptr %array_ptr, i64 %10, !dbg !8
   %12 = load i64, ptr %11, align 4, !dbg !8
   %13 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %12, 1, !dbg !8

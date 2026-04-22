@@ -49,11 +49,11 @@ entry_block:                                      ; preds = %alloca_block
   %array_mask_ptr = extractvalue { ptr, ptr, i64 } %11, 1, !dbg !9
   %array_offset = extractvalue { ptr, ptr, i64 } %11, 2, !dbg !9
   %14 = add i64 %array_offset, 0, !dbg !9
-  notail call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr, i64 %14), !dbg !9
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr, i64 %14), !dbg !9
   %15 = getelementptr inbounds i64, ptr %array_ptr, i64 %14, !dbg !9
   %16 = load i64, ptr %15, align 4, !dbg !9
   %17 = add i64 %array_offset, 1, !dbg !9
-  notail call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr, i64 %17), !dbg !9
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr, i64 %17), !dbg !9
   %18 = getelementptr inbounds i64, ptr %array_ptr, i64 %17, !dbg !9
   %19 = load i64, ptr %18, align 4, !dbg !9
   %array_ptr10 = extractvalue { ptr, ptr, i64 } %4, 0, !dbg !10
@@ -71,8 +71,8 @@ entry_block:                                      ; preds = %alloca_block
 25:                                               ; preds = %entry_block
   %26 = add i64 0, %array_offset12, !dbg !10
   %27 = add i64 1, %array_offset12, !dbg !10
-  notail call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr11, i64 %26), !dbg !10
-  notail call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr11, i64 %27), !dbg !10
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr11, i64 %26), !dbg !10
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr11, i64 %27), !dbg !10
   %28 = getelementptr inbounds i64, ptr %array_ptr10, i64 %26, !dbg !10
   %29 = load i64, ptr %28, align 4, !dbg !10
   %30 = getelementptr inbounds i64, ptr %array_ptr10, i64 %27, !dbg !10
@@ -120,7 +120,7 @@ cond_exit_19:                                     ; preds = %cond_19_case_1, %co
 
 44:                                               ; preds = %cond_exit_19
   %45 = add i64 0, %array_offset29, !dbg !12
-  notail call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr28, i64 %45), !dbg !12
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr28, i64 %45), !dbg !12
   %46 = getelementptr inbounds i64, ptr %array_ptr27, i64 %45, !dbg !12
   %47 = load i64, ptr %46, align 4, !dbg !12
   %48 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %47, 1, !dbg !12
@@ -165,7 +165,7 @@ cond_exit_31:                                     ; preds = %cond_31_case_1, %co
 
 61:                                               ; preds = %cond_exit_31
   %62 = add i64 1, %array_offset46, !dbg !14
-  notail call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr45, i64 %62), !dbg !14
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr45, i64 %62), !dbg !14
   %63 = getelementptr inbounds i64, ptr %array_ptr44, i64 %62, !dbg !14
   %64 = load i64, ptr %63, align 4, !dbg !14
   store i64 %"034.0", ptr %63, align 4, !dbg !14
@@ -207,7 +207,7 @@ cond_exit_42:                                     ; preds = %cond_42_case_1, %co
   %array_mask_ptr71 = extractvalue { ptr, ptr, i64 } %"151.0", 1, !dbg !16
   %array_offset72 = extractvalue { ptr, ptr, i64 } %"151.0", 2, !dbg !16
   %new_offset = add i64 %array_offset72, 1, !dbg !16
-  notail call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr71, i64 %array_offset72), !dbg !16
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr71, i64 %array_offset72), !dbg !16
   %78 = getelementptr inbounds i64, ptr %array_ptr70, i64 %array_offset72, !dbg !16
   %79 = load i64, ptr %78, align 4, !dbg !16
   %80 = insertvalue { ptr, ptr, i64 } poison, ptr %array_ptr70, 0, !dbg !16
@@ -245,7 +245,7 @@ cond_exit_53:                                     ; preds = %cond_53_case_1, %co
   %array_mask_ptr89 = extractvalue { ptr, ptr, i64 } %"175.0", 1, !dbg !18
   %array_offset90 = extractvalue { ptr, ptr, i64 } %"175.0", 2, !dbg !18
   %93 = add i64 %array_offset90, 0, !dbg !18
-  notail call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr89, i64 %93), !dbg !18
+  call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr89, i64 %93), !dbg !18
   %94 = getelementptr inbounds i64, ptr %array_ptr88, i64 %93, !dbg !18
   %95 = load i64, ptr %94, align 4, !dbg !18
   %96 = insertvalue { ptr, ptr, i64 } poison, ptr %array_ptr88, 0, !dbg !18

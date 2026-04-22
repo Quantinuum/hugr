@@ -10,7 +10,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  notail call void @_hl.main_void.1(), !dbg !7
+  call void @_hl.main_void.1(), !dbg !7
   ret void
 }
 
@@ -19,7 +19,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %1 = notail call i1 @_hl.main_unary.5(i1 %0), !dbg !12
+  %1 = call i1 @_hl.main_unary.5(i1 %0), !dbg !12
   ret i1 %1
 }
 
@@ -28,7 +28,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  %2 = notail call { i1, i1 } @_hl.main_binary.9(i1 %0, i1 %1), !dbg !17
+  %2 = call { i1, i1 } @_hl.main_binary.9(i1 %0, i1 %1), !dbg !17
   %3 = extractvalue { i1, i1 } %2, 0, !dbg !17
   %4 = extractvalue { i1, i1 } %2, 1, !dbg !17
   %mrv = insertvalue { i1, i1 } poison, i1 %3, 0
