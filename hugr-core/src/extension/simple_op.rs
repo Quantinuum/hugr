@@ -398,6 +398,7 @@ mod test {
             DummyEnum::from_optype(&o.clone().to_extension_op().unwrap().into()).unwrap(),
             o
         );
+        assert_eq!(format!("{EXT_ID}.Dumb"), o.qualified_opdef_id());
         let registered: RegisteredOp<_> = o.clone().into();
         assert_eq!(registered.to_inner(), o);
 
