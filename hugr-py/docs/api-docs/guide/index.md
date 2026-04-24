@@ -114,3 +114,33 @@ Once loaded, the function is treated as a (higher-order) value.
 
 A `Call` node calls a `FuncDefn` or `FuncDecl` node directly, generating the
 output of the function.
+
+## Custom operations and types
+
+## Entrypoints
+
+## HUGR packages
+
+## Building, saving and loading HUGR packages
+
+### Rust
+
+### Python
+
+## Visualization tools
+
+## HUGR Extensions
+
+### Introduction
+
+### Defining an extension
+
+## Importing HUGR from other formats
+
+## Compilation
+
+### Basic compilation passes
+
+### Using TKET1 passes
+
+### Defining custom passes
