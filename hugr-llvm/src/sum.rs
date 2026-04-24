@@ -1,8 +1,8 @@
 mod layout;
 
-use std::{iter, slice};
-
 use crate::types::{HugrSumType, TypingSession};
+use std::num::NonZeroU32;
+use std::{iter, slice};
 
 use anyhow::{Result, anyhow, bail, ensure};
 use delegate::delegate;
@@ -263,12 +263,12 @@ enum LLVMSumTypeEnum<'c> {
 }
 
 /// Returns the smallest width for an integer type to be able to represent values smaller than `num_variants
-fn tag_width_for_num_variants(num_variants: usize) -> u32 {
+fn tag_width_for_num_variants(num_variants: usize) -> NonZeroU32 {
     debug_assert!(num_variants >= 1);
     if num_variants == 1 {
-        return 1;
+        return NonZeroU32::new(1).unwrap();
     }
-    (num_variants - 1).ilog2() + 1
+    NonZeroU32::new((num_variants - 1).ilog2() + 1).unwrap()
 }
 
 impl<'c> LLVMSumTypeEnum<'c> {
@@ -316,8 +316,9 @@ impl<'c> LLVMSumTypeEnum<'c> {
             }
             num_variants => {
                 let (mut fields, field_indices) = layout::layout_variants(&variant_types);
-                let tag_type =
-                    context.custom_width_int_type(tag_width_for_num_variants(num_variants));
+                let tag_type = context
+                    .custom_width_int_type(tag_width_for_num_variants(num_variants))
+                    .unwrap();
                 if fields.is_empty() {
                     Self::NoFields {
                         variant_types,
@@ -706,7 +707,10 @@ mod test {
     #[case(8, 3)]
     #[case(9, 4)]
     fn tag_width(#[case] num_variants: usize, #[case] expected: u32) {
-        assert_eq!(tag_width_for_num_variants(num_variants), expected);
+        assert_eq!(
+            tag_width_for_num_variants(num_variants),
+            NonZeroU32::new(expected).unwrap()
+        );
     }
 
     #[rstest]
@@ -718,7 +722,10 @@ mod test {
         let iwc = ts.iw_context();
         let empty_struct = iwc.struct_type(&[], false).as_basic_type_enum();
         let i1 = iwc.bool_type().as_basic_type_enum();
-        let i2 = iwc.custom_width_int_type(2).as_basic_type_enum();
+        let i2 = iwc
+            .custom_width_int_type(NonZeroU32::new(2).unwrap())
+            .unwrap()
+            .as_basic_type_enum();
         let i64 = iwc.i64_type().as_basic_type_enum();
 
         {
