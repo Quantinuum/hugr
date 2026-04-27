@@ -1,6 +1,5 @@
 use anyhow::{Context, Result, anyhow};
 use hugr_core::Node;
-use hugr_core::hugr::internal::PortgraphNodeMap;
 use hugr_core::ops::{
     CFG, Call, CallIndirect, Case, Conditional, Const, ExtensionOp, Input, LoadConstant,
     LoadFunction, OpTag, OpTrait, OpType, Output, Tag, TailLoop, Value, constant::Sum,
@@ -73,7 +72,7 @@ where
         let sg = node.hugr().scheduling_graph(node.node());
         let topo = Topo::new(sg.petgraph());
         for n in topo.iter(sg.petgraph()) {
-            let node = node.hugr().fat_optype(sg.node_map().from_portgraph(n));
+            let node = node.hugr().fat_optype(sg.pg_to_node(n));
             let inputs_rmb = context.node_ins_rmb(node)?;
             let inputs = inputs_rmb.read(context.builder(), [])?;
             let outputs = context.node_outs_rmb(node)?.promise();

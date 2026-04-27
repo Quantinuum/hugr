@@ -32,6 +32,7 @@ use portgraph::{LinkView, PortView};
 
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
+use crate::hugr::internal::PortgraphNodeMap;
 use crate::hugr::views::syn_edge::SynEdgeWrapper;
 use crate::metadata::{Metadata, RawMetadataValue};
 use crate::ops::{OpParent, OpTag, OpTrait, OpType, handle::NodeHandle};
@@ -581,13 +582,30 @@ impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
         self.region_parent
     }
 
-    /// Allows translating between the `V::Node`s of the original Hugr and the
-    /// [portgraph::NodeIndex]es of [Self::petgraph()]
-    pub fn node_map(&self) -> &V::RegionPortgraphNodes {
-        &self.node_map
+    /// Converts a `V::Node` index in the original Hugr into
+    /// an index in [Self::petgraph]
+    ///
+    /// # Panics
+    ///
+    /// If `n` is not a child of [Self::region_parent]
+    pub fn node_to_pg(&self, n: V::Node) -> portgraph::NodeIndex {
+        self.node_map.to_portgraph(n)
     }
 
-    /// Like [Self::node_map] but extracts the map, discarding the rest of `self`
+    /// Converts the index of a node in [Self::petgraph] to the corresponding
+    /// `V::Node` of the original Hugr.
+    ///
+    /// # Panics
+    ///
+    /// If `n` is not a node in `Self::petgraph`
+    pub fn pg_to_node(&self, n: portgraph::NodeIndex) -> V::Node {
+        self.node_map.from_portgraph(n)
+    }
+
+    /// Extracts the map between `V::Node` and the [NodeIndex] used in [Self::petgraph],
+    /// discarding the rest of `self`.
+    ///
+    /// [NodeIndex]: portgraph::NodeIndex
     pub fn into_node_map(self) -> V::RegionPortgraphNodes {
         self.node_map
     }
