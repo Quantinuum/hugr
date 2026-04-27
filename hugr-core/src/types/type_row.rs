@@ -270,7 +270,7 @@ impl TypeRowRV {
     }
 
     /// Wraps the given Term, without checking its type.
-    pub fn new_unchecked(t: impl Into<Term>) -> Self {
+    pub(crate) fn new_unchecked(t: impl Into<Term>) -> Self {
         Self(t.into())
     }
 
