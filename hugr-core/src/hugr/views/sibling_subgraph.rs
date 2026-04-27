@@ -9,7 +9,7 @@ use std::mem;
 use itertools::Itertools;
 use petgraph::visit::IntoNodeIdentifiers;
 use portgraph::algorithms::convex::{LineIndex, LineIntervals, Position};
-use portgraph::{LinkView, PortView, algorithms::CreateConvexChecker, boundary::Boundary};
+use portgraph::{PortView, algorithms::CreateConvexChecker, boundary::Boundary};
 use rustc_hash::FxHashSet;
 use thiserror::Error;
 
@@ -860,7 +860,15 @@ fn make_pg_subgraph<'h, H: HugrView>(
 ) -> portgraph::view::Subgraph<CheckerRegion<'h, H>> {
     // Ordering of the edges here is preserved and becomes ordering of the
     // signature.
-    let boundary = make_boundary::<H>(&region, node_map, inputs, outputs);
+    let to_pg_index = |n: H::Node, p: Port| {
+        region
+            .port_index(node_map.to_portgraph(n), p.pg_offset())
+            .unwrap()
+    };
+    let boundary = Boundary::new(
+        iter_incoming(inputs).map(|(n, p)| to_pg_index(n, p.into())),
+        iter_outgoing(outputs).map(|(n, p)| to_pg_index(n, p.into())),
+    );
 
     portgraph::view::Subgraph::new_subgraph(region, boundary)
 }
@@ -1041,23 +1049,6 @@ fn check_parent<'a, N: HugrNode>(
         }
     }
     Ok(first_parent)
-}
-
-fn make_boundary<'a, H: HugrView>(
-    region: &impl LinkView<NodeIndexBase = u32, PortIndexBase = u32, PortOffsetBase = u32>,
-    node_map: &H::RegionPortgraphNodes,
-    inputs: &'a IncomingPorts<H::Node>,
-    outputs: &'a OutgoingPorts<H::Node>,
-) -> Boundary {
-    let to_pg_index = |n: H::Node, p: Port| {
-        region
-            .port_index(node_map.to_portgraph(n), p.pg_offset())
-            .unwrap()
-    };
-    Boundary::new(
-        iter_incoming(inputs).map(|(n, p)| to_pg_index(n, p.into())),
-        iter_outgoing(outputs).map(|(n, p)| to_pg_index(n, p.into())),
-    )
 }
 
 // I'd deprecate this if it were `pub` but it isn't, so, fine
