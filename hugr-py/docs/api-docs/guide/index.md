@@ -117,15 +117,43 @@ output of the function.
 
 ## Custom operations and types
 
+Most "atomic" operations and types are defined in extensions (see below). For
+example, integer types of various bit widths (from 1-bit to 64-bit), and
+operations on them, are defined in the `arithmetic.int.types` and
+`arithmetic.int.ops` extensions. Core HUGR only provides primitives for
+constructing sums and tuples of type; however there is a standard library of
+commonly used operations and types (integers, floats, arrays and so on). The
+qubit type and quantum operations are provided in an extension from TKET.
+
 ## Entrypoints
+
+A HUGR may have one node distinguished as its "entrypoint". For executable HUGRs
+this marks the node where execution begins.
 
 ## HUGR packages
 
+A HUGR package consists of a collection of HUGRs, together with a collection of
+extensions that the HUGRs in the package may depend on.
+
 ## Building, saving and loading HUGR packages
+
+The [HUGR repository](https://github.com/Quantinuum/hugr) contains two independent
+implementations of the HUGR structure, one in Rust and one in Python. The Rust
+implementation is published as [crate](https://crates.io/crates/hugr) on `crates.io`
+(documentation [here](https://docs.rs/hugr/latest/hugr/index.html)),
+while the Python implementation is published as a [package](https://pypi.org/project/hugr/) on `pypi` (documentation [here](https://quantinuum.github.io/hugr/generated/hugr.html)).
+
+Both implementations provide functions to convert to and from the serialized
+"envelope" format, so HUGRs can be shared between them and also shered with
+other libraries such as TKET.
 
 ### Rust
 
+[HUGR Rust tutorial](./tutorial-rust.md)
+
 ### Python
+
+[HUGR Python tutorial](./tutorial-python.md)
 
 ## Visualization tools
 
@@ -144,3 +172,5 @@ output of the function.
 ### Using TKET1 passes
 
 ### Defining custom passes
+
+## Lowering
