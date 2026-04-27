@@ -493,7 +493,7 @@ impl Term {
             Term::BytesType => self.clone(),
             Term::FloatType => self.clone(),
             Term::ListType(item_type) => Term::new_list_type(item_type.substitute(t)),
-            Term::TupleType(item_types) => Term::new_list_type(item_types.substitute(t)),
+            Term::TupleType(item_types) => Term::new_tuple_type(item_types.substitute(t)),
             Term::StaticType => self.clone(),
             Term::ConstType(ty) => Term::new_const(ty.substitute(t)),
         }
