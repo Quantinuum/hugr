@@ -776,3 +776,89 @@ fn test_call_subgraph_from_boundary(hugr_call_subgraph: Hugr) {
     assert_eq!(subg.function_calls.len(), 1);
     assert_eq!(subg.function_calls[0].len(), 2);
 }
+
+#[test]
+fn test_nonlocal_edge_excluding_target() {
+    let mut outer = DFGBuilder::new(endo_sig([bool_t()])).unwrap();
+    let [inp] = outer.input_wires_arr();
+    let not_op = outer.add_dataflow_op(LogicOp::Not, [inp]).unwrap();
+    let mut dfb = outer.dfg_builder(inout_sig([], [bool_t()]), []).unwrap();
+    let [nested_not] = dfb
+        .add_dataflow_op(LogicOp::Not, not_op.outputs())
+        .unwrap()
+        .outputs_arr();
+    let [dfg] = dfb.finish_with_outputs([nested_not]).unwrap().outputs_arr();
+    let h = outer.finish_hugr_with_outputs([dfg]).unwrap();
+    //eprintln!("{}", h.mermaid_string());
+
+    // Sanity check - simple SSG without the nonlocal edge
+    assert_eq!(
+        h.output_neighbours(not_op.node()).collect_vec(),
+        vec![nested_not.node(), dfg.node()]
+    );
+    let outer_not_inputs = vec![vec![(not_op.node(), IncomingPort::from(0))]];
+    let ss = SiblingSubgraph::try_new(
+        outer_not_inputs.clone(),
+        vec![(not_op.node(), 0.into())],
+        &h,
+    )
+    .unwrap();
+    // Nodes include the DFG (by following Order edge) and Output (edge from DFG)
+    assert_eq!(
+        ss.nodes(),
+        &[
+            h.get_io(h.entrypoint()).unwrap()[1],
+            not_op.node(),
+            dfg.node()
+        ]
+    );
+    ss.validate_default(&h).unwrap();
+
+    // We can't "not" follow the Order edge....
+    let ss2 = SiblingSubgraph::try_new(
+        outer_not_inputs.clone(),
+        vec![
+            (not_op.node(), 0.into()),
+            (
+                not_op.node(),
+                h.get_optype(not_op.node()).other_output_port().unwrap(),
+            ),
+        ],
+        &h,
+    );
+    assert_matches!(ss2, Err(InvalidSubgraph::UnsupportedEdgeKind(_, _)));
+
+    // Now try to make an SSG with the outer Not and the DFG...this should not be possible ATM
+    // (it would contain an edge to the inner Not, thus contain the inner Not, thus is not a sibling subgraph).
+    // TODO in future we could consider allowing this i.e. discounting the nonlocal edge and its target
+    // as being part of the graph as it's "internal"?
+    let nested_output = vec![(dfg.node(), dfg.source())];
+    let bad_ss = SiblingSubgraph::try_new(outer_not_inputs.clone(), nested_output.clone(), &h);
+    assert_eq!(bad_ss, Err(InvalidSubgraph::NotConvex));
+
+    let dfg_and_outer_not_outputs = vec![(not_op.node(), 0.into()), (dfg.node(), 0.into())];
+    let ss1 = SiblingSubgraph::try_new(
+        outer_not_inputs.clone(),
+        dfg_and_outer_not_outputs.clone(),
+        &h,
+    )
+    .unwrap();
+    assert_eq!(ss1.nodes(), &[not_op.node(), dfg.node()]);
+    ss1.validate_default(&h).unwrap();
+
+    let ss2 = SiblingSubgraph::try_from_nodes([not_op.node(), dfg.node()], &h).unwrap();
+    assert_eq!(ss2.incoming_ports(), &outer_not_inputs);
+    assert_eq!(ss2.outgoing_ports(), &dfg_and_outer_not_outputs);
+    ss2.validate_default(&h).unwrap();
+
+    let ss3 = SiblingSubgraph::new_unchecked(
+        outer_not_inputs,
+        nested_output,
+        vec![],
+        vec![not_op.node(), dfg.node()],
+    );
+    assert_eq!(ss3.validate_default(&h), Err(InvalidSubgraph::NotConvex));
+    // Without a convexity checker, and since we ignore the nonlocal edges themselves,
+    // all is "ok"....
+    ss3.validate_skip_convexity(&h).unwrap();
+}
