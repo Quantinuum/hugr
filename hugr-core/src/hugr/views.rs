@@ -651,15 +651,13 @@ impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
         self.node_map
     }
 
+    // Just ignore the syn edges. Use at own peril!
     fn portgraph_no_syn_edges(
         self,
     ) -> (
         portgraph::view::FlatRegion<'a, V::RegionPortgraph<'a>>,
         V::RegionPortgraphNodes,
     ) {
-        // This may need to change when the SynEdgeWrapper actually has edges in it...
-        // or maybe we should keep the assert to prevent this being used any time it does.
-        assert!(self.graph.syn_edges.is_empty());
         (self.graph.region_view, self.node_map)
     }
 
