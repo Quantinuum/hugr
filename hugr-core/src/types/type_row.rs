@@ -52,7 +52,7 @@ impl TypeRow {
 
     /// Returns a new `TypeRow` with `xs` concatenated onto `self`.
     pub fn extend<'a>(&'a self, rest: impl IntoIterator<Item = &'a Type>) -> Self {
-        self.iter().chain(rest).cloned().collect_vec().into()
+        self.iter().chain(rest).cloned().collect()
     }
 
     /// Returns a reference to the types in the row.
@@ -176,14 +176,6 @@ impl TryFrom<Vec<Term>> for TypeRow {
     }
 }
 
-impl TryFrom<TypeRowRV> for TypeRow {
-    type Error = TermTypeError;
-
-    fn try_from(value: TypeRowRV) -> Result<Self, Self::Error> {
-        value.0.try_into()
-    }
-}
-
 impl<const N: usize> From<[Type; N]> for TypeRow {
     fn from(types: [Type; N]) -> Self {
         Self::from(Vec::from(types))
@@ -210,12 +202,6 @@ impl PartialEq<Term> for TypeRow {
     }
 }
 
-impl PartialEq<TypeRowRV> for TypeRow {
-    fn eq(&self, other: &TypeRowRV) -> bool {
-        self == &other.0
-    }
-}
-
 /// Fallibly convert a [Term] to a [TypeRow].
 ///
 /// This will fail if `arg` is not a [Term::List] or any of the elements are not [Type]s
@@ -236,13 +222,7 @@ impl TryFrom<Term> for TypeRow {
 
 impl From<TypeRow> for Term {
     fn from(value: TypeRow) -> Self {
-        Term::new_list(value.into_owned().into_iter().map_into())
-    }
-}
-
-impl From<TypeRow> for TypeRowRV {
-    fn from(value: TypeRow) -> Self {
-        Self(Term::from(value))
+        Term::new_list(value.into_owned())
     }
 }
 
@@ -257,6 +237,12 @@ impl Deref for TypeRow {
 impl DerefMut for TypeRow {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.types.to_mut()
+    }
+}
+
+impl FromIterator<Type> for TypeRow {
+    fn from_iter<T: IntoIterator<Item = Type>>(iter: T) -> Self {
+        Self::from(iter.into_iter().collect_vec())
     }
 }
 
@@ -275,7 +261,7 @@ impl DerefMut for TypeRow {
 pub struct TypeRowRV(pub(super) Term);
 
 impl TypeRowRV {
-    const EMPTY: TypeRowRV = Self(Term::List(vec![]));
+    const EMPTY: TypeRowRV = Self(Term::EMPTY_LIST);
     pub(super) const EMPTY_REF: &TypeRowRV = &Self::EMPTY;
 
     /// Create a new empty row.
@@ -283,14 +269,9 @@ impl TypeRowRV {
         Self::EMPTY
     }
 
-    /// Wraps the given Term, without checking its type.
-    pub fn new_unchecked(t: impl Into<Term>) -> Self {
-        Self(t.into())
-    }
-
     /// Creates a singleton row with just a row variable
     /// (a variable ranging over lists of types of any length)
-    pub fn just_row_var(idx: usize, b: TypeBound) -> Self {
+    pub fn new_var_use(idx: usize, b: TypeBound) -> Self {
         Self(Term::new_row_var_use(idx, b))
     }
 
@@ -315,7 +296,27 @@ impl TypeRowLike for TypeRowRV {
 
     fn substitute(&self, s: &Substitution) -> Self {
         // Substitution cannot make this invalid if it was valid previously
-        Self::new_unchecked(self.0.substitute(s))
+        Self(self.0.substitute(s))
+    }
+}
+
+impl TryFrom<TypeRowRV> for TypeRow {
+    type Error = TermTypeError;
+
+    fn try_from(value: TypeRowRV) -> Result<Self, Self::Error> {
+        value.0.try_into()
+    }
+}
+
+impl PartialEq<TypeRowRV> for TypeRow {
+    fn eq(&self, other: &TypeRowRV) -> bool {
+        self == &other.0
+    }
+}
+
+impl From<TypeRow> for TypeRowRV {
+    fn from(value: TypeRow) -> Self {
+        Self(Term::from(value))
     }
 }
 
@@ -355,18 +356,23 @@ impl From<TypeRowRV> for Term {
     }
 }
 
-// This allows an easy syntax for building TypeRowRV's which are all Types
-impl<T: IntoIterator<Item = Type>> From<T> for TypeRowRV {
-    fn from(value: T) -> Self {
-        Self(Term::new_list(value.into_iter().map_into()))
+impl From<Vec<Type>> for TypeRowRV {
+    fn from(value: Vec<Type>) -> Self {
+        Self(Term::new_list(value))
     }
 }
 
-/*impl FromIterator<Type> for TypeRowRV {
-    fn from_iter<T: IntoIterator<Item = Type>>(iter: T) -> Self {
-        Self(Term::new_list(iter.into_iter().map_into()))
+impl<const N: usize> From<[Type; N]> for TypeRowRV {
+    fn from(value: [Type; N]) -> Self {
+        Self(Term::new_list(value))
     }
-}*/
+}
+
+impl FromIterator<Type> for TypeRowRV {
+    fn from_iter<T: IntoIterator<Item = Type>>(iter: T) -> Self {
+        Self(Term::new_list(iter))
+    }
+}
 
 #[cfg(test)]
 mod test {
@@ -406,7 +412,7 @@ mod test {
                             .prop_map(|ts| ts.clone().into())
                             .boxed(),
                         (any::<usize>(), any::<TypeBound>())
-                            .prop_map(|(idx, b)| TypeRowRV::just_row_var(idx, b))
+                            .prop_map(|(idx, b)| TypeRowRV::new_var_use(idx, b))
                             .boxed(),
                     ]
                     .boxed()
@@ -428,7 +434,7 @@ mod test {
     fn test_try_from_term_to_typerow() {
         // Test successful conversion with List
         let types = vec![Type::new_unit_sum(1), bool_t()];
-        let term = Term::new_list(types.iter().cloned().map_into());
+        let term = Term::new_list(types.clone());
         assert_eq!(
             TypeRow::try_from(term.clone()),
             Ok(TypeRow::from(types.clone()))

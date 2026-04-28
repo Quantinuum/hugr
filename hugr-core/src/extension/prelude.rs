@@ -114,8 +114,8 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             ],
             FuncValueType::new(
                 TypeRowRV::from([Type::new_extension(error_type.clone())])
-                    .concat(TypeRowRV::just_row_var(0, TypeBound::Linear)),
-                TypeRowRV::just_row_var(1, TypeBound::Linear),
+                    .concat(TypeRowRV::new_var_use(0, TypeBound::Linear)),
+                TypeRowRV::new_var_use(1, TypeBound::Linear),
             ),
         );
         prelude
@@ -362,7 +362,7 @@ pub fn const_left_tuple(
     ty_right: impl Into<TypeRowRV>,
 ) -> Value {
     let values = values.into_iter().collect_vec();
-    let types: TypeRowRV = values.iter().map(Value::get_type).collect_vec().into();
+    let types: TypeRowRV = values.iter().map(Value::get_type).collect();
     let typ = either_type(types, ty_right);
     Value::sum(0, values, typ).unwrap()
 }
@@ -386,7 +386,7 @@ pub fn const_right_tuple(
     values: impl IntoIterator<Item = Value>,
 ) -> Value {
     let values = values.into_iter().collect_vec();
-    let types: TypeRowRV = values.iter().map(Value::get_type).collect_vec().into();
+    let types: TypeRowRV = values.iter().map(Value::get_type).collect();
     let typ = either_type(ty_left, types);
     Value::sum(1, values, typ).unwrap()
 }
@@ -621,7 +621,7 @@ impl MakeOpDef for TupleOpDef {
     }
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
-        let rv = TypeRowRV::just_row_var(0, TypeBound::Linear);
+        let rv = TypeRowRV::new_var_use(0, TypeBound::Linear);
         let tuple_type = Type::new_tuple(rv.clone());
 
         let param = TypeParam::new_list_kind(TypeBound::Linear);
@@ -694,7 +694,7 @@ impl MakeExtensionOp for MakeTuple {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![Term::new_list(self.0.iter().map(|t| t.clone().into()))]
+        vec![self.0.clone().into()]
     }
 }
 
@@ -742,7 +742,7 @@ impl MakeExtensionOp for UnpackTuple {
     }
 
     fn type_args(&self) -> Vec<Term> {
-        vec![Term::new_list(self.0.iter().map(|t| t.clone().into()))]
+        vec![self.0.clone().into()]
     }
 }
 
@@ -894,7 +894,7 @@ impl MakeOpDef for BarrierDef {
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
             vec![TypeParam::new_list_kind(TypeBound::Linear)],
-            FuncValueType::new_endo(TypeRowRV::just_row_var(0, TypeBound::Linear)),
+            FuncValueType::new_endo(TypeRowRV::new_var_use(0, TypeBound::Linear)),
         )
         .into()
     }
@@ -960,9 +960,7 @@ impl MakeExtensionOp for Barrier {
     }
 
     fn type_args(&self) -> Vec<TypeArg> {
-        vec![TypeArg::new_list(
-            self.type_row.iter().map(|t| t.clone().into()),
-        )]
+        vec![self.type_row.clone().into()]
     }
 }
 
@@ -1107,7 +1105,7 @@ mod test {
         let err = b.add_load_value(error_val);
 
         let op = PRELUDE
-            .instantiate_extension_op(&EXIT_OP_ID, [Term::new_list([]), Term::new_list([])])
+            .instantiate_extension_op(&EXIT_OP_ID, [Term::EMPTY_LIST, Term::EMPTY_LIST])
             .unwrap();
 
         b.add_dataflow_op(op, [err]).unwrap();
@@ -1122,7 +1120,7 @@ mod test {
             .instantiate_extension_op(&MAKE_ERROR_OP_ID, [])
             .unwrap();
         let panic_op = PRELUDE
-            .instantiate_extension_op(&EXIT_OP_ID, [Term::new_list([]), Term::new_list([])])
+            .instantiate_extension_op(&EXIT_OP_ID, [Term::EMPTY_LIST, Term::EMPTY_LIST])
             .unwrap();
 
         let mut b =

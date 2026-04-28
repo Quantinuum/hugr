@@ -178,7 +178,8 @@ fn resolve_typerow_rv_exts(
 ) -> Result<(), ExtensionResolutionError> {
     let mut t = Term::from(std::mem::take(row));
     resolve_term_exts(node, &mut t, extensions, used_extensions)?;
-    *row = TypeRowRV::new_unchecked(t);
+    *row = TypeRowRV::try_from(t)
+        .expect("Resolving extensions cannot change kind from ListType(RuntimeType)");
     Ok(())
 }
 
@@ -220,7 +221,9 @@ pub(super) fn resolve_type_exts(
     const EMPTY: Type = Type::new_unit_sum(0); // as no Type::default()
     let mut tm = std::mem::replace(typ, EMPTY).into();
     let r = resolve_term_exts(node, &mut tm, extensions, used_extensions);
-    *typ = tm.try_into().unwrap();
+    *typ = tm
+        .try_into()
+        .expect("Resolving extensions cannot change kind from RuntimeType");
     r
 }
 

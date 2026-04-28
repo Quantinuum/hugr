@@ -399,7 +399,7 @@ pub(crate) mod test {
         let decl = Term::new_list_kind(TP_ANY);
         let e = PolyFuncTypeBase::new_validated(
             [decl.clone()],
-            FuncValueType::new([usize_t()], TypeRowRV::just_row_var(0, TypeBound::Copyable)),
+            FuncValueType::new([usize_t()], TypeRowRV::new_var_use(0, TypeBound::Copyable)),
         )
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
@@ -420,7 +420,7 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables() {
-        let rty = TypeRowRV::just_row_var(0, TypeBound::Linear);
+        let rty = TypeRowRV::new_var_use(0, TypeBound::Linear);
         let pf = PolyFuncTypeBase::new_validated(
             [TypeParam::new_list_kind(TP_ANY)],
             FuncValueType::new(
@@ -449,7 +449,7 @@ pub(crate) mod test {
 
     #[test]
     fn row_variables_inner() {
-        let inner_fty = Type::new_function(FuncValueType::new_endo(TypeRowRV::just_row_var(
+        let inner_fty = Type::new_function(FuncValueType::new_endo(TypeRowRV::new_var_use(
             0,
             TypeBound::Copyable,
         )));
@@ -461,7 +461,7 @@ pub(crate) mod test {
 
         let inner3 = Type::new_function(Signature::new_endo([usize_t(), bool_t(), usize_t()]));
         let t3 = pf
-            .instantiate(&[[usize_t(), bool_t(), usize_t()].into()])
+            .instantiate(&[Term::new_list([usize_t(), bool_t(), usize_t()])])
             .unwrap();
         assert_eq!(
             t3,

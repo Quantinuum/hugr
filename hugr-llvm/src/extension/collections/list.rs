@@ -202,7 +202,7 @@ fn emit_list_op<'c, H: HugrView<Node = Node>>(
     op: ListOp,
 ) -> Result<()> {
     let hugr_elem_ty = match args.node().args() {
-        [ty] => ty.clone().try_into().expect("List elements not a type"),
+        [ty] => ty.clone().try_into()?,
         _ => {
             bail!("Collections: invalid type args for list op");
         }

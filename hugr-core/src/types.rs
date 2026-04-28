@@ -285,10 +285,6 @@ impl SumType {
         }
     }
 
-    // ALAN removing as_unary_option.
-    // "If a sum is an option of a single type, return the type. pub fn as_unary_option(&self) -> Option<&Term>"
-    // But of course a Term was not necessarily a single type...
-
     /// Returns an iterator over the variants
     pub fn variants(&self) -> impl Iterator<Item = &TypeRowRV> {
         match self {
@@ -416,10 +412,7 @@ impl Type {
     #[must_use]
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(
-            Term::SumType(SumType::new_unary(size)),
-            TypeBound::Copyable,
-        )
+        Self(Term::SumType(SumType::new_unary(size)), TypeBound::Copyable)
     }
 
     /// New use (occurrence) of the type variable with specified index.
@@ -631,7 +624,6 @@ pub(crate) mod test {
                 // Dummy extension reference.
                 &Weak::default(),
             )),
-            //Type::new_alias(AliasDecl::new("my_alias", TypeBound::Copyable)),
         ]);
         assert_eq!(&t.to_string(), "[usize, [] -> [], my_custom]");
     }
@@ -662,7 +654,6 @@ pub(crate) mod test {
             TypeRowRV::from([usize_t()])
         );
         // Two empty variants is like an option of empty.
-        // ALAN note there used to be as_unary_option...
         assert_eq!(
             Type::new_unit_sum(2).as_sum().unwrap().as_option(),
             Some(TypeRowRV::EMPTY_REF)
@@ -698,7 +689,7 @@ pub(crate) mod test {
     fn sum_variants() {
         let variants: Vec<TypeRowRV> = vec![
             [Type::UNIT].into(),
-            TypeRowRV::just_row_var(0, TypeBound::Linear),
+            TypeRowRV::new_var_use(0, TypeBound::Linear),
         ];
         let t = SumType::new(variants.clone());
         assert_eq!(variants, t.variants().cloned().collect_vec());
@@ -786,7 +777,7 @@ pub(crate) mod test {
 
         let coln = e.get_type(&COLN).unwrap();
         let c_of_cpy = coln
-            .instantiate([Term::new_list([Type::from(cpy.clone()).into()])])
+            .instantiate([Term::new_list([Type::from(cpy.clone())])])
             .unwrap();
 
         let mut t = Type::new_extension(c_of_cpy.clone());
@@ -799,7 +790,7 @@ pub(crate) mod test {
         );
 
         let mut t = Type::new_extension(
-            coln.instantiate([Term::new_list([mk_opt(Type::from(cpy.clone())).into()])])
+            coln.instantiate([Term::new_list([mk_opt(Type::from(cpy.clone()))])])
                 .unwrap(),
         );
         assert_eq!(
@@ -816,14 +807,14 @@ pub(crate) mod test {
             (ct == &c_of_cpy).then_some(usize_t())
         });
         let mut t = Type::new_extension(
-            coln.instantiate([Term::new_list(vec![Type::from(c_of_cpy.clone()).into(); 2])])
+            coln.instantiate([Term::new_list(vec![Type::from(c_of_cpy.clone()); 2])])
                 .unwrap(),
         );
         assert_eq!(t.transform(&cpy_to_qb2), Ok(true));
         assert_eq!(
             t,
             Type::new_extension(
-                coln.instantiate([Term::new_list([usize_t().into(), usize_t().into()])])
+                coln.instantiate([Term::new_list([usize_t(), usize_t()])])
                     .unwrap()
             )
         );

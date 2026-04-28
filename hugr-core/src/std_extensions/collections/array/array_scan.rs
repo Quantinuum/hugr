@@ -4,8 +4,6 @@ use std::marker::PhantomData;
 use std::str::FromStr;
 use std::sync::{Arc, Weak};
 
-use itertools::Itertools;
-
 use crate::Extension;
 use crate::extension::simple_op::{
     HasConcrete, HasDef, MakeExtensionOp, MakeOpDef, MakeRegisteredOp, OpLoadError,
@@ -65,7 +63,7 @@ impl<AK: ArrayKind> GenericArrayScanDef<AK> {
         let t1 = Type::new_var_use(1, TypeBound::Linear);
         let t2 = Type::new_var_use(2, TypeBound::Linear);
         let with_rest = |tys: Vec<Type>| {
-            TypeRowRV::from(tys).concat(TypeRowRV::just_row_var(3, TypeBound::Linear))
+            TypeRowRV::from(tys).concat(TypeRowRV::new_var_use(3, TypeBound::Linear))
         };
         PolyFuncTypeRV::new(
             params,
@@ -184,7 +182,7 @@ impl<AK: ArrayKind> MakeExtensionOp for GenericArrayScan<AK> {
             self.size.into(),
             self.src_ty.clone().into(),
             self.tgt_ty.clone().into(),
-            TypeArg::new_list(self.acc_tys.clone().into_iter().map_into()),
+            TypeArg::new_list(self.acc_tys.clone()),
         ]
     }
 }

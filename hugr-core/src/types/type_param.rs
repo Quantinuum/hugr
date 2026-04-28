@@ -17,7 +17,7 @@ use tracing::warn;
 
 use super::{Substitution, Transformable, Type, TypeBound, TypeRowLike, TypeTransformer};
 use crate::extension::SignatureError;
-use crate::types::{CustomType, FuncValueType, SumType, TypeRow};
+use crate::types::{CustomType, FuncValueType, SumType};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
@@ -111,6 +111,7 @@ pub enum Term {
     //
     // TODO optimise with `Box<CustomType>`?
     // or some static version of this?
+    #[display("{_0}")]
     ExtensionType(CustomType),
     /// The type of runtime values that are function pointers.
     /// Instance of [Self::TypeKind]`(`[TypeBound::Copyable]`)`.
@@ -134,13 +135,8 @@ pub enum Term {
     /// A 64-bit floating point number. Instance of [`Term::FloatKind`].
     #[display("{}", _0.into_inner())]
     Float(OrderedFloat<f64>),
-    /// A list of static terms. Instance of [`Term::ListKind`].
-    #[display("[{}]", {
-        use itertools::Itertools as _;
-        //_0.iter().map(|t|t.to_string()).join(",")
-        // extra space matching old Display for TypeRowRV
-        _0.iter().map(|t|t.to_string()).join(", ")
-    })]
+    /// A list of static terms. Instance of [`Term::Listiund`].
+    #[display("[{}]", _0.iter().map(|t|t.to_string()).join(", "))]
     List(Vec<Term>),
     /// Instance of [`TypeParam::ListKind`] defined by a sequence of concatenated lists of the same type.
     #[display("[{}]", {
@@ -178,6 +174,9 @@ pub enum Term {
 }
 
 impl Term {
+    /// An empty list of Terms.
+    pub const EMPTY_LIST: Self = Self::List(vec![]);
+
     /// Creates a [`Term::BoundedNatKind`] with the maximum bound (`u64::MAX` + 1).
     #[must_use]
     pub const fn max_nat_kind() -> Self {
@@ -191,7 +190,7 @@ impl Term {
     }
 
     /// Creates a new [`Term::List`] given a sequence of its items.
-    pub fn new_list(items: impl IntoIterator<Item = Term>) -> Self {
+    pub fn new_list<T: Into<Term>>(items: impl IntoIterator<Item = T>) -> Self {
         Self::List(items.into_iter().map_into().collect())
     }
 
@@ -312,21 +311,9 @@ impl From<Vec<Term>> for Term {
     }
 }
 
-impl From<Vec<Type>> for Term {
-    fn from(value: Vec<Type>) -> Self {
-        TypeRow::from(value).into()
-    }
-}
-
 impl<const N: usize> From<[Term; N]> for Term {
     fn from(value: [Term; N]) -> Self {
         Self::new_list(value)
-    }
-}
-
-impl<const N: usize> From<[Type; N]> for Term {
-    fn from(value: [Type; N]) -> Self {
-        TypeRow::from(value).into()
     }
 }
 
@@ -366,7 +353,9 @@ impl Term {
         Self::String(str.to_string())
     }
 
-    /// Creates a new concatenated list.
+    /// Creates or returns a term equivalent to concatenating a number of lists.
+    ///
+    /// If there is only one list, returns it directly.
     #[inline]
     pub fn concat_lists(lists: impl IntoIterator<Item = Self>) -> Self {
         match lists.into_iter().exactly_one() {
@@ -505,7 +494,7 @@ impl Term {
             Term::BytesKind => self.clone(),
             Term::FloatKind => self.clone(),
             Term::ListKind(item_type) => Term::new_list_kind(item_type.substitute(t)),
-            Term::TupleKind(item_types) => Term::new_list_kind(item_types.substitute(t)),
+            Term::TupleKind(item_types) => Term::new_tuple_kind(item_types.substitute(t)),
             Term::StaticKind => self.clone(),
             Term::ConstKind(ty) => Term::new_const(ty.substitute(t)),
         }
@@ -576,7 +565,7 @@ impl Term {
     /// # let a = Term::new_string("a");
     /// # let b = Term::new_string("b");
     /// # let c = Term::new_string("c");
-    /// let var = Term::new_var_use(0, Term::new_list_type(Term::StringKind));
+    /// let var = Term::new_var_use(0, Term::new_list_kind(Term::StringKind));
     /// let term = Term::concat_lists([
     ///     Term::new_list([a.clone(), b.clone()]),
     ///     var.clone(),
@@ -601,7 +590,7 @@ impl Term {
     ///         Term::new_list([a.clone()]),
     ///         Term::new_list([b.clone()])
     ///     ]),
-    ///     Term::new_list([]),
+    ///     Term::EMPTY_LIST,
     ///     Term::new_list([c.clone()])
     /// ]);
     ///
@@ -744,15 +733,13 @@ pub fn check_term_kind(value: &Term, kind: &Term) -> Result<(), TermTypeError> {
         }
         (Term::SumType(st), Term::TypeKind(bound)) if bound.contains(st.bound()) => Ok(()),
         (Term::FunctionType(_), Term::TypeKind(_)) => Ok(()), // Function pointers are always Copyable so fit any bound
-        (Term::ExtensionType(cty), Term::TypeKind(bound)) if bound.contains(cty.bound()) => {
-            Ok(())
-        }
+        (Term::ExtensionType(cty), Term::TypeKind(bound)) if bound.contains(cty.bound()) => Ok(()),
         (Term::List(elems), Term::ListKind(item_type)) => elems
             .iter()
             .try_for_each(|elem| check_term_kind(elem, item_type)),
         (Term::ListConcat(lists), Term::ListKind(_)) => lists
             .iter()
-            .try_for_each(|list| check_term_kind(list, kind)), // ALAN this used the element type, which seems very wrong
+            .try_for_each(|list| check_term_kind(list, kind)),
         (TypeArg::Tuple(_) | TypeArg::TupleConcat(_), TypeParam::TupleKind(item_types)) => {
             let term_parts: Vec<_> = value.clone().into_tuple_parts().collect();
             let type_parts: Vec<_> = item_types.clone().into_list_parts().collect();
@@ -926,8 +913,6 @@ impl FusedIterator for TuplePartIter {}
 
 #[cfg(test)]
 mod test {
-    use itertools::Itertools;
-
     use super::{Substitution, TypeArg, TypeParam, check_term_kind};
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::types::type_param::SeqPart;
@@ -1000,8 +985,7 @@ mod test {
             args: &[T],
             param: &TypeParam,
         ) -> Result<(), TermTypeError> {
-            let arg = args.iter().cloned().map_into().collect_vec().into();
-            check_term_kind(&arg, param)
+            check_term_kind(&Term::new_list(args.to_vec()), param)
         }
         // Simple cases: Term::XXXTypes are Term::TypeKind's
         check(usize_t(), &TypeBound::Copyable.into()).unwrap();
@@ -1013,7 +997,7 @@ mod test {
         // Into a list of type, we can fit a single row var
         check(rowvar(0, TypeBound::Copyable), &lst_of_cpy).unwrap();
         // or a list of types, or a "concat" of row vars
-        check([usize_t()], &lst_of_cpy).unwrap();
+        check(Term::new_list([usize_t()]), &lst_of_cpy).unwrap();
         check(
             Term::ListConcat(vec![rowvar(0, TypeBound::Copyable); 2]),
             &lst_of_cpy,
@@ -1022,7 +1006,7 @@ mod test {
         check(
             Term::concat_lists([
                 rowvar(1, TypeBound::Linear),
-                vec![usize_t()].into(),
+                Term::new_list([usize_t()]),
                 rowvar(0, TypeBound::Copyable),
             ]),
             &TypeParam::new_list_kind(TypeBound::Linear),
@@ -1035,14 +1019,18 @@ mod test {
         check(
             Term::concat_lists([
                 rowvar(1, TypeBound::Linear),
-                vec![usize_t()].into(),
+                Term::new_list([usize_t()]),
                 rowvar(0, TypeBound::Copyable),
             ]),
             &lst_of_cpy,
         )
         .unwrap_err();
         // seq of seq of types is not allowed
-        check(vec![Term::from(usize_t()), [usize_t()].into()], &lst_of_cpy).unwrap_err();
+        check(
+            vec![Term::from(usize_t()), Term::new_list([usize_t()])],
+            &lst_of_cpy,
+        )
+        .unwrap_err();
 
         // Similar for nats (but no equivalent of fancy row vars)
         check(5, &TypeParam::max_nat_kind()).unwrap();
@@ -1072,10 +1060,8 @@ mod test {
         )
         .unwrap_err(); // Wrong way around
 
-        let two_types = Term::new_tuple_kind(Term::new_list([
-            TypeBound::Linear.into(),
-            TypeBound::Linear.into(),
-        ]));
+        let two_types =
+            Term::new_tuple_kind(Term::new_list([TypeBound::Linear, TypeBound::Linear]));
         check(TypeArg::new_var_use(0, two_types.clone()), &two_types).unwrap();
         // not a Row Var which could have any number of elems
         check(TypeArg::new_var_use(0, lst_of_cpy), &two_types).unwrap_err();
@@ -1084,7 +1070,7 @@ mod test {
     #[test]
     fn type_arg_subst_row() {
         let row_param = Term::new_list_kind(TypeBound::Copyable);
-        let row_arg: Term = vec![bool_t(), Type::UNIT].into();
+        let row_arg: Term = Term::new_list([bool_t(), Type::UNIT]);
         check_term_kind(&row_arg, &row_param).unwrap();
 
         // Now say a row variable referring to *that* row was used
@@ -1092,12 +1078,15 @@ mod test {
         let outer_param = Term::new_list_kind(TypeBound::Linear);
         let outer_arg = Term::concat_lists([
             Term::new_row_var_use(0, TypeBound::Copyable),
-            Term::new_list([usize_t().into()]),
+            Term::new_list([usize_t()]),
         ]);
         check_term_kind(&outer_arg, &outer_param).unwrap();
 
         let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg]));
-        assert_eq!(outer_arg2, vec![bool_t(), Type::UNIT, usize_t()].into());
+        assert_eq!(
+            outer_arg2,
+            Term::new_list([bool_t(), Type::UNIT, usize_t()])
+        );
 
         // Of course this is still valid (as substitution is guaranteed to preserve validity)
         check_term_kind(&outer_arg2, &outer_param).unwrap();
@@ -1110,9 +1099,9 @@ mod test {
         let row_var_use = Term::new_var_use(0, row_var_decl.clone());
         let good_arg = Term::new_list([
             // The row variables here refer to `row_var_decl` above
-            vec![usize_t()].into(),
+            Term::new_list([usize_t()]),
             row_var_use.clone(),
-            Term::concat_lists([row_var_use, Term::new_list([usize_t().into()])]),
+            Term::concat_lists([row_var_use, Term::new_list([usize_t()])]),
         ]);
         check_term_kind(&good_arg, &outer_param).unwrap();
 
@@ -1132,16 +1121,16 @@ mod test {
         );
 
         // Now substitute a list of two types for that row-variable
-        let row_var_arg = vec![usize_t(), bool_t()].into();
+        let row_var_arg = Term::new_list([usize_t(), bool_t()]);
         check_term_kind(&row_var_arg, &row_var_decl).unwrap();
         let subst_arg = good_arg.substitute(&Substitution(std::slice::from_ref(&row_var_arg)));
         check_term_kind(&subst_arg, &outer_param).unwrap(); // invariance of substitution
         assert_eq!(
             subst_arg,
             Term::new_list([
-                [usize_t()].into(),
+                Term::new_list([usize_t()]),
                 row_var_arg,
-                [usize_t(), bool_t(), usize_t()].into()
+                Term::new_list([usize_t(), bool_t(), usize_t()])
             ])
         );
     }
@@ -1150,7 +1139,7 @@ mod test {
     fn test_try_into_list_elements() {
         // Test successful conversion with List
         let types = vec![Type::new_unit_sum(1), bool_t()];
-        let term = TypeArg::new_list(types.iter().cloned().map_into());
+        let term = TypeArg::new_list(types.clone());
         let result = TypeRow::try_from(term);
         assert_eq!(result, Ok(TypeRow::from(types)));
 

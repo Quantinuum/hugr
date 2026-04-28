@@ -39,6 +39,8 @@ pyo3 = ["dep:pyo3"]
 workspace = true
 
 [dev-dependencies]
+anyhow = { workspace = true }
+hugr-core = { version = "0.27.0", path = "../hugr-core", default-features = false }
 rstest = { workspace = true }
 pretty_assertions = { workspace = true }
 proptest = { workspace = true }

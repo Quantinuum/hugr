@@ -306,7 +306,7 @@ mod test {
     use cool_asserts::assert_matches;
 
     use crate::builder::test::dfg_calling_defn_decl;
-    use crate::builder::{Dataflow, DataflowSubContainer, test::n_identity};
+    use crate::builder::{Dataflow, DataflowSubContainer};
     use crate::extension::prelude::usize_t;
     use crate::{hugr::linking::NodeLinkingDirective, ops::OpType, types::Signature};
 
@@ -331,7 +331,7 @@ mod test {
         Ok(())
     }
 
-    #[test]
+    /*#[test]
     #[ignore] // https://github.com/Quantinuum/hugr/issues/2828
     fn simple_alias() -> Result<(), BuildError> {
         let build_result = {
@@ -352,7 +352,7 @@ mod test {
         };
         assert_matches!(build_result, Ok(_));
         Ok(())
-    }
+    }*/
 
     #[test]
     fn builder_from_existing() -> Result<(), BuildError> {

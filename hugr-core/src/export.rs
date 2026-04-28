@@ -963,10 +963,6 @@ impl<'a> Context<'a> {
                 self.make_term_apply(model::CORE_TUPLE_TYPE, &[item_types])
             }
             Term::ExtensionType(ext) => self.export_custom_type(ext),
-            /*TypeEnum::Alias(alias) => {
-                let symbol = self.resolve_symbol(self.bump.alloc_str(alias.name()));
-                self.make_term(table::Term::Apply(symbol, &[]))
-            }*/
             Term::FunctionType(func) => {
                 self.export_func_type(func, |this, trv| this.export_term(trv, None))
             }

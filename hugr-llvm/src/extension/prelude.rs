@@ -699,7 +699,7 @@ mod test {
             .unwrap();
 
         let panic_op = PRELUDE
-            .instantiate_extension_op(&PANIC_OP_ID, [Term::new_list([]), Term::new_list([])])
+            .instantiate_extension_op(&PANIC_OP_ID, [Term::EMPTY_LIST, Term::EMPTY_LIST])
             .unwrap();
 
         let hugr = SimpleHugrConfig::new()
