@@ -269,11 +269,6 @@ impl TypeRowRV {
         Self::EMPTY
     }
 
-    /// Wraps the given Term, without checking its type.
-    pub(crate) fn new_unchecked(t: impl Into<Term>) -> Self {
-        Self(t.into())
-    }
-
     /// Creates a singleton row with just a row variable
     /// (a variable ranging over lists of types of any length)
     pub fn new_var_use(idx: usize, b: TypeBound) -> Self {
@@ -301,7 +296,7 @@ impl TypeRowLike for TypeRowRV {
 
     fn substitute(&self, s: &Substitution) -> Self {
         // Substitution cannot make this invalid if it was valid previously
-        Self::new_unchecked(self.0.substitute(s))
+        Self(self.0.substitute(s))
     }
 }
 
