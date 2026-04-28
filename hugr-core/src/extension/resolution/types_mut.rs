@@ -243,8 +243,8 @@ pub(super) fn resolve_term_exts(
         Term::RuntimeFunction(f) => {
             resolve_func_type_exts(node, &mut *f, extensions, used_extensions)?;
         }
-        Term::RuntimeSum(SumType::General { rows }) => {
-            for row in rows.iter_mut() {
+        Term::RuntimeSum(SumType::General(general)) => {
+            for row in general.rows_mut() {
                 resolve_typerow_rv_exts(node, row, extensions, used_extensions)?;
             }
         }
@@ -305,8 +305,8 @@ pub(super) fn resolve_value_exts(
             }
         }
         Value::Sum(s) => {
-            if let SumType::General { rows } = &mut s.sum_type {
-                for row in rows.iter_mut() {
+            if let SumType::General(general) = &mut s.sum_type {
+                for row in general.rows_mut() {
                     resolve_typerow_rv_exts(node, row, extensions, used_extensions)?;
                 }
             }
