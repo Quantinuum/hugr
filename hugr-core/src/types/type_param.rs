@@ -111,6 +111,7 @@ pub enum Term {
     //
     // TODO optimise with `Box<CustomType>`?
     // or some static version of this?
+    #[display("{_0}")]
     RuntimeExtension(CustomType),
     /// The type of runtime values that are function pointers.
     /// Instance of [Self::RuntimeType]`(`[TypeBound::Copyable]`)`.
