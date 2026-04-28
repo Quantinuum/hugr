@@ -187,7 +187,7 @@ pub enum SumType {
 #[derive(Clone, Debug, PartialEq, Eq, Serialize, Deserialize)]
 pub struct GeneralSum {
     /// The types of the variants of the sum. Each variant is a row of types.
-    pub rows: Vec<TypeRowRV>,
+    rows: Vec<TypeRowRV>,
     #[serde(skip)]
     bound: TypeBound,
 }
@@ -204,6 +204,16 @@ impl GeneralSum {
             TypeBound::Linear
         };
         Self { rows, bound }
+    }
+
+    /// Returns the variant rows of the sum.
+    #[must_use]
+    pub fn rows(&self) -> &[TypeRowRV] {
+        &self.rows
+    }
+
+    pub(crate) fn rows_mut(&mut self) -> &mut [TypeRowRV] {
+        &mut self.rows
     }
 }
 
