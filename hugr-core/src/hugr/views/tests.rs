@@ -1,22 +1,17 @@
+use itertools::Itertools;
+use petgraph::visit::IntoNeighbors as _;
 use portgraph::PortOffset;
 use rstest::{fixture, rstest};
 
-use crate::{
-    Hugr, HugrView,
-    builder::{
-        BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, HugrBuilder,
-        endo_sig, inout_sig,
-    },
-    extension::prelude::qb_t,
-    ops::{
-        Value,
-        handle::{DataflowOpID, NodeHandle},
-    },
-    std_extensions::logic::LogicOp,
-    type_row,
-    types::Signature,
-    utils::test_quantum_extension::cx_gate,
+use crate::builder::{
+    BuildError, BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+    HugrBuilder, endo_sig, inout_sig,
 };
+use crate::extension::prelude::{bool_t, qb_t};
+use crate::ops::Value;
+use crate::ops::handle::{DataflowOpID, NodeHandle};
+use crate::std_extensions::logic::LogicOp;
+use crate::{Hugr, HugrView, type_row, types::Signature, utils::test_quantum_extension::cx_gate};
 
 /// A Dataflow graph from two qubits to two qubits that applies two CX operations on them.
 ///
@@ -213,5 +208,27 @@ fn test_dataflow_ports_only() {
             (not.node(), 0.into()),
             (not.node(), 1.into())
         ]
+    );
+}
+
+#[test]
+fn test_syn_edge() {
+    let mut outer = DFGBuilder::new(endo_sig([bool_t()])).unwrap();
+    let [inp] = outer.input_wires_arr();
+    let mut sub_dfg = outer.dfg_builder(inout_sig([], [bool_t()]), []).unwrap();
+    let [not] = sub_dfg
+        .add_dataflow_op(LogicOp::Not, [inp])
+        .unwrap()
+        .outputs_arr();
+    let [sub_dfg] = sub_dfg.finish_with_outputs([not]).unwrap().outputs_arr();
+    let h = outer.finish_hugr_with_outputs([sub_dfg]).unwrap();
+
+    assert_eq!(h.output_neighbours(inp.node()).collect_vec(), [not.node(), sub_dfg.node()]);
+
+    let sg = h.scheduling_graph(h.entrypoint());
+    assert!(
+        sg.petgraph()
+            .neighbors(sg.node_to_pg(inp.node()))
+            .contains(&sg.node_to_pg(sub_dfg.node()))
     );
 }
