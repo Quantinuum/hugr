@@ -76,7 +76,7 @@ impl From<SerSimpleType> for Term {
             SerSimpleType::G(sig) => Type::new_function(*sig).into(),
             SerSimpleType::Sum(st) => Type::from(st).into(),
             SerSimpleType::Opaque(o) => Type::new_extension(o).into(),
-            SerSimpleType::Alias(_) => todo!("alias?"),
+            SerSimpleType::Alias(_) => unimplemented!("Aliases are currently not supported"),
             SerSimpleType::V { i, b } => Type::new_var_use(i, b).into(),
             SerSimpleType::R { i, b } => Term::new_row_var_use(i, b),
         }
