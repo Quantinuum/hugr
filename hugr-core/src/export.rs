@@ -889,9 +889,11 @@ impl<'a> Context<'a> {
                 );
                 self.make_term(table::Term::List(parts))
             }
-            SumType::General { rows } => {
+            SumType::General(general) => {
                 let parts = self.bump.alloc_slice_fill_iter(
-                    rows.iter()
+                    general
+                        .rows()
+                        .iter()
                         .map(|row| table::SeqPart::Item(self.export_term(row, None))),
                 );
                 self.make_term(table::Term::List(parts))
