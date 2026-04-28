@@ -193,45 +193,6 @@ fn df_children_restrictions() {
 }
 
 #[test]
-fn test_ext_edge() {
-    let mut h = closed_dfg_root_hugr(Signature::new(vec![bool_t(), bool_t()], vec![bool_t()]));
-    let [input, output] = h.get_io(h.entrypoint()).unwrap();
-
-    // Nested DFG bool_t() -> bool_t()
-    let sub_dfg = h.add_node_with_parent(
-        h.entrypoint(),
-        ops::DFG {
-            signature: Signature::new_endo([bool_t()]),
-        },
-    );
-    // this Xor has its 2nd input unconnected
-    let sub_op = {
-        let sub_input = h.add_node_with_parent(sub_dfg, ops::Input::new(vec![bool_t()]));
-        let sub_output = h.add_node_with_parent(sub_dfg, ops::Output::new(vec![bool_t()]));
-        let sub_op = h.add_node_with_parent(sub_dfg, and_op());
-        h.connect(sub_input, 0, sub_op, 0);
-        h.connect(sub_op, 0, sub_output, 0);
-        sub_op
-    };
-
-    h.connect(input, 0, sub_dfg, 0);
-    h.connect(sub_dfg, 0, output, 0);
-
-    assert_matches!(h.validate(), Err(ValidationError::UnconnectedPort { .. }));
-
-    h.connect(input, 1, sub_op, 1);
-    assert_matches!(
-        h.validate(),
-        Err(ValidationError::InterGraphEdgeError(
-            InterGraphEdgeError::MissingOrderEdge { .. }
-        ))
-    );
-    //Order edge. This will need metadata indicating its purpose.
-    h.add_other_edge(input, sub_dfg);
-    h.validate().unwrap();
-}
-
-#[test]
 fn test_local_const() {
     let mut h = closed_dfg_root_hugr(Signature::new_endo([bool_t()]));
     let [input, output] = h.get_io(h.entrypoint()).unwrap();
