@@ -12,7 +12,7 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_term_exts,
 };
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
-use crate::types::type_param::{TermTypeError, check_term_type};
+use crate::types::type_param::{TermTypeError, check_term_kind};
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
@@ -197,7 +197,7 @@ impl GeneralSum {
     pub fn new(rows: Vec<TypeRowRV>) -> Self {
         let bound = if rows
             .iter()
-            .all(|row| check_term_type(row, &Term::new_list_type(TypeBound::Copyable)).is_ok())
+            .all(|row| check_term_kind(row, &Term::new_list_kind(TypeBound::Copyable)).is_ok())
         {
             TypeBound::Copyable
         } else {
@@ -311,7 +311,7 @@ impl SumType {
     }
 
     /// If the sum matches the convention of `Option[row]`, return the row
-    /// (an instance of [Term::ListType]([Term::RuntimeType]).
+    /// (an instance of [Term::ListKind]([Term::TypeKind]).
     #[must_use]
     pub fn as_option(&self) -> Option<&TypeRowRV> {
         match self {
@@ -401,11 +401,11 @@ impl Type {
     /// An empty `TypeRow` or `TypeRowRV`. Provided here for convenience
     pub const EMPTY_TYPEROW: TypeRow = TypeRow::new();
     /// Unit type (empty tuple).
-    pub const UNIT: Self = Self(Term::RuntimeSum(SumType::Unit { size: 1 }));
+    pub const UNIT: Self = Self(Term::SumType(SumType::Unit { size: 1 }));
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<FuncValueType>) -> Self {
-        Self(Term::RuntimeFunction(Box::new(fun_ty.into())))
+        Self(Term::FunctionType(Box::new(fun_ty.into())))
     }
 
     /// Initialize a new tuple type by providing the elements.
@@ -425,26 +425,26 @@ impl Type {
         R: Into<TypeRowRV>,
     {
         let st = SumType::new(variants);
-        Self(Term::RuntimeSum(st))
+        Self(Term::SumType(st))
     }
 
     /// Initialize a new custom type.
     // TODO remove? Extensions/TypeDefs should just provide `Type` directly
     #[must_use]
     pub const fn new_extension(opaque: CustomType) -> Self {
-        Self(Term::RuntimeExtension(opaque))
+        Self(Term::ExtensionType(opaque))
     }
 
     /// New `UnitSum` with empty Tuple variants
     #[must_use]
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(Term::RuntimeSum(SumType::new_unary(size)))
+        Self(Term::SumType(SumType::new_unary(size)))
     }
 
     /// New use (occurrence) of the type variable with specified index.
     /// `bound` must be exactly that with which the variable was declared
-    /// (i.e. as a [`Term::RuntimeType`]`(bound)`), which may be narrower
+    /// (i.e. as a [`Term::TypeKind`]`(bound)`), which may be narrower
     /// than required for the use.
     #[must_use]
     pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
@@ -558,7 +558,7 @@ impl<'a> Substitution<'a> {
             .0
             .get(idx)
             .expect("Undeclared type variable - call validate() ?");
-        debug_assert_eq!(check_term_type(arg, decl), Ok(()));
+        debug_assert_eq!(check_term_kind(arg, decl), Ok(()));
         arg.clone()
     }
 }
@@ -747,7 +747,7 @@ pub(crate) mod test {
             |t| array_type(10, t),
             |t| {
                 array_type_parametric(
-                    TypeArg::new_var_use(0, TypeParam::bounded_nat_type(3.try_into().unwrap())),
+                    TypeArg::new_var_use(0, TypeParam::bounded_nat_kind(3.try_into().unwrap())),
                     t,
                 )
                 .unwrap()
@@ -771,7 +771,7 @@ pub(crate) mod test {
                 .unwrap();
             e.add_type(
                 COLN,
-                vec![TypeParam::new_list_type(TypeBound::Copyable)],
+                vec![TypeParam::new_list_kind(TypeBound::Copyable)],
                 String::new(),
                 TypeDefBound::copyable(),
                 w,

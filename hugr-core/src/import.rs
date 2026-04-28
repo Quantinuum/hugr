@@ -1453,23 +1453,23 @@ impl<'a> Context<'a> {
     ) -> Result<Term, ImportErrorInner> {
         (|| {
             if let Some([]) = self.match_symbol(term_id, model::CORE_STR_TYPE)? {
-                return Ok(Term::StringType);
+                return Ok(Term::StringKind);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_NAT_TYPE)? {
-                return Ok(Term::max_nat_type());
+                return Ok(Term::max_nat_kind());
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
-                return Ok(Term::BytesType);
+                return Ok(Term::BytesKind);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_FLOAT_TYPE)? {
-                return Ok(Term::FloatType);
+                return Ok(Term::FloatKind);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
-                return Ok(TypeParam::RuntimeType(bound));
+                return Ok(TypeParam::TypeKind(bound));
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_CONSTRAINT)? {
@@ -1477,7 +1477,7 @@ impl<'a> Context<'a> {
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_STATIC)? {
-                return Ok(Term::StaticType);
+                return Ok(Term::StaticKind);
             }
 
             if let Some([ty]) = self.match_symbol(term_id, model::CORE_CONST)? {
@@ -1493,7 +1493,7 @@ impl<'a> Context<'a> {
                 let item_type = self
                     .import_term(item_type)
                     .map_err(|err| error_context!(err, "item type of list type"))?;
-                return Ok(TypeParam::new_list_type(item_type));
+                return Ok(TypeParam::new_list_kind(item_type));
             }
 
             if let Some([item_types]) = self.match_symbol(term_id, model::CORE_TUPLE_TYPE)? {
@@ -1502,7 +1502,7 @@ impl<'a> Context<'a> {
                 let item_types = self
                     .import_term(item_types)
                     .map_err(|err| error_context!(err, "item types of tuple type"))?;
-                return Ok(TypeParam::new_tuple_type(item_types));
+                return Ok(TypeParam::new_tuple_kind(item_types));
             }
 
             if let Some([_, _]) = self.match_symbol(term_id, model::CORE_FN)? {
@@ -1926,7 +1926,7 @@ impl<'a> Context<'a> {
                 .map(|(value, ty)| self.import_value(*value, *ty))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let Term::RuntimeSum(ty) = self.import_term(type_id)? else {
+            let Term::SumType(ty) = self.import_term(type_id)? else {
                 unreachable!()
             };
 

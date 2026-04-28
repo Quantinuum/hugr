@@ -574,13 +574,13 @@ fn roundtrip_value(#[case] value: Value) {
 
 fn polyfunctype1() -> PolyFuncType {
     let function_type = Signature::new_endo(type_row![]);
-    PolyFuncType::new([TypeParam::max_nat_type()], function_type)
+    PolyFuncType::new([TypeParam::max_nat_kind()], function_type)
 }
 
 fn polyfunctype2() -> PolyFuncTypeRV {
     let tv0 = TypeRowRV::new_var_use(0, TypeBound::Linear);
     let tv1 = TypeRowRV::new_var_use(1, TypeBound::Copyable);
-    let params = [TypeBound::Linear, TypeBound::Copyable].map(TypeParam::new_list_type);
+    let params = [TypeBound::Linear, TypeBound::Copyable].map(TypeParam::new_list_kind);
     let inputs = TypeRowRV::from([Type::new_function(FuncValueType::new(
         tv0.clone(),
         tv1.clone(),
@@ -596,12 +596,12 @@ fn polyfunctype2() -> PolyFuncTypeRV {
 #[rstest]
 #[case(Signature::new_endo(type_row![]).into())]
 #[case(polyfunctype1())]
-#[case(PolyFuncType::new([TypeParam::StringType], Signature::new_endo([Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncType::new([TypeParam::StringKind], Signature::new_endo([Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncType::new([TypeBound::Copyable.into()], Signature::new_endo([Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncType::new([TypeParam::new_list_type(TypeBound::Linear)], Signature::new_endo(type_row![])))]
-#[case(PolyFuncType::new([TypeParam::new_tuple_type([TypeBound::Linear.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], Signature::new_endo(type_row![])))]
+#[case(PolyFuncType::new([TypeParam::new_list_kind(TypeBound::Linear)], Signature::new_endo(type_row![])))]
+#[case(PolyFuncType::new([TypeParam::new_tuple_kind([TypeBound::Linear.into(), TypeParam::bounded_nat_kind(2.try_into().unwrap())])], Signature::new_endo(type_row![])))]
 #[case(PolyFuncType::new(
-    [TypeParam::new_list_type(TypeBound::Linear)],
+    [TypeParam::new_list_kind(TypeBound::Linear)],
     Signature::new_endo([Type::new_tuple(TypeRowRV::new_var_use(0, TypeBound::Linear))])))]
 fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
     check_testing_roundtrip(poly_func_type);
@@ -609,12 +609,12 @@ fn roundtrip_polyfunctype_fixedlen(#[case] poly_func_type: PolyFuncType) {
 
 #[rstest]
 #[case(FuncValueType::new_endo(type_row![]).into())]
-#[case(PolyFuncTypeRV::new([TypeParam::StringType], FuncValueType::new_endo([Type::new_var_use(0, TypeBound::Copyable)])))]
+#[case(PolyFuncTypeRV::new([TypeParam::StringKind], FuncValueType::new_endo([Type::new_var_use(0, TypeBound::Copyable)])))]
 #[case(PolyFuncTypeRV::new([TypeBound::Copyable.into()], FuncValueType::new_endo([Type::new_var_use(0, TypeBound::Copyable)])))]
-#[case(PolyFuncTypeRV::new([TypeParam::new_list_type(TypeBound::Linear)], FuncValueType::new_endo(type_row![])))]
-#[case(PolyFuncTypeRV::new([TypeParam::new_tuple_type([TypeBound::Linear.into(), TypeParam::bounded_nat_type(2.try_into().unwrap())])], FuncValueType::new_endo(type_row![])))]
+#[case(PolyFuncTypeRV::new([TypeParam::new_list_kind(TypeBound::Linear)], FuncValueType::new_endo(type_row![])))]
+#[case(PolyFuncTypeRV::new([TypeParam::new_tuple_kind([TypeBound::Linear.into(), TypeParam::bounded_nat_kind(2.try_into().unwrap())])], FuncValueType::new_endo(type_row![])))]
 #[case(PolyFuncTypeRV::new(
-    [TypeParam::new_list_type(TypeBound::Linear)],
+    [TypeParam::new_list_kind(TypeBound::Linear)],
     FuncValueType::new_endo(TypeRowRV::new_var_use(0, TypeBound::Linear))))]
 #[case(polyfunctype2())]
 fn roundtrip_polyfunctype_varlen(#[case] poly_func_type: PolyFuncTypeRV) {
