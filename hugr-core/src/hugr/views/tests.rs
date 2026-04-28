@@ -223,7 +223,10 @@ fn test_syn_edge() {
     let [sub_dfg] = sub_dfg.finish_with_outputs([not]).unwrap().outputs_arr();
     let h = outer.finish_hugr_with_outputs([sub_dfg]).unwrap();
 
-    assert_eq!(h.output_neighbours(inp.node()).collect_vec(), [not.node(), sub_dfg.node()]);
+    assert_eq!(
+        h.output_neighbours(inp.node()).collect_vec(),
+        [not.node(), sub_dfg.node()]
+    );
 
     let sg = h.scheduling_graph(h.entrypoint());
     assert!(
