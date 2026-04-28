@@ -35,7 +35,6 @@ impl From<Type> for SerSimpleType {
         }
         match value.into() {
             Term::RuntimeExtension(o) => SerSimpleType::Opaque(o),
-            //TypeEnum::Alias(a) => SerSimpleType::Alias(a),
             Term::RuntimeFunction(sig) => SerSimpleType::G(sig),
             Term::Variable(tv) => {
                 let i = tv.index();

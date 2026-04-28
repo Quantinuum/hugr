@@ -627,7 +627,6 @@ pub(crate) mod test {
                 // Dummy extension reference.
                 &Weak::default(),
             )),
-            //Type::new_alias(AliasDecl::new("my_alias", TypeBound::Copyable)),
         ]);
         assert_eq!(&t.to_string(), "[usize, [] -> [], my_custom]");
     }
