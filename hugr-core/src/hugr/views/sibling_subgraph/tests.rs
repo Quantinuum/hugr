@@ -794,7 +794,7 @@ fn test_nonlocal_edge_excluding_target() {
     // Sanity check - simple SSG without the nonlocal edge
     assert_eq!(
         h.output_neighbours(not_op.node()).collect_vec(),
-        vec![nested_not.node(), dfg.node()]
+        vec![nested_not.node()]
     );
     let outer_not_inputs = vec![vec![(not_op.node(), IncomingPort::from(0))]];
     let ss = SiblingSubgraph::try_new(
@@ -803,15 +803,8 @@ fn test_nonlocal_edge_excluding_target() {
         &h,
     )
     .unwrap();
-    // Nodes include the DFG (by following Order edge) and Output (edge from DFG)
-    assert_eq!(
-        ss.nodes(),
-        &[
-            h.get_io(h.entrypoint()).unwrap()[1],
-            not_op.node(),
-            dfg.node()
-        ]
-    );
+    // Does not include the DFG as does not follow the Syn edge
+    assert_eq!(ss.nodes, &[not_op.node()]);
     ss.validate_default(&h).unwrap();
 
     // We can't "not" follow the Order edge....
@@ -826,7 +819,12 @@ fn test_nonlocal_edge_excluding_target() {
         ],
         &h,
     );
-    assert_matches!(ss2, Err(InvalidSubgraph::UnsupportedEdgeKind(_, _)));
+    assert_matches!(
+        ss2,
+        Err(InvalidSubgraph::InvalidBoundary(
+            InvalidSubgraphBoundary::DisconnectedBoundaryPort(_, _)
+        ))
+    );
 
     // Now try to make an SSG with the outer Not and the DFG...this should not be possible ATM
     // (it would contain an edge to the inner Not, thus contain the inner Not, thus is not a sibling subgraph).
