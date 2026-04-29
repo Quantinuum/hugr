@@ -397,6 +397,7 @@ impl Hugr {
     /// Consumes the HUGR and return a flat portgraph view of the region rooted
     /// at `parent`.
     #[inline]
+    #[deprecated(note = "Use scheduling_graph instead", since = "0.27.0")]
     pub fn into_region_portgraph(
         self,
         parent: Node,

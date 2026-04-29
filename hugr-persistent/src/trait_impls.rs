@@ -65,7 +65,7 @@ impl HugrInternals for PersistentHugr {
         // TODO: this is currently not very efficient (see #2248)
         let (hugr, node_map) = self.apply_all();
         let parent = node_map[&parent];
-
+        #[expect(deprecated)] // Remove region_portgraph at same time
         (hugr.into_region_portgraph(parent), node_map)
     }
 
