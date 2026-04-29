@@ -8,7 +8,7 @@ import hugr.val as val
 from hugr.build.dfg import Dfg, Function, _ancestral_sibling
 from hugr.build.function import Module
 from hugr.hugr import Hugr
-from hugr.hugr.node_port import Node, _SubPort
+from hugr.hugr.node_port import Node
 from hugr.ops import NoConcreteFunc
 from hugr.package import Package
 from hugr.std.int import INT_T, DivMod, IntVal
@@ -186,6 +186,8 @@ def test_build_nested(snapshot):
 
 
 def test_build_inter_graph(snapshot):
+    # Possibly a bit redundant now, really we're just testing that we *don't* do
+    # anything special anymore, following https://github.com/Quantinuum/hugr/pulls/2951.
     h = Dfg(tys.Bool, tys.Bool)
     (a, b) = h.inputs()
     with h.add_nested() as nested:
@@ -196,10 +198,9 @@ def test_build_inter_graph(snapshot):
 
     validate(h.hugr, snap=snapshot)
 
-    assert _SubPort(h.input_node.out(-1)) in h.hugr._links
-    assert h.hugr.num_outgoing(h.input_node) == 3
-    assert len(list(h.hugr.outgoing_order_links(h.input_node))) == 1
-    assert len(list(h.hugr.incoming_order_links(nested))) == 1
+    assert h.hugr.num_outgoing(h.input_node) == 2
+    assert len(list(h.hugr.outgoing_order_links(h.input_node))) == 0
+    assert len(list(h.hugr.incoming_order_links(nested))) == 0
     assert len(list(h.hugr.incoming_order_links(h.output_node))) == 0
 
 

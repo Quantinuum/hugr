@@ -4,7 +4,7 @@
 use crate::hugr::internal::{HugrInternals, HugrMutInternals};
 use crate::hugr::{HugrMut, hugrmut::InsertForestResult};
 
-use super::{HugrView, panic_invalid_node};
+use super::{HugrView, SchedulingGraph, panic_invalid_node};
 
 /// A HUGR wrapper with a modified entrypoint node.
 ///
@@ -108,6 +108,18 @@ impl<H: HugrView> HugrView for Rerooted<H> {
                 fn extensions(&self) -> &crate::extension::ExtensionRegistry;
                 fn validate(&self) -> Result<(), crate::hugr::ValidationError<Self::Node>>;
                 fn extract_hugr(&self, parent: Self::Node) -> (crate::Hugr, impl crate::hugr::views::ExtractionResult<Self::Node> + 'static);
+        }
+    }
+    fn scheduling_graph(&self, parent: Self::Node) -> super::SchedulingGraph<'_, Self> {
+        let SchedulingGraph {
+            graph,
+            node_map,
+            region_parent,
+        } = self.hugr.scheduling_graph(parent);
+        SchedulingGraph {
+            graph,
+            node_map,
+            region_parent,
         }
     }
 }
