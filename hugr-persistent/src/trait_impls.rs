@@ -55,20 +55,6 @@ impl HugrInternals for PersistentHugr {
 
     type RegionPortgraphNodes = HashMap<PatchNode, Node>;
 
-    fn region_portgraph(
-        &self,
-        parent: Self::Node,
-    ) -> (
-        portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>,
-        Self::RegionPortgraphNodes,
-    ) {
-        // TODO: this is currently not very efficient (see #2248)
-        let (hugr, node_map) = self.apply_all();
-        let parent = node_map[&parent];
-        #[expect(deprecated)] // Remove region_portgraph at same time
-        (hugr.into_region_portgraph(parent), node_map)
-    }
-
     fn node_metadata_map(&self, PatchNode(commit_id, node): Self::Node) -> &hugr::NodeMetadataMap {
         let cm = self.get_commit(commit_id);
         cm.node_metadata_map(node)
@@ -342,6 +328,25 @@ impl HugrView for PersistentHugr {
             .collect();
 
         (extracted_hugr, node_map)
+    }
+
+    fn scheduling_graph(&self, parent: Self::Node) -> hugr::views::SchedulingGraph<'_, Self> {
+        // TODO: this is currently not very efficient (see #2248)
+        let (hugr, node_map) = self.apply_all();
+        let parent = node_map[&parent];
+
+        let sg = hugr.scheduling_graph(parent);
+        /* We could do something like:
+              SchedulingGraph {
+                graph: sg.graph,
+                node_map, // no, actually need to compose with sg.node_map
+                region_parent: parent,
+              }
+           ...but exposing SchedulingGraph details outside of hugr-core was really not the plan.
+        */
+        unimplemented!(
+            "No scheduling_graph for PersistentHugr: needs private access to SchedulingGraph"
+        );
     }
 }
 

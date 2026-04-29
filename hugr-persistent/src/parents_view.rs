@@ -44,16 +44,6 @@ impl HugrInternals for ParentsView<'_> {
 
     type RegionPortgraphNodes = HashMap<PatchNode, Node>;
 
-    fn region_portgraph(
-        &self,
-        _parent: Self::Node,
-    ) -> (
-        portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>,
-        Self::RegionPortgraphNodes,
-    ) {
-        unimplemented!()
-    }
-
     fn node_metadata_map(&self, node: Self::Node) -> &hugr::NodeMetadataMap {
         let PatchNode(commit_id, node) = node;
         self.hugrs
@@ -217,5 +207,9 @@ impl HugrView for ParentsView<'_> {
     ) -> (Hugr, impl ExtractionResult<Self::Node> + 'static) {
         #[allow(unreachable_code)]
         (unimplemented!(), HashMap::new())
+    }
+
+    fn scheduling_graph(&self, parent: Self::Node) -> hugr::views::SchedulingGraph<'_, Self> {
+        unimplemented!()
     }
 }
