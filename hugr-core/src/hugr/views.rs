@@ -392,10 +392,7 @@ pub trait HugrView: HugrInternals {
 
     /// Return a wrapper over the view that can be used in petgraph algorithms.
     #[inline]
-    #[deprecated(
-        since = "0.26.0",
-        note = "Use HugrView::scheduling_graph instead."
-    )]
+    #[deprecated(since = "0.26.0", note = "Use HugrView::scheduling_graph instead.")]
     #[expect(deprecated)] // Remove at same time as PetgraphWrapper
     fn as_petgraph(&self) -> PetgraphWrapper<'_, Self>
     where
