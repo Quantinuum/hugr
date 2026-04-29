@@ -1,9 +1,5 @@
-use std::any::type_name;
-
 use crate::metadata::Metadata;
-use crate::{HugrView, Node};
-use serde::{Deserialize, Serialize, de::DeserializeOwned};
-use serde_json::{Error as JsonError, Value as JsonValue};
+use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// The HUGR metadata key for debug records
@@ -12,11 +8,7 @@ pub const DEBUGINFO_META_KEY: &str = "core.debug_info";
 /// Errors related to debug info metadata
 #[derive(Debug, Error)]
 pub enum DebugInfoError {
-    /// There is a fixed type of debug record (or None) we expect to be attached to a
-    /// given HUGR node type. Any other record is rejected as invalid.
-    #[error("Debug metadata does not deserialize to {0}: {1}\n{2}")]
-    DRDeserializationError(&'static str, JsonError, JsonValue),
-    /// After we deserialize the type, we also ensure its `kind` tag is correct.
+    /// This error indicates that the 'kind' field in the metadata record is incorrect.
     #[error("Debug metadata has wrong kind: got '{0}' expected '{1}'")]
     DRKindMismatchError(String, &'static str),
 }
@@ -25,6 +17,8 @@ pub enum DebugInfoError {
 // https://github.com/serde-rs/serde/pull/2908.
 /// Trait which checks the "kind" string in a JSON debug record is correct
 pub trait DebugRecordKind {
+    /// Returns Err if the record's 'kind' tag is incorrect,
+    /// or Ok(()) otherwise.
     fn check_kind(&self) -> Result<(), DebugInfoError>;
 }
 
@@ -102,26 +96,3 @@ impl Metadata for LocationRecord {
     const KEY: &'static str = DEBUGINFO_META_KEY;
 }
 impl_dr_kind_check!(LocationRecord, "location");
-
-/// Inspect the debug metadata attached to the HUGR node.
-///
-/// If there is no debug metadata, return Ok(None). If it is present but is not a valid
-/// `T`, return a DebugInfoError. Otherwise, return the deserialized record as Ok(Some(`T`)).
-pub fn try_get_debug_meta<
-    'h,
-    H: HugrView<Node = Node>,
-    T: Metadata<Type<'h> = T> + DeserializeOwned + DebugRecordKind + 'h,
->(
-    hugr: &'h H,
-    node: Node,
-) -> Result<Option<T>, DebugInfoError> {
-    if let Some(json) = hugr.get_metadata_any(node, DEBUGINFO_META_KEY) {
-        let debug_record = serde_json::from_value::<T>(json.clone()).map_err(|e| {
-            DebugInfoError::DRDeserializationError(type_name::<T>(), e, json.clone())
-        })?;
-        debug_record.check_kind()?;
-        Ok(Some(debug_record))
-    } else {
-        Ok(None)
-    }
-}

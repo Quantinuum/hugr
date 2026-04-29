@@ -6,7 +6,8 @@ use std::ops::Deref;
 use hugr_core::{
     HugrView, Node,
     metadata::{
-        CompileUnitRecord, HugrGenerator, LocationRecord, SubprogramRecord, try_get_debug_meta,
+        CompileUnitRecord, DebugRecordKind, HugrGenerator, LocationRecord, Metadata,
+        SubprogramRecord,
     },
 };
 
@@ -92,6 +93,27 @@ pub struct DebugInfoContext<'c> {
     // see: https://github.com/TheDan64/inkwell/issues/674
     /// Tracks whether the builder currently has a location set
     have_di_loc: bool,
+}
+
+/// Check for a debug record of a given type on a node.
+///
+/// This calls try_get_metadata, and then calls
+/// metadata.check_kind() if that call returns Some(metadata).
+fn try_get_debug_meta<
+    'h,
+    H: HugrView<Node = Node>,
+    M: Metadata<Type<'h> = M> + DebugRecordKind + 'h,
+>(
+    hugr: &'h H,
+    node: Node,
+) -> Result<Option<M>> {
+    let maybe_record = hugr.try_get_metadata::<M>(node)?;
+    if let Some(debug_record) = maybe_record {
+        debug_record.check_kind()?;
+        Ok(Some(debug_record))
+    } else {
+        Ok(None)
+    }
 }
 
 impl<'c> DebugInfoContext<'c> {

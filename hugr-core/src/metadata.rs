@@ -24,9 +24,11 @@
 //! ```
 mod debug_info;
 
+use thiserror::Error;
+
 #[doc(inline)]
 pub use self::debug_info::{
-    CompileUnitRecord, DEBUGINFO_META_KEY, LocationRecord, SubprogramRecord, try_get_debug_meta,
+    CompileUnitRecord, DEBUGINFO_META_KEY, DebugRecordKind, LocationRecord, SubprogramRecord,
 };
 //
 // When adding new metadata keys, they should be re-exported by the python bindings.
@@ -70,4 +72,13 @@ pub struct HugrUsedExtensions;
 impl Metadata for HugrUsedExtensions {
     type Type<'hugr> = Vec<crate::envelope::description::ExtensionDesc>;
     const KEY: &'static str = "core.used_extensions";
+}
+
+/// Errors related to metadata
+#[derive(Error, Debug)]
+pub enum MetadataError {
+    /// Returned by `try_get_metadata` if the metadata present at the requested key
+    /// cannot be deserialized into the expected type.
+    #[error("Metadata value does not deserialize to {0}: {1}")]
+    MetadataDeserializationError(&'static str, serde_json::Error),
 }
