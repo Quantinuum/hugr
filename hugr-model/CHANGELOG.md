@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.27.1](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.27.0...hugr-model-v0.27.1) - 2026-04-30
+
+### Testing
+
+- Hugr model tests validate payload before roundtrip ([#3016](https://github.com/Quantinuum/hugr/pull/3016))
+
 ## [0.26.0](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.25.7...hugr-model-v0.26.0) - 2026-03-16
 
 ### Testing
