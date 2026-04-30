@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.16.1](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.16.0...hugr-py-v0.16.1) (2026-04-30)
+
+
+### Documentation
+
+* Simplify package description. ([#3040](https://github.com/Quantinuum/hugr/issues/3040)) ([2868f4a](https://github.com/Quantinuum/hugr/commit/2868f4a5aae74f969ea47caef6a13cec7e8c898e))
+
 ## [0.16.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.4...hugr-py-v0.16.0) (2026-04-01)
 
 This release changes the default text serialization format from JSON to `MODEL_WITH_EXTS` (the JSON format is now deprecated).
