@@ -65,7 +65,7 @@ impl HugrInternals for PersistentHugr {
         // TODO: this is currently not very efficient (see #2248)
         let (hugr, node_map) = self.apply_all();
         let parent = node_map[&parent];
-
+        #[expect(deprecated)] // Remove region_portgraph at same time
         (hugr.into_region_portgraph(parent), node_map)
     }
 
@@ -424,7 +424,7 @@ mod tests {
     use super::super::tests::test_state_space;
     use super::*;
 
-    use portgraph::PortView;
+    use petgraph::visit::NodeCount;
     use rstest::rstest;
 
     #[rstest]
@@ -570,9 +570,12 @@ mod tests {
         assert_eq!(hugr.num_nodes(), extracted_hugr.num_nodes());
         assert_eq!(hugr.num_edges(), extracted_hugr.num_edges());
 
-        let (pg, _) = hugr.region_portgraph(hugr.entrypoint());
+        let sg = hugr.scheduling_graph(hugr.entrypoint());
 
-        assert_eq!(pg.node_count(), hugr.children(hugr.entrypoint()).count());
+        assert_eq!(
+            sg.petgraph().node_count(),
+            hugr.children(hugr.entrypoint()).count()
+        );
 
         let (new_hugr, _) = hugr.extract_hugr(hugr.entrypoint());
 
