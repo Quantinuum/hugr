@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.27.1](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.27.0...hugr-llvm-v0.27.1) - 2026-04-30
+
+### Documentation
+
+- Update README to refer to current LLVM version. ([#3024](https://github.com/Quantinuum/hugr/pull/3024))
+
+### Testing
+
+- Test execution results of float op LLVM lowering ([#3013](https://github.com/Quantinuum/hugr/pull/3013))
+
 ## [0.27.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.26.1...hugr-llvm-v0.27.0) - 2026-03-31
 
 ### New Features
