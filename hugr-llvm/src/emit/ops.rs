@@ -236,6 +236,7 @@ fn emit_call<'c, H: HugrView<Node = Node>>(
     if !args.node.called_function_type().params().is_empty() {
         return Err(anyhow!("Call of generic function"));
     }
+    context.try_set_debug_loc(&args.node)?;
     let (func_node, _) = args
         .node
         .single_linked_output(args.node.called_function_port())
@@ -249,7 +250,8 @@ fn emit_call<'c, H: HugrView<Node = Node>>(
     let builder = context.builder();
     let call = builder.build_call(func?, inputs.as_slice(), "")?;
     let call_results = deaggregate_call_result(builder, call, args.outputs.len())?;
-    args.outputs.finish(builder, call_results)
+    args.outputs.finish(context.builder(), call_results)?;
+    context.try_unset_debug_loc()
 }
 
 fn emit_call_indirect<'c, H: HugrView<Node = Node>>(
@@ -260,12 +262,14 @@ fn emit_call_indirect<'c, H: HugrView<Node = Node>>(
         BasicValueEnum::PointerValue(v) => Ok(v),
         _ => Err(anyhow!("emit_call_indirect: Not a pointer")),
     }?;
+    context.try_set_debug_loc(&args.node)?;
     let func_ty = context.llvm_func_type(&args.node().signature)?;
     let inputs = args.inputs.into_iter().skip(1).map_into().collect_vec();
     let builder = context.builder();
     let call = builder.build_indirect_call(func_ty, func_ptr, inputs.as_slice(), "")?;
     let call_results = deaggregate_call_result(builder, call, args.outputs.len())?;
-    args.outputs.finish(builder, call_results)
+    args.outputs.finish(builder, call_results)?;
+    context.try_unset_debug_loc()
 }
 
 fn emit_load_function<'c, H: HugrView<Node = Node>>(

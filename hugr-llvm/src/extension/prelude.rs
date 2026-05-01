@@ -514,7 +514,7 @@ mod test {
 
     #[rstest]
     fn prelude_const_usize(prelude_llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_outs([usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
@@ -536,7 +536,7 @@ mod test {
             false,
         );
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_outs(vec![konst1.get_type(), konst2.get_type()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
@@ -549,7 +549,7 @@ mod test {
 
     #[rstest]
     fn prelude_noop(prelude_llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins([usize_t()])
             .with_outs([usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
@@ -566,7 +566,7 @@ mod test {
 
     #[rstest]
     fn prelude_make_tuple(prelude_llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins(vec![bool_t(), bool_t()])
             .with_outs([Type::new_tuple(vec![bool_t(); 2])])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
@@ -580,7 +580,7 @@ mod test {
 
     #[rstest]
     fn prelude_unpack_tuple(prelude_llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins([Type::new_tuple(vec![bool_t(); 2])])
             .with_outs(vec![bool_t(), bool_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
@@ -605,7 +605,7 @@ mod test {
             .instantiate_extension_op(&PANIC_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins(vec![qb_t(), qb_t()])
             .with_outs(vec![qb_t(), qb_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
@@ -631,7 +631,7 @@ mod test {
             .instantiate_extension_op(&EXIT_OP_ID, [type_arg_2q.clone(), type_arg_2q.clone()])
             .unwrap();
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins(vec![qb_t(), qb_t()])
             .with_outs(vec![qb_t(), qb_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
@@ -653,7 +653,7 @@ mod test {
         let greeting: ConstString = ConstString::new("Hello, world!".into());
         let print_op = PRELUDE.instantiate_extension_op(&PRINT_OP_ID, []).unwrap();
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let greeting_out = builder.add_load_value(greeting);
@@ -673,7 +673,7 @@ mod test {
             .instantiate_extension_op(&MAKE_ERROR_OP_ID, [])
             .unwrap();
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .with_outs([error_type()])
             .finish(|mut builder| {
@@ -702,7 +702,7 @@ mod test {
             .instantiate_extension_op(&PANIC_OP_ID, [Term::new_list([]), Term::new_list([])])
             .unwrap();
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
                 let sig_out = builder.add_load_value(sig);
@@ -720,7 +720,7 @@ mod test {
 
     #[rstest]
     fn prelude_load_nat(prelude_llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_outs([usize_t()])
             .with_extensions(prelude::PRELUDE_REGISTRY.to_owned())
             .finish(|mut builder| {
@@ -746,7 +746,7 @@ mod test {
     }
 
     #[rstest]
-    fn prelude_barrier(prelude_llvm_ctx: TestContext, barrier_hugr: Hugr) {
+    fn prelude_barrier(prelude_llvm_ctx: TestContext, mut barrier_hugr: Hugr) {
         check_emission!(barrier_hugr, prelude_llvm_ctx);
     }
     #[rstest]

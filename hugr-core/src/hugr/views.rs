@@ -12,6 +12,7 @@ pub mod sibling_subgraph;
 mod tests;
 
 use serde::de::Deserialize;
+use std::any::type_name;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -33,7 +34,7 @@ use super::validate::ValidationContext;
 use super::{Hugr, HugrMut, Node, ValidationError};
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
-use crate::metadata::{Metadata, RawMetadataValue};
+use crate::metadata::{Metadata, MetadataError, RawMetadataValue};
 use crate::ops::handle::NodeHandle;
 use crate::ops::{OpParent, OpTag, OpTrait, OpType};
 
@@ -109,6 +110,28 @@ pub trait HugrView: HugrInternals {
     fn get_metadata<M: Metadata>(&self, node: Self::Node) -> Option<<M as Metadata>::Type<'_>> {
         self.get_metadata_any(node, <M as Metadata>::KEY)
             .and_then(|value| <<M as Metadata>::Type<'_> as Deserialize>::deserialize(value).ok())
+    }
+
+    /// Returns the metadata associated with a node, differentiating between a missing and
+    /// invalid payload.
+    ///
+    /// If there is no metadata found with key M::KEY, returns Ok(None)
+    /// If there is metadata at that key which does not deserialize into M, return Err
+    /// Otherwise, return Ok(Some(metadata)).
+    #[inline]
+    fn try_get_metadata<M: Metadata>(
+        &self,
+        node: Self::Node,
+    ) -> Result<Option<<M as Metadata>::Type<'_>>, MetadataError> {
+        if let Some(raw_value) = self.get_metadata_any(node, <M as Metadata>::KEY) {
+            <<M as Metadata>::Type<'_> as Deserialize>::deserialize(raw_value)
+                .map_err(|json_err| {
+                    MetadataError::MetadataDeserializationError(type_name::<M>(), json_err)
+                })
+                .map(Some)
+        } else {
+            Ok(None)
+        }
     }
 
     /// Returns a metadata entry associated with a node and a string key.

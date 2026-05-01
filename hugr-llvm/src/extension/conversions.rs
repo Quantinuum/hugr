@@ -326,7 +326,7 @@ mod test {
         });
         let in_ty = INT_TYPES[log_width as usize].clone();
         let out_ty = float64_type();
-        let hugr = test_conversion_op(op_name, in_ty, out_ty, log_width);
+        let mut hugr = test_conversion_op(op_name, in_ty, out_ty, log_width);
         check_emission!(op_name, hugr, llvm_ctx);
     }
 
@@ -347,7 +347,7 @@ mod test {
         });
         let in_ty = float64_type();
         let out_ty = sum_with_error([INT_TYPES[log_width as usize].clone()]);
-        let hugr = test_conversion_op(op_name, in_ty, out_ty.into(), log_width);
+        let mut hugr = test_conversion_op(op_name, in_ty, out_ty.into(), log_width);
         check_emission!(op_name, hugr, llvm_ctx);
     }
 
@@ -370,7 +370,7 @@ mod test {
                 .add_float_extensions()
                 .add_conversion_extensions()
         });
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins(vec![in_t])
             .with_outs(vec![out_t])
             .with_extensions(STD_REG.to_owned())

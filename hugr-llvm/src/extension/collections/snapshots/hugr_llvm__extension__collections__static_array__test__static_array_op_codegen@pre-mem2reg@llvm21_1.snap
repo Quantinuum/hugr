@@ -5,29 +5,29 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define internal { i1, i1 } @_hl.main.1(ptr %0, i64 %1) {
+define internal { i1, i1 } @_hl.main.1(ptr %0, i64 %1) !dbg !3 {
 alloca_block:
   %"0" = alloca { i1, i1 }, align 8
   %"2_0" = alloca ptr, align 8
   %"2_1" = alloca i64, align 8
   %"4_0" = alloca { i1, i1 }, align 8
-  %"03" = alloca { i1, i1 }, align 8
+  %"03" = alloca { i1, i1 }, align 8, !dbg !12
   br label %entry_block
 
 static_array_get_out_of_bounds:                   ; preds = %entry_block
-  store { i1, i1 } { i1 false, i1 poison }, ptr %"03", align 1
-  br label %static_array_get_exit
+  store { i1, i1 } { i1 false, i1 poison }, ptr %"03", align 1, !dbg !12
+  br label %static_array_get_exit, !dbg !12
 
 static_array_get_in_bounds:                       ; preds = %entry_block
-  %2 = getelementptr inbounds { i64, [0 x i1] }, ptr %"2_01", i32 0, i32 1, i64 %"2_12"
-  %3 = load i1, ptr %2, align 1
-  %4 = insertvalue { i1, i1 } { i1 true, i1 poison }, i1 %3, 1
-  store { i1, i1 } %4, ptr %"03", align 1
-  br label %static_array_get_exit
+  %2 = getelementptr inbounds { i64, [0 x i1] }, ptr %"2_01", i32 0, i32 1, i64 %"2_12", !dbg !12
+  %3 = load i1, ptr %2, align 1, !dbg !12
+  %4 = insertvalue { i1, i1 } { i1 true, i1 poison }, i1 %3, 1, !dbg !12
+  store { i1, i1 } %4, ptr %"03", align 1, !dbg !12
+  br label %static_array_get_exit, !dbg !12
 
 static_array_get_exit:                            ; preds = %static_array_get_in_bounds, %static_array_get_out_of_bounds
-  %"04" = load { i1, i1 }, ptr %"03", align 1
-  store { i1, i1 } %"04", ptr %"4_0", align 1
+  %"04" = load { i1, i1 }, ptr %"03", align 1, !dbg !12
+  store { i1, i1 } %"04", ptr %"4_0", align 1, !dbg !12
   %"4_05" = load { i1, i1 }, ptr %"4_0", align 1
   store { i1, i1 } %"4_05", ptr %"0", align 1
   %"06" = load { i1, i1 }, ptr %"0", align 1
@@ -38,8 +38,25 @@ entry_block:                                      ; preds = %alloca_block
   store i64 %1, ptr %"2_1", align 4
   %"2_01" = load ptr, ptr %"2_0", align 8
   %"2_12" = load i64, ptr %"2_1", align 4
-  %5 = getelementptr inbounds { i64, [0 x i1] }, ptr %"2_01", i32 0, i32 0
-  %6 = load i64, ptr %5, align 4
-  %7 = icmp ult i64 %"2_12", %6
-  br i1 %7, label %static_array_get_in_bounds, label %static_array_get_out_of_bounds
+  %5 = getelementptr inbounds { i64, [0 x i1] }, ptr %"2_01", i32 0, i32 0, !dbg !12
+  %6 = load i64, ptr %5, align 4, !dbg !12
+  %7 = icmp ult i64 %"2_12", %6, !dbg !12
+  br i1 %7, label %static_array_get_in_bounds, label %static_array_get_out_of_bounds, !dbg !12
 }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/lPNzlV/ClAphFG/yrhvZs/eDgUn/eIVwAutKJHaZEPSZwPXPeycUvnujGxZ")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{!7, !10, !11}
+!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, i1 }", file: !2, align: 8, elements: !8)
+!8 = !{!9, !9}
+!9 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
+!10 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
+!11 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!12 = !DILocation(line: 27062, column: 402, scope: !3)
