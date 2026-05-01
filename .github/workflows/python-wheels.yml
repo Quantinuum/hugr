@@ -273,13 +273,14 @@ jobs:
         # Ideally this should match both the version used by rustc and the pyodide ABI.
         # See <https://doc.rust-lang.org/beta/rustc/platform-support/wasm32-unknown-emscripten.html>
         # and <https://github.com/pyodide/pyodide/blob/main/docs/development/abi.md>
-        # Pyodide `0.28` and `0.29` use 4.0.9
-        # We fix a rustc version compatible with it.
+        #
+        # We instead use the emsdk chosen by the `pyemscripten_2026_0` ABI.
+        # See <https://github.com/pyodide/pyodide/blob/main/docs/development/abi/314.md>
         run: |
           git clone --depth 1 https://github.com/emscripten-core/emsdk.git
           cd emsdk
-          ./emsdk install 4.0.9
-          ./emsdk activate 4.0.9
+          ./emsdk install 5.0.3
+          ./emsdk activate 5.0.3
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
