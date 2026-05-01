@@ -8,8 +8,8 @@ use std::sync::LazyLock;
 use crate::Hugr;
 
 #[derive(Clone, Copy, Debug, PartialOrd, Ord, PartialEq, Eq)]
-/// The types [Type], [`TypeEnum`], [`SumType`], [`FunctionType`], [`TypeArg`],
-/// [`TypeParam`], as well as several others, form a mutually recursive hierarchy.
+/// The types [Type], [`Term`], [`SumType`], [`FunctionType`], [`CustomType`],
+/// as well as several others, form a mutually recursive hierarchy.
 ///
 /// The proptest [`proptest::strategy::Strategy::prop_recursive`] is inadequate to
 /// generate values for these types.  Instead, the Arbitrary instances take a

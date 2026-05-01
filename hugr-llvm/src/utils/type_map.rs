@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 
 use hugr_core::{
     extension::ExtensionId,
-    types::{CustomType, TypeEnum, TypeName, TypeRow},
+    types::{CustomType, Term, TypeName, TypeRow},
 };
 
 use anyhow::{Result, bail};
@@ -115,18 +115,18 @@ impl<'a, TM: TypeMapping + 'a> TypeMap<'a, TM> {
     /// Map `hugr_type` using the [`TypeMapping`] `TM`, the registered callbacks,
     /// and the auxiliary data `inv`.
     pub fn map_type<'c>(&self, hugr_type: &HugrType, inv: TM::InV<'c>) -> Result<TM::OutV<'c>> {
-        match hugr_type.as_type_enum() {
-            TypeEnum::Extension(custom_type) => {
+        match &**hugr_type {
+            Term::RuntimeExtension(custom_type) => {
                 let key = (custom_type.extension().clone(), custom_type.name().clone());
                 let Some(handler) = self.custom_hooks.get(&key) else {
                     return self.type_map.default_out(inv, &custom_type.clone().into());
                 };
                 handler.map_type(inv, custom_type)
             }
-            TypeEnum::Sum(sum_type) => self
+            Term::RuntimeSum(sum_type) => self
                 .map_sum_type(sum_type, inv)
                 .map(|x| self.type_map.sum_into_out(x)),
-            TypeEnum::Function(function_type) => self
+            Term::RuntimeFunction(function_type) => self
                 .map_function_type(&function_type.as_ref().clone().try_into()?, inv)
                 .map(|x| self.type_map.func_into_out(x)),
             _ => self.type_map.default_out(inv, hugr_type),
