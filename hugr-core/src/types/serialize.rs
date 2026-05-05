@@ -34,8 +34,8 @@ impl From<Type> for SerSimpleType {
             return SerSimpleType::I;
         }
         match value.into() {
-            Term::RuntimeExtension(o) => SerSimpleType::Opaque(o),
-            Term::RuntimeFunction(sig) => SerSimpleType::G(sig),
+            Term::ExtensionType(o) => SerSimpleType::Opaque(o),
+            Term::FunctionType(sig) => SerSimpleType::G(sig),
             Term::Variable(tv) => {
                 let i = tv.index();
                 let Term::TypeKind(b) = &*tv.cached_decl else {
@@ -43,7 +43,7 @@ impl From<Type> for SerSimpleType {
                 };
                 SerSimpleType::V { i, b: *b }
             }
-            Term::RuntimeSum(st) => SerSimpleType::Sum(st),
+            Term::SumType(st) => SerSimpleType::Sum(st),
             v => panic!("{} was not a valid Type", v),
         }
     }
@@ -161,7 +161,7 @@ impl From<Term> for TermSer {
             Term::FloatKind => TermSer::TypeParam(TypeParamSer::Float),
             Term::ListKind(param) => TermSer::TypeParam(TypeParamSer::List { param }),
             Term::ConstKind(ty) => TermSer::TypeParam(TypeParamSer::ConstType { ty: *ty }),
-            Term::RuntimeFunction(_) | Term::RuntimeExtension(_) | Term::RuntimeSum(_) => {
+            Term::FunctionType(_) | Term::ExtensionType(_) | Term::SumType(_) => {
                 TermSer::TypeArg(TypeArgSer::Type {
                     ty: value.try_into().unwrap(),
                 })

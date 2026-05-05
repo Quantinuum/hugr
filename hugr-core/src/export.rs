@@ -962,11 +962,11 @@ impl<'a> Context<'a> {
                 let item_types = self.export_term(item_types, None);
                 self.make_term_apply(model::CORE_TUPLE_TYPE, &[item_types])
             }
-            Term::RuntimeExtension(ext) => self.export_custom_type(ext),
-            Term::RuntimeFunction(func) => {
+            Term::ExtensionType(ext) => self.export_custom_type(ext),
+            Term::FunctionType(func) => {
                 self.export_func_type(func, |this, trv| this.export_term(trv, None))
             }
-            Term::RuntimeSum(sum) => self.export_sum_type(sum),
+            Term::SumType(sum) => self.export_sum_type(sum),
 
             Term::BoundedNat(value) => self.make_term(model::Literal::Nat(*value).into()),
             Term::String(value) => self.make_term(model::Literal::Str(value.into()).into()),

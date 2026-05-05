@@ -237,13 +237,13 @@ pub(super) fn resolve_term_exts(
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
     match term {
-        Term::RuntimeExtension(custom) => {
+        Term::ExtensionType(custom) => {
             resolve_custom_type_exts(node, custom, extensions, used_extensions)?;
         }
-        Term::RuntimeFunction(f) => {
+        Term::FunctionType(f) => {
             resolve_func_type_exts(node, &mut *f, extensions, used_extensions)?;
         }
-        Term::RuntimeSum(SumType::General { rows }) => {
+        Term::SumType(SumType::General { rows }) => {
             for row in rows.iter_mut() {
                 resolve_typerow_rv_exts(node, row, extensions, used_extensions)?;
             }
@@ -274,7 +274,7 @@ pub(super) fn resolve_term_exts(
         | Term::String(_)
         | Term::Bytes(_)
         | Term::Float(_)
-        | Term::RuntimeSum(SumType::Unit { .. }) => {}
+        | Term::SumType(SumType::Unit { .. }) => {}
     }
     Ok(())
 }
