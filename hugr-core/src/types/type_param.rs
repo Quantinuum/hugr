@@ -64,7 +64,7 @@ pub type TypeParam = Term;
 /// are not types but they are static parameters of array types and ops.)
 ///
 /// Terms are used for both parameter declarations and arguments fitting those
-/// parameters, e.g. a [Term::FloatType] parameter would be instantiated (statically)
+/// parameters, e.g. a [Term::FloatKind] parameter would be instantiated (statically)
 /// with a [Term::Float] argument. [`check_term_type`] checks that an argument
 /// is valid (of the correct kind) for the parameter.
 // TODO it might be good to have a separate function that tells, for a given Term,
@@ -84,58 +84,58 @@ pub enum Term {
         TypeBound::Linear => String::new(),
         _ => format!("[{_0}]")
     })]
-    RuntimeType(TypeBound),
+    RuntimeKind(TypeBound),
     /// The type of static data.
-    StaticType,
+    StaticKind,
     /// The type of static natural numbers up to a given bound.
     #[display("{}", match _0.value() {
         Some(v) => format!("BoundedNat[{v}]"),
         None => "Nat".to_string()
     })]
-    BoundedNatType(UpperBound),
+    BoundedNatKind(UpperBound),
     /// The type of static strings. See [`Term::String`].
-    StringType,
+    StringKind,
     /// The type of static byte strings. See [`Term::Bytes`].
-    BytesType,
+    BytesKind,
     /// The type of static floating point numbers. See [`Term::Float`].
-    FloatType,
+    FloatKind,
     /// The type of static lists of indeterminate size containing terms of the
     /// specified static type.
     #[display("ListType[{_0}]")]
-    ListType(Box<Term>),
+    ListKind(Box<Term>),
     /// The type of static tuples.
     #[display("TupleType[{_0}]")]
-    TupleType(Box<Term>),
+    TupleKind(Box<Term>),
     /// The type of runtime values defined by an extension type.
-    /// Instance of [Self::RuntimeType] for some bound.
+    /// Instance of [Self::RuntimeKind] for some bound.
     //
     // TODO optimise with `Box<CustomType>`?
     // or some static version of this?
     #[display("{_0}")]
     RuntimeExtension(CustomType),
     /// The type of runtime values that are function pointers.
-    /// Instance of [Self::RuntimeType]`(`[TypeBound::Copyable]`)`.
+    /// Instance of [Self::RuntimeKind]`(`[TypeBound::Copyable]`)`.
     /// Function values may be passed around without knowing their arity
     /// (i.e. with row vars) as long as they are not called.
     #[display("{_0}")]
     RuntimeFunction(Box<FuncValueType>),
     /// The type of runtime values that are sums of products (ADTs)
-    /// Instance of [Self::RuntimeType]`(bound)` for `bound` calculated from each variant's elements.
+    /// Instance of [Self::RuntimeKind]`(bound)` for `bound` calculated from each variant's elements.
     #[display("{_0}")]
     RuntimeSum(SumType),
-    /// A 64bit unsigned integer literal. Instance of [`Term::BoundedNatType`].
+    /// A 64bit unsigned integer literal. Instance of [`Term::BoundedNatKind`].
     #[display("{_0}")]
     BoundedNat(u64),
-    /// UTF-8 encoded string literal. Instance of [`Term::StringType`].
+    /// UTF-8 encoded string literal. Instance of [`Term::StringKind`].
     #[display("\"{_0}\"")]
     String(String),
-    /// Byte string literal. Instance of [`Term::BytesType`].
+    /// Byte string literal. Instance of [`Term::BytesKind`].
     #[display("bytes")]
     Bytes(Arc<[u8]>),
-    /// A 64-bit floating point number. Instance of [`Term::FloatType`].
+    /// A 64-bit floating point number. Instance of [`Term::FloatKind`].
     #[display("{}", _0.into_inner())]
     Float(OrderedFloat<f64>),
-    /// A list of static terms. Instance of [`Term::ListType`].
+    /// A list of static terms. Instance of [`Term::ListKind`].
     #[display("[{}]", _0.iter().map(|t|t.to_string()).join(", "))]
     List(Vec<Term>),
     /// Instance of [`TypeParam::List`] defined by a sequence of concatenated lists of the same type.
@@ -170,23 +170,23 @@ pub enum Term {
     /// Constants are distinct from the runtime values that they describe. In
     /// particular, as part of the term language, constants can be freely copied
     /// or destroyed even when they describe a non-linear runtime value.
-    ConstType(Box<Type>),
+    ConstKind(Box<Type>),
 }
 
 impl Term {
     /// An empty list of Terms.
     pub const EMPTY_LIST: Self = Self::List(vec![]);
 
-    /// Creates a [`Term::BoundedNatType`] with the maximum bound (`u64::MAX` + 1).
+    /// Creates a [`Term::BoundedNatKind`] with the maximum bound (`u64::MAX` + 1).
     #[must_use]
     pub const fn max_nat_type() -> Self {
-        Self::BoundedNatType(UpperBound(None))
+        Self::BoundedNatKind(UpperBound(None))
     }
 
-    /// Creates a [`Term::BoundedNatType`] with the stated upper bound (non-exclusive).
+    /// Creates a [`Term::BoundedNatKind`] with the stated upper bound (non-exclusive).
     #[must_use]
     pub const fn bounded_nat_type(upper_bound: NonZeroU64) -> Self {
-        Self::BoundedNatType(UpperBound(Some(upper_bound)))
+        Self::BoundedNatKind(UpperBound(Some(upper_bound)))
     }
 
     /// Creates a new [`Term::List`] given a sequence of its items.
@@ -194,19 +194,19 @@ impl Term {
         Self::List(items.into_iter().map_into().collect())
     }
 
-    /// Creates a new [`Term::ListType`] given the type of its elements.
+    /// Creates a new [`Term::ListKind`] given the type of its elements.
     pub fn new_list_type(elem: impl Into<Term>) -> Self {
-        Self::ListType(Box::new(elem.into()))
+        Self::ListKind(Box::new(elem.into()))
     }
 
-    /// Creates a new [`Term::TupleType`] given the type of its elements.
+    /// Creates a new [`Term::TupleKind`] given the type of its elements.
     pub fn new_tuple_type(item_types: impl Into<Term>) -> Self {
-        Self::TupleType(Box::new(item_types.into()))
+        Self::TupleKind(Box::new(item_types.into()))
     }
 
-    /// Creates a new [`Term::ConstType`] from a runtime type.
+    /// Creates a new [`Term::ConstKind`] from a runtime type.
     pub fn new_const(ty: impl Into<Type>) -> Self {
-        Self::ConstType(Box::new(ty.into()))
+        Self::ConstKind(Box::new(ty.into()))
     }
 
     /// Checks if this term is a supertype of another.
@@ -217,16 +217,16 @@ impl Term {
     /// is not a static type) is considered a subtype of itself.
     fn is_supertype(&self, other: &Term) -> bool {
         match (self, other) {
-            (Term::RuntimeType(b1), Term::RuntimeType(b2)) => b1.contains(*b2),
-            (Term::BoundedNatType(b1), Term::BoundedNatType(b2)) => b1.contains(b2),
-            (Term::StringType, Term::StringType) => true,
-            (Term::StaticType, Term::StaticType) => true,
-            (Term::ListType(e1), Term::ListType(e2)) => e1.is_supertype(e2),
+            (Term::RuntimeKind(b1), Term::RuntimeKind(b2)) => b1.contains(*b2),
+            (Term::BoundedNatKind(b1), Term::BoundedNatKind(b2)) => b1.contains(b2),
+            (Term::StringKind, Term::StringKind) => true,
+            (Term::StaticKind, Term::StaticKind) => true,
+            (Term::ListKind(e1), Term::ListKind(e2)) => e1.is_supertype(e2),
             // The term inside a TupleType is a list of types, so this is ok as long as
             // supertype holds element-wise
-            (Term::TupleType(es1), Term::TupleType(es2)) => es1.is_supertype(es2),
-            (Term::BytesType, Term::BytesType) => true,
-            (Term::FloatType, Term::FloatType) => true,
+            (Term::TupleKind(es1), Term::TupleKind(es2)) => es1.is_supertype(es2),
+            (Term::BytesKind, Term::BytesKind) => true,
+            (Term::FloatKind, Term::FloatKind) => true,
             // Needed for TupleType, does not make a great deal of sense otherwise:
             (Term::List(es1), Term::List(es2)) => {
                 es1.len() == es2.len() && es1.iter().zip(es2).all(|(e1, e2)| e1.is_supertype(e2))
@@ -277,13 +277,13 @@ impl Term {
 
 impl From<TypeBound> for Term {
     fn from(bound: TypeBound) -> Self {
-        Self::RuntimeType(bound)
+        Self::RuntimeKind(bound)
     }
 }
 
 impl From<UpperBound> for Term {
     fn from(bound: UpperBound) -> Self {
-        Self::BoundedNatType(bound)
+        Self::BoundedNatKind(bound)
     }
 }
 
@@ -341,7 +341,7 @@ impl Term {
     }
 
     /// Makes a `Term` representing a use (occurrence) of a variable whose
-    /// kind is a [Term::ListType] of [Term::RuntimeType].
+    /// kind is a [Term::ListKind] of [Term::RuntimeKind].
     #[must_use]
     pub fn new_row_var_use(idx: usize, b: TypeBound) -> Self {
         Self::new_var_use(idx, Term::new_list_type(b))
@@ -391,7 +391,7 @@ impl Term {
             Self::RuntimeSum(st) => Some(st.bound()),
             Self::RuntimeFunction(_) => Some(TypeBound::Copyable),
             Self::Variable(v) => match &*v.cached_decl {
-                TypeParam::RuntimeType(b) => Some(*b),
+                TypeParam::RuntimeKind(b) => Some(*b),
                 _ => None,
             },
             _ => None,
@@ -399,14 +399,14 @@ impl Term {
     }
 
     /// Report if this is a copyable runtime type, i.e. an instance
-    /// of [Self::RuntimeType]`(`[TypeBound::Copyable]`)`
+    /// of [Self::RuntimeKind]`(`[TypeBound::Copyable]`)`
     // where the least upper bound of the type is contained by the copyable bound.
     pub(crate) fn copyable(&self) -> bool {
         self.least_upper_bound()
             .is_some_and(|b| TypeBound::Copyable.contains(b))
     }
 
-    /// Report if this is a runtime type, i.e. an instance of [Self::RuntimeType] for some bound.
+    /// Report if this is a runtime type, i.e. an instance of [Self::RuntimeKind] for some bound.
     ///
     /// If so, [Type::try_from(Type)] will succeed and can be followed by [Type::least_upper_bound] to get the bound.
     pub fn is_runtime_type(&self) -> bool {
@@ -441,15 +441,15 @@ impl Term {
             TypeArg::ListConcat(lists) => lists.iter().try_for_each(|a| a.validate(var_decls)),
             TypeArg::TupleConcat(tuples) => tuples.iter().try_for_each(|a| a.validate(var_decls)),
             Term::Variable(tv) => tv.check_decl(var_decls),
-            Term::RuntimeType { .. } => Ok(()),
-            Term::BoundedNatType { .. } => Ok(()),
-            Term::StringType => Ok(()),
-            Term::BytesType => Ok(()),
-            Term::FloatType => Ok(()),
-            Term::ListType(item_type) => item_type.validate(var_decls),
-            Term::TupleType(item_types) => item_types.validate(var_decls),
-            Term::StaticType => Ok(()),
-            Term::ConstType(ty) => ty.validate(var_decls),
+            Term::RuntimeKind { .. } => Ok(()),
+            Term::BoundedNatKind { .. } => Ok(()),
+            Term::StringKind => Ok(()),
+            Term::BytesKind => Ok(()),
+            Term::FloatKind => Ok(()),
+            Term::ListKind(item_type) => item_type.validate(var_decls),
+            Term::TupleKind(item_types) => item_types.validate(var_decls),
+            Term::StaticKind => Ok(()),
+            Term::ConstKind(ty) => ty.validate(var_decls),
         }
     }
 
@@ -488,15 +488,15 @@ impl Term {
                 )
             }
             TypeArg::Variable(TermVar { idx, cached_decl }) => t.apply_var(*idx, cached_decl),
-            Term::RuntimeType(_) => self.clone(),
-            Term::BoundedNatType(_) => self.clone(),
-            Term::StringType => self.clone(),
-            Term::BytesType => self.clone(),
-            Term::FloatType => self.clone(),
-            Term::ListType(item_type) => Term::new_list_type(item_type.substitute(t)),
-            Term::TupleType(item_types) => Term::new_tuple_type(item_types.substitute(t)),
-            Term::StaticType => self.clone(),
-            Term::ConstType(ty) => Term::new_const(ty.substitute(t)),
+            Term::RuntimeKind(_) => self.clone(),
+            Term::BoundedNatKind(_) => self.clone(),
+            Term::StringKind => self.clone(),
+            Term::BytesKind => self.clone(),
+            Term::FloatKind => self.clone(),
+            Term::ListKind(item_type) => Term::new_list_type(item_type.substitute(t)),
+            Term::TupleKind(item_types) => Term::new_tuple_type(item_types.substitute(t)),
+            Term::StaticKind => self.clone(),
+            Term::ConstKind(ty) => Term::new_const(ty.substitute(t)),
         }
     }
 
@@ -565,7 +565,7 @@ impl Term {
     /// # let a = Term::new_string("a");
     /// # let b = Term::new_string("b");
     /// # let c = Term::new_string("c");
-    /// let var = Term::new_var_use(0, Term::new_list_type(Term::StringType));
+    /// let var = Term::new_var_use(0, Term::new_list_type(Term::StringKind));
     /// let term = Term::concat_lists([
     ///     Term::new_list([a.clone(), b.clone()]),
     ///     var.clone(),
@@ -663,17 +663,17 @@ impl Transformable for Term {
             | Term::Variable(_)
             | Term::Float(_)
             | Term::Bytes(_) => Ok(false),
-            Term::RuntimeType { .. } => Ok(false),
-            Term::BoundedNatType { .. } => Ok(false),
-            Term::StringType => Ok(false),
-            Term::BytesType => Ok(false),
-            Term::FloatType => Ok(false),
-            Term::ListType(item_type) => item_type.transform(tr),
-            Term::TupleType(item_types) => item_types.transform(tr),
-            Term::StaticType => Ok(false),
+            Term::RuntimeKind { .. } => Ok(false),
+            Term::BoundedNatKind { .. } => Ok(false),
+            Term::StringKind => Ok(false),
+            Term::BytesKind => Ok(false),
+            Term::FloatKind => Ok(false),
+            Term::ListKind(item_type) => item_type.transform(tr),
+            Term::TupleKind(item_types) => item_types.transform(tr),
+            Term::StaticKind => Ok(false),
             TypeArg::ListConcat(lists) => lists.transform(tr),
             TypeArg::TupleConcat(tuples) => tuples.transform(tr),
-            Term::ConstType(ty) => ty.transform(tr),
+            Term::ConstKind(ty) => ty.transform(tr),
         }
     }
 }
@@ -689,8 +689,8 @@ impl TermVar {
     /// the [`TypeBound`] of the individual types it might stand for.
     #[must_use]
     pub fn bound_if_row_var(&self) -> Option<TypeBound> {
-        if let Term::ListType(item_type) = &*self.cached_decl
-            && let Term::RuntimeType(b) = **item_type
+        if let Term::ListKind(item_type) = &*self.cached_decl
+            && let Term::RuntimeKind(b) = **item_type
         {
             return Some(b);
         }
@@ -729,18 +729,18 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::Variable(TermVar { cached_decl, .. }), _) if type_.is_supertype(cached_decl) => {
             Ok(())
         }
-        (Term::RuntimeSum(st), Term::RuntimeType(bound)) if bound.contains(st.bound()) => Ok(()),
-        (Term::RuntimeFunction(_), Term::RuntimeType(_)) => Ok(()), // Function pointers are always Copyable so fit any bound
-        (Term::RuntimeExtension(cty), Term::RuntimeType(bound)) if bound.contains(cty.bound()) => {
+        (Term::RuntimeSum(st), Term::RuntimeKind(bound)) if bound.contains(st.bound()) => Ok(()),
+        (Term::RuntimeFunction(_), Term::RuntimeKind(_)) => Ok(()), // Function pointers are always Copyable so fit any bound
+        (Term::RuntimeExtension(cty), Term::RuntimeKind(bound)) if bound.contains(cty.bound()) => {
             Ok(())
         }
-        (Term::List(elems), Term::ListType(item_type)) => elems
+        (Term::List(elems), Term::ListKind(item_type)) => elems
             .iter()
             .try_for_each(|elem| check_term_type(elem, item_type)),
-        (Term::ListConcat(lists), Term::ListType(_)) => lists
+        (Term::ListConcat(lists), Term::ListKind(_)) => lists
             .iter()
             .try_for_each(|list| check_term_type(list, type_)),
-        (TypeArg::Tuple(_) | TypeArg::TupleConcat(_), TypeParam::TupleType(item_types)) => {
+        (TypeArg::Tuple(_) | TypeArg::TupleConcat(_), TypeParam::TupleKind(item_types)) => {
             let term_parts: Vec<_> = term.clone().into_tuple_parts().collect();
             let type_parts: Vec<_> = item_types.clone().into_list_parts().collect();
 
@@ -769,21 +769,21 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
 
             Ok(())
         }
-        (Term::BoundedNat(val), Term::BoundedNatType(bound)) if bound.valid_value(*val) => Ok(()),
-        (Term::String { .. }, Term::StringType) => Ok(()),
-        (Term::Bytes(_), Term::BytesType) => Ok(()),
-        (Term::Float(_), Term::FloatType) => Ok(()),
+        (Term::BoundedNat(val), Term::BoundedNatKind(bound)) if bound.valid_value(*val) => Ok(()),
+        (Term::String { .. }, Term::StringKind) => Ok(()),
+        (Term::Bytes(_), Term::BytesKind) => Ok(()),
+        (Term::Float(_), Term::FloatKind) => Ok(()),
 
         // Static types
-        (Term::StaticType, Term::StaticType) => Ok(()),
-        (Term::StringType, Term::StaticType) => Ok(()),
-        (Term::BytesType, Term::StaticType) => Ok(()),
-        (Term::BoundedNatType { .. }, Term::StaticType) => Ok(()),
-        (Term::FloatType, Term::StaticType) => Ok(()),
-        (Term::ListType { .. }, Term::StaticType) => Ok(()),
-        (Term::TupleType(_), Term::StaticType) => Ok(()),
-        (Term::RuntimeType(_), Term::StaticType) => Ok(()),
-        (Term::ConstType(_), Term::StaticType) => Ok(()),
+        (Term::StaticKind, Term::StaticKind) => Ok(()),
+        (Term::StringKind, Term::StaticKind) => Ok(()),
+        (Term::BytesKind, Term::StaticKind) => Ok(()),
+        (Term::BoundedNatKind { .. }, Term::StaticKind) => Ok(()),
+        (Term::FloatKind, Term::StaticKind) => Ok(()),
+        (Term::ListKind { .. }, Term::StaticKind) => Ok(()),
+        (Term::TupleKind(_), Term::StaticKind) => Ok(()),
+        (Term::RuntimeKind(_), Term::StaticKind) => Ok(()),
+        (Term::ConstKind(_), Term::StaticKind) => Ok(()),
 
         _ => Err(TermTypeError::TypeMismatch {
             term: Box::new(term.clone()),
@@ -943,7 +943,7 @@ mod test {
         let b = Term::new_string("b");
         let c = Term::new_string("c");
         let d = Term::new_string("d");
-        let var = Term::new_var_use(0, Term::new_list_type(Term::StringType));
+        let var = Term::new_var_use(0, Term::new_list_type(Term::StringKind));
         let parts = [
             SeqPart::Splice(Term::new_list([a.clone(), b.clone()])),
             SeqPart::Splice(Term::concat_lists([Term::new_list([c.clone()])])),
@@ -962,7 +962,7 @@ mod test {
         let b = Term::new_string("b");
         let c = Term::new_string("c");
         let d = Term::new_string("d");
-        let var = Term::new_var_use(0, Term::new_tuple([Term::StringType]));
+        let var = Term::new_var_use(0, Term::new_tuple([Term::StringKind]));
         let parts = [
             SeqPart::Splice(Term::new_tuple([a.clone(), b.clone()])),
             SeqPart::Splice(Term::new_tuple_concat([Term::new_tuple([c.clone()])])),
@@ -987,7 +987,7 @@ mod test {
         ) -> Result<(), TermTypeError> {
             check_term_type(&Term::new_list(args.to_vec()), param)
         }
-        // Simple cases: Term::RuntimeXXXs are Term::RuntimeType's
+        // Simple cases: Term::RuntimeXXXs are Term::RuntimeKind's
         check(usize_t(), &TypeBound::Copyable.into()).unwrap();
         let lst_of_cpy = TypeParam::new_list_type(TypeBound::Copyable);
         check(usize_t(), &lst_of_cpy).unwrap_err();
@@ -1046,7 +1046,7 @@ mod test {
         )
         .unwrap_err();
 
-        // `Term::TupleType` requires a `Term::Tuple` of the same number of elems
+        // `Term::TupleKind` requires a `Term::Tuple` of the same number of elems
         let usize_and_ty =
             TypeParam::new_tuple_type([TypeParam::max_nat_type(), Term::from(TypeBound::Copyable)]);
         check(
@@ -1210,10 +1210,10 @@ mod test {
             type Strategy = BoxedStrategy<Self>;
             fn arbitrary_with(depth: Self::Parameters) -> Self::Strategy {
                 let strat = Union::new([
-                    Just(Self::StringType).boxed(),
-                    Just(Self::BytesType).boxed(),
-                    Just(Self::FloatType).boxed(),
-                    Just(Self::StringType).boxed(),
+                    Just(Self::StringKind).boxed(),
+                    Just(Self::BytesKind).boxed(),
+                    Just(Self::FloatKind).boxed(),
+                    Just(Self::StringKind).boxed(),
                     any::<TypeBound>().prop_map(Self::from).boxed(),
                     any::<UpperBound>().prop_map(Self::from).boxed(),
                     any::<u64>().prop_map(Self::from).boxed(),
@@ -1234,7 +1234,7 @@ mod test {
                 strat
                     .or(
                         // TODO this means we have two ways to create variables of type
-                        // `RuntimeType`, so we probably get more of them than we should`
+                        // `RuntimeKind`, so we probably get more of them than we should`
                         any_with::<TermVar>(depth).prop_map(Self::Variable).boxed(),
                     )
                     .or(any_with::<Self>(depth)

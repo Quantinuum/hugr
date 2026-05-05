@@ -289,7 +289,7 @@ pub(crate) mod test {
         let body_type = Signature::new_endo([Type::new_extension(list_def.instantiate([tv])?)]);
         for decl in [
             Term::new_list_type(Term::max_nat_type()),
-            Term::StringType,
+            Term::StringKind,
             Term::new_tuple_type([TypeBound::Linear.into(), Term::max_nat_type()]),
         ] {
             let invalid_ts = PolyFuncTypeBase::new_validated([decl.clone()], body_type.clone());
@@ -392,7 +392,7 @@ pub(crate) mod test {
         Ok(())
     }
 
-    const TP_ANY: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
+    const TP_ANY: TypeParam = TypeParam::RuntimeKind(TypeBound::Linear);
     #[test]
     fn row_variables_bad_schema() {
         // Mismatched TypeBound (Copyable vs Any)

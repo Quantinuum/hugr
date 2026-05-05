@@ -1453,7 +1453,7 @@ impl<'a> Context<'a> {
     ) -> Result<Term, ImportErrorInner> {
         (|| {
             if let Some([]) = self.match_symbol(term_id, model::CORE_STR_TYPE)? {
-                return Ok(Term::StringType);
+                return Ok(Term::StringKind);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_NAT_TYPE)? {
@@ -1461,15 +1461,15 @@ impl<'a> Context<'a> {
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
-                return Ok(Term::BytesType);
+                return Ok(Term::BytesKind);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_FLOAT_TYPE)? {
-                return Ok(Term::FloatType);
+                return Ok(Term::FloatKind);
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
-                return Ok(TypeParam::RuntimeType(bound));
+                return Ok(TypeParam::RuntimeKind(bound));
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_CONSTRAINT)? {
@@ -1477,7 +1477,7 @@ impl<'a> Context<'a> {
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_STATIC)? {
-                return Ok(Term::StaticType);
+                return Ok(Term::StaticKind);
             }
 
             if let Some([ty]) = self.match_symbol(term_id, model::CORE_CONST)? {
