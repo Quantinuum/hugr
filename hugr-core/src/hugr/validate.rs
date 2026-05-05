@@ -794,21 +794,6 @@ pub enum InterGraphEdgeError<N: HugrNode> {
         to_offset: Port,
         ancestor_parent_op: Box<OpType>,
     },
-    #[deprecated(
-        note = "These edges are not required, error will be removed in future",
-        since = "0.27.0"
-    )]
-    /// The sibling ancestors of the external inter-graph edge endpoints must be have an order edge between them.
-    #[error(
-        "Missing state order between the external inter-graph source {from} and the ancestor of the target {to_ancestor}. In an external inter-graph edge from {from} ({from_offset}) to {to} ({to_offset})."
-    )]
-    MissingOrderEdge {
-        from: N,
-        from_offset: Port,
-        to: N,
-        to_offset: Port,
-        to_ancestor: N,
-    },
     /// The ancestors of an inter-graph edge are not related.
     #[error(
         "The ancestors of an inter-graph edge are not related. In an inter-graph edge from {from} ({from_offset}) to {to} ({to_offset})."

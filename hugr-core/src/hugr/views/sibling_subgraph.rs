@@ -518,25 +518,6 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 
     /// Check the validity of the subgraph, as described in the docs of
-    /// [`SiblingSubgraph::try_new`].
-    #[deprecated(
-        note = "Use `validate_with_checker`, `validate_default` or `validate_skip_convexity`",
-        since = "0.27.1"
-    )]
-    #[expect(deprecated)] // Remove with ValidationMode
-    pub fn validate<'h, H: HugrView<Node = N>>(
-        &self,
-        hugr: &'h H,
-        mode: ValidationMode<'_, 'h, H>,
-    ) -> Result<(), InvalidSubgraph<N>> {
-        match mode {
-            ValidationMode::WithChecker(checker) => self.validate_with_checker(hugr, Some(checker)),
-            ValidationMode::CheckConvexity => self.validate_default(hugr),
-            ValidationMode::SkipConvexity => self.validate_skip_convexity(hugr),
-        }
-    }
-
-    /// Check the validity of the subgraph, as described in the docs of
     /// [`SiblingSubgraph::try_new`], using a new [`SchedGraphChecker`] for the convexity check.
     pub fn validate_default(
         &self,
@@ -829,23 +810,6 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 }
 
-/// Specify the checks to perform for [`SiblingSubgraph::validate`].
-#[allow(deprecated)] // Remove enum along with TopoConvexChecker
-#[deprecated(
-    note = "Call validate_with_checker or validate_default instead",
-    since = "0.27.1"
-)]
-#[derive(Default)]
-pub enum ValidationMode<'t, 'h, H: HugrView> {
-    /// Check convexity with the given checker.
-    WithChecker(&'t TopoConvexChecker<'h, H>),
-    /// Construct a checker and check convexity.
-    #[default]
-    CheckConvexity,
-    /// Skip convexity check.
-    SkipConvexity,
-}
-
 fn make_pg_subgraph<'h, H: HugrView>(
     region: CheckerRegion<'h, H>,
     inputs: &IncomingPorts<H::Node>,
@@ -1054,22 +1018,6 @@ type CheckerRegion<'g, Base> =
 /// This can be used when constructing multiple sibling subgraphs to speed up
 /// convexity checking.
 ///
-/// This a good default choice for most convexity checking use cases.
-#[deprecated(
-    note = "Use SchedGraphChecker or LineConvexChecker instead",
-    since = "0.27.1"
-)]
-pub type TopoConvexChecker<'g, Base> = PortgraphCheckerWithNodes<
-    'g,
-    Base,
-    portgraph::algorithms::TopoConvexChecker<CheckerRegion<'g, Base>>,
->;
-
-/// Precompute convexity information for a HUGR.
-///
-/// This can be used when constructing multiple sibling subgraphs to speed up
-/// convexity checking.
-///
 /// This is a good choice for checking convexity of circuit-like graphs,
 /// particularly when many checks must be performed.
 pub type LineConvexChecker<'g, Base> = PortgraphCheckerWithNodes<
@@ -1097,10 +1045,6 @@ pub struct PortgraphCheckerWithNodes<'g, Base: HugrView, Checker> {
     /// a map from nodes in the region to `Base` nodes.
     node_map: Base::RegionPortgraphNodes,
 }
-
-#[deprecated(note = "Use PortgraphCheckerWithNodes instead", since = "0.27.1")]
-/// Use [PortgraphCheckerWithNodes]
-pub type ConvexChecker<'g, Base, Checker> = PortgraphCheckerWithNodes<'g, Base, Checker>;
 
 impl<'g, Base, Checker> PortgraphCheckerWithNodes<'g, Base, Checker>
 where
