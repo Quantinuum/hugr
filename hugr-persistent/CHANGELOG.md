@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.6.1](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.6.0...hugr-persistent-v0.6.1) - 2026-05-05
+
+### Refactor
+
+- add HugrView::scheduling_graph, deprecate region_portgraph ([#3015](https://github.com/Quantinuum/hugr/pull/3015))
+
 ## [0.6.0](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.5.1...hugr-persistent-v0.6.0) - 2026-03-31
 
 ### New Features
