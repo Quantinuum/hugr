@@ -45,8 +45,7 @@ impl<T: LinkView> pv::NodeCount for SynEdgeWrapper<T> {
 
 impl<T: LinkView> pv::NodeIndexable for SynEdgeWrapper<T> {
     fn node_bound(&self) -> usize {
-        // ALAN copied from petgraph; but are `NodeIndex`es always dense?
-        self.region_view.node_count()
+        self.region_view.node_capacity()
     }
 
     fn to_index(&self, ix: Self::NodeId) -> usize {
