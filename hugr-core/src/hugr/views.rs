@@ -626,7 +626,7 @@ impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
     + pv::IntoNodeIdentifiers
     + pv::IntoEdgeReferences
     + pv::IntoNeighborsDirected
-    + pv::Visitable<NodeId = portgraph::NodeIndex> {
+    + pv::Visitable<NodeId = portgraph::NodeIndex, Map: Clone> {
         &self.graph
     }
 }
