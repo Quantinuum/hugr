@@ -5,16 +5,19 @@
 //! the core and model to converge incrementally.
 use std::sync::Arc;
 
-use crate::envelope::description::GeneratorDesc;
-use crate::metadata::{self, Metadata};
+use crate::envelope::description::{ExtensionDesc, GeneratorDesc, ModuleDesc};
+use crate::metadata::{self, Metadata, RawMetadataValue};
+use crate::types::type_param::{SeqPart, TermTypeError, TypeParam};
+use crate::types::{
+    CustomType, FuncTypeBase, PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, TypeName,
+    TypeRow, TypeRowLike, TypeRowRV,
+};
 use crate::{
     Direction, Hugr, HugrView, Node, Port,
-    envelope::description::{ExtensionDesc, ModuleDesc},
     extension::{
         ExtensionId, ExtensionRegistry, SignatureError, resolution::ExtensionResolutionError,
     },
     hugr::HugrMut,
-    metadata::RawMetadataValue,
     ops::{
         AliasDecl, AliasDefn, CFG, Call, CallIndirect, Case, Conditional, Const, DFG,
         DataflowBlock, ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType,
@@ -22,16 +25,8 @@ use crate::{
         constant::{CustomConst, CustomSerialized, OpaqueValue},
     },
     package::Package,
-    std_extensions::{
-        arithmetic::{float_types::ConstF64, int_types::ConstInt},
-        collections::array::ArrayValue,
-    },
-    types::{
-        CustomType, FuncTypeBase, MaybeRV, PolyFuncType, PolyFuncTypeBase, RowVariable, Signature,
-        Term, Type, TypeArg, TypeBase, TypeBound, TypeEnum, TypeName, TypeRow,
-        type_param::{SeqPart, TypeParam},
-        type_row::TypeRowBase,
-    },
+    std_extensions::arithmetic::{float_types::ConstF64, int_types::ConstInt},
+    std_extensions::collections::array::ArrayValue,
 };
 use hugr_model::v0::table;
 use hugr_model::v0::{self as model};
@@ -115,6 +110,12 @@ enum ImportErrorInner {
     /// Extension resolution.
     #[error("extension resolution error")]
     ExtensionResolution(#[from] ExtensionResolutionError),
+}
+
+impl From<TermTypeError> for ImportErrorInner {
+    fn from(err: TermTypeError) -> Self {
+        SignatureError::from(err).into()
+    }
 }
 
 #[derive(Debug, Clone, Error)]
@@ -314,7 +315,7 @@ impl<'a> Context<'a> {
         let signature = node_data
             .signature
             .ok_or_else(|| error_uninferred!("node signature"))?;
-        self.import_func_type(signature)
+        self.import_func_type(signature, Self::import_type_row)
     }
 
     /// Get the node with the given `NodeId`, or return an error if it does not exist.
@@ -691,6 +692,7 @@ impl<'a> Context<'a> {
                 region_data
                     .signature
                     .ok_or_else(|| error_uninferred!("region signature"))?,
+                Self::import_type_row,
             )
             .map_err(|err| error_context!(err, "signature of dfg region with id {}", region))?;
 
@@ -839,7 +841,10 @@ impl<'a> Context<'a> {
 
         let sum_rows: Vec<_> = {
             let [variants] = self.expect_symbol(*first, model::CORE_ADT)?;
-            self.import_type_rows(variants)?
+            self.import_closed_list(variants)?
+                .into_iter()
+                .map(|term_id| self.import_type_row(term_id))
+                .collect::<Result<_, _>>()?
         };
 
         let rest = rest
@@ -937,6 +942,7 @@ impl<'a> Context<'a> {
                 region_data
                     .signature
                     .ok_or_else(|| error_uninferred!("region signature"))?,
+                Self::import_type_row,
             )?;
 
             let case_node = self
@@ -1378,11 +1384,11 @@ impl<'a> Context<'a> {
         Ok(node)
     }
 
-    fn import_poly_func_type<RV: MaybeRV, T>(
+    fn import_poly_func_type<T>(
         &mut self,
         node: table::NodeId,
         symbol: table::Symbol<'a>,
-        in_scope: impl FnOnce(&mut Self, PolyFuncTypeBase<RV>) -> Result<T, ImportErrorInner>,
+        in_scope: impl FnOnce(&mut Self, PolyFuncType) -> Result<T, ImportErrorInner>,
     ) -> Result<T, ImportErrorInner> {
         (|| {
             let mut imported_params = Vec::with_capacity(symbol.params.len());
@@ -1425,8 +1431,8 @@ impl<'a> Context<'a> {
                 );
             }
 
-            let body = self.import_func_type::<RV>(symbol.signature)?;
-            in_scope(self, PolyFuncTypeBase::new(imported_params, body))
+            let body = self.import_func_type(symbol.signature, Self::import_type_row)?;
+            in_scope(self, PolyFuncType::new(imported_params, body))
         })()
         .map_err(|err| error_context!(err, "symbol `{}` defined by node {}", symbol.name, node))
     }
@@ -1434,6 +1440,10 @@ impl<'a> Context<'a> {
     /// Import a [`Term`] from a term that represents a static type or value.
     fn import_term(&mut self, term_id: table::TermId) -> Result<Term, ImportErrorInner> {
         self.import_term_with_bound(term_id, TypeBound::Linear)
+    }
+
+    fn import_type(&mut self, term_id: table::TermId) -> Result<Type, ImportErrorInner> {
+        Ok(Type::try_from(self.import_term(term_id)?)?)
     }
 
     fn import_term_with_bound(
@@ -1495,6 +1505,30 @@ impl<'a> Context<'a> {
                 return Ok(TypeParam::new_tuple_type(item_types));
             }
 
+            if let Some([_, _]) = self.match_symbol(term_id, model::CORE_FN)? {
+                let func_type = self.import_func_type(term_id, |this, term_id| {
+                    Ok(TypeRowRV::try_from(this.import_term(term_id)?)?)
+                })?;
+                return Ok(Type::new_function(func_type).into());
+            }
+
+            if let Some([variants]) = self.match_symbol(term_id, model::CORE_ADT)? {
+                let variants = (|| {
+                    self.import_closed_list(variants)?
+                        .iter()
+                        .map(|variant| {
+                            self.import_term(*variant).and_then(|tm| {
+                                TypeRowRV::try_from(tm)
+                                    .map_err(|e| ImportErrorInner::Signature(e.into()))
+                            })
+                        })
+                        .collect::<Result<Vec<_>, _>>()
+                })()
+                .map_err(|err| error_context!(err, "adt variants"))?;
+
+                return Ok(Type::new_sum(variants).into());
+            }
+
             match self.get_term(term_id)? {
                 table::Term::Wildcard => Err(error_uninferred!("wildcard")),
 
@@ -1539,51 +1573,6 @@ impl<'a> Context<'a> {
                 table::Term::Literal(model::Literal::Float(value)) => Ok(Term::Float(*value)),
                 table::Term::Func { .. } => Err(error_unsupported!("function constant")),
 
-                table::Term::Apply { .. } => {
-                    let ty: Type = self.import_type(term_id)?;
-                    Ok(ty.into())
-                }
-            }
-        })()
-        .map_err(|err| error_context!(err, "term {}", term_id))
-    }
-
-    fn import_seq_part(
-        &mut self,
-        seq_part: &'a table::SeqPart,
-    ) -> Result<SeqPart<TypeArg>, ImportErrorInner> {
-        Ok(match seq_part {
-            table::SeqPart::Item(term_id) => SeqPart::Item(self.import_term(*term_id)?),
-            table::SeqPart::Splice(term_id) => SeqPart::Splice(self.import_term(*term_id)?),
-        })
-    }
-
-    /// Import a `Type` from a term that represents a runtime type.
-    fn import_type<RV: MaybeRV>(
-        &mut self,
-        term_id: table::TermId,
-    ) -> Result<TypeBase<RV>, ImportErrorInner> {
-        (|| {
-            if let Some([_, _]) = self.match_symbol(term_id, model::CORE_FN)? {
-                let func_type = self.import_func_type::<RowVariable>(term_id)?;
-                return Ok(TypeBase::new_function(func_type));
-            }
-
-            if let Some([variants]) = self.match_symbol(term_id, model::CORE_ADT)? {
-                let variants = (|| {
-                    self.import_closed_list(variants)?
-                        .iter()
-                        .map(|variant| self.import_type_row::<RowVariable>(*variant))
-                        .collect::<Result<Vec<_>, _>>()
-                })()
-                .map_err(|err| error_context!(err, "adt variants"))?;
-
-                return Ok(TypeBase::new_sum(variants));
-            }
-
-            match self.get_term(term_id)? {
-                table::Term::Wildcard => Err(error_uninferred!("wildcard")),
-
                 table::Term::Apply(symbol, args) => {
                     let name = self.get_symbol_name(*symbol)?;
 
@@ -1615,32 +1604,28 @@ impl<'a> Context<'a> {
 
                     let bound = ext_type.bound(&args);
 
-                    Ok(TypeBase::new_extension(CustomType::new(
+                    Ok(Type::new_extension(CustomType::new(
                         id,
                         args,
                         extension,
                         bound,
                         &Arc::downgrade(extension_ref),
-                    )))
+                    ))
+                    .into())
                 }
-
-                table::Term::Var(var @ table::VarId(_, index)) => {
-                    let local_var = self
-                        .local_vars
-                        .get(var)
-                        .ok_or(error_invalid!("unknown var {}", var))?;
-                    Ok(TypeBase::new_var_use(*index as _, local_var.bound))
-                }
-
-                // The following terms are not runtime types, but the core `Type` only contains runtime types.
-                // We therefore report a type error here.
-                table::Term::Literal(_)
-                | table::Term::List { .. }
-                | table::Term::Tuple { .. }
-                | table::Term::Func { .. } => Err(error_invalid!("expected a runtime type")),
             }
         })()
-        .map_err(|err| error_context!(err, "term {} as `Type`", term_id))
+        .map_err(|err| error_context!(err, "term {}", term_id))
+    }
+
+    fn import_seq_part(
+        &mut self,
+        seq_part: &'a table::SeqPart,
+    ) -> Result<SeqPart<TypeArg>, ImportErrorInner> {
+        Ok(match seq_part {
+            table::SeqPart::Item(term_id) => SeqPart::Item(self.import_term(*term_id)?),
+            table::SeqPart::Splice(term_id) => SeqPart::Splice(self.import_term(*term_id)?),
+        })
     }
 
     fn get_func_type(
@@ -1667,18 +1652,18 @@ impl<'a> Context<'a> {
     ///
     /// Function types are not special-cased in `hugr-model` but are represented
     /// via the `core.fn` term constructor.
-    fn import_func_type<RV: MaybeRV>(
+    fn import_func_type<T: TypeRowLike>(
         &mut self,
         term_id: table::TermId,
-    ) -> Result<FuncTypeBase<RV>, ImportErrorInner> {
+        import_io: impl Fn(&mut Self, table::TermId) -> Result<T, ImportErrorInner>,
+    ) -> Result<FuncTypeBase<T>, ImportErrorInner> {
         (|| {
             let [inputs, outputs] = self.get_func_type(term_id)?;
-            let inputs = self
-                .import_type_row(inputs)
-                .map_err(|err| error_context!(err, "function inputs"))?;
-            let outputs = self
-                .import_type_row(outputs)
-                .map_err(|err| error_context!(err, "function outputs"))?;
+            let inputs =
+                import_io(self, inputs).map_err(|err| error_context!(err, "function inputs"))?;
+            let outputs =
+                import_io(self, outputs).map_err(|err| error_context!(err, "function outputs"))?;
+
             Ok(FuncTypeBase::new(inputs, outputs))
         })()
         .map_err(|err| error_context!(err, "function type"))
@@ -1778,64 +1763,18 @@ impl<'a> Context<'a> {
         Ok(types)
     }
 
-    /// Imports a list of lists as a vector of type rows.
-    ///
-    /// See [`Self::import_type_row`].
-    fn import_type_rows<RV: MaybeRV>(
-        &mut self,
-        term_id: table::TermId,
-    ) -> Result<Vec<TypeRowBase<RV>>, ImportErrorInner> {
-        self.import_closed_list(term_id)?
-            .into_iter()
-            .map(|term_id| self.import_type_row::<RV>(term_id))
-            .collect()
-    }
-
-    /// Imports a list as a type row.
+    /// Imports a closed list as a type row.
     ///
     /// This method works to produce a [`TypeRow`] or a [`TypeRowRV`], depending
     /// on the `RV` type argument. For [`TypeRow`] a closed list is expected.
     /// For [`TypeRowRV`] we import spliced variables as row variables.
-    fn import_type_row<RV: MaybeRV>(
-        &mut self,
-        term_id: table::TermId,
-    ) -> Result<TypeRowBase<RV>, ImportErrorInner> {
-        fn import_into<RV: MaybeRV>(
-            ctx: &mut Context,
-            term_id: table::TermId,
-            types: &mut Vec<TypeBase<RV>>,
-        ) -> Result<(), ImportErrorInner> {
-            match ctx.get_term(term_id)? {
-                table::Term::List(parts) => {
-                    types.reserve(parts.len());
-
-                    for item in *parts {
-                        match item {
-                            table::SeqPart::Item(term_id) => {
-                                types.push(ctx.import_type::<RV>(*term_id)?);
-                            }
-                            table::SeqPart::Splice(term_id) => {
-                                import_into(ctx, *term_id, types)?;
-                            }
-                        }
-                    }
-                }
-                table::Term::Var(table::VarId(_, index)) => {
-                    let var = RV::try_from_rv(RowVariable(*index as _, TypeBound::Linear))
-                        .map_err(|_| {
-                            error_invalid!("Expected a closed list.\n{}", CLOSED_LIST_HINT)
-                        })?;
-                    types.push(TypeBase::new(TypeEnum::RowVar(var)));
-                }
-                _ => return Err(error_invalid!("expected a list")),
-            }
-
-            Ok(())
-        }
-
-        let mut types = Vec::new();
-        import_into(self, term_id, &mut types)?;
-        Ok(types.into())
+    fn import_type_row(&mut self, term_id: table::TermId) -> Result<TypeRow, ImportErrorInner> {
+        let elems = self.import_closed_list(term_id)?;
+        Ok(elems
+            .into_iter()
+            .map(|id| self.import_term(id))
+            .collect::<Result<Vec<_>, _>>()?
+            .try_into()?)
     }
 
     fn import_custom_name(
@@ -1987,13 +1926,8 @@ impl<'a> Context<'a> {
                 .map(|(value, ty)| self.import_value(*value, *ty))
                 .collect::<Result<Vec<_>, _>>()?;
 
-            let ty = {
-                // TODO: Import as a `SumType` directly and avoid the copy.
-                let ty: Type = self.import_type(type_id)?;
-                match ty.as_type_enum() {
-                    TypeEnum::Sum(sum) => sum.clone(),
-                    _ => unreachable!(),
-                }
+            let Term::RuntimeSum(ty) = self.import_term(type_id)? else {
+                unreachable!()
             };
 
             return Ok(Value::sum(*tag as _, items, ty).unwrap());
@@ -2138,7 +2072,7 @@ impl<'a> Context<'a> {
 struct LocalVar {
     /// The type of the variable.
     r#type: table::TermId,
-    /// The type bound of the variable.
+    /// The type bound of the variable. Overwritten if a constraint is seen.
     bound: TypeBound,
 }
 
