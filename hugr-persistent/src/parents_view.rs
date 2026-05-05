@@ -209,7 +209,7 @@ impl HugrView for ParentsView<'_> {
         (unimplemented!(), HashMap::new())
     }
 
-    fn scheduling_graph(&self, parent: Self::Node) -> hugr::views::SchedulingGraph<'_, Self> {
+    fn scheduling_graph(&self, _parent: Self::Node) -> hugr::views::SchedulingGraph<'_, Self> {
         unimplemented!()
     }
 }

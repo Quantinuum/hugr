@@ -335,11 +335,11 @@ impl HugrView for PersistentHugr {
         let (hugr, node_map) = self.apply_all();
         let parent = node_map[&parent];
 
-        let sg = hugr.scheduling_graph(parent);
+        let _sg = hugr.scheduling_graph(parent);
         /* We could do something like:
               SchedulingGraph {
                 graph: sg.graph,
-                node_map, // no, actually need to compose with sg.node_map
+                node_map, // except actually need to compose with sg.node_map
                 region_parent: parent,
               }
            ...but exposing SchedulingGraph details outside of hugr-core was really not the plan.
