@@ -828,57 +828,96 @@ impl HugrView for Hugr {
         let root = parent.into_portgraph();
         let region_view =
             portgraph::view::FlatRegion::new_without_root(&self.graph, &self.hierarchy, root);
-        let region_nodes = DefaultPGNodeMap;
-        let mut syn_edges = Vec::new();
-        if OpTag::DataflowParent.is_superset(self.get_optype(parent).tag()) {
-            let mut cache: HashMap<Self::Node, Self::Node> = HashMap::new();
-            fn find_sib_anc<N: HugrNode>(
-                n: N,
-                hugr: &(impl HugrView<Node = N> + ?Sized),
-                cache: &mut HashMap<N, N>,
-                parent: N,
-            ) -> Option<N> {
-                // If we don't hit parent, it's a Dom edge, so ignore.
-                let p = hugr.get_parent(n)?;
-                if p == parent {
-                    return Some(n);
-                }
-                match cache.get(&p) {
-                    Some(&cached) => Some(cached),
-                    None => {
-                        // can't be borrowing cache during recursive call
-                        let anc = find_sib_anc(p, hugr, cache, parent);
-                        if let Some(anc) = anc {
-                            cache.insert(p, anc);
-                        }
-                        anc
-                    }
-                }
-            }
-            for child in self.children(parent) {
-                for (p, _) in self.out_value_types(child) {
-                    for (tgt, _) in self.linked_inputs(child, p) {
-                        if let Some(tgt_anc) = find_sib_anc(tgt, self, &mut cache, parent)
-                            && tgt_anc != tgt
-                        {
-                            syn_edges.push((
-                                region_nodes.to_portgraph(child),
-                                region_nodes.to_portgraph(tgt_anc),
-                            ));
-                        }
-                    }
-                }
-            }
-        }
+        let syn_edges = calc_syn_edges(self, parent);
         let graph = SynEdgeWrapper {
             region_view,
             syn_edges,
         };
         SchedulingGraph {
             graph,
-            node_map: region_nodes,
+            node_map: DefaultPGNodeMap,
             region_parent: parent,
         }
+    }
+}
+
+fn calc_syn_edges<H: HugrView<Node = Node>>(
+    hugr: &H,
+    parent: H::Node,
+) -> Vec<(portgraph::NodeIndex, portgraph::NodeIndex)> {
+    let mut syn_edges = Vec::new();
+    if OpTag::DataflowParent.is_superset(hugr.get_optype(parent).tag()) {
+        let mut cache: HashMap<H::Node, H::Node> = HashMap::new();
+        fn find_sib_anc<N: HugrNode>(
+            n: N,
+            hugr: &(impl HugrView<Node = N> + ?Sized),
+            cache: &mut HashMap<N, N>,
+            parent: N,
+        ) -> Option<N> {
+            // If we don't hit parent, it's a Dom edge, so ignore.
+            let p = hugr.get_parent(n)?;
+            if p == parent {
+                return Some(n);
+            }
+            match cache.get(&p) {
+                Some(&cached) => Some(cached),
+                None => {
+                    // can't be borrowing cache during recursive call
+                    let anc = find_sib_anc(p, hugr, cache, parent);
+                    if let Some(anc) = anc {
+                        cache.insert(p, anc);
+                    }
+                    anc
+                }
+            }
+        }
+        for child in hugr.children(parent) {
+            for (p, _) in hugr.out_value_types(child) {
+                for (tgt, _) in hugr.linked_inputs(child, p) {
+                    if let Some(tgt_anc) = find_sib_anc(tgt, hugr, &mut cache, parent)
+                        && tgt_anc != tgt
+                    {
+                        syn_edges.push((child.into_portgraph(), tgt_anc.into_portgraph()));
+                    }
+                }
+            }
+        }
+    }
+    syn_edges
+}
+
+/// Like [HugrView::scheduling_graph], but returns a [SchedulingGraph] that owns its own view of the region,
+/// taken from the Hugr.
+///
+/// The API is designed for `hugr-persistent` and allows to implement [HugrView] such that
+/// [HugrInternals::RegionPortgraph] is not tied to the original view but rather an owned
+/// temporary [Hugr].
+pub fn owned_scheduling_graph<'a, N: HugrNode, V>(
+    hugr: Hugr,
+    region_parent: N,
+    node_map: V::RegionPortgraphNodes,
+) -> SchedulingGraph<'a, V>
+where
+    V: for<'p> HugrView<
+            Node = N,
+            RegionPortgraph<'p> = portgraph::MultiPortGraph<u32, u32, u32>,
+            RegionPortgraphNodes = HashMap<N, Node>,
+        > + 'a,
+{
+    let parent = node_map[&region_parent];
+    let root = parent.into_portgraph();
+    let syn_edges = calc_syn_edges(&hugr, parent);
+    let region_view =
+        portgraph::view::FlatRegion::new_without_root(hugr.graph, hugr.hierarchy, root);
+
+    let graph = SynEdgeWrapper {
+        region_view,
+        syn_edges,
+    };
+    SchedulingGraph {
+        graph,
+        node_map,
+        region_parent,
     }
 }
 

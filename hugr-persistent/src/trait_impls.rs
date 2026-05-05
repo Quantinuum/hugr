@@ -12,7 +12,7 @@ use hugr_core::{
         self, Patch, SimpleReplacementError,
         internal::HugrInternals,
         views::{
-            ExtractionResult,
+            ExtractionResult, owned_scheduling_graph,
             render::{MermaidFormatter, NodeLabel},
         },
     },
@@ -331,22 +331,9 @@ impl HugrView for PersistentHugr {
     }
 
     fn scheduling_graph(&self, parent: Self::Node) -> hugr::views::SchedulingGraph<'_, Self> {
-        // TODO: this is currently not very efficient (see #2248)
+        // TODO: this is currently not very efficient (https://github.com/Quantinuum/hugr/issues/2248)
         let (hugr, node_map) = self.apply_all();
-        let parent = node_map[&parent];
-
-        let _sg = hugr.scheduling_graph(parent);
-        /* We could do something like:
-              SchedulingGraph {
-                graph: sg.graph,
-                node_map, // except actually need to compose with sg.node_map
-                region_parent: parent,
-              }
-           ...but exposing SchedulingGraph details outside of hugr-core was really not the plan.
-        */
-        unimplemented!(
-            "No scheduling_graph for PersistentHugr: needs private access to SchedulingGraph"
-        );
+        owned_scheduling_graph(hugr, parent, node_map)
     }
 }
 
