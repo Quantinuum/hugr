@@ -777,7 +777,7 @@ pub(super) mod test {
             }
 
             fn static_params(&self) -> &[TypeParam] {
-                const MAX_NAT: &[TypeParam] = &[TypeParam::max_nat_type()];
+                const MAX_NAT: &[TypeParam] = &[TypeParam::max_nat_kind()];
                 MAX_NAT
             }
         }
@@ -820,7 +820,7 @@ pub(super) mod test {
             );
 
             // First arg must be concrete, not a variable
-            let kind = TypeParam::bounded_nat_type(NonZeroU64::new(5).unwrap());
+            let kind = TypeParam::bounded_nat_kind(NonZeroU64::new(5).unwrap());
             let args = [TypeArg::new_var_use(0, kind.clone()), usize_t().into()];
             // We can't prevent this from getting into our compute_signature implementation:
             assert_eq!(

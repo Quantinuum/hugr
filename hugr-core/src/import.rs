@@ -1457,7 +1457,7 @@ impl<'a> Context<'a> {
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_NAT_TYPE)? {
-                return Ok(Term::max_nat_type());
+                return Ok(Term::max_nat_kind());
             }
 
             if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
@@ -1493,7 +1493,7 @@ impl<'a> Context<'a> {
                 let item_type = self
                     .import_term(item_type)
                     .map_err(|err| error_context!(err, "item type of list type"))?;
-                return Ok(TypeParam::new_list_type(item_type));
+                return Ok(TypeParam::new_list_kind(item_type));
             }
 
             if let Some([item_types]) = self.match_symbol(term_id, model::CORE_TUPLE_TYPE)? {
@@ -1502,7 +1502,7 @@ impl<'a> Context<'a> {
                 let item_types = self
                     .import_term(item_types)
                     .map_err(|err| error_context!(err, "item types of tuple type"))?;
-                return Ok(TypeParam::new_tuple_type(item_types));
+                return Ok(TypeParam::new_tuple_kind(item_types));
             }
 
             if let Some([_, _]) = self.match_symbol(term_id, model::CORE_FN)? {

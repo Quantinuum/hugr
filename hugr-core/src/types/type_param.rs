@@ -53,7 +53,7 @@ impl UpperBound {
 /// A [`Term`] that is a static argument to an operation or constructor.
 pub type TypeArg = Term;
 
-/// A [`Term`] that is the static type of an operation or constructor parameter.
+/// A [`Term`] that is the static kind of an operation or constructor parameter.
 pub type TypeParam = Term;
 
 /// The main entity in the static language (aka "type system") of Hugr.
@@ -68,8 +68,8 @@ pub type TypeParam = Term;
 /// with a [Term::Float] argument. [`check_term_kind`] checks that an argument
 /// is valid (of the correct kind) for the parameter.
 // TODO it might be good to have a separate function that tells, for a given Term,
-// whether there is *any* valid argument; we could then rule out using as parameters
-// any Term for which there are no valid arguments.
+// whether it is a kind (for which there is *any* valid argument); we could then
+// rule out using as parameters any Term which is not a kind.
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
 )]
@@ -79,31 +79,31 @@ pub type TypeParam = Term;
     into = "crate::types::serialize::TermSer"
 )]
 pub enum Term {
-    /// The type of runtime types.
+    /// The kind of runtime types.
     #[display("Type{}", match _0 {
         TypeBound::Linear => String::new(),
         _ => format!("[{_0}]")
     })]
     TypeKind(TypeBound),
-    /// The type of static data.
+    /// The kind of static data.
     StaticKind,
-    /// The type of static natural numbers up to a given bound.
+    /// The kind of static natural numbers up to a given bound.
     #[display("{}", match _0.value() {
         Some(v) => format!("BoundedNat[{v}]"),
         None => "Nat".to_string()
     })]
     BoundedNatKind(UpperBound),
-    /// The type of static strings. See [`Term::String`].
+    /// The kind of static strings. See [`Term::String`].
     StringKind,
-    /// The type of static byte strings. See [`Term::Bytes`].
+    /// The kind of static byte strings. See [`Term::Bytes`].
     BytesKind,
-    /// The type of static floating point numbers. See [`Term::Float`].
+    /// The kind of static floating point numbers. See [`Term::Float`].
     FloatKind,
-    /// The type of static lists of indeterminate size containing terms of the
-    /// specified static type.
+    /// The kind of static lists of indeterminate size, each of whose elements
+    /// is a `Term` of the specified kind
     #[display("ListType[{_0}]")]
     ListKind(Box<Term>),
-    /// The type of static tuples.
+    /// The kind of static tuples.
     #[display("TupleType[{_0}]")]
     TupleKind(Box<Term>),
     /// The type of runtime values defined by an extension type.
@@ -138,19 +138,19 @@ pub enum Term {
     /// A list of static terms. Instance of [`Term::ListKind`].
     #[display("[{}]", _0.iter().map(|t|t.to_string()).join(", "))]
     List(Vec<Term>),
-    /// Instance of [`TypeParam::List`] defined by a sequence of concatenated lists of the same type.
+    /// Instance of [`TypeParam::ListKind`] defined by a sequence of concatenated lists of the same type.
     #[display("[{}]", {
         use itertools::Itertools as _;
         _0.iter().map(|t| format!("... {t}")).join(",")
     })]
     ListConcat(Vec<TypeArg>),
-    /// Instance of [`TypeParam::Tuple`] defined by a sequence of elements of varying type.
+    /// Instance of [`TypeParam::TupleKind`] defined by a sequence of elements of varying kind.
     #[display("({})", {
         use itertools::Itertools as _;
         _0.iter().map(std::string::ToString::to_string).join(",")
     })]
     Tuple(Vec<Term>),
-    /// Instance of [`TypeParam::Tuple`] defined by a sequence of concatenated tuples.
+    /// Instance of [`TypeParam::TupleKind`] defined by a sequence of concatenated tuples.
     #[display("({})", {
         use itertools::Itertools as _;
         _0.iter().map(|tuple| format!("... {tuple}")).join(",")
@@ -162,7 +162,7 @@ pub enum Term {
     #[display("{_0}")]
     Variable(TermVar),
 
-    /// The type of constants for a runtime type.
+    /// The kind of constants for a runtime type.
     ///
     /// A constant is a compile time description of how to produce a runtime value.
     /// The runtime value is constructed when the constant is loaded.
@@ -179,13 +179,13 @@ impl Term {
 
     /// Creates a [`Term::BoundedNatKind`] with the maximum bound (`u64::MAX` + 1).
     #[must_use]
-    pub const fn max_nat_type() -> Self {
+    pub const fn max_nat_kind() -> Self {
         Self::BoundedNatKind(UpperBound(None))
     }
 
     /// Creates a [`Term::BoundedNatKind`] with the stated upper bound (non-exclusive).
     #[must_use]
-    pub const fn bounded_nat_type(upper_bound: NonZeroU64) -> Self {
+    pub const fn bounded_nat_kind(upper_bound: NonZeroU64) -> Self {
         Self::BoundedNatKind(UpperBound(Some(upper_bound)))
     }
 
@@ -195,12 +195,12 @@ impl Term {
     }
 
     /// Creates a new [`Term::ListKind`] given the type of its elements.
-    pub fn new_list_type(elem: impl Into<Term>) -> Self {
+    pub fn new_list_kind(elem: impl Into<Term>) -> Self {
         Self::ListKind(Box::new(elem.into()))
     }
 
     /// Creates a new [`Term::TupleKind`] given the type of its elements.
-    pub fn new_tuple_type(item_types: impl Into<Term>) -> Self {
+    pub fn new_tuple_kind(item_types: impl Into<Term>) -> Self {
         Self::TupleKind(Box::new(item_types.into()))
     }
 
@@ -344,7 +344,7 @@ impl Term {
     /// kind is a [Term::ListKind] of [Term::TypeKind].
     #[must_use]
     pub fn new_row_var_use(idx: usize, b: TypeBound) -> Self {
-        Self::new_var_use(idx, Term::new_list_type(b))
+        Self::new_var_use(idx, Term::new_list_kind(b))
     }
 
     /// Creates a new string literal.
@@ -493,8 +493,8 @@ impl Term {
             Term::StringKind => self.clone(),
             Term::BytesKind => self.clone(),
             Term::FloatKind => self.clone(),
-            Term::ListKind(item_type) => Term::new_list_type(item_type.substitute(t)),
-            Term::TupleKind(item_types) => Term::new_tuple_type(item_types.substitute(t)),
+            Term::ListKind(item_type) => Term::new_list_kind(item_type.substitute(t)),
+            Term::TupleKind(item_types) => Term::new_tuple_kind(item_types.substitute(t)),
             Term::StaticKind => self.clone(),
             Term::ConstKind(ty) => Term::new_const(ty.substitute(t)),
         }
@@ -565,7 +565,7 @@ impl Term {
     /// # let a = Term::new_string("a");
     /// # let b = Term::new_string("b");
     /// # let c = Term::new_string("c");
-    /// let var = Term::new_var_use(0, Term::new_list_type(Term::StringKind));
+    /// let var = Term::new_var_use(0, Term::new_list_kind(Term::StringKind));
     /// let term = Term::concat_lists([
     ///     Term::new_list([a.clone(), b.clone()]),
     ///     var.clone(),
@@ -943,7 +943,7 @@ mod test {
         let b = Term::new_string("b");
         let c = Term::new_string("c");
         let d = Term::new_string("d");
-        let var = Term::new_var_use(0, Term::new_list_type(Term::StringKind));
+        let var = Term::new_var_use(0, Term::new_list_kind(Term::StringKind));
         let parts = [
             SeqPart::Splice(Term::new_list([a.clone(), b.clone()])),
             SeqPart::Splice(Term::concat_lists([Term::new_list([c.clone()])])),
@@ -989,7 +989,7 @@ mod test {
         }
         // Simple cases: Term::XXXTypes are Term::TypeKind's
         check(usize_t(), &TypeBound::Copyable.into()).unwrap();
-        let lst_of_cpy = TypeParam::new_list_type(TypeBound::Copyable);
+        let lst_of_cpy = TypeParam::new_list_kind(TypeBound::Copyable);
         check(usize_t(), &lst_of_cpy).unwrap_err();
         // ...but singleton sequences thereof are lists
         check_seq(&[usize_t()], &TypeBound::Linear.into()).unwrap_err();
@@ -1009,7 +1009,7 @@ mod test {
                 Term::new_list([usize_t()]),
                 rowvar(0, TypeBound::Copyable),
             ]),
-            &TypeParam::new_list_type(TypeBound::Linear),
+            &TypeParam::new_list_kind(TypeBound::Linear),
         )
         .unwrap();
         // but a *list* of the rowvar is a list of list of types, which is wrong
@@ -1033,9 +1033,9 @@ mod test {
         .unwrap_err();
 
         // Similar for nats (but no equivalent of fancy row vars)
-        check(5, &TypeParam::max_nat_type()).unwrap();
-        check_seq(&[5], &TypeParam::max_nat_type()).unwrap_err();
-        let list_of_nat = TypeParam::new_list_type(TypeParam::max_nat_type());
+        check(5, &TypeParam::max_nat_kind()).unwrap();
+        check_seq(&[5], &TypeParam::max_nat_kind()).unwrap_err();
+        let list_of_nat = TypeParam::new_list_kind(TypeParam::max_nat_kind());
         check(5, &list_of_nat).unwrap_err();
         check_seq(&[5], &list_of_nat).unwrap();
         check(TypeArg::new_var_use(0, list_of_nat.clone()), &list_of_nat).unwrap();
@@ -1048,7 +1048,7 @@ mod test {
 
         // `Term::TupleKind` requires a `Term::Tuple` of the same number of elems
         let usize_and_ty =
-            TypeParam::new_tuple_type([TypeParam::max_nat_type(), Term::from(TypeBound::Copyable)]);
+            TypeParam::new_tuple_kind([TypeParam::max_nat_kind(), Term::from(TypeBound::Copyable)]);
         check(
             TypeArg::Tuple(vec![5.into(), usize_t().into()]),
             &usize_and_ty,
@@ -1061,7 +1061,7 @@ mod test {
         .unwrap_err(); // Wrong way around
 
         let two_types =
-            Term::new_tuple_type(Term::new_list([TypeBound::Linear, TypeBound::Linear]));
+            Term::new_tuple_kind(Term::new_list([TypeBound::Linear, TypeBound::Linear]));
         check(TypeArg::new_var_use(0, two_types.clone()), &two_types).unwrap();
         // not a Row Var which could have any number of elems
         check(TypeArg::new_var_use(0, lst_of_cpy), &two_types).unwrap_err();
@@ -1069,13 +1069,13 @@ mod test {
 
     #[test]
     fn type_arg_subst_row() {
-        let row_param = Term::new_list_type(TypeBound::Copyable);
+        let row_param = Term::new_list_kind(TypeBound::Copyable);
         let row_arg: Term = Term::new_list([bool_t(), Type::UNIT]);
         check_term_kind(&row_arg, &row_param).unwrap();
 
         // Now say a row variable referring to *that* row was used
         // to instantiate an outer "row parameter" (list of type).
-        let outer_param = Term::new_list_type(TypeBound::Linear);
+        let outer_param = Term::new_list_kind(TypeBound::Linear);
         let outer_arg = Term::concat_lists([
             Term::new_row_var_use(0, TypeBound::Copyable),
             Term::new_list([usize_t()]),
@@ -1094,8 +1094,8 @@ mod test {
 
     #[test]
     fn subst_list_list() {
-        let outer_param = Term::new_list_type(Term::new_list_type(TypeBound::Linear));
-        let row_var_decl = Term::new_list_type(TypeBound::Copyable);
+        let outer_param = Term::new_list_kind(Term::new_list_kind(TypeBound::Linear));
+        let row_var_decl = Term::new_list_kind(TypeBound::Copyable);
         let row_var_use = Term::new_var_use(0, row_var_decl.clone());
         let good_arg = Term::new_list([
             // The row variables here refer to `row_var_decl` above
@@ -1116,7 +1116,7 @@ mod test {
             Err(TermTypeError::TypeMismatch {
                 term: Box::new(usize_t().into()),
                 // The error reports the type expected for each element of the list:
-                type_: Box::new(TypeParam::new_list_type(TypeBound::Linear))
+                type_: Box::new(TypeParam::new_list_kind(TypeBound::Linear))
             })
         );
 
@@ -1238,10 +1238,10 @@ mod test {
                         any_with::<TermVar>(depth).prop_map(Self::Variable).boxed(),
                     )
                     .or(any_with::<Self>(depth)
-                        .prop_map(Self::new_list_type)
+                        .prop_map(Self::new_list_kind)
                         .boxed())
                     .or(any_with::<Self>(depth)
-                        .prop_map(Self::new_tuple_type)
+                        .prop_map(Self::new_tuple_kind)
                         .boxed())
                     .or(vec(any_with::<Self>(depth), 0..3)
                         .prop_map(Self::new_list)
