@@ -723,10 +723,12 @@ impl TermVar {
     }
 }
 
-/// Checks that a [`Term`] is valid for a given type.
-pub fn check_term_kind(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
-    match (term, type_) {
-        (Term::Variable(TermVar { cached_decl, .. }), _) if type_.is_supertype(cached_decl) => {
+/// Checks that a [`Term`] (value) is a valid instance of another [`Term`] (kind)
+///
+/// I.e. the former is acceptable as an argument to a parameter of the latter.
+pub fn check_term_kind(value: &Term, kind: &Term) -> Result<(), TermTypeError> {
+    match (value, kind) {
+        (Term::Variable(TermVar { cached_decl, .. }), _) if kind.is_supertype(cached_decl) => {
             Ok(())
         }
         (Term::SumType(st), Term::TypeKind(bound)) if bound.contains(st.bound()) => Ok(()),
@@ -737,9 +739,9 @@ pub fn check_term_kind(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
             .try_for_each(|elem| check_term_kind(elem, item_type)),
         (Term::ListConcat(lists), Term::ListKind(_)) => lists
             .iter()
-            .try_for_each(|list| check_term_kind(list, type_)),
+            .try_for_each(|list| check_term_kind(list, kind)),
         (TypeArg::Tuple(_) | TypeArg::TupleConcat(_), TypeParam::TupleKind(item_types)) => {
-            let term_parts: Vec<_> = term.clone().into_tuple_parts().collect();
+            let term_parts: Vec<_> = value.clone().into_tuple_parts().collect();
             let type_parts: Vec<_> = item_types.clone().into_list_parts().collect();
 
             for (term, type_) in term_parts.iter().zip(&type_parts) {
@@ -784,8 +786,8 @@ pub fn check_term_kind(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::ConstKind(_), Term::StaticKind) => Ok(()),
 
         _ => Err(TermTypeError::TypeMismatch {
-            term: Box::new(term.clone()),
-            type_: Box::new(type_.clone()),
+            term: Box::new(value.clone()),
+            type_: Box::new(kind.clone()),
         }),
     }
 }
