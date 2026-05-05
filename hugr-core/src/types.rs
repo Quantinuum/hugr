@@ -519,13 +519,13 @@ impl TryFrom<Term> for Type {
     type Error = TermTypeError;
 
     fn try_from(t: Term) -> Result<Self, TermTypeError> {
-        if t.is_runtime_type() {
-            return Ok(Self(t));
+        match t.is_runtime_type() {
+            true => Ok(Self(t)),
+            false => Err(TermTypeError::TypeMismatch {
+                term: Box::new(t),
+                type_: Box::new(TypeBound::Linear.into()),
+            }),
         }
-        Err(TermTypeError::TypeMismatch {
-            term: Box::new(t),
-            type_: Box::new(TypeBound::Linear.into()),
-        })
     }
 }
 
