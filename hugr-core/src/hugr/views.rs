@@ -567,11 +567,20 @@ impl<S: HugrNode> ExtractionResult<S> for HashMap<S, Node> {
 }
 
 /// A graph of a flat region of a Hugr, including ordering constraints from nonlocal edges
-#[derive(Clone, Debug)]
 pub struct SchedulingGraph<'a, V: HugrView + ?Sized + 'a> {
     graph: SynEdgeWrapper<portgraph::view::FlatRegion<'a, V::RegionPortgraph<'a>>>,
     node_map: V::RegionPortgraphNodes,
     region_parent: V::Node,
+}
+
+impl <'a, V: HugrView + ?Sized + 'a> Clone for SchedulingGraph<'a, V> {
+    fn clone(&self) -> Self {
+        Self {
+            graph: self.graph.clone(),
+            node_map: self.node_map.clone(),
+            region_parent: self.region_parent,
+        }
+    }
 }
 
 impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
