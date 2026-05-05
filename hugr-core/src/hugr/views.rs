@@ -33,7 +33,8 @@ use portgraph::{LinkView, PortView};
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::PortgraphNodeMap;
-use crate::hugr::views::syn_edge::SynEdgeWrapper;
+// Have to re-export as we are returning from fn petgraph()
+pub use crate::hugr::views::syn_edge::SynEdgeWrapper;
 use crate::metadata::{Metadata, RawMetadataValue};
 use crate::ops::{OpParent, OpTag, OpTrait, OpType, handle::NodeHandle};
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
@@ -632,12 +633,7 @@ impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
     /// Access to the graph, sufficient to allow [pv::Topo]
     pub fn petgraph(
         &self,
-    ) -> impl pv::NodeCount
-    + pv::IntoNodeIdentifiers
-    + pv::IntoEdgeReferences
-    + pv::IntoNeighborsDirected
-    + pv::Visitable<NodeId = portgraph::NodeIndex, Map: Clone>
-    + Clone {
+    ) -> &SynEdgeWrapper<portgraph::view::FlatRegion<'a, V::RegionPortgraph<'a>>> {
         &self.graph
     }
 }

@@ -18,7 +18,7 @@ pub enum MaybeSynEdge<T> {
 
 /// Wrapper for a [LinkView] that implements petgraph traits and adds some extra edges.
 #[derive(Clone, Debug)]
-pub(super) struct SynEdgeWrapper<T: LinkView> {
+pub struct SynEdgeWrapper<T: LinkView> {
     pub(super) region_view: T,
     #[allow(clippy::type_complexity)]
     pub(super) syn_edges: Vec<(NIdx<T::NodeIndexBase>, NIdx<T::NodeIndexBase>)>,
