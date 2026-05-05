@@ -19,8 +19,8 @@ alloca_block:
   %"06" = alloca i1, align 1
   %"20_0" = alloca i1, align 1
   %"25_0" = alloca i1, align 1
-  %"39_0" = alloca i1, align 1
-  %"44_0" = alloca i1, align 1
+  %"35_0" = alloca i1, align 1
+  %"40_0" = alloca i1, align 1
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
@@ -41,33 +41,33 @@ entry_block:                                      ; preds = %alloca_block
   br label %8
 
 3:                                                ; preds = %19
-  store i1 true, ptr %"39_0", align 1
+  store i1 true, ptr %"35_0", align 1
   %"5_025" = load {}, ptr %"5_0", align 1
-  %"39_026" = load i1, ptr %"39_0", align 1
+  %"35_026" = load i1, ptr %"35_0", align 1
   store {} %"5_025", ptr %"5_0", align 1
-  store i1 %"39_026", ptr %"39_0", align 1
+  store i1 %"35_026", ptr %"35_0", align 1
   %"5_027" = load {}, ptr %"5_0", align 1
-  %"39_028" = load i1, ptr %"39_0", align 1
+  %"35_028" = load i1, ptr %"35_0", align 1
   switch i1 false, label %4 [
   ]
 
 4:                                                ; preds = %3
-  store i1 %"39_028", ptr %"03", align 1
+  store i1 %"35_028", ptr %"03", align 1
   br label %7
 
 5:                                                ; preds = %20
-  store i1 false, ptr %"44_0", align 1
+  store i1 false, ptr %"40_0", align 1
   %"5_029" = load {}, ptr %"5_0", align 1
-  %"44_030" = load i1, ptr %"44_0", align 1
+  %"40_030" = load i1, ptr %"40_0", align 1
   store {} %"5_029", ptr %"5_0", align 1
-  store i1 %"44_030", ptr %"44_0", align 1
+  store i1 %"40_030", ptr %"40_0", align 1
   %"5_031" = load {}, ptr %"5_0", align 1
-  %"44_032" = load i1, ptr %"44_0", align 1
+  %"40_032" = load i1, ptr %"40_0", align 1
   switch i1 false, label %6 [
   ]
 
 6:                                                ; preds = %5
-  store i1 %"44_032", ptr %"03", align 1
+  store i1 %"40_032", ptr %"03", align 1
   br label %7
 
 7:                                                ; preds = %6, %4
