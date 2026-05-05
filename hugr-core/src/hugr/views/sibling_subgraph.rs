@@ -266,7 +266,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     /// You MUST make sure that the boundary ports and nodes provided satisfy
     /// the SiblingSubgraph validity conditions described in
     /// [`SiblingSubgraph::try_new`] and which can be checked using
-    /// [`SiblingSubgraph::validate`].
+    /// [`SiblingSubgraph::validate_with_checker`] or friends.
     ///
     /// See [`SiblingSubgraph::try_new`] for the full documentation.
     ///
@@ -1033,7 +1033,6 @@ pub type LineConvexChecker<'g, Base> = PortgraphCheckerWithNodes<
 ///
 /// This type is generic over the convexity checker used. If checking convexity
 /// for circuit-like graphs, use [`LineConvexChecker`]. Alternatively, use [SchedGraphChecker].
-/// [`TopoConvexChecker`].
 #[derive(Clone)]
 pub struct PortgraphCheckerWithNodes<'g, Base: HugrView, Checker> {
     /// The base HUGR to check convexity on.
