@@ -331,29 +331,6 @@ mod test {
         Ok(())
     }
 
-    /*#[test]
-    #[ignore] // https://github.com/Quantinuum/hugr/issues/2828
-    fn simple_alias() -> Result<(), BuildError> {
-        let build_result = {
-            let mut module_builder = ModuleBuilder::new();
-
-            let qubit_state_type =
-                module_builder.add_alias_declare("qubit_state", TypeBound::Linear)?;
-
-            let f_build = module_builder.define_function(
-                "main",
-                Signature::new(
-                    vec![qubit_state_type.get_alias_type()],
-                    vec![qubit_state_type.get_alias_type()],
-                ),
-            )?;
-            n_identity(f_build)?;
-            module_builder.finish_hugr()
-        };
-        assert_matches!(build_result, Ok(_));
-        Ok(())
-    }*/
-
     #[test]
     fn builder_from_existing() -> Result<(), BuildError> {
         let hugr = Hugr::new();
