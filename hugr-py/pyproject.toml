@@ -1,10 +1,10 @@
 [project]
 name = "hugr"
-version = "0.15.5"
+version = "0.16.0"
 requires-python = ">=3.10"
 description = "Quantinuum's common representation for quantum programs"
 license = { file = "LICENCE" }
-readme = "README.md"
+readme = "package.md"
 authors = [
     { name = "TKET development team", email = "tket-support@quantinuum.com" },
 ]

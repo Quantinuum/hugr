@@ -1,11 +1,11 @@
 //! Rewrite to inline a Call to a `FuncDefn` by copying the body of the function
 //! into a DFG which replaces the Call node.
-use derive_more::{Display, Error};
-
 use crate::core::HugrNode;
-use crate::ops::{DFG, DataflowParent, OpType};
+use crate::ops::{DFG, OpType};
 use crate::types::Substitution;
 use crate::{Direction, HugrView, Node};
+use derive_more::{Display, Error};
+use itertools::Itertools;
 
 use super::{HugrMut, PatchHugrMut, PatchVerification};
 
@@ -58,8 +58,10 @@ impl<N: HugrNode> PatchVerification for InlineCall<N> {
 }
 
 impl<N: HugrNode> PatchHugrMut for InlineCall<N> {
-    type Outcome = ();
-    fn apply_hugr_mut(self, h: &mut impl HugrMut<Node = N>) -> Result<(), Self::Error> {
+    /// The new nodes inserted into the Hugr on success
+    type Outcome = Vec<N>;
+
+    fn apply_hugr_mut(self, h: &mut impl HugrMut<Node = N>) -> Result<Self::Outcome, Self::Error> {
         self.verify(h)?; // Now we know we have a Call to a FuncDefn.
         let orig_func = h.static_source(self.0).unwrap();
 
@@ -71,22 +73,20 @@ impl<N: HugrNode> PatchHugrMut for InlineCall<N> {
         let order_preds = h.linked_outputs(self.0, old_order_in).collect::<Vec<_>>();
         h.disconnect(self.0, old_order_in); // PortGraph currently does this anyway
 
+        let ty_args = h.get_optype(self.0).as_call().unwrap().type_args.clone();
+
         let new_op = OpType::from(DFG {
             signature: h
                 .get_optype(orig_func)
                 .as_func_defn()
                 .unwrap()
-                .inner_signature()
-                .into_owned(),
+                .signature()
+                .instantiate(&ty_args)
+                .unwrap(),
         });
         let new_order_in = new_op.other_input_port().unwrap();
 
-        let ty_args = h
-            .replace_op(self.0, new_op)
-            .as_call()
-            .unwrap()
-            .type_args
-            .clone();
+        h.replace_op(self.0, new_op);
 
         h.add_ports(self.0, Direction::Incoming, -1);
 
@@ -95,12 +95,12 @@ impl<N: HugrNode> PatchHugrMut for InlineCall<N> {
             h.connect(src, srcp, self.0, new_order_in);
         }
 
-        h.copy_descendants(
+        let mapped_nodes = h.copy_descendants(
             orig_func,
             self.0,
             (!ty_args.is_empty()).then_some(Substitution::new(&ty_args)),
         );
-        Ok(())
+        Ok(mapped_nodes.into_values().collect_vec())
     }
 
     /// Failure only occurs if the node is not a Call, or the target not a `FuncDefn`.
@@ -112,8 +112,6 @@ impl<N: HugrNode> PatchHugrMut for InlineCall<N> {
 mod test {
     use std::iter::successors;
 
-    use itertools::Itertools;
-
     use crate::builder::{
         Container, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder, HugrBuilder,
         ModuleBuilder,
@@ -124,6 +122,7 @@ mod test {
     use crate::ops::{Input, OpType, Value};
     use crate::std_extensions::arithmetic::int_types::INT_TYPES;
     use crate::std_extensions::arithmetic::{int_ops::IntOpDef, int_types::ConstInt};
+    use itertools::Itertools;
 
     use crate::types::{PolyFuncType, Signature, Type, TypeBound};
     use crate::{HugrView, Node};
@@ -179,7 +178,7 @@ mod test {
             .count(),
             1
         );
-        hugr.apply_patch(InlineCall(call1.node())).unwrap();
+        let new_nodes = hugr.apply_patch(InlineCall(call1.node())).unwrap();
         hugr.validate().unwrap();
         assert_eq!(hugr.output_neighbours(func.node()).collect_vec(), [call2]);
         assert_eq!(calls(&hugr), [call2]);
@@ -192,11 +191,15 @@ mod test {
             .count(),
             1
         );
-        hugr.apply_patch(InlineCall(call2.node())).unwrap();
+        // Expect the direct function children, plus an input/output node, and a wrapping DFG
+        let expected_new_nodes = hugr.children(func.node()).collect_vec().len() + 3;
+        assert_eq!(new_nodes.len(), expected_new_nodes);
+        let new_nodes_2 = hugr.apply_patch(InlineCall(call2.node())).unwrap();
         hugr.validate().unwrap();
         assert_eq!(hugr.output_neighbours(func.node()).next(), None);
         assert_eq!(calls(&hugr), []);
         assert_eq!(extension_ops(&hugr).len(), 3);
+        assert_eq!(new_nodes_2.len(), expected_new_nodes);
 
         Ok(())
     }
@@ -312,7 +315,10 @@ mod test {
             hugr.output_neighbours(helper.node()).collect::<Vec<_>>(),
             [call1.node(), call2.node()]
         );
+        let call1_sig = hugr.signature(call1.node()).unwrap().into_owned();
         hugr.apply_patch(InlineCall::new(call1.node()))?;
+        hugr.validate().unwrap();
+        assert_eq!(hugr.signature(call1.node()).unwrap().as_ref(), &call1_sig);
 
         assert_eq!(
             hugr.output_neighbours(helper.node()).collect::<Vec<_>>(),

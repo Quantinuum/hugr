@@ -159,7 +159,7 @@ def test_type_resolution(typ: tys.Type, extensions: list[ext.Extension]) -> None
 
     test_registry = ext.ExtensionRegistry()
     for extension in extensions:
-        test_registry.add_extension(extension)
+        test_registry.register(extension)
     _, result = typ._resolve_used_extensions(test_registry)
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
@@ -202,7 +202,7 @@ def test_type_arg_resolution(arg: tys.TypeArg, extensions: list[ext.Extension]) 
 
     test_registry = ext.ExtensionRegistry()
     for extension in extensions:
-        test_registry.add_extension(extension)
+        test_registry.register(extension)
     _, result = arg._resolve_used_extensions(test_registry)
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
@@ -239,7 +239,7 @@ def test_type_param_resolution(
 
     test_registry = ext.ExtensionRegistry()
     for extension in extensions:
-        test_registry.add_extension(extension)
+        test_registry.register(extension)
     _, result = param._resolve_used_extensions(test_registry)
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
@@ -292,7 +292,7 @@ def test_op_resolution(op: ops.Op, extensions: list[ext.Extension]) -> None:
 
     test_ext_registry = ext.ExtensionRegistry()
     for extension in extensions:
-        test_ext_registry.add_extension(extension)
+        test_ext_registry.register(extension)
     _, result = op._resolve_used_extensions(test_ext_registry)
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
@@ -322,7 +322,7 @@ def test_value_resolution(value: val.Value, extensions: list[ext.Extension]) -> 
     # Reset the value for the second test by creating a fresh copy
     test_ext_registry = ext.ExtensionRegistry()
     for extension in extensions:
-        test_ext_registry.add_extension(extension)
+        test_ext_registry.register(extension)
     result = value._resolve_used_extensions_inplace(test_ext_registry)
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
@@ -341,7 +341,7 @@ def test_hugr_with_opaque_type_resolve() -> None:
 
     # With resolve_from, should work
     test_ext_registry = ext.ExtensionRegistry()
-    test_ext_registry.add_extension(TEST_EXT)
+    test_ext_registry.register(TEST_EXT)
     exts = h.hugr.used_extensions(resolve_from=test_ext_registry)
     assert TEST_EXT.name in exts.used_extensions.ids()
 

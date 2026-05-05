@@ -170,13 +170,15 @@ mod test {
         builder::Dataflow,
         std_extensions::arithmetic::float_types::{ConstF64, float64_type},
     };
+    use itertools::Itertools;
     use rstest::rstest;
+    use std::fmt::Debug;
 
     use super::add_float_extensions;
     use crate::{
         check_emission,
         emit::test::SimpleHugrConfig,
-        test::{TestContext, llvm_ctx},
+        test::{TestContext, exec_ctx, llvm_ctx},
     };
 
     fn test_float_op(op: FloatOps) -> Hugr {
@@ -232,5 +234,51 @@ mod test {
         let hugr = test_float_op(op);
         llvm_ctx.add_extensions(add_float_extensions);
         check_emission!(name, hugr, llvm_ctx);
+    }
+
+    #[rstest]
+    #[case::feq_true(FloatOps::feq, &[0.1, 0.1], true)]
+    #[case::feq_false(FloatOps::feq, &[0.1, 0.2], false)]
+    #[case::fne_true(FloatOps::fne, &[0.1, 0.2], true)]
+    #[case::fne_false(FloatOps::fne, &[0.1, 0.1], false)]
+    #[case::flt_true(FloatOps::flt, &[0.1, 0.2], true)]
+    #[case::flt_false(FloatOps::flt, &[0.1, 0.1], false)]
+    #[case::fgt_true(FloatOps::fgt, &[0.2, 0.1], true)]
+    #[case::fgt_false(FloatOps::fgt, &[0.1, 0.1], false)]
+    #[case::fle_true(FloatOps::fle, &[0.1, 0.1], true)]
+    #[case::fle_false(FloatOps::fle, &[0.2, 0.1], false)]
+    #[case::fge_true(FloatOps::fge, &[0.1, 0.1], true)]
+    #[case::fge_false(FloatOps::fge, &[0.1, 0.2], false)]
+    #[case::fadd(FloatOps::fadd, &[0.1, 0.2], 0.30000000000000004)]
+    #[case::fsub(FloatOps::fsub, &[1., 2.], -1.)]
+    #[case::fneg(FloatOps::fneg, &[42.42], -42.42)]
+    #[case::fmul(FloatOps::fmul, &[2., 3.], 6.)]
+    #[case::fdiv(FloatOps::fdiv, &[7., 2.], 3.5)]
+    #[case::fpow(FloatOps::fpow, &[0.5, 3.], 0.125)]
+    #[case::fround(FloatOps::fround, &[42.42], 42.)]
+    fn float_operations_exec_f64<T: PartialEq + Debug>(
+        mut exec_ctx: TestContext,
+        #[case] op: FloatOps,
+        #[case] inputs: &[f64],
+        #[case] expected: T,
+    ) {
+        let SignatureFunc::PolyFuncType(poly_sig) = op.signature() else {
+            panic!("Expected PolyFuncType");
+        };
+        let out: TypeRow = poly_sig.body().output.clone().try_into().unwrap();
+
+        let hugr = SimpleHugrConfig::new()
+            .with_outs(out)
+            .with_extensions(STD_REG.to_owned())
+            .finish(|mut builder| {
+                let inp = inputs
+                    .iter()
+                    .map(|&f| builder.add_load_value(ConstF64::new(f)))
+                    .collect_vec();
+                let outputs = builder.add_dataflow_op(op, inp).unwrap().outputs();
+                builder.finish_hugr_with_outputs(outputs).unwrap()
+            });
+        exec_ctx.add_extensions(add_float_extensions);
+        assert_eq!(expected, exec_ctx.exec_hugr::<T>(hugr, "main"))
     }
 }

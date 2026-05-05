@@ -53,7 +53,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -82,7 +82,7 @@ jobs:
       checks: write
     steps:
       - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install LLVM and Clang
@@ -114,7 +114,7 @@ jobs:
     name: tests (Rust stable, no features)
     steps:
       - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -136,7 +136,7 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -154,6 +154,10 @@ jobs:
         run: cargo nextest r --verbose --no-run --all-features
       - name: Tests with all features
         run: cargo nextest r --verbose --all-features
+      - name: Run doctests
+        run: cargo test --doc --workspace --all-features --exclude hugr-py
+        env:
+          RUSTDOCFLAGS: "-Dwarnings"
       - name: Build hugr-llvm
         if: ${{ needs.changes.outputs.llvm == 'true'}}
         run: cargo nextest r -p hugr-llvm --verbose --features llvm${{ env.LLVM_FEATURE_NAME }} --no-run
@@ -183,7 +187,7 @@ jobs:
     name: tests (Rust ${{ matrix.rust }})
     steps:
       - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -220,7 +224,7 @@ jobs:
     name: tests (Rust MSRV, min dependencies)
     steps:
       - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install MSRV toolchain
         id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -303,7 +307,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install CapnProto
@@ -335,7 +339,7 @@ jobs:
     name: tests (Rust nightly, coverage)
     steps:
       - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.9
+      - uses: mozilla-actions/sccache-action@v0.0.10
       - uses: dtolnay/rust-toolchain@master
         with:
           # Nightly is required to count doctests coverage
@@ -367,7 +371,7 @@ jobs:
       - name: Generate coverage report
         run: cargo llvm-cov --all-features report --codecov --output-path coverage.json
       - name: Upload coverage to codecov.io
-        uses: codecov/codecov-action@v5
+        uses: codecov/codecov-action@v6
         with:
           files: coverage.json
           name: rust
