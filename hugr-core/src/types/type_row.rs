@@ -12,7 +12,7 @@ use crate::{
     extension::SignatureError,
     types::{
         TypeBound,
-        type_param::{TermTypeError, check_term_type},
+        type_param::{TermTypeError, check_term_kind},
     },
     utils::display_list,
 };
@@ -249,7 +249,7 @@ impl FromIterator<Type> for TypeRow {
 /// Row of types and/or row variables, the number of actual types is thus
 /// unknown. Used for opdef signatures, and types of runtime function pointers.
 ///
-/// A [Term] that `check_term_type`s against [Term::ListKind] of [Term::TypeKind]
+/// A [Term] that `check_term_kind`s against [Term::ListKind] of [Term::TypeKind]
 /// (of a [TypeBound]), i.e. one of
 /// * A [Term::Variable] of type [Term::ListKind] (of [Term::TypeKind]...)
 /// * A [Term::List], each of whose elements is of type some [Term::TypeKind]
@@ -290,7 +290,7 @@ impl TypeRowLike for TypeRowRV {
     /// Checks that this is indeed a list of runtime types;
     /// and that all variables are as declared in the supplied list of params.
     fn validate(&self, vars: &[TypeParam]) -> Result<(), SignatureError> {
-        check_term_type(&self.0, &Term::new_list_type(TypeBound::Linear))?;
+        check_term_kind(&self.0, &Term::new_list_type(TypeBound::Linear))?;
         self.0.validate(vars)
     }
 
@@ -345,7 +345,7 @@ impl TryFrom<Term> for TypeRowRV {
     type Error = TermTypeError;
 
     fn try_from(t: Term) -> Result<Self, Self::Error> {
-        check_term_type(&t, &Term::new_list_type(TypeBound::Linear))?;
+        check_term_kind(&t, &Term::new_list_type(TypeBound::Linear))?;
         Ok(Self(t))
     }
 }

@@ -65,7 +65,7 @@ pub type TypeParam = Term;
 ///
 /// Terms are used for both parameter declarations and arguments fitting those
 /// parameters, e.g. a [Term::FloatKind] parameter would be instantiated (statically)
-/// with a [Term::Float] argument. [`check_term_type`] checks that an argument
+/// with a [Term::Float] argument. [`check_term_kind`] checks that an argument
 /// is valid (of the correct kind) for the parameter.
 // TODO it might be good to have a separate function that tells, for a given Term,
 // whether there is *any* valid argument; we could then rule out using as parameters
@@ -425,7 +425,7 @@ impl Term {
     /// Checks variables are as declared and [CustomType] arguments fit their parameters.
     /// Does not check that e.g. list elements all have same type (except inside a
     /// [CustomType] where we know the element type from the corresponding list parameter)
-    /// - this is left to [check_term_type].
+    /// - this is left to [check_term_kind].
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
             Term::SumType(SumType::General { rows }) => {
@@ -700,7 +700,7 @@ impl TermVar {
     /// Check that the cached declaration of this variable matches the actual one (provided).
     ///
     /// The cache just mirrors the declaration; the typevar can be used anywhere expecting
-    /// a kind containing the decl - see [check_term_type] / [Term::is_supertype].
+    /// a kind containing the decl - see [check_term_kind] / [Term::is_supertype].
     fn check_decl(&self, decls: &[TypeParam]) -> Result<(), SignatureError> {
         let idx = self.idx;
         let cached_decl: &TypeParam = &self.cached_decl;
@@ -724,7 +724,7 @@ impl TermVar {
 }
 
 /// Checks that a [`Term`] is valid for a given type.
-pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
+pub fn check_term_kind(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
     match (term, type_) {
         (Term::Variable(TermVar { cached_decl, .. }), _) if type_.is_supertype(cached_decl) => {
             Ok(())
@@ -734,10 +734,10 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
         (Term::ExtensionType(cty), Term::TypeKind(bound)) if bound.contains(cty.bound()) => Ok(()),
         (Term::List(elems), Term::ListKind(item_type)) => elems
             .iter()
-            .try_for_each(|elem| check_term_type(elem, item_type)),
+            .try_for_each(|elem| check_term_kind(elem, item_type)),
         (Term::ListConcat(lists), Term::ListKind(_)) => lists
             .iter()
-            .try_for_each(|list| check_term_type(list, type_)),
+            .try_for_each(|list| check_term_kind(list, type_)),
         (TypeArg::Tuple(_) | TypeArg::TupleConcat(_), TypeParam::TupleKind(item_types)) => {
             let term_parts: Vec<_> = term.clone().into_tuple_parts().collect();
             let type_parts: Vec<_> = item_types.clone().into_list_parts().collect();
@@ -745,7 +745,7 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
             for (term, type_) in term_parts.iter().zip(&type_parts) {
                 match (term, type_) {
                     (SeqPart::Item(term), SeqPart::Item(type_)) => {
-                        check_term_type(term, type_)?;
+                        check_term_kind(term, type_)?;
                     }
                     (_, SeqPart::Splice(_)) | (SeqPart::Splice(_), _) => {
                         // TODO: Checking tuples with splicing requires more
@@ -791,12 +791,12 @@ pub fn check_term_type(term: &Term, type_: &Term) -> Result<(), TermTypeError> {
 }
 
 /// Check a list of [`Term`]s is valid for a list of types.
-pub fn check_term_types(terms: &[Term], types: &[Term]) -> Result<(), TermTypeError> {
+pub fn check_term_kinds(terms: &[Term], types: &[Term]) -> Result<(), TermTypeError> {
     if terms.len() != types.len() {
         return Err(TermTypeError::WrongNumberArgs(terms.len(), types.len()));
     }
     for (term, type_) in terms.iter().zip(types.iter()) {
-        check_term_type(term, type_)?;
+        check_term_kind(term, type_)?;
     }
     Ok(())
 }
@@ -911,7 +911,7 @@ impl FusedIterator for TuplePartIter {}
 
 #[cfg(test)]
 mod test {
-    use super::{Substitution, TypeArg, TypeParam, check_term_type};
+    use super::{Substitution, TypeArg, TypeParam, check_term_kind};
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::types::type_param::SeqPart;
     use crate::types::{Term, Type, TypeBound, TypeRow, type_param::TermTypeError};
@@ -977,13 +977,13 @@ mod test {
     fn type_arg_fits_param() {
         let rowvar = Term::new_row_var_use;
         fn check(arg: impl Into<TypeArg>, param: &TypeParam) -> Result<(), TermTypeError> {
-            check_term_type(&arg.into(), param)
+            check_term_kind(&arg.into(), param)
         }
         fn check_seq<T: Clone + Into<TypeArg>>(
             args: &[T],
             param: &TypeParam,
         ) -> Result<(), TermTypeError> {
-            check_term_type(&Term::new_list(args.to_vec()), param)
+            check_term_kind(&Term::new_list(args.to_vec()), param)
         }
         // Simple cases: Term::XXXTypes are Term::TypeKind's
         check(usize_t(), &TypeBound::Copyable.into()).unwrap();
@@ -1069,7 +1069,7 @@ mod test {
     fn type_arg_subst_row() {
         let row_param = Term::new_list_type(TypeBound::Copyable);
         let row_arg: Term = Term::new_list([bool_t(), Type::UNIT]);
-        check_term_type(&row_arg, &row_param).unwrap();
+        check_term_kind(&row_arg, &row_param).unwrap();
 
         // Now say a row variable referring to *that* row was used
         // to instantiate an outer "row parameter" (list of type).
@@ -1078,7 +1078,7 @@ mod test {
             Term::new_row_var_use(0, TypeBound::Copyable),
             Term::new_list([usize_t()]),
         ]);
-        check_term_type(&outer_arg, &outer_param).unwrap();
+        check_term_kind(&outer_arg, &outer_param).unwrap();
 
         let outer_arg2 = outer_arg.substitute(&Substitution(&[row_arg]));
         assert_eq!(
@@ -1087,7 +1087,7 @@ mod test {
         );
 
         // Of course this is still valid (as substitution is guaranteed to preserve validity)
-        check_term_type(&outer_arg2, &outer_param).unwrap();
+        check_term_kind(&outer_arg2, &outer_param).unwrap();
     }
 
     #[test]
@@ -1101,7 +1101,7 @@ mod test {
             row_var_use.clone(),
             Term::concat_lists([row_var_use, Term::new_list([usize_t()])]),
         ]);
-        check_term_type(&good_arg, &outer_param).unwrap();
+        check_term_kind(&good_arg, &outer_param).unwrap();
 
         // Outer list cannot include single types:
         let Term::List(mut elems) = good_arg.clone() else {
@@ -1110,7 +1110,7 @@ mod test {
         let t: Term = usize_t().into();
         elems.push(t);
         assert_eq!(
-            check_term_type(&Term::new_list(elems), &outer_param),
+            check_term_kind(&Term::new_list(elems), &outer_param),
             Err(TermTypeError::TypeMismatch {
                 term: Box::new(usize_t().into()),
                 // The error reports the type expected for each element of the list:
@@ -1120,9 +1120,9 @@ mod test {
 
         // Now substitute a list of two types for that row-variable
         let row_var_arg = Term::new_list([usize_t(), bool_t()]);
-        check_term_type(&row_var_arg, &row_var_decl).unwrap();
+        check_term_kind(&row_var_arg, &row_var_decl).unwrap();
         let subst_arg = good_arg.substitute(&Substitution(std::slice::from_ref(&row_var_arg)));
-        check_term_type(&subst_arg, &outer_param).unwrap(); // invariance of substitution
+        check_term_kind(&subst_arg, &outer_param).unwrap(); // invariance of substitution
         assert_eq!(
             subst_arg,
             Term::new_list([

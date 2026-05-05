@@ -15,7 +15,7 @@ use crate::Hugr;
 use crate::envelope::serde_with::AsBinaryEnvelope;
 use crate::ops::{OpName, OpNameRef};
 use crate::package::Package;
-use crate::types::type_param::{TypeArg, TypeParam, check_term_types};
+use crate::types::type_param::{TypeArg, TypeParam, check_term_kinds};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
 mod serialize_signature_func;
 
@@ -254,7 +254,7 @@ impl SignatureFunc {
                 let static_params = func.static_params();
                 let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
 
-                check_term_types(static_args, static_params)?;
+                check_term_kinds(static_args, static_params)?;
                 temp = func.compute_signature(static_args, def)?;
                 (&temp, other_args)
             }
@@ -406,7 +406,7 @@ impl OpDef {
                 let (static_args, other_args) =
                     args.split_at(min(custom.static_params().len(), args.len()));
                 static_args.iter().try_for_each(|ta| ta.validate(&[]))?;
-                check_term_types(static_args, custom.static_params())?;
+                check_term_kinds(static_args, custom.static_params())?;
                 temp = custom.compute_signature(static_args, self)?;
                 (&temp, other_args)
             }
@@ -416,7 +416,7 @@ impl OpDef {
             }
         };
         args.iter().try_for_each(|ta| ta.validate(var_decls))?;
-        check_term_types(args, pf.params())?;
+        check_term_kinds(args, pf.params())?;
         Ok(())
     }
 

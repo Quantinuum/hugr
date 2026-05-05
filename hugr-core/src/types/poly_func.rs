@@ -11,7 +11,7 @@ use crate::{
 
 use super::Substitution;
 use super::signature::FuncTypeBase;
-use super::type_param::{TypeArg, TypeParam, check_term_types};
+use super::type_param::{TypeArg, TypeParam, check_term_kinds};
 
 /// A polymorphic type scheme, i.e. of a [`FuncDecl`], [`FuncDefn`] or [`OpDef`].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -130,7 +130,7 @@ impl<T: TypeRowLike> PolyFuncTypeBase<T> {
     pub fn instantiate(&self, args: &[TypeArg]) -> Result<FuncTypeBase<T>, SignatureError> {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
-        check_term_types(args, &self.params)?;
+        check_term_kinds(args, &self.params)?;
         Ok(self.body.substitute(&Substitution(args)))
     }
 
