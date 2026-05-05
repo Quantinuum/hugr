@@ -31,6 +31,14 @@ fn roundtrip(source: &str) -> Result<String> {
     Ok(exported_ast.to_string())
 }
 
+/// Ensure a fixture edn represents a valid HUGR.
+fn validate_fixture(mut source: String) -> Result<()> {
+    source.insert_str(0, "HUGRiHJv(@");
+    let package = Package::load_str(source, None)?;
+    package.validate()?;
+    Ok(())
+}
+
 macro_rules! test_roundtrip {
     ($name: ident, $file: expr) => {
         #[test]
@@ -128,4 +136,15 @@ fn import_package_with_extensions(#[case] format: EnvelopeFormat, simple_dfg_hug
     assert_eq!(read_ext.name(), &"miniquantum".try_into().unwrap());
 
     assert_eq!(package, loaded_pkg);
+}
+
+/// Check that the fixtures in `hugr-model` are valid HUGR packages.
+#[rstest]
+#[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+pub fn test_fixtures_validate(
+    #[files("../hugr-model/tests/fixtures/*.edn")]
+    #[mode = str]
+    source: &str,
+) -> Result<()> {
+    validate_fixture(source.to_string())
 }
