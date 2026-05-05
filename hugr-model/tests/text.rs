@@ -1,8 +1,16 @@
 #![allow(missing_docs)]
 
+use hugr_core::package::Package;
 use hugr_model::v0::ast;
 use rstest::rstest;
 use std::str::FromStr as _;
+
+fn validate_hugr(mut source: String) -> Result<(), anyhow::Error> {
+    source.insert_str(0, "HUGRiHJv(@");
+    let pkg = Package::load_str(source, None)?;
+    pkg.validate()?;
+    Ok(())
+}
 
 fn roundtrip(source: &str) -> String {
     let package = ast::Package::from_str(source).unwrap();
@@ -15,7 +23,8 @@ pub fn test_roundtrip(
     #[files("tests/fixtures/*.edn")]
     #[mode = str]
     expected: &str,
-) {
+) -> Result<(), anyhow::Error> {
+    validate_hugr(expected.to_string())?;
     let actual = roundtrip(expected);
     // Trim whitespace from the strings to compare them
     let expected_trim = expected
@@ -25,4 +34,5 @@ pub fn test_roundtrip(
         .split_whitespace()
         .fold(String::new(), |acc, s| acc + s);
     assert_eq!(expected_trim, actual_trim);
+    Ok(())
 }

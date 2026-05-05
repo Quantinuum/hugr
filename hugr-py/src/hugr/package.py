@@ -239,10 +239,10 @@ class Package:
         for pkg in other:
             modules.extend(pkg.modules)
             for new_ext in pkg.extensions:
-                registry.register_updated(new_ext)
+                registry.register(new_ext)
 
         if len(modules) == 0:
-            return Package([], list(registry.extensions.values()))
+            return Package([], list(registry.all_extensions))
 
         result_module_bytes = modules[0].to_bytes(include_extensions=registry)
         for module in modules[1:]:
@@ -252,7 +252,7 @@ class Package:
 
         return Package(
             [Hugr.from_bytes(result_module_bytes)],
-            list(registry.extensions.values()),
+            list(registry.all_extensions),
         )
 
 

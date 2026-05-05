@@ -4,7 +4,7 @@
 //!
 //! References:
 //! * The full specification for LLVM IR as on the main branch: <https://llvm.org/docs/LangRef.html>.
-//! * The full specification for LLVM IR version for version 14.0: <https://releases.llvm.org/14.0.0/docs/LangRef.html>
+//! * The full specification for LLVM IR version for version 21.1: <https://releases.llvm.org/21.1.0/docs/LangRef.html>
 //! * The documentation for the [inkwell] crate <https://thedan64.github.io/inkwell/inkwell/index.html>
 //!
 //! LLVM offers a stable C interface to most of it's functionality. These

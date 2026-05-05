@@ -829,28 +829,22 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 }
 
-mod hidden {
-    #![expect(deprecated)] // Remove enum along with TopoConvexChecker
-    use super::*;
-    /// Specify the checks to perform for [`SiblingSubgraph::validate`].
-    #[deprecated(
-        note = "Call validate_with_checker or validate_default instead",
-        since = "0.27.1"
-    )]
-    #[derive(Default)]
-    pub enum ValidationMode<'t, 'h, H: HugrView> {
-        /// Check convexity with the given checker.
-        WithChecker(&'t TopoConvexChecker<'h, H>),
-        /// Construct a checker and check convexity.
-        #[default]
-        CheckConvexity,
-        /// Skip convexity check.
-        SkipConvexity,
-    }
+/// Specify the checks to perform for [`SiblingSubgraph::validate`].
+#[allow(deprecated)] // Remove enum along with TopoConvexChecker
+#[deprecated(
+    note = "Call validate_with_checker or validate_default instead",
+    since = "0.27.1"
+)]
+#[derive(Default)]
+pub enum ValidationMode<'t, 'h, H: HugrView> {
+    /// Check convexity with the given checker.
+    WithChecker(&'t TopoConvexChecker<'h, H>),
+    /// Construct a checker and check convexity.
+    #[default]
+    CheckConvexity,
+    /// Skip convexity check.
+    SkipConvexity,
 }
-
-#[expect(deprecated)] // Remove along with TopoConvexChecker
-pub use hidden::ValidationMode;
 
 fn make_pg_subgraph<'h, H: HugrView>(
     region: CheckerRegion<'h, H>,

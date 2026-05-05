@@ -8,6 +8,7 @@ use crate::ops::{ExtensionOp, OpName, OpNameRef};
 use crate::{Extension, ops::OpType, types::TypeArg};
 
 use super::{ExtensionBuildError, ExtensionId, OpDef, SignatureError, op_def::SignatureFunc};
+use crate::ops::custom::qualify_name;
 use delegate::delegate;
 use thiserror::Error;
 
@@ -50,6 +51,12 @@ pub trait MakeOpDef {
 
     /// The ID of the extension this operation is defined in.
     fn extension(&self) -> ExtensionId;
+
+    /// Returns the qualified id of the operation. e.g. 'arithmetic.iadd'.
+    /// See [`MakeOpDef::opdef_id`] for more information.
+    fn qualified_opdef_id(&self) -> OpName {
+        qualify_name(&self.extension(), &self.opdef_id())
+    }
 
     /// Returns a weak reference to the extension this operation is defined in.
     fn extension_ref(&self) -> Weak<Extension>;
@@ -391,6 +398,7 @@ mod test {
             DummyEnum::from_optype(&o.clone().to_extension_op().unwrap().into()).unwrap(),
             o
         );
+        assert_eq!(format!("{EXT_ID}.Dumb"), o.qualified_opdef_id());
         let registered: RegisteredOp<_> = o.clone().into();
         assert_eq!(registered.to_inner(), o);
 
