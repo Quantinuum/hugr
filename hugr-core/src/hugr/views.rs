@@ -567,6 +567,7 @@ impl<S: HugrNode> ExtractionResult<S> for HashMap<S, Node> {
 }
 
 /// A graph of a flat region of a Hugr, including ordering constraints from nonlocal edges
+#[derive(Clone, Debug)]
 pub struct SchedulingGraph<'a, V: HugrView + ?Sized + 'a> {
     graph: SynEdgeWrapper<portgraph::view::FlatRegion<'a, V::RegionPortgraph<'a>>>,
     node_map: V::RegionPortgraphNodes,
@@ -626,7 +627,8 @@ impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
     + pv::IntoNodeIdentifiers
     + pv::IntoEdgeReferences
     + pv::IntoNeighborsDirected
-    + pv::Visitable<NodeId = portgraph::NodeIndex, Map: Clone> {
+    + pv::Visitable<NodeId = portgraph::NodeIndex, Map: Clone>
+    + Clone {
         &self.graph
     }
 }
