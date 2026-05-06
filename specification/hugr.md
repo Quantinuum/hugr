@@ -300,7 +300,9 @@ flowchart
 
 In a dataflow graph, the evaluation semantics are simple: all nodes in
 the graph are necessarily evaluated, in some order (perhaps parallel)
-respecting the Dataflow and Order edges. This may include interleaving/overlapping evaluation of siblings and descendants as long as said edges are respected.
+respecting the Dataflow and Order edges. This may include interleaving or
+overlapping evaluation of siblings and descendants as long as said edges
+are respected.
 
 The following operations are used to
 express control flow, i.e. conditional or repeated evaluation.
@@ -409,7 +411,7 @@ flowchart TB
 (control-flow-graphs)=
 #### Control Flow Graphs
 
-When Conditional and `TailLoop` are not sufficient, the HUGR allows
+When `Conditional` and `TailLoop` are not sufficient, the HUGR allows
 arbitrarily-complex (even irreducible) control flow via an explicit `CFG` node:
 a dataflow node defined by a child control sibling graph. This sibling
 graph contains `BasicBlock` nodes (and [scoped definitions](#scoped-definitions)),
