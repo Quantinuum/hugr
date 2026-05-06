@@ -300,13 +300,10 @@ flowchart
 
 In a dataflow graph, the evaluation semantics are simple: all nodes in
 the graph are necessarily evaluated, in some order (perhaps parallel)
-respecting the Dataflow edges.** The following operations are used to
-express control flow, i.e. conditional or repeated evaluation.
+respecting the Dataflow and Order edges. This may include interleaving/overlapping evaluation of siblings and descendants as long as said edges are respected.
 
-**ALAN this might be a place to either say, and respecting the ordering
-constraints imposed by nonlocal edges (source before ancestor of target?)
-or to say descendant nodes may be *interleaved* with siblings (obvs. respecting
-Dataflow edges).
+The following operations are used to
+express control flow, i.e. conditional or repeated evaluation.
 
 #### `Conditional` nodes
 

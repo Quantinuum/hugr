@@ -187,7 +187,7 @@ def test_build_nested(snapshot):
 
 def test_build_inter_graph(snapshot):
     # Possibly a bit redundant now, really we're just testing that we *don't* do
-    # anything special anymore, following https://github.com/Quantinuum/hugr/pulls/2951.
+    # anything special anymore, following https://github.com/Quantinuum/hugr/pull/2951.
     h = Dfg(tys.Bool, tys.Bool)
     (a, b) = h.inputs()
     with h.add_nested() as nested:
