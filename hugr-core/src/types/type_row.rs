@@ -12,7 +12,7 @@ use crate::{
     extension::SignatureError,
     types::{
         TypeBound,
-        type_param::{TermTypeError, check_term_kind},
+        type_param::{TermKindError, check_term_kind},
     },
     utils::display_list,
 };
@@ -165,7 +165,7 @@ impl From<Vec<Type>> for TypeRow {
 }
 
 impl TryFrom<Vec<Term>> for TypeRow {
-    type Error = TermTypeError;
+    type Error = TermKindError;
 
     fn try_from(value: Vec<Term>) -> Result<Self, Self::Error> {
         value
@@ -206,7 +206,7 @@ impl PartialEq<Term> for TypeRow {
 ///
 /// This will fail if `arg` is not a [Term::List] or any of the elements are not [Type]s
 impl TryFrom<Term> for TypeRow {
-    type Error = TermTypeError;
+    type Error = TermKindError;
 
     fn try_from(value: Term) -> Result<Self, Self::Error> {
         match value {
@@ -215,7 +215,7 @@ impl TryFrom<Term> for TypeRow {
                 .map(Type::try_from)
                 .collect::<Result<Vec<_>, _>>()?
                 .into()),
-            v => Err(TermTypeError::InvalidValue(Box::new(v))),
+            v => Err(TermKindError::InvalidValue(Box::new(v))),
         }
     }
 }
@@ -301,7 +301,7 @@ impl TypeRowLike for TypeRowRV {
 }
 
 impl TryFrom<TypeRowRV> for TypeRow {
-    type Error = TermTypeError;
+    type Error = TermKindError;
 
     fn try_from(value: TypeRowRV) -> Result<Self, Self::Error> {
         value.0.try_into()
@@ -342,7 +342,7 @@ impl std::ops::Deref for TypeRowRV {
 }
 
 impl TryFrom<Term> for TypeRowRV {
-    type Error = TermTypeError;
+    type Error = TermKindError;
 
     fn try_from(t: Term) -> Result<Self, Self::Error> {
         check_term_kind(&t, &Term::new_list_kind(TypeBound::Linear))?;

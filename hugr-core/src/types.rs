@@ -12,7 +12,7 @@ use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_term_exts,
 };
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
-use crate::types::type_param::{TermTypeError, check_term_kind};
+use crate::types::type_param::{TermKindError, check_term_kind};
 use crate::utils::display_list_with_separator;
 pub use check::SumTypeError;
 pub use custom::CustomType;
@@ -503,12 +503,12 @@ impl Deref for Type {
 }
 
 impl TryFrom<Term> for Type {
-    type Error = TermTypeError;
+    type Error = TermKindError;
 
-    fn try_from(t: Term) -> Result<Self, TermTypeError> {
+    fn try_from(t: Term) -> Result<Self, TermKindError> {
         match t.least_upper_bound() {
             Some(b) => Ok(Self(t, b)),
-            None => Err(TermTypeError::KindMismatch {
+            None => Err(TermKindError::KindMismatch {
                 term: Box::new(t),
                 type_: Box::new(TypeBound::Linear.into()),
             }),
@@ -608,7 +608,7 @@ pub(crate) mod test {
     use crate::extension::prelude::{option_type, qb_t, usize_t};
     use crate::std_extensions::collections::array::{array_type, array_type_parametric};
     use crate::std_extensions::collections::list::list_type;
-    use crate::types::type_param::TermTypeError;
+    use crate::types::type_param::TermKindError;
     use crate::{Extension, hugr::IdentList, type_row};
 
     #[test]
@@ -783,7 +783,7 @@ pub(crate) mod test {
         let mut t = Type::new_extension(c_of_cpy.clone());
         assert_eq!(
             t.transform(&cpy_to_qb),
-            Err(SignatureError::from(TermTypeError::KindMismatch {
+            Err(SignatureError::from(TermKindError::KindMismatch {
                 type_: Box::new(TypeBound::Copyable.into()),
                 term: Box::new(qb_t().into())
             }))
@@ -795,7 +795,7 @@ pub(crate) mod test {
         );
         assert_eq!(
             t.transform(&cpy_to_qb),
-            Err(SignatureError::from(TermTypeError::KindMismatch {
+            Err(SignatureError::from(TermKindError::KindMismatch {
                 type_: Box::new(TypeBound::Copyable.into()),
                 term: Box::new(mk_opt(qb_t()).into())
             }))

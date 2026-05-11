@@ -613,7 +613,7 @@ pub(super) mod test {
     use crate::ops::OpName;
     use crate::package::Package;
     use crate::std_extensions::collections::list;
-    use crate::types::type_param::{TermTypeError, TypeParam};
+    use crate::types::type_param::{TermKindError, TypeParam};
     use crate::types::{PolyFuncTypeRV, Signature, Term, Type, TypeArg, TypeBound};
     use crate::{Extension, const_extension_ids};
 
@@ -866,7 +866,7 @@ pub(super) mod test {
             assert_eq!(
                 def.compute_signature(std::slice::from_ref(&arg)),
                 Err(SignatureError::TypeArgMismatch(
-                    TermTypeError::KindMismatch {
+                    TermKindError::KindMismatch {
                         type_: Box::new(TypeBound::Linear.into()),
                         term: Box::new(arg),
                     }

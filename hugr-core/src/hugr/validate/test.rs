@@ -22,7 +22,7 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::{self, FuncDecl, FuncDefn, OpType, Value};
 use crate::std_extensions::logic::LogicOp;
 use crate::std_extensions::logic::test::{and_op, or_op};
-use crate::types::type_param::{TermTypeError, TypeArg};
+use crate::types::type_param::{TermKindError, TypeArg};
 use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Term, Type, TypeBound,
     TypeRow, TypeRowRV,
@@ -343,7 +343,7 @@ fn invalid_types() {
     );
     assert_eq!(
         validate_to_sig_error(element_outside_bound),
-        SignatureError::TypeArgMismatch(TermTypeError::KindMismatch {
+        SignatureError::TypeArgMismatch(TermKindError::KindMismatch {
             type_: Box::new(TypeBound::Copyable.into()),
             term: Box::new(valid.into())
         })
@@ -389,7 +389,7 @@ fn invalid_types() {
     );
     assert_eq!(
         validate_to_sig_error(too_many_type_args),
-        SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(2, 1))
+        SignatureError::TypeArgMismatch(TermKindError::WrongNumberArgs(2, 1))
     );
 }
 
