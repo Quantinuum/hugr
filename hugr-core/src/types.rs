@@ -508,7 +508,7 @@ impl TryFrom<Term> for Type {
     fn try_from(t: Term) -> Result<Self, TermTypeError> {
         match t.least_upper_bound() {
             Some(b) => Ok(Self(t, b)),
-            None => Err(TermTypeError::TypeMismatch {
+            None => Err(TermTypeError::KindMismatch {
                 term: Box::new(t),
                 type_: Box::new(TypeBound::Linear.into()),
             }),
@@ -783,7 +783,7 @@ pub(crate) mod test {
         let mut t = Type::new_extension(c_of_cpy.clone());
         assert_eq!(
             t.transform(&cpy_to_qb),
-            Err(SignatureError::from(TermTypeError::TypeMismatch {
+            Err(SignatureError::from(TermTypeError::KindMismatch {
                 type_: Box::new(TypeBound::Copyable.into()),
                 term: Box::new(qb_t().into())
             }))
@@ -795,7 +795,7 @@ pub(crate) mod test {
         );
         assert_eq!(
             t.transform(&cpy_to_qb),
-            Err(SignatureError::from(TermTypeError::TypeMismatch {
+            Err(SignatureError::from(TermTypeError::KindMismatch {
                 type_: Box::new(TypeBound::Copyable.into()),
                 term: Box::new(mk_opt(qb_t()).into())
             }))

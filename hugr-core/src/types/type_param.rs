@@ -785,7 +785,7 @@ pub fn check_term_kind(value: &Term, kind: &Term) -> Result<(), TermTypeError> {
         (Term::TypeKind(_), Term::StaticKind) => Ok(()),
         (Term::ConstKind(_), Term::StaticKind) => Ok(()),
 
-        _ => Err(TermTypeError::TypeMismatch {
+        _ => Err(TermTypeError::KindMismatch {
             term: Box::new(value.clone()),
             type_: Box::new(kind.clone()),
         }),
@@ -808,11 +808,11 @@ pub fn check_term_kinds(terms: &[Term], types: &[Term]) -> Result<(), TermTypeEr
 #[non_exhaustive]
 pub enum TermTypeError {
     #[allow(missing_docs)]
-    /// For now, general case of a term not fitting a type.
+    /// For now, general case of a term not fitting a kind.
     /// We'll have more cases when we allow general Containers.
     // TODO It may become possible to combine this with ConstTypeError.
-    #[error("Term {term} does not fit declared type {type_}")]
-    TypeMismatch { term: Box<Term>, type_: Box<Term> },
+    #[error("Term {term} does not fit declared kind {type_}")]
+    KindMismatch { term: Box<Term>, type_: Box<Term> },
     /// Wrong number of type arguments (actual vs expected).
     // For now this only happens at the top level (TypeArgs of op/type vs TypeParams of Op/TypeDef).
     // However in the future it may be applicable to e.g. contents of Tuples too.
@@ -1113,7 +1113,7 @@ mod test {
         elems.push(t);
         assert_eq!(
             check_term_kind(&Term::new_list(elems), &outer_param),
-            Err(TermTypeError::TypeMismatch {
+            Err(TermTypeError::KindMismatch {
                 term: Box::new(usize_t().into()),
                 // The error reports the type expected for each element of the list:
                 type_: Box::new(TypeParam::new_list_kind(TypeBound::Linear))

@@ -270,7 +270,7 @@ mod test {
         assert_eq!(
             def.instantiate([qb_t().into()]),
             Err(SignatureError::TypeArgMismatch(
-                TermTypeError::TypeMismatch {
+                TermTypeError::KindMismatch {
                     term: Box::new(qb_t().into()),
                     type_: Box::new(TypeBound::Copyable.into())
                 }

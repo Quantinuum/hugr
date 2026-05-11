@@ -78,7 +78,7 @@ pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat_kind({
 pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TermTypeError> {
     match arg {
         TypeArg::BoundedNat(n) if is_valid_log_width(*n as u8) => Ok(*n as u8),
-        _ => Err(TermTypeError::TypeMismatch {
+        _ => Err(TermTypeError::KindMismatch {
             term: Box::new(arg.clone()),
             type_: Box::new(LOG_WIDTH_TYPE_PARAM),
         }),
@@ -240,7 +240,7 @@ mod test {
         let type_arg_128 = TypeArg::BoundedNat(7);
         assert_matches!(
             get_log_width(&type_arg_128),
-            Err(TermTypeError::TypeMismatch { .. })
+            Err(TermTypeError::KindMismatch { .. })
         );
     }
 

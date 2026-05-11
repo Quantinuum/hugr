@@ -866,7 +866,7 @@ pub(super) mod test {
             assert_eq!(
                 def.compute_signature(std::slice::from_ref(&arg)),
                 Err(SignatureError::TypeArgMismatch(
-                    TermTypeError::TypeMismatch {
+                    TermTypeError::KindMismatch {
                         type_: Box::new(TypeBound::Linear.into()),
                         term: Box::new(arg),
                     }

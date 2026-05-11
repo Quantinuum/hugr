@@ -958,7 +958,7 @@ pub(crate) mod test {
         assert_eq!(
             ev,
             Err(SignatureError::TypeArgMismatch(
-                TermTypeError::TypeMismatch {
+                TermTypeError::KindMismatch {
                     term: Box::new(rv),
                     type_: Box::new(TypeBound::Linear.into())
                 }
