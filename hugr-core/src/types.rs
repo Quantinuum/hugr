@@ -510,7 +510,7 @@ impl TryFrom<Term> for Type {
             Some(b) => Ok(Self(t, b)),
             None => Err(TermKindError::KindMismatch {
                 term: Box::new(t),
-                type_: Box::new(TypeBound::Linear.into()),
+                kind: Box::new(TypeBound::Linear.into()),
             }),
         }
     }
@@ -784,7 +784,7 @@ pub(crate) mod test {
         assert_eq!(
             t.transform(&cpy_to_qb),
             Err(SignatureError::from(TermKindError::KindMismatch {
-                type_: Box::new(TypeBound::Copyable.into()),
+                kind: Box::new(TypeBound::Copyable.into()),
                 term: Box::new(qb_t().into())
             }))
         );
@@ -796,7 +796,7 @@ pub(crate) mod test {
         assert_eq!(
             t.transform(&cpy_to_qb),
             Err(SignatureError::from(TermKindError::KindMismatch {
-                type_: Box::new(TypeBound::Copyable.into()),
+                kind: Box::new(TypeBound::Copyable.into()),
                 term: Box::new(mk_opt(qb_t()).into())
             }))
         );

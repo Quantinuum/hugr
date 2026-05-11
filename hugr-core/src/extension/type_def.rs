@@ -272,7 +272,7 @@ mod test {
             Err(SignatureError::TypeArgMismatch(
                 TermKindError::KindMismatch {
                     term: Box::new(qb_t().into()),
-                    type_: Box::new(TypeBound::Copyable.into())
+                    kind: Box::new(TypeBound::Copyable.into())
                 }
             ))
         );

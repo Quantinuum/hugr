@@ -344,7 +344,7 @@ fn invalid_types() {
     assert_eq!(
         validate_to_sig_error(element_outside_bound),
         SignatureError::TypeArgMismatch(TermKindError::KindMismatch {
-            type_: Box::new(TypeBound::Copyable.into()),
+            kind: Box::new(TypeBound::Copyable.into()),
             term: Box::new(valid.into())
         })
     );

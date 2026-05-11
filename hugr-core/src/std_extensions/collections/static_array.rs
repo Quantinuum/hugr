@@ -312,7 +312,7 @@ impl HasConcrete for StaticArrayOpDef {
             [arg] => {
                 if !arg.copyable() {
                     Err(SignatureError::from(TermKindError::KindMismatch {
-                        type_: Box::new(Copyable.into()),
+                        kind: Box::new(Copyable.into()),
                         term: Box::new(arg.clone()),
                     }))?
                 }

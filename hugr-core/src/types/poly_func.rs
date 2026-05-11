@@ -251,7 +251,7 @@ pub(crate) mod test {
             wrong_args,
             Err(SignatureError::TypeArgMismatch(
                 TermKindError::KindMismatch {
-                    type_: Box::new(type_params[0].clone()),
+                    kind: Box::new(type_params[0].clone()),
                     term: Box::new(usize_t().into()),
                 }
             ))
@@ -259,7 +259,7 @@ pub(crate) mod test {
 
         // (Try to) make a schema with the args in the wrong order
         let arg_err = SignatureError::TypeArgMismatch(TermKindError::KindMismatch {
-            type_: Box::new(type_params[0].clone()),
+            kind: Box::new(type_params[0].clone()),
             term: Box::new(ty_var.clone()),
         });
         assert_eq!(
@@ -356,7 +356,7 @@ pub(crate) mod test {
                 make_scheme(decl.clone()).err(),
                 Some(SignatureError::TypeArgMismatch(
                     TermKindError::KindMismatch {
-                        type_: Box::new(bound.clone()),
+                        kind: Box::new(bound.clone()),
                         term: Box::new(TypeArg::new_var_use(0, decl.clone()))
                     }
                 ))

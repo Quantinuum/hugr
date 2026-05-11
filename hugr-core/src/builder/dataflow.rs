@@ -960,7 +960,7 @@ pub(crate) mod test {
             Err(SignatureError::TypeArgMismatch(
                 TermKindError::KindMismatch {
                     term: Box::new(rv),
-                    type_: Box::new(TypeBound::Linear.into())
+                    kind: Box::new(TypeBound::Linear.into())
                 }
             ))
         );

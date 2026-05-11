@@ -787,7 +787,7 @@ pub fn check_term_kind(value: &Term, kind: &Term) -> Result<(), TermKindError> {
 
         _ => Err(TermKindError::KindMismatch {
             term: Box::new(value.clone()),
-            type_: Box::new(kind.clone()),
+            kind: Box::new(kind.clone()),
         }),
     }
 }
@@ -811,24 +811,24 @@ pub enum TermKindError {
     /// For now, general case of a term not fitting a kind.
     /// We'll have more cases when we allow general Containers.
     // TODO It may become possible to combine this with ConstTypeError.
-    #[error("Term {term} does not fit declared kind {type_}")]
-    KindMismatch { term: Box<Term>, type_: Box<Term> },
-    /// Wrong number of type arguments (actual vs expected).
-    // For now this only happens at the top level (TypeArgs of op/type vs TypeParams of Op/TypeDef).
-    // However in the future it may be applicable to e.g. contents of Tuples too.
-    #[error("Wrong number of type arguments: {0} vs expected {1} declared type parameters")]
+    #[error("Term {term} does not fit declared kind {kind}")]
+    KindMismatch { term: Box<Term>, kind: Box<Term> },
+    /// Wrong number of term arguments (actual vs expected).
+    // For now this is just args of op/type vs params declared by Op/TypeDef,
+    // however in the future it may be applicable to e.g. contents of Tuples too.
+    #[error("Wrong number of term arguments: {0} vs expected {1} declared parameters")]
     WrongNumberArgs(usize, usize),
 
-    /// Wrong number of type arguments in tuple (actual vs expected).
+    /// Wrong number of terms in tuple (actual vs expected).
     #[error(
-        "Wrong number of type arguments to tuple parameter: {0} vs expected {1} declared type parameters"
+        "Wrong number of terms in tuple: {0} vs expected {1} declared by parameter"
     )]
     WrongNumberTuple(usize, usize),
     /// Opaque value type check error.
     #[error("Opaque type argument does not fit declared parameter type: {0}")]
     OpaqueTypeMismatch(#[from] crate::types::CustomCheckFailure),
     /// Invalid value
-    #[error("Invalid value of type argument")]
+    #[error("Invalid value of term argument")]
     InvalidValue(Box<TypeArg>),
 }
 
@@ -1116,7 +1116,7 @@ mod test {
             Err(TermKindError::KindMismatch {
                 term: Box::new(usize_t().into()),
                 // The error reports the type expected for each element of the list:
-                type_: Box::new(TypeParam::new_list_kind(TypeBound::Linear))
+                kind: Box::new(TypeParam::new_list_kind(TypeBound::Linear))
             })
         );
 

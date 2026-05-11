@@ -867,7 +867,7 @@ pub(super) mod test {
                 def.compute_signature(std::slice::from_ref(&arg)),
                 Err(SignatureError::TypeArgMismatch(
                     TermKindError::KindMismatch {
-                        type_: Box::new(TypeBound::Linear.into()),
+                        kind: Box::new(TypeBound::Linear.into()),
                         term: Box::new(arg),
                     }
                 ))

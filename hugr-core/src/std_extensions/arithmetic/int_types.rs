@@ -80,7 +80,7 @@ pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TermKindError> {
         TypeArg::BoundedNat(n) if is_valid_log_width(*n as u8) => Ok(*n as u8),
         _ => Err(TermKindError::KindMismatch {
             term: Box::new(arg.clone()),
-            type_: Box::new(LOG_WIDTH_TYPE_PARAM),
+            kind: Box::new(LOG_WIDTH_TYPE_PARAM),
         }),
     }
 }
