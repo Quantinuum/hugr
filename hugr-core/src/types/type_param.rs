@@ -824,9 +824,6 @@ pub enum TermKindError {
         "Wrong number of terms in tuple: {0} vs expected {1} declared by parameter"
     )]
     WrongNumberTuple(usize, usize),
-    /// Opaque value type check error.
-    #[error("Opaque type argument does not fit declared parameter type: {0}")]
-    OpaqueTypeMismatch(#[from] crate::types::CustomCheckFailure),
     /// Invalid value
     #[error("Invalid value of term argument")]
     InvalidValue(Box<TypeArg>),
