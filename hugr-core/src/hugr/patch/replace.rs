@@ -400,6 +400,10 @@ impl<HostNode: HugrNode> PatchHugrMut for Replacement<HostNode> {
         h.remove_node(inserted_entrypoint);
 
         // 6. Transfer to keys of `transfers` children of the corresponding values.
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "adoptions move disjoint child sets, so order cannot affect the result"
+        )]
         for (new_parent, &old_parent) in &self.adoptions {
             let new_parent = node_map.get(new_parent).unwrap();
             debug_assert!(h.children(old_parent).next().is_some());
@@ -409,6 +413,10 @@ impl<HostNode: HugrNode> PatchHugrMut for Replacement<HostNode> {
         }
 
         // 7. Remove remaining nodes
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "all nodes in this set are removed, so removal order does not affect the result"
+        )]
         for n in to_remove {
             h.remove_node(n);
         }

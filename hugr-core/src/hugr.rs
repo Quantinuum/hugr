@@ -12,7 +12,6 @@ pub mod views;
 
 use std::cmp::Ordering;
 use std::collections::BTreeSet;
-use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::io;
 use std::iter;
@@ -439,7 +438,7 @@ impl Hugr {
     /// (since these must be the entry and exit blocks) and in each dataflow
     /// sibling graph (since these must be the input and output nodes).
     fn order_siblings_by_node_index(&mut self) {
-        let mut node_children: HashMap<Node, Vec<Node>> = HashMap::default();
+        let mut node_children = Vec::new();
         for node in self.nodes() {
             let mut children = self.children(node).collect_vec();
             if self.contains_dsg_or_csg(node) {
@@ -447,9 +446,9 @@ impl Hugr {
             } else {
                 children.sort();
             }
-            node_children.insert(node, children);
+            node_children.push((node, children));
         }
-        for (node, children) in &node_children {
+        for (node, children) in node_children {
             self.hierarchy.detach_children(node.into_portgraph());
             for child in children {
                 self.hierarchy
