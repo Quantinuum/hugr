@@ -820,9 +820,7 @@ pub enum TermKindError {
     WrongNumberArgs(usize, usize),
 
     /// Wrong number of terms in tuple (actual vs expected).
-    #[error(
-        "Wrong number of terms in tuple: {0} vs expected {1} declared by parameter"
-    )]
+    #[error("Wrong number of terms in tuple: {0} vs expected {1} declared by parameter")]
     WrongNumberTuple(usize, usize),
     /// Invalid value
     #[error("Invalid value of term argument")]
