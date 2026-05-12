@@ -726,7 +726,7 @@ impl TermVar {
 /// Checks that a [`Term`] (value) is a valid instance of another [`Term`] (kind)
 ///
 /// I.e. the former is acceptable as an argument to a parameter of the latter.
-pub fn check_term_kind(value: &Term, kind: &Term) -> Result<(), TermTypeError> {
+pub fn check_term_kind(value: &Term, kind: &Term) -> Result<(), TermKindError> {
     match (value, kind) {
         (Term::Variable(TermVar { cached_decl, .. }), _) if kind.is_supertype(cached_decl) => {
             Ok(())
@@ -761,7 +761,7 @@ pub fn check_term_kind(value: &Term, kind: &Term) -> Result<(), TermTypeError> {
             }
 
             if term_parts.len() != type_parts.len() {
-                return Err(TermTypeError::WrongNumberTuple(
+                return Err(TermKindError::WrongNumberTuple(
                     term_parts.len(),
                     type_parts.len(),
                 ));
@@ -785,17 +785,17 @@ pub fn check_term_kind(value: &Term, kind: &Term) -> Result<(), TermTypeError> {
         (Term::TypeKind(_), Term::StaticKind) => Ok(()),
         (Term::ConstKind(_), Term::StaticKind) => Ok(()),
 
-        _ => Err(TermTypeError::TypeMismatch {
+        _ => Err(TermKindError::KindMismatch {
             term: Box::new(value.clone()),
-            type_: Box::new(kind.clone()),
+            kind: Box::new(kind.clone()),
         }),
     }
 }
 
 /// Check a list of [`Term`]s is valid for a list of types.
-pub fn check_term_kinds(terms: &[Term], types: &[Term]) -> Result<(), TermTypeError> {
+pub fn check_term_kinds(terms: &[Term], types: &[Term]) -> Result<(), TermKindError> {
     if terms.len() != types.len() {
-        return Err(TermTypeError::WrongNumberArgs(terms.len(), types.len()));
+        return Err(TermKindError::WrongNumberArgs(terms.len(), types.len()));
     }
     for (term, type_) in terms.iter().zip(types.iter()) {
         check_term_kind(term, type_)?;
@@ -803,32 +803,29 @@ pub fn check_term_kinds(terms: &[Term], types: &[Term]) -> Result<(), TermTypeEr
     Ok(())
 }
 
-/// Errors that can occur when checking that a [`Term`] has an expected type.
+/// Errors that can occur when checking that a [`Term`] has an expected kind.
 #[derive(Clone, Debug, PartialEq, Eq, Error)]
 #[non_exhaustive]
-pub enum TermTypeError {
+pub enum TermKindError {
     #[allow(missing_docs)]
-    /// For now, general case of a term not fitting a type.
+    /// For now, general case of a term not fitting a kind.
     /// We'll have more cases when we allow general Containers.
     // TODO It may become possible to combine this with ConstTypeError.
-    #[error("Term {term} does not fit declared type {type_}")]
-    TypeMismatch { term: Box<Term>, type_: Box<Term> },
-    /// Wrong number of type arguments (actual vs expected).
-    // For now this only happens at the top level (TypeArgs of op/type vs TypeParams of Op/TypeDef).
-    // However in the future it may be applicable to e.g. contents of Tuples too.
-    #[error("Wrong number of type arguments: {0} vs expected {1} declared type parameters")]
+    #[error("Term {term} does not fit declared kind {kind}")]
+    KindMismatch { term: Box<Term>, kind: Box<Term> },
+    /// Wrong number of term arguments (actual vs expected).
+    // For now this is just args of op/type vs params declared by Op/TypeDef,
+    // however in the future it may be applicable to e.g. contents of Tuples too.
+    #[error("Wrong number of term arguments: {0} vs expected {1} declared parameters")]
     WrongNumberArgs(usize, usize),
 
-    /// Wrong number of type arguments in tuple (actual vs expected).
+    /// Wrong number of terms in tuple (actual vs expected).
     #[error(
-        "Wrong number of type arguments to tuple parameter: {0} vs expected {1} declared type parameters"
+        "Wrong number of terms in tuple: {0} vs expected {1} declared by parameter"
     )]
     WrongNumberTuple(usize, usize),
-    /// Opaque value type check error.
-    #[error("Opaque type argument does not fit declared parameter type: {0}")]
-    OpaqueTypeMismatch(#[from] crate::types::CustomCheckFailure),
     /// Invalid value
-    #[error("Invalid value of type argument")]
+    #[error("Invalid value of term argument")]
     InvalidValue(Box<TypeArg>),
 }
 
@@ -916,7 +913,7 @@ mod test {
     use super::{Substitution, TypeArg, TypeParam, check_term_kind};
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::types::type_param::SeqPart;
-    use crate::types::{Term, Type, TypeBound, TypeRow, type_param::TermTypeError};
+    use crate::types::{Term, Type, TypeBound, TypeRow, type_param::TermKindError};
 
     #[test]
     fn new_list_from_parts_items() {
@@ -978,13 +975,13 @@ mod test {
     #[test]
     fn type_arg_fits_param() {
         let rowvar = Term::new_row_var_use;
-        fn check(arg: impl Into<TypeArg>, param: &TypeParam) -> Result<(), TermTypeError> {
+        fn check(arg: impl Into<TypeArg>, param: &TypeParam) -> Result<(), TermKindError> {
             check_term_kind(&arg.into(), param)
         }
         fn check_seq<T: Clone + Into<TypeArg>>(
             args: &[T],
             param: &TypeParam,
-        ) -> Result<(), TermTypeError> {
+        ) -> Result<(), TermKindError> {
             check_term_kind(&Term::new_list(args.to_vec()), param)
         }
         // Simple cases: Term::XXXTypes are Term::TypeKind's
@@ -1113,10 +1110,10 @@ mod test {
         elems.push(t);
         assert_eq!(
             check_term_kind(&Term::new_list(elems), &outer_param),
-            Err(TermTypeError::TypeMismatch {
+            Err(TermKindError::KindMismatch {
                 term: Box::new(usize_t().into()),
                 // The error reports the type expected for each element of the list:
-                type_: Box::new(TypeParam::new_list_kind(TypeBound::Linear))
+                kind: Box::new(TypeParam::new_list_kind(TypeBound::Linear))
             })
         );
 

@@ -5,7 +5,7 @@ use std::sync::{Arc, Weak};
 use strum::IntoEnumIterator;
 
 use crate::ops::{ExtensionOp, OpName, OpNameRef};
-use crate::types::type_param::TermTypeError;
+use crate::types::type_param::TermKindError;
 use crate::{Extension, ops::OpType, types::TypeArg};
 
 use super::{ExtensionBuildError, ExtensionId, OpDef, SignatureError, op_def::SignatureFunc};
@@ -27,8 +27,8 @@ pub enum OpLoadError {
     WrongExtension(ExtensionId, ExtensionId),
 }
 
-impl From<TermTypeError> for OpLoadError {
-    fn from(value: TermTypeError) -> Self {
+impl From<TermKindError> for OpLoadError {
+    fn from(value: TermKindError) -> Self {
         SignatureError::from(value).into()
     }
 }

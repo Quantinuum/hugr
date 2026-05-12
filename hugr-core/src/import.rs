@@ -7,7 +7,7 @@ use std::sync::Arc;
 
 use crate::envelope::description::{ExtensionDesc, GeneratorDesc, ModuleDesc};
 use crate::metadata::{self, Metadata, RawMetadataValue};
-use crate::types::type_param::{SeqPart, TermTypeError, TypeParam};
+use crate::types::type_param::{SeqPart, TermKindError, TypeParam};
 use crate::types::{
     CustomType, FuncTypeBase, PolyFuncType, Signature, Term, Type, TypeArg, TypeBound, TypeName,
     TypeRow, TypeRowLike, TypeRowRV,
@@ -112,8 +112,8 @@ enum ImportErrorInner {
     ExtensionResolution(#[from] ExtensionResolutionError),
 }
 
-impl From<TermTypeError> for ImportErrorInner {
-    fn from(err: TermTypeError) -> Self {
+impl From<TermKindError> for ImportErrorInner {
+    fn from(err: TermKindError) -> Self {
         SignatureError::from(err).into()
     }
 }

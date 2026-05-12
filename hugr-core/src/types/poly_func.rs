@@ -162,7 +162,7 @@ pub(crate) mod test {
     use crate::std_extensions::collections::array::{self, array_type_parametric};
     use crate::std_extensions::collections::list;
     use crate::types::signature::FuncTypeBase;
-    use crate::types::type_param::{TermTypeError, TypeArg, TypeParam};
+    use crate::types::type_param::{TermKindError, TypeArg, TypeParam};
     use crate::types::{
         CustomType, FuncValueType, PolyFuncTypeBase, Signature, Term, Type, TypeBound, TypeName,
         TypeRowLike, TypeRowRV,
@@ -250,16 +250,16 @@ pub(crate) mod test {
         assert_eq!(
             wrong_args,
             Err(SignatureError::TypeArgMismatch(
-                TermTypeError::TypeMismatch {
-                    type_: Box::new(type_params[0].clone()),
+                TermKindError::KindMismatch {
+                    kind: Box::new(type_params[0].clone()),
                     term: Box::new(usize_t().into()),
                 }
             ))
         );
 
         // (Try to) make a schema with the args in the wrong order
-        let arg_err = SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
-            type_: Box::new(type_params[0].clone()),
+        let arg_err = SignatureError::TypeArgMismatch(TermKindError::KindMismatch {
+            kind: Box::new(type_params[0].clone()),
             term: Box::new(ty_var.clone()),
         });
         assert_eq!(
@@ -355,8 +355,8 @@ pub(crate) mod test {
             assert_eq!(
                 make_scheme(decl.clone()).err(),
                 Some(SignatureError::TypeArgMismatch(
-                    TermTypeError::TypeMismatch {
-                        type_: Box::new(bound.clone()),
+                    TermKindError::KindMismatch {
+                        kind: Box::new(bound.clone()),
                         term: Box::new(TypeArg::new_var_use(0, decl.clone()))
                     }
                 ))

@@ -5,7 +5,7 @@ use thiserror::Error;
 use super::{Type, TypeRow};
 use crate::{
     ops::Value,
-    types::{Term, type_param::TermTypeError},
+    types::{Term, type_param::TermKindError},
 };
 
 /// Errors that arise from typechecking constants
@@ -72,7 +72,7 @@ impl super::SumType {
                 num_variants: self.num_variants(),
             })?;
         let variant: TypeRow = variant.clone().try_into().map_err(|e| {
-            let TermTypeError::TypeMismatch { term, .. } = e else {
+            let TermKindError::KindMismatch { term, .. } = e else {
                 panic!("Unexpected error {e}")
             };
             let Term::Variable(tv) = &*term else {

@@ -10,7 +10,7 @@ use super::custom::CustomType;
 use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
 use crate::types::TypeRowRV;
-use crate::types::type_param::{SeqPart, TermTypeError, TermVar, UpperBound};
+use crate::types::type_param::{SeqPart, TermKindError, TermVar, UpperBound};
 
 #[derive(Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -51,7 +51,7 @@ impl From<Type> for SerSimpleType {
 
 // Row Variables can also be serialized as "simple types"
 impl TryFrom<Term> for SerSimpleType {
-    type Error = TermTypeError;
+    type Error = TermKindError;
 
     fn try_from(value: Term) -> Result<Self, Self::Error> {
         if let Term::Variable(tv) = &value
@@ -83,7 +83,7 @@ impl From<SerSimpleType> for Term {
 }
 
 impl TryFrom<SerSimpleType> for Type {
-    type Error = TermTypeError;
+    type Error = TermKindError;
 
     fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
         Term::from(value).try_into()

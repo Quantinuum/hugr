@@ -240,7 +240,7 @@ mod test {
     use crate::extension::SignatureError;
     use crate::extension::prelude::{qb_t, usize_t};
     use crate::std_extensions::arithmetic::float_types::float64_type;
-    use crate::types::type_param::{TermTypeError, TypeParam};
+    use crate::types::type_param::{TermKindError, TypeParam};
     use crate::types::{Signature, Type, TypeBound};
 
     use super::{TypeDef, TypeDefBound};
@@ -270,22 +270,22 @@ mod test {
         assert_eq!(
             def.instantiate([qb_t().into()]),
             Err(SignatureError::TypeArgMismatch(
-                TermTypeError::TypeMismatch {
+                TermKindError::KindMismatch {
                     term: Box::new(qb_t().into()),
-                    type_: Box::new(TypeBound::Copyable.into())
+                    kind: Box::new(TypeBound::Copyable.into())
                 }
             ))
         );
         // Too few arguments:
         assert_eq!(
             def.instantiate([]).unwrap_err(),
-            SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(0, 1))
+            SignatureError::TypeArgMismatch(TermKindError::WrongNumberArgs(0, 1))
         );
         // Too many arguments:
         assert_eq!(
             def.instantiate([float64_type().into(), float64_type().into(),])
                 .unwrap_err(),
-            SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(2, 1))
+            SignatureError::TypeArgMismatch(TermKindError::WrongNumberArgs(2, 1))
         );
     }
 }
