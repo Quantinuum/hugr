@@ -453,6 +453,30 @@ impl Term {
         }
     }
 
+    /// Checks whether the term is parametric, i.e. it (recursively) contains variables.
+    pub(crate) fn is_parametrized(&self) -> bool {
+        match self {
+            Term::RuntimeSum(SumType::General { rows }) => {
+                rows.iter().any(|row| row.is_parametrized())
+            }
+            Term::RuntimeSum(SumType::Unit { .. }) => false, // No leaves there
+            Term::RuntimeExtension(custy) => custy.args().iter().any(Term::is_parametrized),
+            Term::RuntimeFunction(ft) => ft.input.is_parametrized() || ft.output.is_parametrized(),
+            Term::List(elems) => elems.iter().any(Term::is_parametrized),
+            Term::Tuple(elems) => elems.iter().any(Term::is_parametrized),
+            TypeArg::ListConcat(lists) => lists.iter().any(Term::is_parametrized),
+            TypeArg::TupleConcat(tuples) => tuples.iter().any(Term::is_parametrized),
+            Term::BoundedNat(_) | Term::String(_) | Term::Float(_) | Term::Bytes(_) => false,
+            Term::BoundedNatType(_) | Term::StringType | Term::BytesType | Term::FloatType => false,
+            Term::RuntimeType(_) => false,
+            Term::StaticType => false,
+            Term::ListType(item_type) => item_type.is_parametrized(),
+            Term::TupleType(item_types) => item_types.is_parametrized(),
+            Term::ConstType(ty) => ty.is_parametrized(),
+            Term::Variable(_) => true,
+        }
+    }
+
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
             TypeArg::RuntimeSum(SumType::Unit { .. }) => self.clone(),

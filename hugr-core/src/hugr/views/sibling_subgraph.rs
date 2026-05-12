@@ -13,6 +13,7 @@ use portgraph::{PortView, algorithms::CreateConvexChecker, boundary::Boundary};
 use rustc_hash::FxHashSet;
 use thiserror::Error;
 
+use super::{RootChecked, SchedulingGraph, SynEdgeWrapper};
 use crate::builder::{Container, FunctionBuilder};
 use crate::core::HugrNode;
 use crate::hugr::internal::{HugrInternals, PortgraphNodeMap};
@@ -20,10 +21,8 @@ use crate::hugr::{HugrMut, HugrView};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{NamedOp, OpTag, OpTrait, OpType};
-use crate::types::{Signature, Type};
+use crate::types::{PolyFuncType, Signature, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
-
-use super::{RootChecked, SchedulingGraph, SynEdgeWrapper};
 
 mod convex;
 
@@ -550,7 +549,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 
     /// Check the validity of the subgraph, as described in the docs of
-    /// [`SiblingSubgraph::try_new`], but do not check convexity.    
+    /// [`SiblingSubgraph::try_new`], but do not check convexity.
     pub fn validate_skip_convexity(
         &self,
         hugr: &impl HugrView<Node = N>,
@@ -652,7 +651,17 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 
     /// The signature of the subgraph.
+    ///
+    /// Panics if the signature contains unresolved type variables, i.e. is polymorphic. Use
+    /// [`SiblingSubgraph::poly_func_type`] instead.
     pub fn signature(&self, hugr: &impl HugrView<Node = N>) -> Signature {
+        let poly_func_type = self.poly_func_type(hugr);
+        assert_eq!(poly_func_type.params(), &[]);
+        poly_func_type.into_body()
+    }
+
+    /// The (potentially polymorphic) signature of the subgraph.
+    pub fn poly_func_type(&self, hugr: &impl HugrView<Node = N>) -> PolyFuncType {
         let input = self
             .inputs
             .iter()
@@ -670,7 +679,26 @@ impl<N: HugrNode> SiblingSubgraph<N> {
                 sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
-        Signature::new(input, output)
+
+        // Discover type variable declarations from the closest function definition, if type
+        // variable usages are found.
+        let params = if input.iter().any(|t| t.is_parametrized())
+            || output.iter().any(|t| t.is_parametrized())
+        {
+            let mut parent = self.get_parent(hugr);
+            while !hugr.get_optype(parent).is_func_defn() {
+                parent = hugr.get_parent(parent).unwrap();
+            }
+            hugr.get_optype(parent)
+                .as_func_defn()
+                .unwrap()
+                .signature()
+                .params()
+        } else {
+            &[]
+        };
+
+        PolyFuncType::new(params, Signature::new(input, output))
     }
 
     /// The parent of the sibling subgraph.
@@ -768,7 +796,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         hugr: &impl HugrView<Node = N>,
         name: impl Into<String>,
     ) -> Hugr {
-        let mut builder = FunctionBuilder::new(name, self.signature(hugr)).unwrap();
+        let mut builder = FunctionBuilder::new(name, self.poly_func_type(hugr)).unwrap();
         // Take the unfinished Hugr from the builder, to avoid unnecessary
         // validation checks that require connecting the inputs and outputs.
         let mut extracted = mem::take(builder.hugr_mut());
@@ -1460,9 +1488,9 @@ pub enum InvalidReplacement {
     ]
     InvalidSignature {
         /// The expected signature.
-        expected: Box<Signature>,
+        expected: Box<PolyFuncType>,
         /// The actual signature.
-        actual: Option<Box<Signature>>,
+        actual: Option<Box<PolyFuncType>>,
     },
     /// `SiblingSubgraph` is not convex.
     #[error("SiblingSubgraph is not convex.")]
