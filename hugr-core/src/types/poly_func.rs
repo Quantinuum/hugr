@@ -144,6 +144,11 @@ impl<T: TypeRowLike> PolyFuncTypeBase<T> {
     pub fn body_mut(&mut self) -> &mut FuncTypeBase<T> {
         &mut self.body
     }
+
+    /// Consumes the function type to extract the body.
+    pub fn into_body(self) -> FuncTypeBase<T> {
+        self.body
+    }
 }
 
 // Do not implement Substitutable: we never need to substitute into a PolyFuncType
