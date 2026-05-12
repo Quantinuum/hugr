@@ -60,16 +60,18 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         let subgraph_sig = subgraph.poly_func_type(host);
         let repl_sig = replacement
             .poly_func_type()
-            .or(Some(
-                replacement
-                    .inner_function_type()
-                    .unwrap()
-                    .into_owned()
-                    .into(),
-            ))
+            .or_else(|| {
+                Some(
+                    replacement
+                        .inner_function_type()
+                        .unwrap()
+                        .into_owned()
+                        .into(),
+                )
+            })
             .ok_or(InvalidReplacement::InvalidDataflowGraph {
                 node: replacement.entrypoint(),
-                op: Box::new(replacement.get_optype(replacement.entrypoint()).to_owned()),
+                op: Box::new(replacement.entrypoint_optype().to_owned()),
             })?;
         if subgraph_sig != repl_sig {
             return Err(InvalidReplacement::InvalidSignature {

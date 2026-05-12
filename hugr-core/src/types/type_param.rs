@@ -460,7 +460,7 @@ impl Term {
                 rows.iter().any(|row| row.is_parametrized())
             }
             Term::RuntimeSum(SumType::Unit { .. }) => false, // No leaves there
-            Term::RuntimeExtension(custy) => !custy.args().is_empty(),
+            Term::RuntimeExtension(custy) => custy.args().iter().any(Term::is_parametrized),
             Term::RuntimeFunction(ft) => ft.input.is_parametrized() || ft.output.is_parametrized(),
             Term::List(elems) => elems.iter().any(Term::is_parametrized),
             Term::Tuple(elems) => elems.iter().any(Term::is_parametrized),
