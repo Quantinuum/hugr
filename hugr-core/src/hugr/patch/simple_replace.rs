@@ -45,6 +45,11 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
 
     /// Create a new [`SimpleReplacement`] specification.
     ///
+    /// The given replacement should have an entrypoint that is a dataflow container (such as a DFG
+    /// or a function definition). If the entrypoint is a function, its (potentially polymorphic)
+    /// signature will be checked against the subgraph signature, otherwise the inner function type
+    /// of the entrypoint will be checked against the subgraph signature.
+    ///
     /// Return a [`InvalidReplacement::InvalidSignature`] error if `subgraph`
     /// and `replacement` have different signatures.
     pub fn try_new(
@@ -52,18 +57,24 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         host: &impl HugrView<Node = HostNode>,
         replacement: Hugr,
     ) -> Result<Self, InvalidReplacement> {
-        let subgraph_sig = subgraph.signature(host);
-        let repl_sig =
-            replacement
-                .inner_function_type()
-                .ok_or(InvalidReplacement::InvalidDataflowGraph {
-                    node: replacement.entrypoint(),
-                    op: Box::new(replacement.get_optype(replacement.entrypoint()).to_owned()),
-                })?;
-        if &subgraph_sig != repl_sig.as_ref() {
+        let subgraph_sig = subgraph.poly_func_type(host);
+        let repl_sig = replacement
+            .poly_func_type()
+            .or(Some(
+                replacement
+                    .inner_function_type()
+                    .unwrap()
+                    .into_owned()
+                    .into(),
+            ))
+            .ok_or(InvalidReplacement::InvalidDataflowGraph {
+                node: replacement.entrypoint(),
+                op: Box::new(replacement.get_optype(replacement.entrypoint()).to_owned()),
+            })?;
+        if subgraph_sig != repl_sig {
             return Err(InvalidReplacement::InvalidSignature {
                 expected: Box::new(subgraph_sig),
-                actual: Some(Box::new(repl_sig.into_owned())),
+                actual: Some(Box::new(repl_sig)),
             });
         }
         Ok(Self {
@@ -157,7 +168,13 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         host: &impl HugrView<Node = HostNode>,
         boundary: BoundaryMode,
     ) -> BoundaryPort<HostNode, OutgoingPort> {
-        debug_assert!(pos < self.subgraph().signature(host).output_count());
+        debug_assert!(
+            pos < self
+                .subgraph()
+                .poly_func_type(host)
+                .into_body()
+                .output_count()
+        );
 
         // The outgoing ports at the output boundary of `replacement`
         let [repl_inp, repl_out] = self.get_replacement_io();
@@ -245,7 +262,13 @@ impl<HostNode: HugrNode> SimpleReplacement<HostNode> {
         host: &impl HugrView<Node = HostNode>,
         boundary: BoundaryMode,
     ) -> impl Iterator<Item = BoundaryPort<HostNode, IncomingPort>> {
-        debug_assert!(pos < self.subgraph().signature(host).input_count());
+        debug_assert!(
+            pos < self
+                .subgraph()
+                .poly_func_type(host)
+                .into_body()
+                .input_count()
+        );
 
         let [repl_inp, repl_out] = self.get_replacement_io();
         self.replacement

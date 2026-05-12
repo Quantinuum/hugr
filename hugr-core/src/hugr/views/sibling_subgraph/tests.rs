@@ -1,3 +1,6 @@
+use crate::std_extensions::collections::array::array_type_parametric;
+use crate::types::TypeArg;
+use crate::types::type_param::TypeParam;
 use std::collections::BTreeSet;
 
 use cool_asserts::assert_matches;
@@ -181,6 +184,45 @@ fn test_signature() -> Result<(), InvalidSubgraph> {
     assert_eq!(
         sub.signature(&func),
         Signature::new_endo([qb_t(), qb_t(), qb_t()])
+    );
+    Ok(())
+}
+
+#[test]
+fn test_polymorphic_signature() -> Result<(), InvalidSubgraph> {
+    let mut mod_builder = ModuleBuilder::new();
+    let arr_type =
+        array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_type()), bool_t())
+            .unwrap();
+    let func_id = {
+        let mut h = mod_builder
+            .define_function(
+                "test",
+                PolyFuncType::new(
+                    vec![TypeParam::max_nat_type()],
+                    Signature::new_endo(vec![arr_type.clone()]),
+                ),
+            )
+            .unwrap();
+        let [arr] = h.input_wires_arr();
+        let tuple = h.make_tuple([arr]).unwrap();
+        let op = UnpackTuple::new(vec![arr_type.clone()].into());
+        let [arr] = h.add_dataflow_op(op, [tuple]).unwrap().outputs_arr();
+        h.finish_with_outputs([arr]).unwrap()
+    };
+    let hugr = mod_builder.finish_hugr().unwrap();
+
+    let func = hugr.with_entrypoint(func_id.node());
+    let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
+        RootChecked::try_new(&func).expect("Root should be FuncDefn."),
+    )?;
+    assert!(sub.validate_default(&func).is_ok());
+    assert_eq!(
+        sub.poly_func_type(&func),
+        PolyFuncType::new(
+            vec![TypeParam::max_nat_type()],
+            Signature::new_endo(vec![arr_type]),
+        ),
     );
     Ok(())
 }
