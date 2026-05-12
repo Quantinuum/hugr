@@ -91,6 +91,10 @@ pub trait HugrLinking: HugrMut {
             roots.insert(other.entrypoint(), parent);
             other.set_parent(other.entrypoint(), other.module_root());
         };
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "roots are stored in a BTreeMap and child pruning is independent"
+        )]
         for (ch, dirv) in children.iter() {
             roots.insert(*ch, self.module_root());
             if matches!(dirv, NodeLinkingDirective::UseExisting(_)) {
@@ -759,10 +763,22 @@ fn check_directives<SRC: HugrView, TN: HugrNode>(
     parent: Option<TN>,
     children: &NodeLinkingDirectives<SRC::Node, TN>,
 ) -> Result<Transfers<SRC::Node, TN>, NodeLinkingError<SRC::Node, TN>> {
+    /// Returns the minimum key in `children` for which `pred` returns true, or
+    /// `None` if there is no such key.
+    ///
+    /// Helper function to avoid indeterminism in error reporting from iterating
+    /// over `children` (a `HashMap`).
+    fn min_directive_key<SN: HugrNode, TN>(
+        children: &NodeLinkingDirectives<SN, TN>,
+        mut pred: impl FnMut(SN) -> bool,
+    ) -> Option<SN> {
+        children.keys().copied().filter(|&n| pred(n)).min()
+    }
+
     if parent.is_some() {
         if other.entrypoint() == other.module_root() {
-            if let Some(c) = children.keys().next() {
-                return Err(NodeLinkingError::ChildOfEntrypoint(*c));
+            if let Some(c) = min_directive_key(children, |_| true) {
+                return Err(NodeLinkingError::ChildOfEntrypoint(c));
             }
         } else {
             let mut n = other.entrypoint();
@@ -787,10 +803,15 @@ fn check_directives<SRC: HugrView, TN: HugrNode>(
         replace: HashMap::default(),
         use_existing: HashMap::default(),
     };
-    for (&sn, dirv) in children {
-        if other.get_parent(sn) != Some(other.module_root()) {
-            return Err(NodeLinkingError::NotChildOfRoot(sn));
-        }
+    if let Some(sn) = min_directive_key(children, |sn| {
+        other.get_parent(sn) != Some(other.module_root())
+    }) {
+        return Err(NodeLinkingError::NotChildOfRoot(sn));
+    }
+    for sn in other.children(other.module_root()) {
+        let Some(dirv) = children.get(&sn) else {
+            continue;
+        };
         match dirv {
             NodeLinkingDirective::Add { replace } => {
                 for &r in replace {
@@ -814,12 +835,20 @@ fn link_by_node<SN: HugrNode, TGT: HugrLinking + ?Sized>(
 ) {
     // Resolve `use_existing` first in case the existing node is also replaced by
     // a new node (which we know will not be in RHS of any entry in `replace`).
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each source is replaced independently, so order cannot affect the result"
+    )]
     for (sn, tn) in transfers.use_existing {
         let copy = node_map.remove(&sn).unwrap();
         // Because of `UseExisting` we avoided adding `sn`s descendants
         debug_assert_eq!(hugr.children(copy).next(), None);
         replace_static_src(hugr, copy, tn);
     }
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "each source is replaced independently, so order cannot affect the result"
+    )]
     for (tn, sn) in transfers.replace {
         let new_node = *node_map.get(&sn).unwrap();
         replace_static_src(hugr, tn, new_node);

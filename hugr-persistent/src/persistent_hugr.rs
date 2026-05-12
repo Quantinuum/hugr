@@ -8,6 +8,7 @@ use hugr_core::{
     Hugr, HugrView, Node,
     hugr::patch::{Patch, simple_replace},
 };
+use indexmap::IndexMap;
 use itertools::Itertools;
 use relrc::HistoryGraph;
 
@@ -187,13 +188,10 @@ impl PersistentHugr {
     ) -> Result<CommitId, InvalidCommit> {
         // Check that `replacement` does not conflict with siblings at any of its
         // parents
-        let new_invalid_nodes = replacement
-            .subgraph()
-            .nodes()
-            .iter()
-            .map(|&PatchNode(id, node)| (id, node))
-            .into_grouping_map()
-            .collect::<BTreeSet<_>>();
+        let mut new_invalid_nodes = IndexMap::<_, BTreeSet<_>>::new();
+        for &PatchNode(id, node) in replacement.subgraph().nodes() {
+            new_invalid_nodes.entry(id).or_default().insert(node);
+        }
         for (parent, new_invalid_nodes) in new_invalid_nodes {
             let invalidation_set = self.deleted_nodes(parent).collect();
             if let Some(&node) = new_invalid_nodes.intersection(&invalidation_set).next() {
@@ -394,6 +392,10 @@ impl PersistentHugr {
                 hugr.mermaid_string()
             );
 
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "inserting independent node mappings is order-independent"
+            )]
             for (old_node, new_node) in new_node_map {
                 let old_patch_node = PatchNode(commit_id, old_node);
                 node_map.insert(old_patch_node, new_node);

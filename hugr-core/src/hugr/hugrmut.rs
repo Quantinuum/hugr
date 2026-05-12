@@ -663,6 +663,10 @@ impl HugrMut for Hugr {
         // Update the optypes and metadata, taking them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "updating per-node payloads is independent for each node"
+        )]
         for (&node, &new_node) in &inserted.node_map {
             let node_pg = node.into_portgraph();
             let new_node_pg = new_node.into_portgraph();
@@ -686,6 +690,10 @@ impl HugrMut for Hugr {
         // Update the optypes and metadata, copying them from the other graph.
         //
         // No need to compute each node's extensions here, as we merge `other.extensions` directly.
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "updating per-node payloads is independent for each node"
+        )]
         for (&node, &new_node) in &inserted.node_map {
             let nodetype = other.get_optype(node);
             self.op_types
