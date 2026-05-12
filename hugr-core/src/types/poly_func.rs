@@ -11,7 +11,7 @@ use crate::{
 
 use super::Substitution;
 use super::signature::FuncTypeBase;
-use super::type_param::{TypeArg, TypeParam, check_term_types};
+use super::type_param::{TypeArg, TypeParam, check_term_kinds};
 
 /// A polymorphic type scheme, i.e. of a [`FuncDecl`], [`FuncDefn`] or [`OpDef`].
 /// (Nodes/operations in the Hugr are not polymorphic.)
@@ -130,7 +130,7 @@ impl<T: TypeRowLike> PolyFuncTypeBase<T> {
     pub fn instantiate(&self, args: &[TypeArg]) -> Result<FuncTypeBase<T>, SignatureError> {
         // Check that args are applicable, and that we have a value for each binder,
         // i.e. each possible free variable within the body.
-        check_term_types(args, &self.params)?;
+        check_term_kinds(args, &self.params)?;
         Ok(self.body.substitute(&Substitution(args)))
     }
 
@@ -167,7 +167,7 @@ pub(crate) mod test {
     use crate::std_extensions::collections::array::{self, array_type_parametric};
     use crate::std_extensions::collections::list;
     use crate::types::signature::FuncTypeBase;
-    use crate::types::type_param::{TermTypeError, TypeArg, TypeParam};
+    use crate::types::type_param::{TermKindError, TypeArg, TypeParam};
     use crate::types::{
         CustomType, FuncValueType, PolyFuncTypeBase, Signature, Term, Type, TypeBound, TypeName,
         TypeRowLike, TypeRowRV,
@@ -237,9 +237,9 @@ pub(crate) mod test {
 
     #[test]
     fn test_mismatched_args() -> Result<(), SignatureError> {
-        let size_var = TypeArg::new_var_use(0, TypeParam::max_nat_type());
+        let size_var = TypeArg::new_var_use(0, TypeParam::max_nat_kind());
         let ty_var = TypeArg::new_var_use(1, TypeBound::Linear);
-        let type_params = [TypeParam::max_nat_type(), TypeBound::Linear.into()];
+        let type_params = [TypeParam::max_nat_kind(), TypeBound::Linear.into()];
 
         // Valid schema...
         let good_array = array_type_parametric(size_var.clone(), ty_var.clone())?;
@@ -255,16 +255,16 @@ pub(crate) mod test {
         assert_eq!(
             wrong_args,
             Err(SignatureError::TypeArgMismatch(
-                TermTypeError::TypeMismatch {
-                    type_: Box::new(type_params[0].clone()),
+                TermKindError::KindMismatch {
+                    kind: Box::new(type_params[0].clone()),
                     term: Box::new(usize_t().into()),
                 }
             ))
         );
 
         // (Try to) make a schema with the args in the wrong order
-        let arg_err = SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
-            type_: Box::new(type_params[0].clone()),
+        let arg_err = SignatureError::TypeArgMismatch(TermKindError::KindMismatch {
+            kind: Box::new(type_params[0].clone()),
             term: Box::new(ty_var.clone()),
         });
         assert_eq!(
@@ -293,9 +293,9 @@ pub(crate) mod test {
         let list_def = list::EXTENSION.get_type(&list::LIST_TYPENAME).unwrap();
         let body_type = Signature::new_endo([Type::new_extension(list_def.instantiate([tv])?)]);
         for decl in [
-            Term::new_list_type(Term::max_nat_type()),
-            Term::StringType,
-            Term::new_tuple_type([TypeBound::Linear.into(), Term::max_nat_type()]),
+            Term::new_list_kind(Term::max_nat_kind()),
+            Term::StringKind,
+            Term::new_tuple_kind([TypeBound::Linear.into(), Term::max_nat_kind()]),
         ] {
             let invalid_ts = PolyFuncTypeBase::new_validated([decl.clone()], body_type.clone());
             assert_eq!(
@@ -360,8 +360,8 @@ pub(crate) mod test {
             assert_eq!(
                 make_scheme(decl.clone()).err(),
                 Some(SignatureError::TypeArgMismatch(
-                    TermTypeError::TypeMismatch {
-                        type_: Box::new(bound.clone()),
+                    TermKindError::KindMismatch {
+                        kind: Box::new(bound.clone()),
                         term: Box::new(TypeArg::new_var_use(0, decl.clone()))
                     }
                 ))
@@ -379,29 +379,29 @@ pub(crate) mod test {
         )?;
 
         decl_accepts_rejects_var(
-            Term::new_list_type(TypeBound::Copyable),
-            &[Term::new_list_type(TypeBound::Copyable)],
-            &[Term::new_list_type(TypeBound::Linear)],
+            Term::new_list_kind(TypeBound::Copyable),
+            &[Term::new_list_kind(TypeBound::Copyable)],
+            &[Term::new_list_kind(TypeBound::Linear)],
         )?;
 
         decl_accepts_rejects_var(
-            TypeParam::max_nat_type(),
-            &[TypeParam::bounded_nat_type(NonZeroU64::new(5).unwrap())],
+            TypeParam::max_nat_kind(),
+            &[TypeParam::bounded_nat_kind(NonZeroU64::new(5).unwrap())],
             &[],
         )?;
         decl_accepts_rejects_var(
-            TypeParam::bounded_nat_type(NonZeroU64::new(10).unwrap()),
-            &[TypeParam::bounded_nat_type(NonZeroU64::new(5).unwrap())],
-            &[TypeParam::max_nat_type()],
+            TypeParam::bounded_nat_kind(NonZeroU64::new(10).unwrap()),
+            &[TypeParam::bounded_nat_kind(NonZeroU64::new(5).unwrap())],
+            &[TypeParam::max_nat_kind()],
         )?;
         Ok(())
     }
 
-    const TP_ANY: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
+    const TP_ANY: TypeParam = TypeParam::TypeKind(TypeBound::Linear);
     #[test]
     fn row_variables_bad_schema() {
         // Mismatched TypeBound (Copyable vs Any)
-        let decl = Term::new_list_type(TP_ANY);
+        let decl = Term::new_list_kind(TP_ANY);
         let e = PolyFuncTypeBase::new_validated(
             [decl.clone()],
             FuncValueType::new([usize_t()], TypeRowRV::new_var_use(0, TypeBound::Copyable)),
@@ -409,7 +409,7 @@ pub(crate) mod test {
         .unwrap_err();
         assert_matches!(e, SignatureError::TypeVarDoesNotMatchDeclaration { actual, cached } => {
             assert_eq!(*actual, decl);
-            assert_eq!(*cached, TypeParam::new_list_type(TypeBound::Copyable));
+            assert_eq!(*cached, TypeParam::new_list_kind(TypeBound::Copyable));
         });
         // Declared as row variable, used as type variable
         let e = PolyFuncTypeBase::new_validated(
@@ -427,7 +427,7 @@ pub(crate) mod test {
     fn row_variables() {
         let rty = TypeRowRV::new_var_use(0, TypeBound::Linear);
         let pf = PolyFuncTypeBase::new_validated(
-            [TypeParam::new_list_type(TP_ANY)],
+            [TypeParam::new_list_kind(TP_ANY)],
             FuncValueType::new(
                 TypeRowRV::from([usize_t()]).concat(rty.clone()),
                 [Type::new_tuple(rty)],
@@ -459,7 +459,7 @@ pub(crate) mod test {
             TypeBound::Copyable,
         )));
         let pf = PolyFuncTypeBase::new_validated(
-            [Term::new_list_type(TypeBound::Copyable)],
+            [Term::new_list_kind(TypeBound::Copyable)],
             Signature::new(vec![usize_t(), inner_fty.clone()], vec![inner_fty]),
         )
         .unwrap();

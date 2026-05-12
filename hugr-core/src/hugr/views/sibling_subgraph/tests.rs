@@ -192,14 +192,14 @@ fn test_signature() -> Result<(), InvalidSubgraph> {
 fn test_polymorphic_signature() -> Result<(), InvalidSubgraph> {
     let mut mod_builder = ModuleBuilder::new();
     let arr_type =
-        array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_type()), bool_t())
+        array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_kind()), bool_t())
             .unwrap();
     let func_id = {
         let mut h = mod_builder
             .define_function(
                 "test",
                 PolyFuncType::new(
-                    vec![TypeParam::max_nat_type()],
+                    vec![TypeParam::max_nat_kind()],
                     Signature::new_endo(vec![arr_type.clone()]),
                 ),
             )
@@ -220,7 +220,7 @@ fn test_polymorphic_signature() -> Result<(), InvalidSubgraph> {
     assert_eq!(
         sub.poly_func_type(&func),
         PolyFuncType::new(
-            vec![TypeParam::max_nat_type()],
+            vec![TypeParam::max_nat_kind()],
             Signature::new_endo(vec![arr_type]),
         ),
     );
@@ -231,14 +231,14 @@ fn test_polymorphic_signature() -> Result<(), InvalidSubgraph> {
 fn test_polymorphic_signature_nested() -> Result<(), InvalidSubgraph> {
     let mut mod_builder = ModuleBuilder::new();
     let arr_type =
-        array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_type()), bool_t())
+        array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_kind()), bool_t())
             .unwrap();
     let dfg_node = {
         let mut h = mod_builder
             .define_function(
                 "test",
                 PolyFuncType::new(
-                    vec![TypeParam::max_nat_type()],
+                    vec![TypeParam::max_nat_kind()],
                     Signature::new_endo(vec![arr_type.clone()]),
                 ),
             )
@@ -267,7 +267,7 @@ fn test_polymorphic_signature_nested() -> Result<(), InvalidSubgraph> {
     assert_eq!(
         sub.poly_func_type(&hugr),
         PolyFuncType::new(
-            vec![TypeParam::max_nat_type()],
+            vec![TypeParam::max_nat_kind()],
             Signature::new_endo(vec![arr_type]),
         ),
     );

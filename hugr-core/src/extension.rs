@@ -125,7 +125,7 @@ use thiserror::Error;
 use crate::hugr::IdentList;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{OpName, OpNameRef};
-use crate::types::type_param::{TermTypeError, TypeArg, TypeParam};
+use crate::types::type_param::{TermKindError, TypeArg, TypeParam};
 use crate::types::{CustomType, TypeBound, TypeName};
 use crate::types::{Signature, TypeNameRef};
 
@@ -490,7 +490,7 @@ pub enum SignatureError {
     ExtensionMismatch(ExtensionId, ExtensionId),
     /// When the type arguments of the node did not match the params declared by the `OpDef`
     #[error("Type arguments of node did not match params declared by definition: {0}")]
-    TypeArgMismatch(#[from] TermTypeError),
+    TypeArgMismatch(#[from] TermKindError),
     /// Invalid type arguments
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,

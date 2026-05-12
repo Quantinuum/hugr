@@ -357,7 +357,7 @@ mod test {
 
     #[test]
     fn test_transform() {
-        let Term::RuntimeExtension(usz_t) = usize_t().into() else {
+        let Term::ExtensionType(usz_t) = usize_t().into() else {
             panic!()
         };
         let tr = FnTransformer(|ct: &CustomType| (ct == &usz_t).then_some(bool_t()));

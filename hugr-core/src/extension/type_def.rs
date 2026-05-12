@@ -6,7 +6,7 @@ use super::{Extension, ExtensionId, SignatureError};
 
 use crate::types::{CustomType, TypeName, least_upper_bound};
 
-use crate::types::type_param::{TypeArg, check_term_types};
+use crate::types::type_param::{TypeArg, check_term_kinds};
 
 use crate::types::type_param::TypeParam;
 
@@ -79,7 +79,7 @@ pub struct TypeDef {
 impl TypeDef {
     /// Check provided type arguments are valid against parameters.
     pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        Ok(check_term_types(args, &self.params)?)
+        Ok(check_term_kinds(args, &self.params)?)
     }
 
     /// Check [`CustomType`] is a valid instantiation of this definition.
@@ -102,7 +102,7 @@ impl TypeDef {
             ));
         }
 
-        check_term_types(custom.type_args(), &self.params)?;
+        check_term_kinds(custom.type_args(), &self.params)?;
 
         let calc_bound = self.bound(custom.args());
         if calc_bound == custom.bound() {
@@ -123,7 +123,7 @@ impl TypeDef {
     /// valid instances of the type parameters.
     pub fn instantiate(&self, args: impl Into<Vec<TypeArg>>) -> Result<CustomType, SignatureError> {
         let args = args.into();
-        check_term_types(&args, &self.params)?;
+        check_term_kinds(&args, &self.params)?;
         let bound = self.bound(&args);
         Ok(CustomType::new(
             self.name().clone(),
@@ -240,7 +240,7 @@ mod test {
     use crate::extension::SignatureError;
     use crate::extension::prelude::{qb_t, usize_t};
     use crate::std_extensions::arithmetic::float_types::float64_type;
-    use crate::types::type_param::{TermTypeError, TypeParam};
+    use crate::types::type_param::{TermKindError, TypeParam};
     use crate::types::{Signature, Type, TypeBound};
 
     use super::{TypeDef, TypeDefBound};
@@ -249,7 +249,7 @@ mod test {
     fn test_instantiate_typedef() {
         let def = TypeDef {
             name: "MyType".into(),
-            params: vec![TypeParam::RuntimeType(TypeBound::Copyable)],
+            params: vec![TypeParam::TypeKind(TypeBound::Copyable)],
             extension: "MyRsrc".try_into().unwrap(),
             // Dummy extension. Will return `None` when trying to upgrade it into an `Arc`.
             extension_ref: Default::default(),
@@ -270,22 +270,22 @@ mod test {
         assert_eq!(
             def.instantiate([qb_t().into()]),
             Err(SignatureError::TypeArgMismatch(
-                TermTypeError::TypeMismatch {
+                TermKindError::KindMismatch {
                     term: Box::new(qb_t().into()),
-                    type_: Box::new(TypeBound::Copyable.into())
+                    kind: Box::new(TypeBound::Copyable.into())
                 }
             ))
         );
         // Too few arguments:
         assert_eq!(
             def.instantiate([]).unwrap_err(),
-            SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(0, 1))
+            SignatureError::TypeArgMismatch(TermKindError::WrongNumberArgs(0, 1))
         );
         // Too many arguments:
         assert_eq!(
             def.instantiate([float64_type().into(), float64_type().into(),])
                 .unwrap_err(),
-            SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(2, 1))
+            SignatureError::TypeArgMismatch(TermKindError::WrongNumberArgs(2, 1))
         );
     }
 }

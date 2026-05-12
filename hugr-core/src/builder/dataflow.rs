@@ -481,7 +481,7 @@ pub(crate) mod test {
     use crate::metadata::Metadata;
     use crate::ops::{FuncDecl, FuncDefn, OpParent, OpTag, OpTrait, Value, handle::NodeHandle};
     use crate::std_extensions::logic::test::and_op;
-    use crate::types::type_param::{TermTypeError, TypeParam};
+    use crate::types::type_param::{TermKindError, TypeParam};
     use crate::types::{EdgeKind, FuncValueType, Signature, Term, Type, TypeBound, TypeRowRV};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{Wire, builder::test::n_identity, type_row};
@@ -931,7 +931,7 @@ pub(crate) mod test {
         FunctionBuilder::new(
             "bad_eval",
             PolyFuncType::new(
-                [TypeParam::new_list_type(TypeBound::Copyable)],
+                [TypeParam::new_list_kind(TypeBound::Copyable)],
                 Signature::new(
                     [Type::new_function(FuncValueType::new(
                         [usize_t()],
@@ -947,7 +947,7 @@ pub(crate) mod test {
         assert_eq!(
             ev,
             Err(SignatureError::TypeArgMismatch(
-                TermTypeError::InvalidValue(Box::new(rv.clone()))
+                TermKindError::InvalidValue(Box::new(rv.clone()))
             ))
         );
 
@@ -958,9 +958,9 @@ pub(crate) mod test {
         assert_eq!(
             ev,
             Err(SignatureError::TypeArgMismatch(
-                TermTypeError::TypeMismatch {
+                TermKindError::KindMismatch {
                     term: Box::new(rv),
-                    type_: Box::new(TypeBound::Linear.into())
+                    kind: Box::new(TypeBound::Linear.into())
                 }
             ))
         );

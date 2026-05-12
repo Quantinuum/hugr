@@ -10,7 +10,7 @@ use super::custom::CustomType;
 use crate::extension::prelude::{qb_t, usize_t};
 use crate::ops::AliasDecl;
 use crate::types::TypeRowRV;
-use crate::types::type_param::{SeqPart, TermTypeError, TermVar, UpperBound};
+use crate::types::type_param::{SeqPart, TermKindError, TermVar, UpperBound};
 
 #[derive(Serialize, serde::Deserialize, Clone, Debug)]
 #[serde(tag = "t")]
@@ -34,16 +34,16 @@ impl From<Type> for SerSimpleType {
             return SerSimpleType::I;
         }
         match value.into() {
-            Term::RuntimeExtension(o) => SerSimpleType::Opaque(o),
-            Term::RuntimeFunction(sig) => SerSimpleType::G(sig),
+            Term::ExtensionType(o) => SerSimpleType::Opaque(o),
+            Term::FunctionType(sig) => SerSimpleType::G(sig),
             Term::Variable(tv) => {
                 let i = tv.index();
-                let Term::RuntimeType(b) = &*tv.cached_decl else {
+                let Term::TypeKind(b) = &*tv.cached_decl else {
                     panic!("Variable with bound {} is not a valid Type", tv.cached_decl);
                 };
                 SerSimpleType::V { i, b: *b }
             }
-            Term::RuntimeSum(st) => SerSimpleType::Sum(st),
+            Term::SumType(st) => SerSimpleType::Sum(st),
             v => panic!("{} was not a valid Type", v),
         }
     }
@@ -51,12 +51,12 @@ impl From<Type> for SerSimpleType {
 
 // Row Variables can also be serialized as "simple types"
 impl TryFrom<Term> for SerSimpleType {
-    type Error = TermTypeError;
+    type Error = TermKindError;
 
     fn try_from(value: Term) -> Result<Self, Self::Error> {
         if let Term::Variable(tv) = &value
-            && let Term::ListType(t) = &*tv.cached_decl
-            && let Term::RuntimeType(b) = &**t
+            && let Term::ListKind(t) = &*tv.cached_decl
+            && let Term::TypeKind(b) = &**t
         {
             return Ok(SerSimpleType::R {
                 i: tv.index(),
@@ -83,7 +83,7 @@ impl From<SerSimpleType> for Term {
 }
 
 impl TryFrom<SerSimpleType> for Type {
-    type Error = TermTypeError;
+    type Error = TermKindError;
 
     fn try_from(value: SerSimpleType) -> Result<Self, Self::Error> {
         Term::from(value).try_into()
@@ -153,20 +153,20 @@ pub(super) enum TermSer {
 impl From<Term> for TermSer {
     fn from(value: Term) -> Self {
         match value {
-            Term::RuntimeType(b) => TermSer::TypeParam(TypeParamSer::Type { b }),
-            Term::StaticType => TermSer::TypeParam(TypeParamSer::StaticType),
-            Term::BoundedNatType(bound) => TermSer::TypeParam(TypeParamSer::BoundedNat { bound }),
-            Term::StringType => TermSer::TypeParam(TypeParamSer::String),
-            Term::BytesType => TermSer::TypeParam(TypeParamSer::Bytes),
-            Term::FloatType => TermSer::TypeParam(TypeParamSer::Float),
-            Term::ListType(param) => TermSer::TypeParam(TypeParamSer::List { param }),
-            Term::ConstType(ty) => TermSer::TypeParam(TypeParamSer::ConstType { ty: *ty }),
-            Term::RuntimeFunction(_) | Term::RuntimeExtension(_) | Term::RuntimeSum(_) => {
+            Term::TypeKind(b) => TermSer::TypeParam(TypeParamSer::Type { b }),
+            Term::StaticKind => TermSer::TypeParam(TypeParamSer::StaticType),
+            Term::BoundedNatKind(bound) => TermSer::TypeParam(TypeParamSer::BoundedNat { bound }),
+            Term::StringKind => TermSer::TypeParam(TypeParamSer::String),
+            Term::BytesKind => TermSer::TypeParam(TypeParamSer::Bytes),
+            Term::FloatKind => TermSer::TypeParam(TypeParamSer::Float),
+            Term::ListKind(param) => TermSer::TypeParam(TypeParamSer::List { param }),
+            Term::ConstKind(ty) => TermSer::TypeParam(TypeParamSer::ConstType { ty: *ty }),
+            Term::FunctionType(_) | Term::ExtensionType(_) | Term::SumType(_) => {
                 TermSer::TypeArg(TypeArgSer::Type {
                     ty: value.try_into().unwrap(),
                 })
             }
-            Term::TupleType(params) => TermSer::TypeParam(TypeParamSer::Tuple {
+            Term::TupleKind(params) => TermSer::TypeParam(TypeParamSer::Tuple {
                 params: (*params).into(),
             }),
             Term::BoundedNat(n) => TermSer::TypeArg(TypeArgSer::BoundedNat { n }),
@@ -175,7 +175,7 @@ impl From<Term> for TermSer {
             Term::Float(value) => TermSer::TypeArg(TypeArgSer::Float { value }),
             Term::List(elems) => TermSer::TypeArg(TypeArgSer::List { elems }),
             Term::Tuple(elems) => TermSer::TypeArg(TypeArgSer::Tuple { elems }),
-            Term::Variable(ref v) if matches!(&*v.cached_decl, Term::RuntimeType(_)) => {
+            Term::Variable(ref v) if matches!(&*v.cached_decl, Term::TypeKind(_)) => {
                 TermSer::TypeArg(TypeArgSer::Type {
                     ty: value.try_into().unwrap(),
                 })
@@ -192,15 +192,15 @@ impl From<TermSer> for Term {
     fn from(value: TermSer) -> Self {
         match value {
             TermSer::TypeParam(param) => match param {
-                TypeParamSer::Type { b } => Term::RuntimeType(b),
-                TypeParamSer::StaticType => Term::StaticType,
-                TypeParamSer::BoundedNat { bound } => Term::BoundedNatType(bound),
-                TypeParamSer::String => Term::StringType,
-                TypeParamSer::Bytes => Term::BytesType,
-                TypeParamSer::Float => Term::FloatType,
-                TypeParamSer::List { param } => Term::ListType(param),
-                TypeParamSer::Tuple { params } => Term::TupleType(Box::new(params.into())),
-                TypeParamSer::ConstType { ty } => Term::ConstType(Box::new(ty)),
+                TypeParamSer::Type { b } => Term::TypeKind(b),
+                TypeParamSer::StaticType => Term::StaticKind,
+                TypeParamSer::BoundedNat { bound } => Term::BoundedNatKind(bound),
+                TypeParamSer::String => Term::StringKind,
+                TypeParamSer::Bytes => Term::BytesKind,
+                TypeParamSer::Float => Term::FloatKind,
+                TypeParamSer::List { param } => Term::ListKind(param),
+                TypeParamSer::Tuple { params } => Term::TupleKind(Box::new(params.into())),
+                TypeParamSer::ConstType { ty } => Term::ConstKind(Box::new(ty)),
             },
             TermSer::TypeArg(arg) => match arg {
                 TypeArgSer::Type { ty } => Term::from(ty),
