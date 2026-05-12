@@ -228,6 +228,53 @@ fn test_polymorphic_signature() -> Result<(), InvalidSubgraph> {
 }
 
 #[test]
+fn test_polymorphic_signature_nested() -> Result<(), InvalidSubgraph> {
+    let mut mod_builder = ModuleBuilder::new();
+    let arr_type =
+        array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_type()), bool_t())
+            .unwrap();
+    let dfg_node = {
+        let mut h = mod_builder
+            .define_function(
+                "test",
+                PolyFuncType::new(
+                    vec![TypeParam::max_nat_type()],
+                    Signature::new_endo(vec![arr_type.clone()]),
+                ),
+            )
+            .unwrap();
+        let [arr] = h.input_wires_arr();
+        // Nest target subgraph inside a DFG
+        let mut dfg = h
+            .dfg_builder(Signature::new_endo(vec![arr_type.clone()]), [arr])
+            .unwrap();
+        let [arr] = dfg.input_wires_arr();
+        let tuple = dfg.make_tuple([arr]).unwrap();
+        let op = UnpackTuple::new(vec![arr_type.clone()].into());
+        let [arr] = dfg.add_dataflow_op(op, [tuple]).unwrap().outputs_arr();
+        let dfg = dfg.finish_with_outputs([arr]).unwrap();
+        let [arr] = dfg.outputs_arr();
+        h.finish_with_outputs([arr]).unwrap();
+
+        dfg.node()
+    };
+    let hugr = mod_builder.finish_hugr().unwrap();
+
+    // Skip the input and output nodes of the dfg
+    let nodes = hugr.children(dfg_node).skip(2).collect_vec();
+    let sub = SiblingSubgraph::try_from_nodes(nodes, &hugr)?;
+    assert!(sub.validate_default(&hugr).is_ok(),);
+    assert_eq!(
+        sub.poly_func_type(&hugr),
+        PolyFuncType::new(
+            vec![TypeParam::max_nat_type()],
+            Signature::new_endo(vec![arr_type]),
+        ),
+    );
+    Ok(())
+}
+
+#[test]
 fn construct_simple_replacement_invalid_signature() -> Result<(), InvalidSubgraph> {
     let (hugr, dfg) = build_hugr().unwrap();
     let func = hugr.with_entrypoint(dfg);
