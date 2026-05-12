@@ -37,11 +37,18 @@ class Metadata(Protocol[Meta]):
     primitive type, `to_json` and `from_json` must be implemented to serialize
     and deserialize the value.
 
+    Class variables:
+        KEY: The unique key associated with the metadata entry.
+        ALIASES: Other aliases of the metadata key. Typed metadata reads use
+            these, in order, as fallbacks when KEY is not present. This is used
+            for backward compatibility when renaming metadata keys.
+
     Args:
         value: The value of the metadata.
     """
 
     KEY: ClassVar[str]
+    ALIASES: ClassVar[list[str]] = []
 
     @classmethod
     def to_json(cls, value: Meta) -> JsonType:
@@ -74,6 +81,16 @@ class NodeMetadata:
         # Only a shallow copy, values may still be shared with the original dictionary.
         self._dict = copy.copy(metadata)
 
+    @staticmethod
+    def _keys_for_metadata(key: type[Metadata[Meta]]) -> Iterable[str]:
+        return (key.KEY, *key.ALIASES)
+
+    def _typed_json(self, key: type[Metadata[Meta]]) -> JsonType:
+        for raw_key in self._keys_for_metadata(key):
+            if raw_key in self._dict:
+                return self._dict[raw_key]
+        raise KeyError(key.KEY)
+
     @overload
     def get(self, key: type[Metadata[Meta]], default: Meta) -> Meta: ...
     @overload
@@ -85,11 +102,12 @@ class NodeMetadata:
     ) -> Meta | JsonType | None:
         if isinstance(key, str):
             return self._dict.get(key, default)
-        elif key.KEY in self._dict:
-            val = self._dict[key.KEY]
-            return key.from_json(val)
         else:
-            return default
+            try:
+                val = self._typed_json(key)
+            except KeyError:
+                return default
+            return key.from_json(val)
 
     def items(self) -> Iterable[tuple[str, JsonType]]:
         return self._dict.items()
@@ -105,7 +123,7 @@ class NodeMetadata:
         if isinstance(key, str):
             return self._dict[key]
         else:
-            val = self._dict[key.KEY]
+            val = self._typed_json(key)
             return key.from_json(val)
 
     @overload
@@ -135,9 +153,9 @@ class NodeMetadata:
         return len(self._dict)
 
     def __contains__(self, key: str | type[Metadata[Meta]]) -> bool:
-        if not isinstance(key, str):
-            key = key.KEY
-        return key in self._dict
+        if isinstance(key, str):
+            return key in self._dict
+        return any(raw_key in self._dict for raw_key in self._keys_for_metadata(key))
 
     def __repr__(self) -> str:
         return f"NodeMetadata({self._dict})"

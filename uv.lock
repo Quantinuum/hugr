@@ -409,7 +409,7 @@ requires-dist = [
     { name = "semver", specifier = "~=3.0" },
     { name = "sphinx", marker = "extra == 'docs'", specifier = ">=8.1.3,<10" },
     { name = "sphinx-favicon", marker = "extra == 'docs'", specifier = "~=1.1.0" },
-    { name = "sphinxcontrib-mermaid", marker = "extra == 'docs'", specifier = ">=2.0.2,<3" },
+    { name = "sphinxcontrib-mermaid", marker = "extra == 'docs'", specifier = ">=1,<3" },
     { name = "typing-extensions", specifier = "~=4.12" },
 ]
 provides-extras = ["docs", "pytket"]
