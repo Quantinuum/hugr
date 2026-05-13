@@ -131,22 +131,10 @@ fn add_order_edges<N: HugrNode>(
     (tgt_n, tgt_p): (N, IncomingPort),
     (src_n, src_p): (N, OutgoingPort),
 ) {
-    let src_succs = h
-        .linked_inputs(src_n, src_p)
-        .map(|(tgt_n, tgt_p)| {
-            debug_assert_eq!(Some(tgt_p), h.get_optype(tgt_n).other_input_port());
-            tgt_n
-        })
-        .collect::<Vec<_>>();
-    let tgt_preds = h
-        .linked_outputs(tgt_n, tgt_p)
-        .map(|(src_n, src_p)| {
-            debug_assert_eq!(Some(src_p), h.get_optype(src_n).other_output_port());
-            src_n
-        })
-        .collect::<Vec<_>>();
-    for (src_n, tgt_n) in tgt_preds.into_iter().cartesian_product(&src_succs) {
-        h.add_other_edge(src_n, *tgt_n);
+    let src_succs = h.linked_inputs(src_n, src_p).collect::<Vec<_>>();
+    let tgt_preds = h.linked_outputs(tgt_n, tgt_p).collect::<Vec<_>>();
+    for ((src_n, src_p), (tgt_n, tgt_p)) in tgt_preds.into_iter().cartesian_product(&src_succs) {
+        h.connect(src_n, src_p, *tgt_n, *tgt_p);
     }
 }
 
