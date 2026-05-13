@@ -2,8 +2,11 @@
 //! of the DFG except Input+Output into the DFG's parent,
 //! and deleting the DFG along with its Input + Output
 
+use itertools::Itertools;
+
 use super::{PatchHugrMut, PatchVerification};
 use crate::core::HugrNode;
+use crate::hugr::HugrMut;
 use crate::ops::handle::{DfgID, NodeHandle};
 use crate::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
 
@@ -58,10 +61,7 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn apply_hugr_mut(
-        self,
-        h: &mut impl crate::hugr::HugrMut<Node = N>,
-    ) -> Result<Self::Outcome, Self::Error> {
+    fn apply_hugr_mut(self, h: &mut impl HugrMut<Node = N>) -> Result<Self::Outcome, Self::Error> {
         self.verify(h)?;
         let n = self.0.node();
         let (oth_in, oth_out) = {
@@ -71,70 +71,54 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
                 dfg_ty.other_output_port().unwrap(),
             )
         };
+
+        // Order edges. Any paths A -> DFG -> B, where both edges are Order edges,
+        // must be preserved as A -> B. (These new edges may be redundant if there
+        // are paths through the nodes *inside* the DFG, but that's fine.)
+
+        for ((src_n, src_p), (tgt_n, tgt_p)) in h
+            .linked_outputs(n, oth_in)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .cartesian_product(&h.linked_inputs(n, oth_out).collect::<Vec<_>>())
+        {
+            h.connect(src_n, src_p, *tgt_n, *tgt_p);
+        }
+
         let parent = h.get_parent(n).unwrap();
         let [input, output] = h.get_io(n).unwrap();
         for ch in h.children(n).skip(2).collect::<Vec<_>>() {
             h.set_parent(ch, parent);
         }
-        // DFG Inputs. Deal with Order inputs first
-        for (src_n, src_p) in h.linked_outputs(n, oth_in).collect::<Vec<_>>() {
-            // Order edge from src_n to DFG => add order edge to each successor of Input node
-            debug_assert_eq!(Some(src_p), h.get_optype(src_n).other_output_port());
-            for tgt_n in h.output_neighbours(input).collect::<Vec<_>>() {
-                h.add_other_edge(src_n, tgt_n);
-            }
-        }
-        // And remaining (Value) inputs
-        let input_ord_succs = h
-            .linked_inputs(input, h.get_optype(input).other_output_port().unwrap())
-            .collect::<Vec<_>>();
+
+        // DFG Inputs.
         for inp in h.node_inputs(n).collect::<Vec<_>>() {
-            if inp == oth_in {
-                continue;
-            }
-            // Hugr is invalid if there is no output linked to the DFG input.
-            let (src_n, src_p) = h.single_linked_output(n, inp).unwrap();
+            let dfg_preds = h.linked_outputs(n, inp).collect::<Vec<_>>();
+            assert!(inp == oth_in || dfg_preds.len() == 1); // Any number of order preds
             h.disconnect(n, inp); // These disconnects allow permutations to work trivially.
             let outp = OutgoingPort::from(inp.index());
             let targets = h.linked_inputs(input, outp).collect::<Vec<_>>();
             h.disconnect(input, outp);
 
-            for (tgt_n, tgt_p) in targets {
-                h.connect(src_n, src_p, tgt_n, tgt_p);
-            }
-            // Ensure order-successors of Input node execute after any node producing an input
-            for (tgt, _) in &input_ord_succs {
-                h.add_other_edge(src_n, *tgt);
+            for ((src_n, src_p), (tgt_n, tgt_p)) in
+                dfg_preds.into_iter().cartesian_product(&targets)
+            {
+                h.connect(src_n, src_p, *tgt_n, *tgt_p);
             }
         }
-        // DFG Outputs. Deal with Order outputs first.
-        for (tgt_n, tgt_p) in h.linked_inputs(n, oth_out).collect::<Vec<_>>() {
-            debug_assert_eq!(Some(tgt_p), h.get_optype(tgt_n).other_input_port());
-            for src_n in h.input_neighbours(output).collect::<Vec<_>>() {
-                h.add_other_edge(src_n, tgt_n);
-            }
-        }
-        // And remaining (Value) outputs
-        let output_ord_preds = h
-            .linked_outputs(output, h.get_optype(output).other_input_port().unwrap())
-            .collect::<Vec<_>>();
+        // DFG Outputs.
         for outport in h.node_outputs(n).collect::<Vec<_>>() {
-            if outport == oth_out {
-                continue;
-            }
             let inpp = IncomingPort::from(outport.index());
-            // Hugr is invalid if the Output node has no corresponding input
-            let (src_n, src_p) = h.single_linked_output(output, inpp).unwrap();
+            let sources = h.linked_outputs(output, inpp).collect::<Vec<_>>();
+            assert!(outport == oth_out || sources.len() == 1); // Any number of order sources
             h.disconnect(output, inpp);
 
-            for (tgt_n, tgt_p) in h.linked_inputs(n, outport).collect::<Vec<_>>() {
-                h.connect(src_n, src_p, tgt_n, tgt_p);
-                // Ensure order-predecessors of Output node execute before any node consuming a DFG output
-                for (src, _) in &output_ord_preds {
-                    h.add_other_edge(*src, tgt_n);
-                }
-            }
+            let targets = h.linked_inputs(n, outport).collect::<Vec<_>>();
             h.disconnect(n, outport);
+            for ((src_n, src_p), (tgt_n, tgt_p)) in sources.into_iter().cartesian_product(&targets)
+            {
+                h.connect(src_n, src_p, *tgt_n, *tgt_p);
+            }
         }
         h.remove_node(input);
         h.remove_node(output);
@@ -147,6 +131,7 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
+    use std::iter::once;
 
     use rstest::rstest;
 
@@ -307,32 +292,36 @@ mod test {
         Ok(())
     }
 
-    #[test]
-    fn order_edges() -> Result<(), Box<dyn std::error::Error>> {
+    #[rstest]
+    fn order_edges(
+        #[values(false, true)] o1: bool,
+        #[values(false, true)] o2: bool,
+        #[values(false, true)] o3: bool,
+        #[values(false, true)] o4: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         /*      -----|-----|-----
          *           |     |
          *          H_a   H_b
-         *           |.    /         NB. Order edge H_a to nested DFG
-         *           | .  |
+         *           |.   |?         NB. Order edge H_a to nested DFG
+         *           | .  |?         NB. Optional(o1) Order edge from H_b to nested DFG
          *           |  /-|--------\
-         *           |  | | .  Cst | NB. Order edge Input to LCst
-         *           |  | |  . |   |
-         *           |  | |   LCst |
-         *           |  |  \ /     |
+         *           |  | |?.  Cst | NB. Order edge Input to LCst
+         *           |  | |? . |   | NB. Optional(o2) Order edge from Input to RZ
+         *           |  | |?  LCst |
+         *           |  | \? /     |
          *           |  |  RZ      |
          *           |  |  |       |
          *           |  |  meas    |
-         *           |  |  | \     |
-         *           |  |  |  if   |
-         *           |  |  |  .    | NB. Order edge if to Output
+         *           |  |  |? \    |
+         *           |  |  |? if   | NB. Optional(o3) Order edge from meas to Output
+         *           |  |  |? .    | NB. Order edge if to Output
          *           |  \--|-------/
-         *           |  .  |
-         *           | .   |         NB. Order edge nested DFG to H_a2
-         *           H_a2  /
-         *             \  /
-         *              CX
+         *           |  . ?|         NB. Optional(o4) Order edge from nested DFG to CX
+         *           | .  ?|         NB. Order edge nested DFG to H_a2
+         *           H_a2 ?|
+         *              \ ?/
+         *               CX
          */
-        // Extension inference here relies on quantum ops not requiring their own test_quantum_extension
         let mut outer = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
         let [a, b] = outer.input_wires_arr();
         let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;
@@ -342,6 +331,9 @@ mod test {
         let f = inner.add_load_value(float_types::ConstF64::new(1.0));
         inner.add_other_wire(inner.input().node(), f.node());
         let r = inner.add_dataflow_op(test_quantum_extension::rz_f64(), [i, f])?;
+        if o2 {
+            inner.add_other_wire(inner.input().node(), r.node());
+        }
         let [m, b] = inner
             .add_dataflow_op(test_quantum_extension::measure(), r.outputs())?
             .outputs_arr();
@@ -352,14 +344,23 @@ mod test {
         if_n.case_builder(1)?.finish_with_outputs([])?;
         let if_n = if_n.finish_sub_container()?;
         inner.add_other_wire(if_n.node(), inner.output().node());
+        if o3 {
+            inner.add_other_wire(m.node(), inner.output().node());
+        }
         let inner = inner.finish_with_outputs([m])?;
         outer.add_other_wire(h_a.node(), inner.node());
+        if o1 {
+            outer.add_other_wire(h_b.node(), inner.node());
+        }
         let h_a2 = outer.add_dataflow_op(test_quantum_extension::h_gate(), h_a.outputs())?;
         outer.add_other_wire(inner.node(), h_a2.node());
         let cx = outer.add_dataflow_op(
             test_quantum_extension::cx_gate(),
             h_a2.outputs().chain(inner.outputs()),
         )?;
+        if o4 {
+            outer.add_other_wire(inner.node(), cx.node());
+        }
         let mut outer = outer.finish_hugr_with_outputs(cx.outputs())?;
 
         outer.apply_patch(InlineDFG(*inner.handle()))?;
@@ -371,26 +372,40 @@ mod test {
                 .map(|(n, _)| n)
                 .collect::<HashSet<_>>()
         };
-        // h_a should have Order edges added to Rz and the F64 load_const
-        assert_eq!(
-            order_neighbours(h_a.node(), Direction::Outgoing),
-            HashSet::from([r.node(), f.node()])
-        );
-        // Likewise the load_const should have Order edges from the inputs to the inner DFG, i.e. h_a and h_b
-        assert_eq!(
-            order_neighbours(f.node(), Direction::Incoming),
-            HashSet::from([h_a.node(), h_b.node()])
-        );
-        // h_a2 should have Order edges from the measure and if
-        assert_eq!(
-            order_neighbours(h_a2.node(), Direction::Incoming),
-            HashSet::from([m.node(), if_n.node()])
-        );
-        // the if should have Order edges to the CX and h_a2
-        assert_eq!(
-            order_neighbours(if_n.node(), Direction::Outgoing),
-            HashSet::from([h_a2.node(), cx.node()])
-        );
+        // h_a, and optionally h_b, should have Order edges to the F64 load_const,
+        // optionally the Rz, also the Order-successors of the DFG
+        let input_ord_srcs = HashSet::from_iter(once(h_a.node()).chain(o1.then_some(h_b.node())));
+        let input_ord_tgts = HashSet::from_iter(once(f.node()).chain(o2.then_some(r.node())));
+
+        // h_a2, and optionally the CX, should have Order edges from the if,
+        // optionally meas, and the Order-predecessors of the DFG
+        let output_ord_tgts = HashSet::from_iter(once(h_a2.node()).chain(o4.then_some(cx.node())));
+        let output_ord_srcs = HashSet::from_iter(once(if_n.node()).chain(o3.then_some(m.node())));
+
+        for input_ord_src in &input_ord_srcs {
+            assert_eq!(
+                order_neighbours(*input_ord_src, Direction::Outgoing),
+                HashSet::from_iter(input_ord_tgts.union(&output_ord_tgts).copied())
+            );
+        }
+        for input_ord_tgt in &input_ord_tgts {
+            assert_eq!(
+                order_neighbours(*input_ord_tgt, Direction::Incoming),
+                input_ord_srcs
+            );
+        }
+        for output_ord_src in &output_ord_srcs {
+            assert_eq!(
+                order_neighbours(*output_ord_src, Direction::Outgoing),
+                output_ord_tgts
+            );
+        }
+        for output_ord_tgt in &output_ord_tgts {
+            assert_eq!(
+                order_neighbours(*output_ord_tgt, Direction::Incoming),
+                HashSet::from_iter(output_ord_srcs.union(&input_ord_srcs).copied())
+            );
+        }
         Ok(())
     }
 }
