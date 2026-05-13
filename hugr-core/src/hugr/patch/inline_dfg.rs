@@ -71,11 +71,26 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
                 dfg_ty.other_output_port().unwrap(),
             )
         };
+
+        // Order edges. Any paths A -> DFG -> B, where both edges are Order edges,
+        // must be preserved as A -> B. (These new edges may be redundant if there
+        // are paths through the nodes *inside* the DFG, but that's fine.)
+
+        for ((src_n, src_p), (tgt_n, tgt_p)) in h
+            .linked_outputs(n, oth_in)
+            .collect::<Vec<_>>()
+            .into_iter()
+            .cartesian_product(&h.linked_inputs(n, oth_out).collect::<Vec<_>>())
+        {
+            h.connect(src_n, src_p, *tgt_n, *tgt_p);
+        }
+
         let parent = h.get_parent(n).unwrap();
         let [input, output] = h.get_io(n).unwrap();
         for ch in h.children(n).skip(2).collect::<Vec<_>>() {
             h.set_parent(ch, parent);
         }
+
         // DFG Inputs.
         for inp in h.node_inputs(n).collect::<Vec<_>>() {
             let dfg_preds = h.linked_outputs(n, inp).collect::<Vec<_>>();
@@ -357,14 +372,20 @@ mod test {
                 .map(|(n, _)| n)
                 .collect::<HashSet<_>>()
         };
-        // h_a, and optionally h_b, should have Order edge(s)...
+        // h_a, and optionally h_b, should have Order edges to the F64 load_const,
+        // optionally the Rz, also the Order-successors of the DFG
         let input_ord_srcs = HashSet::from_iter(once(h_a.node()).chain(o1.then_some(h_b.node())));
-        // ...to the F64 load_const, and optionally the Rz
         let input_ord_tgts = HashSet::from_iter(once(f.node()).chain(o2.then_some(r.node())));
+
+        // h_a2, and optionally the CX, should have Order edges from the if,
+        // optionally meas, and the Order-predecessors of the DFG
+        let output_ord_tgts = HashSet::from_iter(once(h_a2.node()).chain(o4.then_some(cx.node())));
+        let output_ord_srcs = HashSet::from_iter(once(if_n.node()).chain(o3.then_some(m.node())));
+
         for input_ord_src in &input_ord_srcs {
             assert_eq!(
                 order_neighbours(*input_ord_src, Direction::Outgoing),
-                input_ord_tgts
+                HashSet::from_iter(input_ord_tgts.union(&output_ord_tgts).copied())
             );
         }
         for input_ord_tgt in &input_ord_tgts {
@@ -373,10 +394,6 @@ mod test {
                 input_ord_srcs
             );
         }
-        // h_a2, and optionally the CX, should have Order edges...
-        let output_ord_tgts = HashSet::from_iter(once(h_a2.node()).chain(o4.then_some(cx.node())));
-        // ...from the if, and optionally meas
-        let output_ord_srcs = HashSet::from_iter(once(if_n.node()).chain(o3.then_some(m.node())));
         for output_ord_src in &output_ord_srcs {
             assert_eq!(
                 order_neighbours(*output_ord_src, Direction::Outgoing),
@@ -386,7 +403,7 @@ mod test {
         for output_ord_tgt in &output_ord_tgts {
             assert_eq!(
                 order_neighbours(*output_ord_tgt, Direction::Incoming),
-                output_ord_srcs
+                HashSet::from_iter(output_ord_srcs.union(&input_ord_srcs).copied())
             );
         }
         Ok(())
