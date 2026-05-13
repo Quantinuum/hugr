@@ -262,9 +262,10 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
     }
 
     /// Consumes the `EmitModuleContext` and returns the internal [Module] and
-    /// [DebugInfoContext] (if present).
+    /// [DebugInfoContext] (if present). If the DebugInfoContext is Some,
+    /// the caller must call `finish` on it before calling `verify` on the Module.
     pub fn finish(mut self) -> (Module<'c>, Option<DebugInfoContext<'c>>) {
-        // NOTE: We do not consume the DebugInfoContext here because qis-compiler uses
+        // NOTE: We do not finish() the DebugInfoContext here because qis-compiler needs
         // it to mark the `qmain` entry point wrapper as compiler-generated.
         (self.module, self.di_context.take())
     }
@@ -414,7 +415,9 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
         Ok((self, todos))
     }
 
-    /// Consumes the `EmitHugr` and returns the internal [Module].
+    /// Consumes the `EmitHugr` and returns the internal [Module] and optional
+    /// [DebugInfoContext]. See the docs of EmitModuleContext::finish()
+    /// for an explanation of what to do with the DebugInfoContext.
     pub fn finish(self) -> (Module<'c>, Option<DebugInfoContext<'c>>) {
         self.module_context.finish()
     }
