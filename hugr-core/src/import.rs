@@ -427,7 +427,13 @@ impl<'a> Context<'a> {
     fn record_links(&mut self, node: Node, direction: Direction, links: &'a [table::LinkIndex]) {
         let optype = self.hugr.get_optype(node);
         // NOTE: `OpType::port_count` copies the signature, which significantly slows down the import.
-        debug_assert!(links.len() <= optype.port_count(direction));
+        debug_assert!(
+            links.len() <= optype.port_count(direction),
+            "{} has too many links, links: {}, port count: {}",
+            node,
+            links.len(),
+            optype.port_count(direction)
+        );
 
         for (link, port) in links.iter().zip(self.hugr.node_ports(node, direction)) {
             self.link_ports
@@ -2147,6 +2153,26 @@ impl LocalVar {
         Self {
             r#type,
             bound: TypeBound::Linear,
+        }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use crate::Hugr;
+    use std::fs::read;
+    use std::path::Path;
+
+    #[test]
+    fn test_import_cases() {
+        for case in Path::new("../test_files/import_tests")
+            .read_dir()
+            .expect("read_dir call failed")
+        {
+            let case = case.expect("could not locate case");
+            let content = read(case.path()).expect("could not read case file");
+            // Smoke test importing the HUGR
+            let _hugr = Hugr::load(content.as_slice(), None).expect("could not import hugr");
         }
     }
 }
