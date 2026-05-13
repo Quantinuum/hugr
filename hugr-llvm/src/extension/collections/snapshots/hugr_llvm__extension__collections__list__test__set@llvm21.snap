@@ -34,10 +34,10 @@ declare i1 @__rt__list__set(ptr, i64, ptr)
 !4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
 !5 = !DISubroutineType(types: !6)
 !6 = !{!7, !9, !14, !13}
-!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ ptr, { i1, i16 } }", file: !2, size: 10, align: 8, elements: !8)
+!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ ptr, { i1, i16 } }", file: !2, size: 80, align: 8, elements: !8)
 !8 = !{!9, !10}
 !9 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
-!10 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, i16 }", file: !2, size: 2, align: 8, elements: !11)
+!10 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, i16 }", file: !2, size: 16, align: 8, elements: !11)
 !11 = !{!12, !13}
 !12 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
 !13 = !DIBasicType(name: "i16", size: 16, encoding: DW_ATE_unsigned)

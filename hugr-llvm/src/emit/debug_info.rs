@@ -141,10 +141,19 @@ impl<'c> DebugInfoContext<'c> {
             .map(|genmeta| genmeta.to_string())
             .unwrap_or("unknown_hugr_generator".to_string());
 
+        let file = root_meta
+            .file_table
+            .get(root_meta.filename)
+            .ok_or_else(|| {
+                anyhow!(
+                    "Invalid file index in root debug info: {}",
+                    root_meta.filename
+                )
+            })?;
         let (builder, compile_unit) = iw_module.create_debug_info_builder(
             true, // allow_unresolved
             DWARFSourceLanguage::Python,
-            &(root_meta.file_table[root_meta.filename]),
+            file,
             &root_meta.directory,
             &prod_str,
             false, // is_optimized
@@ -193,20 +202,22 @@ impl<'c> DebugInfoContext<'c> {
         }))
     }
 
-    /// Get the size of a BasicTypeEnum
-    fn get_basic_type_size(&self, ty: BasicTypeEnum<'c>) -> u64 {
+    /// Get the size of a BasicTypeEnum in bytes
+    fn get_basic_type_byte_len(&self, ty: BasicTypeEnum<'c>) -> u64 {
         match ty {
             BasicTypeEnum::ArrayType(array_ty) => {
-                array_ty.len() as u64 * self.get_basic_type_size(array_ty.get_element_type())
+                array_ty.len() as u64 * self.get_basic_type_byte_len(array_ty.get_element_type())
             }
             BasicTypeEnum::FloatType(float_ty) => (float_ty.get_bit_width() / 8).into(),
             BasicTypeEnum::IntType(int_ty) => (int_ty.get_bit_width() / 8).into(),
             BasicTypeEnum::PointerType(_) => self.ptr_type.get_size_in_bits() / 8,
             // TODO: this does not respect inter-member alignment. not that important
             // until we have support for values in debug info.
-            BasicTypeEnum::StructType(struct_ty) => struct_ty
-                .get_field_types_iter()
-                .fold(0, |len, elem_ty| len + self.get_basic_type_size(elem_ty)),
+            BasicTypeEnum::StructType(struct_ty) => {
+                struct_ty.get_field_types_iter().fold(0, |len, elem_ty| {
+                    len + self.get_basic_type_byte_len(elem_ty)
+                })
+            }
             _ => panic!("Unexpected type in `get_basic_type_size`: {ty}"),
         }
     }
@@ -260,11 +271,11 @@ impl<'c> DebugInfoContext<'c> {
     }
 
     fn create_di_struct_type(&mut self, struct_ty: StructType<'c>) -> Result<DIType<'c>> {
-        let mut struct_len: u64 = 0;
+        let mut struct_bit_len: u64 = 0;
         let mut elem_tys = Vec::default();
         for llvm_ty in struct_ty.get_field_types_iter() {
             elem_tys.push(self.get_basic_di_type(llvm_ty.into())?);
-            struct_len += self.get_basic_type_size(llvm_ty);
+            struct_bit_len += self.get_basic_type_byte_len(llvm_ty) * 8;
         }
 
         Ok(self
@@ -277,7 +288,7 @@ impl<'c> DebugInfoContext<'c> {
                     .expect("type name is utf-8"),
                 self.compile_unit.get_file(), // TODO: this is probably supposed to be the decl
                 0,                            // line_no
-                struct_len,
+                struct_bit_len,
                 DEBUG_TYPE_ALIGNMENT,
                 0,    // flags
                 None, // derived_from
@@ -807,6 +818,26 @@ pub mod test {
             assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
         }
 
+        /// Test that compilation fails when a CompileUnitRecord has an out-of-range
+        /// file index.
+        #[rstest]
+        fn test_invalid_file_index_on_module(mut llvm_ctx: TestContext) {
+            llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
+            let mut hugr = build_hugr_with_all_debug_info();
+            let root = hugr.module_root();
+            hugr.set_metadata::<CompileUnitRecord>(
+                root,
+                CompileUnitRecord {
+                    kind: "compile_unit".into(),
+                    directory: "".into(),
+                    filename: 42,
+                    file_table: vec!["foo".into()],
+                },
+            );
+            let root = hugr.fat_root().unwrap();
+            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+        }
+
         /// Test that compilation fails when invalid JSON (not matching SubprogramRecord's
         /// schema) is attached to a FuncDefn node.
         #[rstest]
@@ -822,6 +853,30 @@ pub mod test {
                 func_node,
                 DEBUGINFO_META_KEY,
                 serde_json::json!({"not_a_valid_field": true}),
+            );
+            let root = hugr.fat_root().unwrap();
+            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+        }
+
+        /// Test that compilation fails when a SubprogramRecord has an out-of-range file
+        /// index.
+        #[rstest]
+        fn test_invalid_file_index_on_funcdefn(mut llvm_ctx: TestContext) {
+            llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
+            let mut hugr = build_hugr_with_all_debug_info();
+            let root = hugr.module_root();
+            let func_node = hugr
+                .children(root)
+                .find(|&n| matches!(hugr.get_optype(n), OpType::FuncDefn(_)))
+                .unwrap();
+            hugr.set_metadata::<SubprogramRecord>(
+                func_node,
+                SubprogramRecord {
+                    kind: "subprogram".into(),
+                    file: 42,
+                    line_no: 0,
+                    scope_line: 7,
+                },
             );
             let root = hugr.fat_root().unwrap();
             assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());

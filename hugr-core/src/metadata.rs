@@ -22,7 +22,9 @@
 //! let payload = hugr.get_metadata::<SomeMetadata>(hugr.module_root());
 //! assert_eq!(payload, Some("payload"));
 //! ```
-mod debug_info;
+
+/// Definitions of the HUGR debug info metadata types
+pub mod debug_info;
 
 use thiserror::Error;
 

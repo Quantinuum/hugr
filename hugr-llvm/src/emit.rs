@@ -264,6 +264,8 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
     /// Consumes the `EmitModuleContext` and returns the internal [Module] and
     /// [DebugInfoContext] (if present).
     pub fn finish(mut self) -> (Module<'c>, Option<DebugInfoContext<'c>>) {
+        // NOTE: We do not consume the DebugInfoContext here because qis-compiler uses
+        // it to mark the `qmain` entry point wrapper as compiler-generated.
         (self.module, self.di_context.take())
     }
 }

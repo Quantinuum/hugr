@@ -7,6 +7,7 @@ pub const DEBUGINFO_META_KEY: &str = "core.debug_info";
 
 /// Errors related to debug info metadata
 #[derive(Debug, Error)]
+#[non_exhaustive]
 pub enum DebugInfoError {
     /// This error indicates that the 'kind' field in the metadata record is incorrect.
     #[error("Debug metadata has wrong kind: got '{0}' expected '{1}'")]

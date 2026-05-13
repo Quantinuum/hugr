@@ -57,7 +57,7 @@ declare void @abort()
 !4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
 !5 = !DISubroutineType(types: !6)
 !6 = !{!7, !9, !9}
-!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i16, i16 }", file: !2, size: 4, align: 8, elements: !8)
+!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i16, i16 }", file: !2, size: 32, align: 8, elements: !8)
 !8 = !{!9, !9}
 !9 = !DIBasicType(name: "i16", size: 16, encoding: DW_ATE_unsigned)
 !10 = !DILocation(line: 27062, column: 402, scope: !3)
