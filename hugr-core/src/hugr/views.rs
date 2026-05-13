@@ -105,7 +105,7 @@ pub trait HugrView: HugrInternals {
 
     /// Returns the metadata associated with a node.
     ///
-    /// Looks up metadata under `M::KEY`, then under `M::ALIASES` in order.
+    /// Looks up metadata under `M::KEY`, then under entries of `M::ALIASES` in order.
     ///
     /// For a non type-safe accessor use [`HugrView::get_metadata_any`] instead.
     #[inline]
