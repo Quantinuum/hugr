@@ -77,64 +77,39 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
             h.set_parent(ch, parent);
         }
         // DFG Inputs.
-        add_order_edges(
-            h,
-            (n, oth_in),
-            (input, h.get_optype(input).other_output_port().unwrap()),
-        );
         for inp in h.node_inputs(n).collect::<Vec<_>>() {
-            if inp == oth_in {
-                continue;
-            }
-            // Hugr is invalid if there is no output linked to the DFG input.
-            let (src_n, src_p) = h.single_linked_output(n, inp).unwrap();
+            let dfg_preds = h.linked_outputs(n, inp).collect::<Vec<_>>();
+            assert!(inp == oth_in || dfg_preds.len() == 1); // Any number of order preds
             h.disconnect(n, inp); // These disconnects allow permutations to work trivially.
             let outp = OutgoingPort::from(inp.index());
             let targets = h.linked_inputs(input, outp).collect::<Vec<_>>();
             h.disconnect(input, outp);
 
-            for (tgt_n, tgt_p) in targets {
-                h.connect(src_n, src_p, tgt_n, tgt_p);
+            for ((src_n, src_p), (tgt_n, tgt_p)) in
+                dfg_preds.into_iter().cartesian_product(&targets)
+            {
+                h.connect(src_n, src_p, *tgt_n, *tgt_p);
             }
         }
-        // DFG Outputs. Deal with Order outputs first.
-        add_order_edges(
-            h,
-            (output, h.get_optype(output).other_input_port().unwrap()),
-            (n, oth_out),
-        );
-        // And remaining (Value) outputs
+        // DFG Outputs.
         for outport in h.node_outputs(n).collect::<Vec<_>>() {
-            if outport == oth_out {
-                continue;
-            }
             let inpp = IncomingPort::from(outport.index());
-            // Hugr is invalid if the Output node has no corresponding input
-            let (src_n, src_p) = h.single_linked_output(output, inpp).unwrap();
+            let sources = h.linked_outputs(output, inpp).collect::<Vec<_>>();
+            assert!(outport == oth_out || sources.len() == 1); // Any number of order sources
             h.disconnect(output, inpp);
 
-            for (tgt_n, tgt_p) in h.linked_inputs(n, outport).collect::<Vec<_>>() {
-                h.connect(src_n, src_p, tgt_n, tgt_p);
-            }
+            let targets = h.linked_inputs(n, outport).collect::<Vec<_>>();
             h.disconnect(n, outport);
+            for ((src_n, src_p), (tgt_n, tgt_p)) in sources.into_iter().cartesian_product(&targets)
+            {
+                h.connect(src_n, src_p, *tgt_n, *tgt_p);
+            }
         }
         h.remove_node(input);
         h.remove_node(output);
         assert!(h.children(n).next().is_none());
         h.remove_node(n);
         Ok([n, input, output])
-    }
-}
-
-fn add_order_edges<N: HugrNode>(
-    h: &mut impl HugrMut<Node = N>,
-    (tgt_n, tgt_p): (N, IncomingPort),
-    (src_n, src_p): (N, OutgoingPort),
-) {
-    let src_succs = h.linked_inputs(src_n, src_p).collect::<Vec<_>>();
-    let tgt_preds = h.linked_outputs(tgt_n, tgt_p).collect::<Vec<_>>();
-    for ((src_n, src_p), (tgt_n, tgt_p)) in tgt_preds.into_iter().cartesian_product(&src_succs) {
-        h.connect(src_n, src_p, *tgt_n, *tgt_p);
     }
 }
 
