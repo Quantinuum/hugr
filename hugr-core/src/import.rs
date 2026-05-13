@@ -2160,19 +2160,13 @@ impl LocalVar {
 #[cfg(test)]
 mod test {
     use crate::Hugr;
-    use std::fs::read;
-    use std::path::Path;
+    use rstest::rstest;
+    use std::path::PathBuf;
 
-    #[test]
-    fn test_import_cases() {
-        for case in Path::new("../test_files/import_tests")
-            .read_dir()
-            .expect("read_dir call failed")
-        {
-            let case = case.expect("could not locate case");
-            let content = read(case.path()).expect("could not read case file");
-            // Smoke test importing the HUGR
-            let _hugr = Hugr::load(content.as_slice(), None).expect("could not import hugr");
-        }
+    #[rstest]
+    fn test_import_cases(#[files("../test_files/import_tests/*.hugr")] case: PathBuf) {
+        let content = std::fs::read(&case).expect("could not read case file");
+        // Smoke test importing the HUGR
+        assert!(Hugr::load(content.as_slice(), None).is_ok());
     }
 }

@@ -524,6 +524,7 @@ class ModelExport:
                         )
 
                         child_node = self.export_node(child)
+                        assert child_node is not None
                         # The CFG node needs to be linked to the entry node, so if there
                         # is no existing link name available (no input port), we must
                         # generate one.

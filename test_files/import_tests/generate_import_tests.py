@@ -1,7 +1,7 @@
 #!/usr/bin/env python
-"""TODO docstring
+"""Generates the HUGR files used by the Rust HUGR import integration tests.
 
-usage: python generate_schema.py [<OUT_DIR>]
+usage: python generate_import_tests.py
 """
 from pathlib import Path
 from typing import Callable
