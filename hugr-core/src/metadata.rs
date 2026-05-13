@@ -42,6 +42,8 @@ pub trait Metadata {
     /// Typed metadata reads use these, in order, as fallbacks when [`Metadata::KEY`]
     /// is not present. This is intended for backward compatibility when renaming
     /// metadata keys.
+    ///
+    /// Metadata writes ignore this field and only write to [`Metadata::KEY`].
     const ALIASES: &'static [&'static str] = &[];
     /// The type of the metadata value.
     type Type<'hugr>: serde::de::Deserialize<'hugr> + serde::ser::Serialize;
