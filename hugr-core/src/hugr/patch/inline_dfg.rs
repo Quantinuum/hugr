@@ -153,6 +153,7 @@ fn add_order_edges<N: HugrNode>(
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
+    use std::iter::once;
 
     use rstest::rstest;
 
@@ -313,32 +314,36 @@ mod test {
         Ok(())
     }
 
-    #[test]
-    fn order_edges() -> Result<(), Box<dyn std::error::Error>> {
+    #[rstest]
+    fn order_edges(
+        #[values(false, true)] o1: bool,
+        #[values(false, true)] o2: bool,
+        #[values(false, true)] o3: bool,
+        #[values(false, true)] o4: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         /*      -----|-----|-----
          *           |     |
          *          H_a   H_b
-         *           |.    /         NB. Order edge H_a to nested DFG
-         *           | .  |
+         *           |.   |?         NB. Order edge H_a to nested DFG
+         *           | .  |?         NB. Optional(o1) Order edge from H_b to nested DFG
          *           |  /-|--------\
-         *           |  | | .  Cst | NB. Order edge Input to LCst
-         *           |  | |  . |   |
-         *           |  | |   LCst |
-         *           |  |  \ /     |
+         *           |  | |?.  Cst | NB. Order edge Input to LCst
+         *           |  | |? . |   | NB. Optional(o2) Order edge from Input to RZ
+         *           |  | |?  LCst |
+         *           |  | \? /     |
          *           |  |  RZ      |
          *           |  |  |       |
          *           |  |  meas    |
-         *           |  |  | \     |
-         *           |  |  |  if   |
-         *           |  |  |  .    | NB. Order edge if to Output
+         *           |  |  |? \    |
+         *           |  |  |? if   | NB. Optional(o3) Order edge from meas to Output
+         *           |  |  |? .    | NB. Order edge if to Output
          *           |  \--|-------/
-         *           |  .  |
-         *           | .   |         NB. Order edge nested DFG to H_a2
-         *           H_a2  /
-         *             \  /
-         *              CX
+         *           |  . ?|         NB. Optional(o4) Order edge from nested DFG to CX
+         *           | .  ?|         NB. Order edge nested DFG to H_a2
+         *           H_a2 ?|
+         *              \ ?/
+         *               CX
          */
-        // Extension inference here relies on quantum ops not requiring their own test_quantum_extension
         let mut outer = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
         let [a, b] = outer.input_wires_arr();
         let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;
@@ -348,6 +353,9 @@ mod test {
         let f = inner.add_load_value(float_types::ConstF64::new(1.0));
         inner.add_other_wire(inner.input().node(), f.node());
         let r = inner.add_dataflow_op(test_quantum_extension::rz_f64(), [i, f])?;
+        if o2 {
+            inner.add_other_wire(inner.input().node(), r.node());
+        }
         let [m, b] = inner
             .add_dataflow_op(test_quantum_extension::measure(), r.outputs())?
             .outputs_arr();
@@ -358,14 +366,23 @@ mod test {
         if_n.case_builder(1)?.finish_with_outputs([])?;
         let if_n = if_n.finish_sub_container()?;
         inner.add_other_wire(if_n.node(), inner.output().node());
+        if o3 {
+            inner.add_other_wire(m.node(), inner.output().node());
+        }
         let inner = inner.finish_with_outputs([m])?;
         outer.add_other_wire(h_a.node(), inner.node());
+        if o1 {
+            outer.add_other_wire(h_b.node(), inner.node());
+        }
         let h_a2 = outer.add_dataflow_op(test_quantum_extension::h_gate(), h_a.outputs())?;
         outer.add_other_wire(inner.node(), h_a2.node());
         let cx = outer.add_dataflow_op(
             test_quantum_extension::cx_gate(),
             h_a2.outputs().chain(inner.outputs()),
         )?;
+        if o4 {
+            outer.add_other_wire(inner.node(), cx.node());
+        }
         let mut outer = outer.finish_hugr_with_outputs(cx.outputs())?;
 
         outer.apply_patch(InlineDFG(*inner.handle()))?;
@@ -377,26 +394,38 @@ mod test {
                 .map(|(n, _)| n)
                 .collect::<HashSet<_>>()
         };
-        // h_a should have an Order edge to the F64 load_const
-        assert_eq!(
-            order_neighbours(h_a.node(), Direction::Outgoing),
-            HashSet::from([f.node()])
-        );
-        // Likewise the load_const should have an Order edge from h_a
-        assert_eq!(
-            order_neighbours(f.node(), Direction::Incoming),
-            HashSet::from([h_a.node()])
-        );
-        // h_a2 should have an Order edge from the if
-        assert_eq!(
-            order_neighbours(h_a2.node(), Direction::Incoming),
-            HashSet::from([if_n.node()])
-        );
-        // the if should have an Order edge to h_a2
-        assert_eq!(
-            order_neighbours(if_n.node(), Direction::Outgoing),
-            HashSet::from([h_a2.node()])
-        );
+        // h_a, and optionally h_b, should have Order edge(s)...
+        let input_ord_srcs = HashSet::from_iter(once(h_a.node()).chain(o1.then_some(h_b.node())));
+        // ...to the F64 load_const, and optionally the Rz
+        let input_ord_tgts = HashSet::from_iter(once(f.node()).chain(o2.then_some(r.node())));
+        for input_ord_src in &input_ord_srcs {
+            assert_eq!(
+                order_neighbours(*input_ord_src, Direction::Outgoing),
+                input_ord_tgts
+            );
+        }
+        for input_ord_tgt in &input_ord_tgts {
+            assert_eq!(
+                order_neighbours(*input_ord_tgt, Direction::Incoming),
+                input_ord_srcs
+            );
+        }
+        // h_a2, and optionally the CX, should have Order edges...
+        let output_ord_tgts = HashSet::from_iter(once(h_a2.node()).chain(o4.then_some(cx.node())));
+        // ...from the if, and optionally meas
+        let output_ord_srcs = HashSet::from_iter(once(if_n.node()).chain(o3.then_some(m.node())));
+        for output_ord_src in &output_ord_srcs {
+            assert_eq!(
+                order_neighbours(*output_ord_src, Direction::Outgoing),
+                output_ord_tgts
+            );
+        }
+        for output_ord_tgt in &output_ord_tgts {
+            assert_eq!(
+                order_neighbours(*output_ord_tgt, Direction::Incoming),
+                output_ord_srcs
+            );
+        }
         Ok(())
     }
 }
