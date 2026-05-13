@@ -161,6 +161,7 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
+    use std::iter::once;
 
     use rstest::rstest;
 
@@ -320,32 +321,36 @@ mod test {
         Ok(())
     }
 
-    #[test]
-    fn order_edges() -> Result<(), Box<dyn std::error::Error>> {
+    #[rstest]
+    fn order_edges(
+        #[values(false, true)] o1: bool,
+        #[values(false, true)] o2: bool,
+        #[values(false, true)] o3: bool,
+        #[values(false, true)] o4: bool,
+    ) -> Result<(), Box<dyn std::error::Error>> {
         /*      -----|-----|-----
          *           |     |
          *          H_a   H_b
-         *           |.    /         NB. Order edge H_a to nested DFG
-         *           | .  |
+         *           |.   |?         NB. Order edge H_a to nested DFG
+         *           | .  |?         NB. Optional(o1) Order edge from H_b to nested DFG
          *           |  /-|--------\
-         *           |  | |  . Cst | NB. Order edge Input to LCst
-         *           |  | |  . |   |
-         *           |  | |   LCst |
-         *           |  |  \ /     |
+         *           |  | |? . Cst | NB. Order edge Input to LCst
+         *           |  | |? . |   | NB. Optional(o2) Order edge from Input to RZ
+         *           |  | |?  LCst |
+         *           |  | \? /     |
          *           |  |  RZ      |
          *           |  |  |       |
          *           |  |  meas    |
-         *           |  |  | \     |
-         *           |  |  |  if   |
-         *           |  |  |  .    | NB. Order edge if to Output
+         *           |  |  |? \    |
+         *           |  |  |? if   | NB. Optional(o3) Order edge from meas to Output
+         *           |  |  |? .    | NB. Order edge if to Output
          *           |  \--|-------/
-         *           |  .  |
-         *           | .   |         NB. Order edge nested DFG to H_a2
-         *           H_a2  /
-         *             \  /
-         *              CX
+         *           |  . ?|         NB. Optional(o4) Order edge from nested DFG to CX
+         *           | .  ?|         NB. Order edge nested DFG to H_a2
+         *           H_a2 ?|
+         *              \ ?/
+         *               CX
          */
-
         let mut outer = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
         let [a, b] = outer.input_wires_arr();
         let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;
@@ -355,6 +360,9 @@ mod test {
         let f = inner.add_load_value(float_types::ConstF64::new(1.0));
         inner.add_other_wire(inner.input().node(), f.node());
         let r = inner.add_dataflow_op(test_quantum_extension::rz_f64(), [i, f])?;
+        if o2 {
+            inner.add_other_wire(inner.input().node(), r.node());
+        }
         let [m, b] = inner
             .add_dataflow_op(test_quantum_extension::measure(), r.outputs())?
             .outputs_arr();
@@ -365,14 +373,23 @@ mod test {
         if_n.case_builder(1)?.finish_with_outputs([])?;
         let if_n = if_n.finish_sub_container()?;
         inner.add_other_wire(if_n.node(), inner.output().node());
+        if o3 {
+            inner.add_other_wire(m.node(), inner.output().node());
+        }
         let inner = inner.finish_with_outputs([m])?;
         outer.add_other_wire(h_a.node(), inner.node());
+        if o1 {
+            outer.add_other_wire(h_b.node(), inner.node());
+        }
         let h_a2 = outer.add_dataflow_op(test_quantum_extension::h_gate(), h_a.outputs())?;
         outer.add_other_wire(inner.node(), h_a2.node());
         let cx = outer.add_dataflow_op(
             test_quantum_extension::cx_gate(),
             h_a2.outputs().chain(inner.outputs()),
         )?;
+        if o4 {
+            outer.add_other_wire(inner.node(), cx.node());
+        }
         let mut outer = outer.finish_hugr_with_outputs(cx.outputs())?;
 
         outer.apply_patch(InlineDFG(*inner.handle()))?;
@@ -384,25 +401,67 @@ mod test {
                 .map(|(n, _)| n)
                 .collect::<HashSet<_>>()
         };
-        // h_a should have Order edges added to Rz, the F64 load_const and H_a2 (the DFG's Order successor)
+        // h_a should have Order edge(s) to the F64 load_const and the Rz,
+        // and the DFG's Order successors (h_a2, and optionally CX)
+        let input_ord_tgts = HashSet::from_iter(
+            [f.node(), r.node(), h_a2.node()]
+                .into_iter()
+                .chain(o4.then_some(cx.node())),
+        );
         assert_eq!(
             order_neighbours(h_a.node(), Direction::Outgoing),
-            HashSet::from([r.node(), f.node(), h_a2.node()])
+            input_ord_tgts
         );
-        // The load_const should have Order edges from the inputs to the inner DFG, i.e. h_a and h_b
+        //if h_b had an Order edge to the DFG, then it should have Order edges to the same nodes as h_a,
+        // otherwise, only to the Order-successors of the Input node
+        assert_eq!(
+            order_neighbours(h_b.node(), Direction::Outgoing),
+            if o1 {
+                input_ord_tgts
+            } else {
+                HashSet::from_iter([f.node()].into_iter().chain(o2.then_some(r.node())))
+            }
+        );
+        // The F64 LoadConstant (with an Order edge from Input) has edges from all DFG predecessors
         assert_eq!(
             order_neighbours(f.node(), Direction::Incoming),
-            HashSet::from([h_a.node(), h_b.node()])
+            HashSet::from_iter([h_a.node(), h_b.node()])
         );
-        // h_a2 should have Order edges from the measure, if, and H_a (the DFG's Order predecessor)
+        // The RZ has an Order edge from h_a, and from h_b if EITHER h_b -> DFG or Input -> RZ were Order edges
         assert_eq!(
-            order_neighbours(h_a2.node(), Direction::Incoming),
-            HashSet::from([h_a.node(), m.node(), if_n.node()])
+            order_neighbours(r.node(), Direction::Incoming),
+            HashSet::from_iter(once(h_a.node()).chain((o1 || o2).then_some(h_b.node())))
         );
-        // the if should have Order edges to the CX and h_a2
+
+        // The `if` had an Order edge to Output, so now has Order edges to both h_a2 and CX
         assert_eq!(
             order_neighbours(if_n.node(), Direction::Outgoing),
-            HashSet::from([h_a2.node(), cx.node()])
+            HashSet::from_iter([h_a2.node(), cx.node()])
+        );
+        // `meas` has Order edge to h_a2 (DFG Order-successor), and to CX if EITHER meas->Output or DFG->CX were Order edges
+        assert_eq!(
+            order_neighbours(m.node(), Direction::Outgoing),
+            HashSet::from_iter(once(h_a2.node()).chain((o3 || o4).then_some(cx.node())))
+        );
+
+        // h_a2 should have Order edges from `meas` and `if`, and the DFG's Order-precedessors (h_a, and optionally h_b),
+        let output_ord_srcs = HashSet::from_iter(
+            [h_a.node(), m.node(), if_n.node()]
+                .into_iter()
+                .chain(o1.then_some(h_b.node())),
+        );
+        assert_eq!(
+            order_neighbours(h_a2.node(), Direction::Incoming),
+            output_ord_srcs
+        );
+        // if CX had an Order edge from the DFG, then same, otherwise only from `if` and maybe `meas`
+        assert_eq!(
+            order_neighbours(cx.node(), Direction::Incoming),
+            if o4 {
+                output_ord_srcs
+            } else {
+                HashSet::from_iter(once(if_n.node()).chain(o3.then_some(m.node())))
+            }
         );
         Ok(())
     }
