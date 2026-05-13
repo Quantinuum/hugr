@@ -101,10 +101,14 @@ pub trait HugrView: HugrInternals {
 
     /// Returns the metadata associated with a node.
     ///
+    /// Looks up metadata under `M::KEY`, then under entries of `M::ALIASES` in order.
+    ///
     /// For a non type-safe accessor use [`HugrView::get_metadata_any`] instead.
     #[inline]
     fn get_metadata<M: Metadata>(&self, node: Self::Node) -> Option<<M as Metadata>::Type<'_>> {
-        self.get_metadata_any(node, <M as Metadata>::KEY)
+        std::iter::once(<M as Metadata>::KEY)
+            .chain(<M as Metadata>::ALIASES.iter().copied())
+            .find_map(|key| self.get_metadata_any(node, key))
             .and_then(|value| <<M as Metadata>::Type<'_> as Deserialize>::deserialize(value).ok())
     }
 
