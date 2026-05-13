@@ -2,8 +2,11 @@
 //! of the DFG except Input+Output into the DFG's parent,
 //! and deleting the DFG along with its Input + Output
 
+use itertools::Itertools;
+
 use super::{PatchHugrMut, PatchVerification};
 use crate::core::HugrNode;
+use crate::hugr::HugrMut;
 use crate::ops::handle::{DfgID, NodeHandle};
 use crate::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
 
@@ -58,10 +61,7 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
 
     const UNCHANGED_ON_FAILURE: bool = true;
 
-    fn apply_hugr_mut(
-        self,
-        h: &mut impl crate::hugr::HugrMut<Node = N>,
-    ) -> Result<Self::Outcome, Self::Error> {
+    fn apply_hugr_mut(self, h: &mut impl HugrMut<Node = N>) -> Result<Self::Outcome, Self::Error> {
         self.verify(h)?;
         let n = self.0.node();
         let (oth_in, oth_out) = {
@@ -76,18 +76,12 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
         for ch in h.children(n).skip(2).collect::<Vec<_>>() {
             h.set_parent(ch, parent);
         }
-        // DFG Inputs. Deal with Order inputs first
-        for (src_n, src_p) in h.linked_outputs(n, oth_in).collect::<Vec<_>>() {
-            // Order edge from src_n to DFG => add order edge to each successor of Input node
-            debug_assert_eq!(Some(src_p), h.get_optype(src_n).other_output_port());
-            for tgt_n in h.output_neighbours(input).collect::<Vec<_>>() {
-                h.add_other_edge(src_n, tgt_n);
-            }
-        }
-        // And remaining (Value) inputs
-        let input_ord_succs = h
-            .linked_inputs(input, h.get_optype(input).other_output_port().unwrap())
-            .collect::<Vec<_>>();
+        // DFG Inputs.
+        add_order_edges(
+            h,
+            (n, oth_in),
+            (input, h.get_optype(input).other_output_port().unwrap()),
+        );
         for inp in h.node_inputs(n).collect::<Vec<_>>() {
             if inp == oth_in {
                 continue;
@@ -102,22 +96,14 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
             for (tgt_n, tgt_p) in targets {
                 h.connect(src_n, src_p, tgt_n, tgt_p);
             }
-            // Ensure order-successors of Input node execute after any node producing an input
-            for (tgt, _) in &input_ord_succs {
-                h.add_other_edge(src_n, *tgt);
-            }
         }
         // DFG Outputs. Deal with Order outputs first.
-        for (tgt_n, tgt_p) in h.linked_inputs(n, oth_out).collect::<Vec<_>>() {
-            debug_assert_eq!(Some(tgt_p), h.get_optype(tgt_n).other_input_port());
-            for src_n in h.input_neighbours(output).collect::<Vec<_>>() {
-                h.add_other_edge(src_n, tgt_n);
-            }
-        }
+        add_order_edges(
+            h,
+            (output, h.get_optype(output).other_input_port().unwrap()),
+            (n, oth_out),
+        );
         // And remaining (Value) outputs
-        let output_ord_preds = h
-            .linked_outputs(output, h.get_optype(output).other_input_port().unwrap())
-            .collect::<Vec<_>>();
         for outport in h.node_outputs(n).collect::<Vec<_>>() {
             if outport == oth_out {
                 continue;
@@ -129,10 +115,6 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
 
             for (tgt_n, tgt_p) in h.linked_inputs(n, outport).collect::<Vec<_>>() {
                 h.connect(src_n, src_p, tgt_n, tgt_p);
-                // Ensure order-predecessors of Output node execute before any node consuming a DFG output
-                for (src, _) in &output_ord_preds {
-                    h.add_other_edge(*src, tgt_n);
-                }
             }
             h.disconnect(n, outport);
         }
@@ -141,6 +123,30 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
         assert!(h.children(n).next().is_none());
         h.remove_node(n);
         Ok([n, input, output])
+    }
+}
+
+fn add_order_edges<N: HugrNode>(
+    h: &mut impl HugrMut<Node = N>,
+    (tgt_n, tgt_p): (N, IncomingPort),
+    (src_n, src_p): (N, OutgoingPort),
+) {
+    let src_succs = h
+        .linked_inputs(src_n, src_p)
+        .map(|(tgt_n, tgt_p)| {
+            debug_assert_eq!(Some(tgt_p), h.get_optype(tgt_n).other_input_port());
+            tgt_n
+        })
+        .collect::<Vec<_>>();
+    let tgt_preds = h
+        .linked_outputs(tgt_n, tgt_p)
+        .map(|(src_n, src_p)| {
+            debug_assert_eq!(Some(src_p), h.get_optype(src_n).other_output_port());
+            src_n
+        })
+        .collect::<Vec<_>>();
+    for (src_n, tgt_n) in tgt_preds.into_iter().cartesian_product(&src_succs) {
+        h.add_other_edge(src_n, *tgt_n);
     }
 }
 
@@ -371,25 +377,25 @@ mod test {
                 .map(|(n, _)| n)
                 .collect::<HashSet<_>>()
         };
-        // h_a should have Order edges added to Rz and the F64 load_const
+        // h_a should have an Order edge to the F64 load_const
         assert_eq!(
             order_neighbours(h_a.node(), Direction::Outgoing),
-            HashSet::from([r.node(), f.node()])
+            HashSet::from([f.node()])
         );
-        // Likewise the load_const should have Order edges from the inputs to the inner DFG, i.e. h_a and h_b
+        // Likewise the load_const should have an Order edge from h_a
         assert_eq!(
             order_neighbours(f.node(), Direction::Incoming),
-            HashSet::from([h_a.node(), h_b.node()])
+            HashSet::from([h_a.node()])
         );
-        // h_a2 should have Order edges from the measure and if
+        // h_a2 should have an Order edge from the if
         assert_eq!(
             order_neighbours(h_a2.node(), Direction::Incoming),
-            HashSet::from([m.node(), if_n.node()])
+            HashSet::from([if_n.node()])
         );
-        // the if should have Order edges to the CX and h_a2
+        // the if should have an Order edge to h_a2
         assert_eq!(
             order_neighbours(if_n.node(), Direction::Outgoing),
-            HashSet::from([h_a2.node(), cx.node()])
+            HashSet::from([h_a2.node()])
         );
         Ok(())
     }
