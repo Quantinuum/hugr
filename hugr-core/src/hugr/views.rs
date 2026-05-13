@@ -116,15 +116,18 @@ pub trait HugrView: HugrInternals {
     /// Returns the metadata associated with a node, differentiating between a missing and
     /// invalid payload.
     ///
-    /// If there is no metadata found with key M::KEY, returns Ok(None)
-    /// If there is metadata at that key which does not deserialize into M, return Err
+    /// If there is no metadata found with a key matching `M::KEY` or `M::ALIASES`, returns Ok(None)
+    /// If metadata is present but it does not deserialize into M, return Err
     /// Otherwise, return Ok(Some(metadata)).
     #[inline]
     fn try_get_metadata<M: Metadata>(
         &self,
         node: Self::Node,
     ) -> Result<Option<<M as Metadata>::Type<'_>>, MetadataError> {
-        if let Some(raw_value) = self.get_metadata_any(node, <M as Metadata>::KEY) {
+        if let Some(raw_value) = std::iter::once(<M as Metadata>::KEY)
+            .chain(<M as Metadata>::ALIASES.iter().copied())
+            .find_map(|key| self.get_metadata_any(node, key))
+        {
             <<M as Metadata>::Type<'_> as Deserialize>::deserialize(raw_value)
                 .map_err(|json_err| {
                     MetadataError::MetadataDeserializationError(type_name::<M>(), json_err)
