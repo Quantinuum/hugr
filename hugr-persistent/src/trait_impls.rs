@@ -12,7 +12,7 @@ use hugr_core::{
         self, Patch, SimpleReplacementError,
         internal::HugrInternals,
         views::{
-            ExtractionResult,
+            ExtractionResult, owned_scheduling_graph,
             render::{MermaidFormatter, NodeLabel},
         },
     },
@@ -54,20 +54,6 @@ impl HugrInternals for PersistentHugr {
     type Node = PatchNode;
 
     type RegionPortgraphNodes = HashMap<PatchNode, Node>;
-
-    fn region_portgraph(
-        &self,
-        parent: Self::Node,
-    ) -> (
-        portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>,
-        Self::RegionPortgraphNodes,
-    ) {
-        // TODO: this is currently not very efficient (see #2248)
-        let (hugr, node_map) = self.apply_all();
-        let parent = node_map[&parent];
-        #[expect(deprecated)] // Remove region_portgraph at same time
-        (hugr.into_region_portgraph(parent), node_map)
-    }
 
     fn node_metadata_map(&self, PatchNode(commit_id, node): Self::Node) -> &hugr::NodeMetadataMap {
         let cm = self.get_commit(commit_id);
@@ -342,6 +328,12 @@ impl HugrView for PersistentHugr {
             .collect();
 
         (extracted_hugr, node_map)
+    }
+
+    fn scheduling_graph(&self, parent: Self::Node) -> hugr::views::SchedulingGraph<'_, Self> {
+        // TODO: this is currently not very efficient (https://github.com/Quantinuum/hugr/issues/2248)
+        let (hugr, node_map) = self.apply_all();
+        owned_scheduling_graph(hugr, parent, node_map)
     }
 }
 

@@ -2,7 +2,6 @@
 
 mod impls;
 mod nodes_iter;
-pub mod petgraph;
 pub mod render;
 mod rerooted;
 mod root_checked;
@@ -17,9 +16,6 @@ use serde::de::Deserialize;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-#[deprecated(since = "0.26.0")]
-#[expect(deprecated)] // Remove at same time
-pub use self::petgraph::PetgraphWrapper;
 use self::render::MermaidFormatter;
 pub use nodes_iter::NodesIter;
 pub use rerooted::Rerooted;
@@ -32,7 +28,7 @@ use portgraph::{LinkView, PortView};
 
 use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
-use crate::hugr::internal::PortgraphNodeMap;
+use crate::hugr::internal::{DefaultPGNodeMap, PortgraphNodeMap};
 use crate::hugr::views::syn_edge::SynEdgeWrapper;
 use crate::metadata::{Metadata, RawMetadataValue};
 use crate::ops::{OpParent, OpTag, OpTrait, OpType, handle::NodeHandle};
@@ -390,32 +386,9 @@ pub trait HugrView: HugrInternals {
         }
     }
 
-    /// Return a wrapper over the view that can be used in petgraph algorithms.
-    #[inline]
-    #[deprecated(since = "0.26.0", note = "Use HugrView::scheduling_graph instead.")]
-    #[expect(deprecated)] // Remove at same time as PetgraphWrapper
-    fn as_petgraph(&self) -> PetgraphWrapper<'_, Self>
-    where
-        Self: Sized,
-    {
-        PetgraphWrapper { hugr: self }
-    }
-
     /// A view of a flat region, including ordering constraints from nonlocal edges,
     /// suitable for use with petgraph algorithms.
-    fn scheduling_graph(&self, parent: Self::Node) -> SchedulingGraph<'_, Self> {
-        #[expect(deprecated)] // Inline region_portgraph here when removing
-        let (region_view, region_nodes) = self.region_portgraph(parent);
-        let graph = SynEdgeWrapper {
-            region_view,
-            syn_edges: Vec::new(),
-        };
-        SchedulingGraph {
-            graph,
-            node_map: region_nodes,
-            region_parent: parent,
-        }
-    }
+    fn scheduling_graph(&self, parent: Self::Node) -> SchedulingGraph<'_, Self>;
 
     /// Return the mermaid representation of the underlying hierarchical graph.
     ///
@@ -607,15 +580,13 @@ impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
         self.node_map
     }
 
+    // Just ignore the syn edges. Use at own peril!
     fn portgraph_no_syn_edges(
         self,
     ) -> (
         portgraph::view::FlatRegion<'a, V::RegionPortgraph<'a>>,
         V::RegionPortgraphNodes,
     ) {
-        // This may need to change when the SynEdgeWrapper actually has edges in it...
-        // or maybe we should keep the assert to prevent this being used any time it does.
-        assert!(self.graph.syn_edges.is_empty());
         (self.graph.region_view, self.node_map)
     }
 
@@ -851,6 +822,102 @@ impl HugrView for Hugr {
             }
         }
         (extracted, DefaultNodeMap(inserted.node_map))
+    }
+
+    fn scheduling_graph(&self, parent: Self::Node) -> SchedulingGraph<'_, Self> {
+        let root = parent.into_portgraph();
+        let region_view =
+            portgraph::view::FlatRegion::new_without_root(&self.graph, &self.hierarchy, root);
+        let syn_edges = calc_syn_edges(self, parent);
+        let graph = SynEdgeWrapper {
+            region_view,
+            syn_edges,
+        };
+        SchedulingGraph {
+            graph,
+            node_map: DefaultPGNodeMap,
+            region_parent: parent,
+        }
+    }
+}
+
+fn calc_syn_edges<H: HugrView<Node = Node>>(
+    hugr: &H,
+    parent: H::Node,
+) -> Vec<(portgraph::NodeIndex, portgraph::NodeIndex)> {
+    let mut syn_edges = Vec::new();
+    if OpTag::DataflowParent.is_superset(hugr.get_optype(parent).tag()) {
+        let mut cache: HashMap<H::Node, H::Node> = HashMap::new();
+        fn find_sib_anc<N: HugrNode>(
+            n: N,
+            hugr: &(impl HugrView<Node = N> + ?Sized),
+            cache: &mut HashMap<N, N>,
+            parent: N,
+        ) -> Option<N> {
+            // If we don't hit parent, it's a Dom edge, so ignore.
+            let p = hugr.get_parent(n)?;
+            if p == parent {
+                return Some(n);
+            }
+            match cache.get(&p) {
+                Some(&cached) => Some(cached),
+                None => {
+                    // can't be borrowing cache during recursive call
+                    let anc = find_sib_anc(p, hugr, cache, parent);
+                    if let Some(anc) = anc {
+                        cache.insert(p, anc);
+                    }
+                    anc
+                }
+            }
+        }
+        for child in hugr.children(parent) {
+            for (p, _) in hugr.out_value_types(child) {
+                for (tgt, _) in hugr.linked_inputs(child, p) {
+                    if let Some(tgt_anc) = find_sib_anc(tgt, hugr, &mut cache, parent)
+                        && tgt_anc != tgt
+                    {
+                        syn_edges.push((child.into_portgraph(), tgt_anc.into_portgraph()));
+                    }
+                }
+            }
+        }
+    }
+    syn_edges
+}
+
+/// Like [HugrView::scheduling_graph], but returns a [SchedulingGraph] that owns its own view of the region,
+/// taken from the Hugr.
+///
+/// The API is designed for `hugr-persistent` and allows to implement [HugrView] such that
+/// [HugrInternals::RegionPortgraph] is not tied to the original view but rather an owned
+/// temporary [Hugr].
+pub fn owned_scheduling_graph<'a, N: HugrNode, V>(
+    hugr: Hugr,
+    region_parent: N,
+    node_map: V::RegionPortgraphNodes,
+) -> SchedulingGraph<'a, V>
+where
+    V: for<'p> HugrView<
+            Node = N,
+            RegionPortgraph<'p> = portgraph::MultiPortGraph<u32, u32, u32>,
+            RegionPortgraphNodes = HashMap<N, Node>,
+        > + 'a,
+{
+    let parent = node_map[&region_parent];
+    let root = parent.into_portgraph();
+    let syn_edges = calc_syn_edges(&hugr, parent);
+    let region_view =
+        portgraph::view::FlatRegion::new_without_root(hugr.graph, hugr.hierarchy, root);
+
+    let graph = SynEdgeWrapper {
+        region_view,
+        syn_edges,
+    };
+    SchedulingGraph {
+        graph,
+        node_map,
+        region_parent,
     }
 }
 
