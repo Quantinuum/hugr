@@ -528,6 +528,8 @@ class ModelExport:
                         # The CFG node needs to be linked to the entry node, so if there
                         # is no existing link name available (no input port), we must
                         # generate one.
+                        #
+                        # See https://github.com/Quantinuum/hugr/pull/3060.
                         if len(child_node.inputs) == 0:
                             child_node.inputs = [f"_{self.link_next}"]
                             self.link_next += 1
