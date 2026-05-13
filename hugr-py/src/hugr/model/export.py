@@ -64,15 +64,11 @@ class ModelExport:
             self.link_names[root] = name
             return name
 
-    def export_node(
-        self, node: Node, virtual_input_links: Sequence[str] = []
-    ) -> model.Node | None:
+    def export_node(self, node: Node) -> model.Node | None:
         """Export the node with the given node id."""
         node_data = self.hugr[node]
 
         inputs = [self.link_name(InPort(node, i)) for i in range(node_data._num_inps)]
-        inputs = [*inputs, *virtual_input_links]
-
         outputs = [self.link_name(OutPort(node, i)) for i in range(node_data._num_outs)]
         meta = self.export_json_meta(node)
         meta += self.export_entrypoint_meta(node)
@@ -526,12 +522,18 @@ class ModelExport:
                         source_types = model.List(
                             [type.to_model() for type in op.inputs]
                         )
-                        source = f"_{self.link_next}"
-                        self.link_next += 1
 
-                        child_node = self.export_node(
-                            child, virtual_input_links=[source]
-                        )
+                        child_node = self.export_node(child)
+                        assert child_node is not None
+                        # The CFG node needs to be linked to the entry node, so if there
+                        # is no existing link name available (no input port), we must
+                        # generate one.
+                        #
+                        # See https://github.com/Quantinuum/hugr/pull/3060.
+                        if len(child_node.inputs) == 0:
+                            child_node.inputs = [f"_{self.link_next}"]
+                            self.link_next += 1
+                        source = child_node.inputs[0]
                     else:
                         child_node = self.export_node(child)
 

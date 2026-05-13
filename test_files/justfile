@@ -6,7 +6,7 @@ help:
 recompile: recompile-hugrs
 
 # Re-generate all hugr files.
-recompile-hugrs:
+recompile-hugrs: recompile-import-tests
     #!/usr/bin/env sh
     for example in $(find ./guppy_examples -type f -name "*.py"); do
         echo "Re-generating $example"
@@ -16,6 +16,10 @@ recompile-hugrs:
         echo "Re-generating $example"
         uv run "$example"
     done
+
+# Update the test files used by Rust HUGR import tests
+recompile-import-tests:
+    uv run ./import_tests/generate_import_tests.py
 
 # Remove all .hugr files recursively
 clean-hugrs:
