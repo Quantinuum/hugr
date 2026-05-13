@@ -125,8 +125,7 @@ use thiserror::Error;
 use crate::hugr::IdentList;
 use crate::ops::custom::{ExtensionOp, OpaqueOp};
 use crate::ops::{OpName, OpNameRef};
-use crate::types::RowVariable;
-use crate::types::type_param::{TermTypeError, TypeArg, TypeParam};
+use crate::types::type_param::{TermKindError, TypeArg, TypeParam};
 use crate::types::{CustomType, TypeBound, TypeName};
 use crate::types::{Signature, TypeNameRef};
 
@@ -491,7 +490,7 @@ pub enum SignatureError {
     ExtensionMismatch(ExtensionId, ExtensionId),
     /// When the type arguments of the node did not match the params declared by the `OpDef`
     #[error("Type arguments of node did not match params declared by definition: {0}")]
-    TypeArgMismatch(#[from] TermTypeError),
+    TypeArgMismatch(#[from] TermKindError),
     /// Invalid type arguments
     #[error("Invalid type arguments for operation")]
     InvalidTypeArgs,
@@ -518,9 +517,6 @@ pub enum SignatureError {
     /// A type variable that was used has not been declared
     #[error("Type variable {idx} was not declared ({num_decls} in scope)")]
     FreeTypeVar { idx: usize, num_decls: usize },
-    /// A row variable was found outside of a variable-length row
-    #[error("Expected a single type, but found row variable {var}")]
-    RowVarWhereTypeExpected { var: RowVariable },
     /// The result of the type application stored in a [Call]
     /// is not what we get by applying the type-args to the polymorphic function
     ///

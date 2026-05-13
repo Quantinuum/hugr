@@ -95,7 +95,7 @@ pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
         extension
             .add_type(
                 ARRAY_TYPENAME,
-                vec![TypeParam::max_nat_type(), TypeBound::Linear.into()],
+                vec![TypeParam::max_nat_kind(), TypeBound::Linear.into()],
                 "Fixed-length array".into(),
                 // Default array is linear, even if the elements are copyable
                 TypeDefBound::any(),

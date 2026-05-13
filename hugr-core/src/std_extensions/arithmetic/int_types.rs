@@ -11,7 +11,7 @@ use crate::{
     ops::constant::CustomConst,
     types::{
         ConstTypeError, CustomType, Type, TypeBound,
-        type_param::{TermTypeError, TypeArg, TypeParam},
+        type_param::{TermKindError, TypeArg, TypeParam},
     },
 };
 /// The extension identifier.
@@ -68,19 +68,19 @@ pub const LOG_WIDTH_BOUND: u8 = LOG_WIDTH_MAX + 1;
 
 /// Type parameter for the log width of the integer.
 #[allow(clippy::assertions_on_constants)]
-pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat_type({
+pub const LOG_WIDTH_TYPE_PARAM: TypeParam = TypeParam::bounded_nat_kind({
     assert!(LOG_WIDTH_BOUND > 0);
     NonZeroU64::MIN.saturating_add(LOG_WIDTH_BOUND as u64 - 1)
 });
 
 /// Get the log width  of the specified type argument or error if the argument
 /// is invalid.
-pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TermTypeError> {
+pub(super) fn get_log_width(arg: &TypeArg) -> Result<u8, TermKindError> {
     match arg {
         TypeArg::BoundedNat(n) if is_valid_log_width(*n as u8) => Ok(*n as u8),
-        _ => Err(TermTypeError::TypeMismatch {
+        _ => Err(TermKindError::KindMismatch {
             term: Box::new(arg.clone()),
-            type_: Box::new(LOG_WIDTH_TYPE_PARAM),
+            kind: Box::new(LOG_WIDTH_TYPE_PARAM),
         }),
     }
 }
@@ -240,7 +240,7 @@ mod test {
         let type_arg_128 = TypeArg::BoundedNat(7);
         assert_matches!(
             get_log_width(&type_arg_128),
-            Err(TermTypeError::TypeMismatch { .. })
+            Err(TermKindError::KindMismatch { .. })
         );
     }
 

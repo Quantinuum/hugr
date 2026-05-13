@@ -3,19 +3,17 @@
 //! Views into convex subgraphs of HUGRs within a single level of the
 //! hierarchy, i.e. within a sibling graph. Convex subgraph are always
 //! induced subgraphs, i.e. they are defined by a subset of the sibling nodes.
-
-use std::collections::HashSet;
+use std::collections::{BTreeSet, HashSet};
 use std::mem;
 
 use itertools::Itertools;
-use portgraph::LinkView;
-use portgraph::PortView;
-use portgraph::algorithms::CreateConvexChecker;
+use petgraph::visit::IntoNodeIdentifiers;
 use portgraph::algorithms::convex::{LineIndex, LineIntervals, Position};
-use portgraph::boundary::Boundary;
+use portgraph::{PortView, algorithms::CreateConvexChecker, boundary::Boundary};
 use rustc_hash::FxHashSet;
 use thiserror::Error;
 
+use super::{RootChecked, SchedulingGraph, SynEdgeWrapper};
 use crate::builder::{Container, FunctionBuilder};
 use crate::core::HugrNode;
 use crate::hugr::internal::{HugrInternals, PortgraphNodeMap};
@@ -23,10 +21,10 @@ use crate::hugr::{HugrMut, HugrView};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{NamedOp, OpTag, OpTrait, OpType};
-use crate::types::{Signature, Type};
+use crate::types::{PolyFuncType, Signature, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
 
-use super::RootChecked;
+mod convex;
 
 /// Checks convexity of potential sibling subgraphs within a Hugr region.
 pub trait HugrConvexChecker<N: HugrNode> {
@@ -53,7 +51,7 @@ pub trait HugrConvexChecker<N: HugrNode> {
     ) -> Result<Vec<N>, InvalidSubgraph<N>>;
 }
 
-impl<'a, H, CC> HugrConvexChecker<H::Node> for ConvexChecker<'a, H, CC>
+impl<'a, H, CC> HugrConvexChecker<H::Node> for PortgraphCheckerWithNodes<'a, H, CC>
 where
     H: HugrView,
     CC: CreateConvexChecker<CheckerRegion<'a, H>, NodeIndexBase = u32, PortIndexBase = u32>,
@@ -258,7 +256,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         let parent = hugr
             .get_parent(node)
             .ok_or(InvalidSubgraph::OrphanNode { orphan: node })?;
-        let checker = TopoConvexChecker::new(hugr, parent);
+        let checker = SchedGraphChecker::new(hugr.scheduling_graph(parent));
         Self::try_new_with_checker(inputs, outputs, hugr, &checker)
     }
 
@@ -267,7 +265,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     /// You MUST make sure that the boundary ports and nodes provided satisfy
     /// the SiblingSubgraph validity conditions described in
     /// [`SiblingSubgraph::try_new`] and which can be checked using
-    /// [`SiblingSubgraph::validate`].
+    /// [`SiblingSubgraph::validate_with_checker`] or friends.
     ///
     /// See [`SiblingSubgraph::try_new`] for the full documentation.
     ///
@@ -358,7 +356,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             .get_parent(*node)
             .ok_or(InvalidSubgraph::OrphanNode { orphan: *node })?;
 
-        let checker = TopoConvexChecker::new(hugr, parent);
+        let checker = SchedGraphChecker::new(hugr.scheduling_graph(parent));
         Self::try_from_nodes_with_checker(nodes, hugr, &checker)
     }
 
@@ -519,49 +517,71 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 
     /// Check the validity of the subgraph, as described in the docs of
-    /// [`SiblingSubgraph::try_new`].
-    ///
-    /// The `mode` parameter controls the convexity check:
-    ///  - [`ValidationMode::CheckConvexity`] will create a new convexity
-    ///    checker for the subgraph and use it to check convexity of the
-    ///    subgraph.
-    ///  - [`ValidationMode::WithChecker`] will use the given convexity checker
-    ///    to check convexity of the subgraph.
-    ///  - [`ValidationMode::SkipConvexity`] will skip the convexity check.
-    pub fn validate<'h, H: HugrView<Node = N>>(
+    /// [`SiblingSubgraph::try_new`], using a new [`SchedGraphChecker`] for the convexity check.
+    pub fn validate_default(
         &self,
-        hugr: &'h H,
-        mode: ValidationMode<'_, 'h, H>,
+        hugr: &impl HugrView<Node = N>,
+    ) -> Result<(), InvalidSubgraph<N>> {
+        let parent = check_parent(hugr, &self.inputs, &self.outputs)?;
+        self.validate_with_checker(
+            hugr,
+            Some(&SchedGraphChecker::new(hugr.scheduling_graph(parent))),
+        )
+    }
+
+    /// Check the validity of the subgraph, as described in the docs of
+    /// [`SiblingSubgraph::try_new`], but do not check convexity.
+    pub fn validate_skip_convexity(
+        &self,
+        hugr: &impl HugrView<Node = N>,
+    ) -> Result<(), InvalidSubgraph<N>> {
+        enum NoChecker {}
+        impl<N: HugrNode> HugrConvexChecker<N> for NoChecker {
+            fn region_parent(&self) -> N {
+                match *self {}
+            }
+
+            fn nodes_if_convex(
+                &self,
+                _hugr: &impl HugrView<Node = N>,
+                _inputs: &IncomingPorts<N>,
+                _outputs: &OutgoingPorts<N>,
+                _function_calls: &IncomingPorts<N>,
+            ) -> Result<Vec<N>, InvalidSubgraph<N>> {
+                match *self {}
+            }
+        }
+        let no_checker: Option<&NoChecker> = None;
+        self.validate_with_checker(hugr, no_checker)
+    }
+
+    /// Check the validity of the subgraph, as described in the docs of
+    /// [`SiblingSubgraph::try_new`], with a given convexity checker
+    /// (or `None` to skip convexity checks).
+    ///
+    /// See also convenience methods [Self::validate_default] and [Self::validate_skip_convexity].
+    pub fn validate_with_checker<H: HugrView<Node = N>>(
+        &self,
+        hugr: &H,
+        checker: Option<&impl HugrConvexChecker<N>>,
     ) -> Result<(), InvalidSubgraph<N>> {
         let subgraph_parent = check_parent(hugr, &self.inputs, &self.outputs)?;
-        let checker;
-        let checker_ref = match mode {
-            ValidationMode::WithChecker(c) => {
+
+        let mut exp_nodes = match checker {
+            Some(c) => {
                 if c.region_parent() != subgraph_parent {
                     return Err(InvalidSubgraph::MismatchedCheckerParent {
                         checker_parent: c.region_parent(),
                         subgraph_parent,
                     });
                 }
-                Some(c)
+                c.nodes_if_convex(hugr, &self.inputs, &self.outputs, &self.function_calls)?
             }
-            ValidationMode::CheckConvexity => {
-                checker = TopoConvexChecker::new(hugr, subgraph_parent);
-                Some(&checker)
-            }
-            ValidationMode::SkipConvexity => None,
-        };
-
-        let mut exp_nodes = match checker_ref {
-            Some(checker_ref) => checker_ref.nodes_if_convex(
-                hugr,
-                &self.inputs,
-                &self.outputs,
-                &self.function_calls,
-            )?,
             // Note we used to check exp_nodes == nodes *before* the convexity check
             None => {
-                let (region, node_map) = hugr.region_portgraph(subgraph_parent);
+                let (region, node_map) = hugr
+                    .scheduling_graph(subgraph_parent)
+                    .portgraph_no_syn_edges();
                 make_pg_subgraph::<H>(region, &self.inputs, &self.outputs, &node_map)
                     .nodes_iter()
                     .map(|n| node_map.from_portgraph(n))
@@ -612,7 +632,17 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 
     /// The signature of the subgraph.
+    ///
+    /// Panics if the signature contains unresolved type variables, i.e. is polymorphic. Use
+    /// [`SiblingSubgraph::poly_func_type`] instead.
     pub fn signature(&self, hugr: &impl HugrView<Node = N>) -> Signature {
+        let poly_func_type = self.poly_func_type(hugr);
+        assert_eq!(poly_func_type.params(), &[]);
+        poly_func_type.into_body()
+    }
+
+    /// The (potentially polymorphic) signature of the subgraph.
+    pub fn poly_func_type(&self, hugr: &impl HugrView<Node = N>) -> PolyFuncType {
         let input = self
             .inputs
             .iter()
@@ -630,7 +660,26 @@ impl<N: HugrNode> SiblingSubgraph<N> {
                 sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
-        Signature::new(input, output)
+
+        // Discover type variable declarations from the closest function definition, if type
+        // variable usages are found.
+        let params = if input.iter().any(|t| t.is_parametrized())
+            || output.iter().any(|t| t.is_parametrized())
+        {
+            let mut parent = self.get_parent(hugr);
+            while !hugr.get_optype(parent).is_func_defn() {
+                parent = hugr.get_parent(parent).unwrap();
+            }
+            hugr.get_optype(parent)
+                .as_func_defn()
+                .unwrap()
+                .signature()
+                .params()
+        } else {
+            &[]
+        };
+
+        PolyFuncType::new(params, Signature::new(input, output))
     }
 
     /// The parent of the sibling subgraph.
@@ -728,7 +777,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         hugr: &impl HugrView<Node = N>,
         name: impl Into<String>,
     ) -> Hugr {
-        let mut builder = FunctionBuilder::new(name, self.signature(hugr)).unwrap();
+        let mut builder = FunctionBuilder::new(name, self.poly_func_type(hugr)).unwrap();
         // Take the unfinished Hugr from the builder, to avoid unnecessary
         // validation checks that require connecting the inputs and outputs.
         let mut extracted = mem::take(builder.hugr_mut());
@@ -789,18 +838,6 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 }
 
-/// Specify the checks to perform for [`SiblingSubgraph::validate`].
-#[derive(Default)]
-pub enum ValidationMode<'t, 'h, H: HugrView> {
-    /// Check convexity with the given checker.
-    WithChecker(&'t TopoConvexChecker<'h, H>),
-    /// Construct a checker and check convexity.
-    #[default]
-    CheckConvexity,
-    /// Skip convexity check.
-    SkipConvexity,
-}
-
 fn make_pg_subgraph<'h, H: HugrView>(
     region: CheckerRegion<'h, H>,
     inputs: &IncomingPorts<H::Node>,
@@ -809,7 +846,15 @@ fn make_pg_subgraph<'h, H: HugrView>(
 ) -> portgraph::view::Subgraph<CheckerRegion<'h, H>> {
     // Ordering of the edges here is preserved and becomes ordering of the
     // signature.
-    let boundary = make_boundary::<H>(&region, node_map, inputs, outputs);
+    let to_pg_index = |n: H::Node, p: Port| {
+        region
+            .port_index(node_map.to_portgraph(n), p.pg_offset())
+            .unwrap()
+    };
+    let boundary = Boundary::new(
+        iter_incoming(inputs).map(|(n, p)| to_pg_index(n, p.into())),
+        iter_outgoing(outputs).map(|(n, p)| to_pg_index(n, p.into())),
+    );
 
     portgraph::view::Subgraph::new_subgraph(region, boundary)
 }
@@ -992,23 +1037,7 @@ fn check_parent<'a, N: HugrNode>(
     Ok(first_parent)
 }
 
-fn make_boundary<'a, H: HugrView>(
-    region: &impl LinkView<NodeIndexBase = u32, PortIndexBase = u32, PortOffsetBase = u32>,
-    node_map: &H::RegionPortgraphNodes,
-    inputs: &'a IncomingPorts<H::Node>,
-    outputs: &'a OutgoingPorts<H::Node>,
-) -> Boundary {
-    let to_pg_index = |n: H::Node, p: Port| {
-        region
-            .port_index(node_map.to_portgraph(n), p.pg_offset())
-            .unwrap()
-    };
-    Boundary::new(
-        iter_incoming(inputs).map(|(n, p)| to_pg_index(n, p.into())),
-        iter_outgoing(outputs).map(|(n, p)| to_pg_index(n, p.into())),
-    )
-}
-
+// I'd deprecate this if it were `pub` but it isn't, so, fine
 type CheckerRegion<'g, Base> =
     portgraph::view::FlatRegion<'g, <Base as HugrInternals>::RegionPortgraph<'g>>;
 
@@ -1017,30 +1046,23 @@ type CheckerRegion<'g, Base> =
 /// This can be used when constructing multiple sibling subgraphs to speed up
 /// convexity checking.
 ///
-/// This a good default choice for most convexity checking use cases.
-pub type TopoConvexChecker<'g, Base> =
-    ConvexChecker<'g, Base, portgraph::algorithms::TopoConvexChecker<CheckerRegion<'g, Base>>>;
-
-/// Precompute convexity information for a HUGR.
-///
-/// This can be used when constructing multiple sibling subgraphs to speed up
-/// convexity checking.
-///
 /// This is a good choice for checking convexity of circuit-like graphs,
 /// particularly when many checks must be performed.
-pub type LineConvexChecker<'g, Base> =
-    ConvexChecker<'g, Base, portgraph::algorithms::LineConvexChecker<CheckerRegion<'g, Base>>>;
+pub type LineConvexChecker<'g, Base> = PortgraphCheckerWithNodes<
+    'g,
+    Base,
+    portgraph::algorithms::LineConvexChecker<CheckerRegion<'g, Base>>,
+>;
 
-/// Precompute convexity information for a HUGR.
+/// Precompute convexity information for a Portgraph view of a Hugr.
 ///
 /// This can be used when constructing multiple sibling subgraphs to speed up
 /// convexity checking.
 ///
 /// This type is generic over the convexity checker used. If checking convexity
-/// for circuit-like graphs, use [`LineConvexChecker`], otherwise use
-/// [`TopoConvexChecker`].
+/// for circuit-like graphs, use [`LineConvexChecker`]. Alternatively, use [SchedGraphChecker].
 #[derive(Clone)]
-pub struct ConvexChecker<'g, Base: HugrView, Checker> {
+pub struct PortgraphCheckerWithNodes<'g, Base: HugrView, Checker> {
     /// The base HUGR to check convexity on.
     base: &'g Base,
     /// The parent of the region where we are checking convexity.
@@ -1051,14 +1073,16 @@ pub struct ConvexChecker<'g, Base: HugrView, Checker> {
     node_map: Base::RegionPortgraphNodes,
 }
 
-impl<'g, Base, Checker> ConvexChecker<'g, Base, Checker>
+impl<'g, Base, Checker> PortgraphCheckerWithNodes<'g, Base, Checker>
 where
     Base: HugrView,
     Checker: CreateConvexChecker<CheckerRegion<'g, Base>>,
 {
     /// Create a new convexity checker.
     pub fn new(base: &'g Base, region_parent: Base::Node) -> Self {
-        let (region, node_map) = base.region_portgraph(region_parent);
+        let (region, node_map) = base
+            .scheduling_graph(region_parent)
+            .portgraph_no_syn_edges();
         let checker = Checker::new_convex_checker(region);
         Self {
             base,
@@ -1081,7 +1105,8 @@ where
     }
 }
 
-impl<'g, Base, Checker> portgraph::algorithms::ConvexChecker for ConvexChecker<'g, Base, Checker>
+impl<'g, Base, Checker> portgraph::algorithms::ConvexChecker
+    for PortgraphCheckerWithNodes<'g, Base, Checker>
 where
     Base: HugrView,
     Checker: CreateConvexChecker<CheckerRegion<'g, Base>, NodeIndexBase = u32, PortIndexBase = u32>,
@@ -1406,9 +1431,9 @@ pub enum InvalidReplacement {
     ]
     InvalidSignature {
         /// The expected signature.
-        expected: Box<Signature>,
+        expected: Box<PolyFuncType>,
         /// The actual signature.
-        actual: Option<Box<Signature>>,
+        actual: Option<Box<PolyFuncType>>,
     },
     /// `SiblingSubgraph` is not convex.
     #[error("SiblingSubgraph is not convex.")]
@@ -1526,797 +1551,97 @@ fn has_unique_linear_ports<H: HugrView>(host: &H, ports: &OutgoingPorts<H::Node>
     linear_ports.len() == unique_ports.len()
 }
 
-#[cfg(test)]
-mod tests {
-    use std::collections::BTreeSet;
+/// A [HugrConvexChecker] that works on a [SchedulingGraph]
+pub struct SchedGraphChecker<'h, H: HugrView + 'h> {
+    node_map: H::RegionPortgraphNodes,
+    region_parent: H::Node,
+    checker: convex::TopoConvexChecker<
+        SynEdgeWrapper<portgraph::view::FlatRegion<'h, H::RegionPortgraph<'h>>>,
+    >,
+}
 
-    use cool_asserts::assert_matches;
-    use rstest::{fixture, rstest};
-
-    use crate::builder::{endo_sig, inout_sig};
-    use crate::extension::prelude::{MakeTuple, UnpackTuple};
-    use crate::hugr::Patch;
-    use crate::hugr::internal::HugrMutInternals;
-    use crate::ops::Const;
-    use crate::ops::handle::DataflowParentID;
-    use crate::std_extensions::arithmetic::float_types::ConstF64;
-    use crate::std_extensions::logic::LogicOp;
-    use crate::type_row;
-    use crate::utils::test_quantum_extension::{cx_gate, rz_f64};
-    use crate::{
-        builder::{
-            BuildError, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder,
-            ModuleBuilder,
-        },
-        extension::prelude::{bool_t, qb_t},
-        ops::handle::{DfgID, FuncID, NodeHandle},
-        std_extensions::logic::test::and_op,
-    };
-
-    use super::*;
-
-    impl<N: HugrNode> SiblingSubgraph<N> {
-        /// Create a sibling subgraph containing every node in a HUGR region.
-        ///
-        /// This will return an [`InvalidSubgraph::EmptySubgraph`] error if the
-        /// subgraph is empty.
-        fn from_sibling_graph(
-            hugr: &impl HugrView<Node = N>,
-            parent: N,
-        ) -> Result<Self, InvalidSubgraph<N>> {
-            let nodes = hugr.children(parent).collect_vec();
-            if nodes.is_empty() {
-                Err(InvalidSubgraph::EmptySubgraph)
-            } else {
-                Ok(Self {
-                    nodes,
-                    inputs: Vec::new(),
-                    outputs: Vec::new(),
-                    function_calls: Vec::new(),
-                })
-            }
+impl<'h, H: HugrView> SchedGraphChecker<'h, H> {
+    /// Creates a new instance from a [SchedulingGraph]. This performs some precomputation,
+    /// so it is more efficient to reuse the same instance for multiple checks on the same graph.
+    pub fn new(graph: SchedulingGraph<'h, H>) -> Self {
+        let SchedulingGraph {
+            graph,
+            node_map,
+            region_parent,
+        } = graph;
+        let checker = convex::TopoConvexChecker::new(graph);
+        Self {
+            node_map,
+            region_parent,
+            checker,
         }
     }
+}
 
-    /// A Module with a single function from three qubits to three qubits.
-    /// The function applies a CX gate to the first two qubits and a Rz gate
-    /// (with a constant angle) to the last qubit.
-    fn build_hugr() -> Result<(Hugr, Node), BuildError> {
-        let mut mod_builder = ModuleBuilder::new();
-        let func =
-            mod_builder.declare("test", Signature::new_endo([qb_t(), qb_t(), qb_t()]).into())?;
-        let func_id = {
-            let mut dfg = mod_builder.define_declaration(&func)?;
-            let [w0, w1, w2] = dfg.input_wires_arr();
-            let [w0, w1] = dfg.add_dataflow_op(cx_gate(), [w0, w1])?.outputs_arr();
-            let c = dfg.add_load_const(Const::new(ConstF64::new(0.5).into()));
-            let [w2] = dfg.add_dataflow_op(rz_f64(), [w2, c])?.outputs_arr();
-            dfg.finish_with_outputs([w0, w1, w2])?
-        };
-        let hugr = mod_builder
-            .finish_hugr()
-            .map_err(|e| -> BuildError { e.into() })?;
-        Ok((hugr, func_id.node()))
+impl<H: HugrView> HugrConvexChecker<H::Node> for SchedGraphChecker<'_, H> {
+    fn region_parent(&self) -> H::Node {
+        self.region_parent
     }
-
-    /// A bool to bool hugr with three subsequent NOT gates.
-    fn build_3not_hugr() -> Result<(Hugr, Node), BuildError> {
-        let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare("test", Signature::new_endo([bool_t()]).into())?;
-        let func_id = {
-            let mut dfg = mod_builder.define_declaration(&func)?;
-            let outs1 = dfg.add_dataflow_op(LogicOp::Not, dfg.input_wires())?;
-            let outs2 = dfg.add_dataflow_op(LogicOp::Not, outs1.outputs())?;
-            let outs3 = dfg.add_dataflow_op(LogicOp::Not, outs2.outputs())?;
-            dfg.finish_with_outputs(outs3.outputs())?
-        };
-        let hugr = mod_builder
-            .finish_hugr()
-            .map_err(|e| -> BuildError { e.into() })?;
-        Ok((hugr, func_id.node()))
-    }
-
-    /// A bool to (bool, bool) with multiports.
-    fn build_multiport_hugr() -> Result<(Hugr, Node), BuildError> {
-        let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare(
-            "test",
-            Signature::new([bool_t()], vec![bool_t(), bool_t()]).into(),
-        )?;
-        let func_id = {
-            let mut dfg = mod_builder.define_declaration(&func)?;
-            let [b0] = dfg.input_wires_arr();
-            let [b1] = dfg.add_dataflow_op(LogicOp::Not, [b0])?.outputs_arr();
-            let [b2] = dfg.add_dataflow_op(LogicOp::Not, [b1])?.outputs_arr();
-            dfg.finish_with_outputs([b1, b2])?
-        };
-        let hugr = mod_builder
-            .finish_hugr()
-            .map_err(|e| -> BuildError { e.into() })?;
-        Ok((hugr, func_id.node()))
-    }
-
-    /// A HUGR with a copy
-    fn build_hugr_classical() -> Result<(Hugr, Node), BuildError> {
-        let mut mod_builder = ModuleBuilder::new();
-        let func = mod_builder.declare("test", Signature::new_endo([bool_t()]).into())?;
-        let func_id = {
-            let mut dfg = mod_builder.define_declaration(&func)?;
-            let in_wire = dfg.input_wires().exactly_one().unwrap();
-            let outs = dfg.add_dataflow_op(and_op(), [in_wire, in_wire])?;
-            dfg.finish_with_outputs(outs.outputs())?
-        };
-        let hugr = mod_builder
-            .finish_hugr()
-            .map_err(|e| -> BuildError { e.into() })?;
-        Ok((hugr, func_id.node()))
-    }
-
-    #[test]
-    fn construct_simple_replacement() -> Result<(), InvalidSubgraph> {
-        let (mut hugr, func_root) = build_hugr().unwrap();
-        let func = hugr.with_entrypoint(func_root);
-        let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
-            RootChecked::try_new(&func).expect("Root should be FuncDefn."),
-        )?;
-        assert!(sub.validate(&func, Default::default()).is_ok());
-
-        let empty_dfg = {
-            let builder = DFGBuilder::new(Signature::new_endo([qb_t(), qb_t(), qb_t()])).unwrap();
-            let inputs = builder.input_wires();
-            builder.finish_hugr_with_outputs(inputs).unwrap()
-        };
-
-        let rep = sub.create_simple_replacement(&func, empty_dfg).unwrap();
-
-        assert_eq!(rep.subgraph().nodes().len(), 4);
-
-        assert_eq!(hugr.num_nodes(), 8); // Module + Def + In + CX + Rz + Const + LoadConst + Out
-        hugr.apply_patch(rep).unwrap();
-        assert_eq!(hugr.num_nodes(), 4); // Module + Def + In + Out
-
-        Ok(())
-    }
-
-    /// Make a sibling subgraph from a constant and a LoadConst node.
-    #[test]
-    fn construct_load_const_subgraph() -> Result<(), InvalidSubgraph> {
-        let (hugr, func_root) = build_hugr().unwrap();
-
-        let const_node = hugr
-            .children(func_root)
-            .find(|&n| hugr.get_optype(n).is_const())
-            .unwrap();
-        let load_const_node = hugr
-            .children(func_root)
-            .find(|&n| hugr.get_optype(n).is_load_constant())
-            .unwrap();
-        let nodes: BTreeSet<_> = BTreeSet::from_iter([const_node, load_const_node]);
-
-        let sub = SiblingSubgraph::try_from_nodes(vec![const_node, load_const_node], &hugr)?;
-
-        let subgraph_nodes: BTreeSet<_> = sub.nodes().iter().copied().collect();
-        assert_eq!(subgraph_nodes, nodes);
-
-        Ok(())
-    }
-
-    #[test]
-    fn test_signature() -> Result<(), InvalidSubgraph> {
-        let (hugr, dfg) = build_hugr().unwrap();
-        let func = hugr.with_entrypoint(dfg);
-        let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
-            RootChecked::try_new(&func).expect("Root should be FuncDefn."),
-        )?;
-        assert!(sub.validate(&func, Default::default()).is_ok());
-        assert_eq!(
-            sub.signature(&func),
-            Signature::new_endo([qb_t(), qb_t(), qb_t()])
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn construct_simple_replacement_invalid_signature() -> Result<(), InvalidSubgraph> {
-        let (hugr, dfg) = build_hugr().unwrap();
-        let func = hugr.with_entrypoint(dfg);
-        let sub = SiblingSubgraph::from_sibling_graph(&hugr, dfg)?;
-
-        let empty_dfg = {
-            let builder = DFGBuilder::new(Signature::new_endo([qb_t()])).unwrap();
-            let inputs = builder.input_wires();
-            builder.finish_hugr_with_outputs(inputs).unwrap()
-        };
-
-        assert_matches!(
-            sub.create_simple_replacement(&func, empty_dfg).unwrap_err(),
-            InvalidReplacement::InvalidSignature { .. }
-        );
-        Ok(())
-    }
-
-    #[test]
-    fn convex_subgraph() {
-        let (hugr, func_root) = build_hugr().unwrap();
-        let func = hugr.with_entrypoint(func_root);
-        assert_eq!(
-            SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
-                RootChecked::try_new(&func).expect("Root should be FuncDefn.")
-            )
-            .unwrap()
-            .nodes()
-            .len(),
-            4
-        );
-    }
-
-    #[test]
-    fn with_checker() {
-        let (mut hugr, func_root) = build_hugr().unwrap();
-        hugr.set_entrypoint(func_root);
-        let mut hugr2 = hugr.clone();
-        match hugr2.optype_mut(func_root) {
-            OpType::FuncDefn(fd) => *fd.func_name_mut() = "test2".into(),
-            _ => panic!(),
-        };
-        let func2 = hugr
-            .insert_hugr(hugr.module_root(), hugr2)
-            .inserted_entrypoint;
-        hugr.validate().unwrap();
-
-        let checker1 = TopoConvexChecker::new(&hugr, func_root);
-        let checker2 = TopoConvexChecker::new(&hugr, func2);
-        let sub1 = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
-            RootChecked::try_new(&hugr).expect("Root should be FuncDefn."),
+    fn nodes_if_convex(
+        &self,
+        hugr: &impl HugrView<Node = H::Node>,
+        inputs: &IncomingPorts<H::Node>,
+        outputs: &OutgoingPorts<H::Node>,
+        function_calls: &IncomingPorts<H::Node>,
+    ) -> Result<Vec<H::Node>, InvalidSubgraph<H::Node>> {
+        // Compute the nodes inside the boundary ignoring synthetic edges -
+        // there is no way to specify a synthetic edge as part of the boundary,
+        // and if there are any nonlocal edges not part of the boundary (the condition
+        // that would lead to needing those synthetic edges) then the subgraph is invalid
+        // (nodes would not share the same parent)!
+        let node_indices = make_pg_subgraph::<H>(
+            self.checker.graph().region_view.clone(),
+            inputs,
+            outputs,
+            &self.node_map,
         )
-        .unwrap();
-        sub1.validate(&hugr, ValidationMode::WithChecker(&checker1))
-            .unwrap();
-        let e = sub1.validate(&hugr, ValidationMode::WithChecker(&checker2));
-        assert_eq!(
-            e,
-            Err(InvalidSubgraph::MismatchedCheckerParent {
-                checker_parent: func2,
-                subgraph_parent: func_root
-            })
-        );
+        .node_identifiers()
+        .collect_vec();
 
-        SiblingSubgraph::try_new_with_checker(
-            sub1.inputs.clone(),
-            sub1.outputs.clone(),
-            &hugr,
-            &checker1,
-        )
-        .unwrap();
-        let e = SiblingSubgraph::try_new_with_checker(
-            sub1.inputs.clone(),
-            sub1.outputs.clone(),
-            &hugr,
-            &checker2,
-        );
-        assert_eq!(
-            e,
-            Err(InvalidSubgraph::MismatchedCheckerParent {
-                checker_parent: func2,
-                subgraph_parent: func_root
-            })
-        );
-
-        SiblingSubgraph::try_from_nodes_with_checker(sub1.nodes.clone(), &hugr, &checker1).unwrap();
-        let e = SiblingSubgraph::try_from_nodes_with_checker(sub1.nodes.clone(), &hugr, &checker2);
-        assert_eq!(
-            e,
-            Err(InvalidSubgraph::MismatchedCheckerParent {
-                checker_parent: func2,
-                subgraph_parent: func_root
-            })
-        );
-    }
-
-    #[test]
-    fn convex_subgraph_2() {
-        let (hugr, func_root) = build_hugr().unwrap();
-        let [inp, out] = hugr.get_io(func_root).unwrap();
-        let func = hugr.with_entrypoint(func_root);
-        // All graph except input/output nodes
-        SiblingSubgraph::try_new(
-            hugr.node_outputs(inp)
-                .take(2)
-                .map(|p| hugr.linked_inputs(inp, p).collect_vec())
-                .filter(|ps| !ps.is_empty())
-                .collect(),
-            hugr.node_inputs(out)
-                .take(2)
-                .filter_map(|p| hugr.single_linked_output(out, p))
-                .collect(),
-            &func,
-        )
-        .unwrap();
-    }
-
-    #[test]
-    fn degen_boundary() {
-        let (hugr, func_root) = build_hugr().unwrap();
-        let func = hugr.with_entrypoint(func_root);
-        let [inp, _] = hugr.get_io(func_root).unwrap();
-        let first_cx_edge = hugr.node_outputs(inp).next().unwrap();
-        // All graph but one edge
-        assert_matches!(
-            SiblingSubgraph::try_new(
-                vec![
-                    hugr.linked_ports(inp, first_cx_edge)
-                        .map(|(n, p)| (n, p.as_incoming().unwrap()))
-                        .collect()
-                ],
-                vec![(inp, first_cx_edge)],
-                &func,
-            ),
-            Err(InvalidSubgraph::InvalidBoundary(
-                InvalidSubgraphBoundary::DisconnectedBoundaryPort(_, _)
-            ))
-        );
-    }
-
-    #[test]
-    fn non_convex_subgraph() {
-        let (hugr, func_root) = build_3not_hugr().unwrap();
-        let func = hugr.with_entrypoint(func_root);
-        let [inp, _out] = hugr.get_io(func_root).unwrap();
-        let not1 = hugr.output_neighbours(inp).exactly_one().ok().unwrap();
-        let not2 = hugr.output_neighbours(not1).exactly_one().ok().unwrap();
-        let not3 = hugr.output_neighbours(not2).exactly_one().ok().unwrap();
-        let not1_inp = hugr.node_inputs(not1).next().unwrap();
-        let not1_out = hugr.node_outputs(not1).next().unwrap();
-        let not3_inp = hugr.node_inputs(not3).next().unwrap();
-        let not3_out = hugr.node_outputs(not3).next().unwrap();
-        assert_matches!(
-            SiblingSubgraph::try_new(
-                vec![vec![(not1, not1_inp)], vec![(not3, not3_inp)]],
-                vec![(not1, not1_out), (not3, not3_out)],
-                &func
-            ),
-            Err(InvalidSubgraph::NotConvex)
-        );
-    }
-
-    /// A subgraphs mixed with multiports caused a `NonConvex` error.
-    /// <https://github.com/CQCL/hugr/issues/1294>
-    #[test]
-    fn convex_multiports() {
-        let (hugr, func_root) = build_multiport_hugr().unwrap();
-        let [inp, out] = hugr.get_io(func_root).unwrap();
-        let not1 = hugr.output_neighbours(inp).exactly_one().ok().unwrap();
-        let not2 = hugr
-            .output_neighbours(not1)
-            .filter(|&n| n != out)
-            .exactly_one()
-            .ok()
-            .unwrap();
-
-        let subgraph = SiblingSubgraph::try_from_nodes([not1, not2], &hugr).unwrap();
-        assert_eq!(subgraph.nodes(), [not1, not2]);
-    }
-
-    #[test]
-    fn invalid_boundary() {
-        let (hugr, func_root) = build_hugr().unwrap();
-        let func = hugr.with_entrypoint(func_root);
-        let [inp, out] = hugr.get_io(func_root).unwrap();
-        let cx_edges_in = hugr.node_outputs(inp);
-        let cx_edges_out = hugr.node_inputs(out);
-        // All graph but the CX
-        assert_matches!(
-            SiblingSubgraph::try_new(
-                cx_edges_out.map(|p| vec![(out, p)]).collect(),
-                cx_edges_in.map(|p| (inp, p)).collect(),
-                &func,
-            ),
-            Err(InvalidSubgraph::InvalidBoundary(
-                InvalidSubgraphBoundary::DisconnectedBoundaryPort(_, _)
-            ))
-        );
-    }
-
-    #[test]
-    fn preserve_signature() {
-        let (hugr, func_root) = build_hugr_classical().unwrap();
-        let func_graph = hugr.with_entrypoint(func_root);
-        let func = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
-            RootChecked::try_new(&func_graph).expect("Root should be FuncDefn."),
-        )
-        .unwrap();
-        let func_defn = hugr.get_optype(func_root).as_func_defn().unwrap();
-        assert_eq!(func_defn.signature(), &func.signature(&func_graph).into());
-    }
-
-    #[test]
-    fn extract_subgraph() {
-        let (hugr, func_root) = build_hugr().unwrap();
-        let func_graph = hugr.with_entrypoint(func_root);
-        let subgraph = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
-            RootChecked::try_new(&func_graph).expect("Root should be FuncDefn."),
-        )
-        .unwrap();
-        let extracted = subgraph.extract_subgraph(&hugr, "region");
-
-        extracted.validate().unwrap();
-    }
-
-    #[test]
-    fn edge_both_output_and_copy() {
-        // https://github.com/CQCL/hugr/issues/518
-        let one_bit = vec![bool_t()];
-        let two_bit = vec![bool_t(), bool_t()];
-
-        let mut builder = DFGBuilder::new(inout_sig(one_bit.clone(), two_bit.clone())).unwrap();
-        let inw = builder.input_wires().exactly_one().unwrap();
-        let outw1 = builder
-            .add_dataflow_op(LogicOp::Not, [inw])
-            .unwrap()
-            .out_wire(0);
-        let outw2 = builder
-            .add_dataflow_op(and_op(), [inw, outw1])
-            .unwrap()
-            .outputs();
-        let outw = [outw1].into_iter().chain(outw2);
-        let h = builder.finish_hugr_with_outputs(outw).unwrap();
-        let subg = SiblingSubgraph::try_new_dataflow_subgraph::<_, DfgID>(
-            RootChecked::try_new(&h).expect("Root should be DFG."),
-        )
-        .unwrap();
-        assert_eq!(subg.nodes().len(), 2);
-    }
-
-    #[test]
-    fn test_unconnected() {
-        // test a replacement on a subgraph with a discarded output
-        let mut b = DFGBuilder::new(Signature::new([bool_t()], type_row![])).unwrap();
-        let inw = b.input_wires().exactly_one().unwrap();
-        let not_n = b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
-        // Unconnected output, discarded
-        let mut h = b.finish_hugr_with_outputs([]).unwrap();
-
-        let subg = SiblingSubgraph::from_node(not_n.node(), &h);
-
-        assert_eq!(subg.nodes().len(), 1);
-        //  TODO create a valid replacement
-        let replacement = {
-            let mut rep_b = DFGBuilder::new(Signature::new_endo([bool_t()])).unwrap();
-            let inw = rep_b.input_wires().exactly_one().unwrap();
-
-            let not_n = rep_b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
-
-            rep_b.finish_hugr_with_outputs(not_n.outputs()).unwrap()
-        };
-        let rep = subg.create_simple_replacement(&h, replacement).unwrap();
-        rep.apply(&mut h).unwrap();
-    }
-
-    /// Test the behaviour of the sibling subgraph when built from a single
-    /// node.
-    #[test]
-    fn single_node_subgraph() {
-        // A hugr with a single NOT operation, with disconnected output.
-        let mut b = DFGBuilder::new(Signature::new([bool_t()], type_row![])).unwrap();
-        let inw = b.input_wires().exactly_one().unwrap();
-        let not_n = b.add_dataflow_op(LogicOp::Not, [inw]).unwrap();
-        // Unconnected output, discarded
-        let h = b.finish_hugr_with_outputs([]).unwrap();
-
-        // When built with `from_node`, the subgraph's signature is the same as the
-        // node's. (bool input, bool output)
-        let subg = SiblingSubgraph::from_node(not_n.node(), &h);
-        assert_eq!(subg.nodes().len(), 1);
-        assert_eq!(
-            subg.signature(&h).io(),
-            Signature::new(vec![bool_t()], vec![bool_t()]).io()
-        );
-
-        // `from_nodes` is different, is it only uses incoming and outgoing edges to
-        // compute the signature. In this case, the output is disconnected, so
-        // it is not part of the subgraph signature.
-        let subg = SiblingSubgraph::try_from_nodes([not_n.node()], &h).unwrap();
-        assert_eq!(subg.nodes().len(), 1);
-        assert_eq!(
-            subg.signature(&h).io(),
-            Signature::new(vec![bool_t()], vec![]).io()
-        );
-    }
-
-    /// Test the behaviour of the sibling subgraph when built from a single
-    /// node with no inputs or outputs.
-    #[test]
-    fn singleton_disconnected_subgraph() {
-        // A hugr with some empty MakeTuple operations.
-        let op = MakeTuple::new(type_row![]);
-
-        let mut b = DFGBuilder::new(Signature::new_endo(type_row![])).unwrap();
-        let _mk_tuple_1 = b.add_dataflow_op(op.clone(), []).unwrap();
-        let mk_tuple_2 = b.add_dataflow_op(op.clone(), []).unwrap();
-        let _mk_tuple_3 = b.add_dataflow_op(op, []).unwrap();
-        // Unconnected output, discarded
-        let h = b.finish_hugr_with_outputs([]).unwrap();
-
-        // When built with `try_from_nodes`, the subgraph's signature is the same as the
-        // node's. (empty input, tuple output)
-        let subg = SiblingSubgraph::from_node(mk_tuple_2.node(), &h);
-        assert_eq!(subg.nodes().len(), 1);
-        assert_eq!(
-            subg.signature(&h).io(),
-            Signature::new(type_row![], vec![Type::new_tuple(type_row![])]).io()
-        );
-
-        // `from_nodes` is different, is it only uses incoming and outgoing edges to
-        // compute the signature. In this case, the output is disconnected, so
-        // it is not part of the subgraph signature.
-        let subg = SiblingSubgraph::try_from_nodes([mk_tuple_2.node()], &h).unwrap();
-        assert_eq!(subg.nodes().len(), 1);
-        assert_eq!(
-            subg.signature(&h).io(),
-            Signature::new_endo(type_row![]).io()
-        );
-    }
-
-    /// Run `try_from_nodes` including some complete graph components.
-    #[test]
-    fn partially_connected_subgraph() {
-        // A hugr with some empty MakeTuple operations.
-        let tuple_op = MakeTuple::new(type_row![]);
-        let untuple_op = UnpackTuple::new(type_row![]);
-        let tuple_t = Type::new_tuple(type_row![]);
-
-        let mut b = DFGBuilder::new(Signature::new(type_row![], vec![tuple_t.clone()])).unwrap();
-        let mk_tuple_1 = b.add_dataflow_op(tuple_op.clone(), []).unwrap();
-        let untuple_1 = b
-            .add_dataflow_op(untuple_op.clone(), [mk_tuple_1.out_wire(0)])
-            .unwrap();
-        let mk_tuple_2 = b.add_dataflow_op(tuple_op.clone(), []).unwrap();
-        let _mk_tuple_3 = b.add_dataflow_op(tuple_op, []).unwrap();
-        // Output the 2nd tuple output
-        let h = b
-            .finish_hugr_with_outputs([mk_tuple_2.out_wire(0)])
-            .unwrap();
-
-        let subgraph_nodes = [mk_tuple_1.node(), mk_tuple_2.node(), untuple_1.node()];
-
-        // `try_from_nodes` uses incoming and outgoing edges to compute the signature.
-        let subg = SiblingSubgraph::try_from_nodes(subgraph_nodes, &h).unwrap();
-        assert_eq!(subg.nodes().len(), 3);
-        assert_eq!(
-            subg.signature(&h).io(),
-            Signature::new(type_row![], vec![tuple_t]).io()
-        );
-    }
-
-    #[test]
-    fn test_set_outgoing_ports() {
-        let (hugr, func_root) = build_3not_hugr().unwrap();
-        let [inp, out] = hugr.get_io(func_root).unwrap();
-        let not1 = hugr.output_neighbours(inp).exactly_one().ok().unwrap();
-        let not1_out = hugr.node_outputs(not1).next().unwrap();
-
-        // Create a subgraph with just the NOT gate
-        let mut subgraph = SiblingSubgraph::from_node(not1, &hugr);
-
-        // Initially should have one output
-        assert_eq!(subgraph.outgoing_ports().len(), 1);
-
-        // Try to set two outputs by copying the existing one
-        let new_outputs = vec![(not1, not1_out), (not1, not1_out)];
-        assert!(subgraph.set_outgoing_ports(new_outputs, &hugr).is_ok());
-
-        // Should now have two outputs
-        assert_eq!(subgraph.outgoing_ports().len(), 2);
-
-        // Try to set an invalid output (from a different node)
-        let invalid_outputs = vec![(not1, not1_out), (out, 2.into())];
-        assert!(matches!(
-            subgraph.set_outgoing_ports(invalid_outputs, &hugr),
-            Err(InvalidOutputPorts::UnknownOutput { .. })
-        ));
-
-        // Should still have two outputs from before
-        assert_eq!(subgraph.outgoing_ports().len(), 2);
-    }
-
-    #[test]
-    fn test_set_outgoing_ports_linear() {
-        let (hugr, func_root) = build_hugr().unwrap();
-        let [inp, _out] = hugr.get_io(func_root).unwrap();
-        let rz = hugr.output_neighbours(inp).nth(2).unwrap();
-        let rz_out = hugr.node_outputs(rz).next().unwrap();
-
-        // Create a subgraph with just the CX gate
-        let mut subgraph = SiblingSubgraph::from_node(rz, &hugr);
-
-        // Initially should have one output
-        assert_eq!(subgraph.outgoing_ports().len(), 1);
-
-        // Try to set two outputs by copying the existing one (should fail for linear
-        // ports)
-        let new_outputs = vec![(rz, rz_out), (rz, rz_out)];
-        assert!(matches!(
-            subgraph.set_outgoing_ports(new_outputs, &hugr),
-            Err(InvalidOutputPorts::NonUniqueLinear)
-        ));
-
-        // Should still have one output
-        assert_eq!(subgraph.outgoing_ports().len(), 1);
-    }
-
-    #[test]
-    fn test_try_from_nodes_with_intervals() {
-        let (hugr, func_root) = build_3not_hugr().unwrap();
-        let line_checker = LineConvexChecker::new(&hugr, func_root);
-        let [inp, _out] = hugr.get_io(func_root).unwrap();
-        let not1 = hugr.output_neighbours(inp).exactly_one().ok().unwrap();
-        let not2 = hugr.output_neighbours(not1).exactly_one().ok().unwrap();
-
-        let intervals = line_checker.get_intervals_from_nodes([not1, not2]).unwrap();
-        let subgraph =
-            SiblingSubgraph::try_from_nodes_with_intervals([not1, not2], &intervals, &line_checker)
-                .unwrap();
-        let exp_subgraph = SiblingSubgraph::try_from_nodes([not1, not2], &hugr).unwrap();
-
-        assert_eq!(subgraph, exp_subgraph);
-        assert_eq!(
-            line_checker.nodes_in_intervals(&intervals).collect_vec(),
-            [not1, not2]
-        );
-
-        let intervals2 = line_checker
-            .get_intervals_from_boundary_ports([
-                (not1, IncomingPort::from(0).into()),
-                (not2, OutgoingPort::from(0).into()),
-            ])
-            .unwrap();
-        let subgraph2 = SiblingSubgraph::try_from_nodes_with_intervals(
-            [not1, not2],
-            &intervals2,
-            &line_checker,
-        )
-        .unwrap();
-        assert_eq!(subgraph2, exp_subgraph);
-    }
-
-    #[test]
-    fn test_validate() {
-        let (hugr, func_root) = build_3not_hugr().unwrap();
-        let func = hugr.with_entrypoint(func_root);
-        let checker = TopoConvexChecker::new(&func, func_root);
-        let [inp, _out] = hugr.get_io(func_root).unwrap();
-        let not1 = hugr.output_neighbours(inp).exactly_one().ok().unwrap();
-        let not2 = hugr.output_neighbours(not1).exactly_one().ok().unwrap();
-        let not3 = hugr.output_neighbours(not2).exactly_one().ok().unwrap();
-
-        // A valid boundary, and convex
-        let sub = SiblingSubgraph::new_unchecked(
-            vec![vec![(not1, 0.into())]],
-            vec![(not2, 0.into())],
-            vec![],
-            vec![not1, not2],
-        );
-        assert_eq!(sub.validate(&func, ValidationMode::SkipConvexity), Ok(()));
-        assert_eq!(sub.validate(&func, ValidationMode::CheckConvexity), Ok(()));
-        assert_eq!(
-            sub.validate(&func, ValidationMode::WithChecker(&checker)),
-            Ok(())
-        );
-
-        // A valid boundary, but not convex
-        let sub = SiblingSubgraph::new_unchecked(
-            vec![vec![(not1, 0.into())], vec![(not3, 0.into())]],
-            vec![(not1, 0.into()), (not3, 0.into())],
-            vec![],
-            vec![not1, not3],
-        );
-        assert_eq!(sub.validate(&func, ValidationMode::SkipConvexity), Ok(()));
-        assert_eq!(
-            sub.validate(&func, ValidationMode::CheckConvexity),
-            Err(InvalidSubgraph::NotConvex)
-        );
-        assert_eq!(
-            sub.validate(&func, ValidationMode::WithChecker(&checker)),
-            Err(InvalidSubgraph::NotConvex)
-        );
-
-        // An invalid boundary (missing an input)
-        let sub = SiblingSubgraph::new_unchecked(
-            vec![vec![(not1, 0.into())]],
-            vec![(not1, 0.into()), (not3, 0.into())],
-            vec![],
-            vec![not1, not3],
-        );
-        assert_eq!(
-            sub.validate(&func, ValidationMode::SkipConvexity),
-            Err(InvalidSubgraph::InvalidNodeSet)
-        );
-    }
-
-    #[fixture]
-    pub(crate) fn hugr_call_subgraph() -> Hugr {
-        let mut builder = ModuleBuilder::new();
-        let decl_node = builder
-            .declare("test", endo_sig([bool_t()]).into())
-            .unwrap();
-        let mut main = builder
-            .define_function("main", endo_sig([bool_t()]))
-            .unwrap();
-        let [bool] = main.input_wires_arr();
-
-        let [bool] = main
-            .add_dataflow_op(LogicOp::Not, [bool])
-            .unwrap()
-            .outputs_arr();
-
-        // Chain two calls to the same function
-        let [bool] = main.call(&decl_node, &[], [bool]).unwrap().outputs_arr();
-        let [bool] = main.call(&decl_node, &[], [bool]).unwrap().outputs_arr();
-
-        let main_def = main.finish_with_outputs([bool]).unwrap();
-
-        let mut hugr = builder.finish_hugr().unwrap();
-        hugr.set_entrypoint(main_def.node());
-        hugr
-    }
-
-    #[rstest]
-    fn test_call_subgraph_from_dfg(hugr_call_subgraph: Hugr) {
-        let subg = SiblingSubgraph::try_new_dataflow_subgraph::<_, DataflowParentID>(
-            RootChecked::try_new(&hugr_call_subgraph).expect("Root should be DFG container."),
-        )
-        .unwrap();
-
-        assert_eq!(subg.function_calls.len(), 1);
-        assert_eq!(subg.function_calls[0].len(), 2);
-    }
-
-    #[rstest]
-    fn test_call_subgraph_from_nodes(hugr_call_subgraph: Hugr) {
-        let call_nodes = hugr_call_subgraph
-            .children(hugr_call_subgraph.entrypoint())
-            .filter(|&n| hugr_call_subgraph.get_optype(n).is_call())
+        let nodes = node_indices
+            .iter()
+            .map(|&pg_node| self.node_map.from_portgraph(pg_node))
             .collect_vec();
+        validate_boundary(hugr, &nodes, inputs, outputs, function_calls)?;
 
-        let subg =
-            SiblingSubgraph::try_from_nodes(call_nodes.clone(), &hugr_call_subgraph).unwrap();
-        assert_eq!(subg.function_calls.len(), 1);
-        assert_eq!(subg.function_calls[0].len(), 2);
+        if nodes.len() <= 1 {
+            return Ok(nodes);
+        }
+        let post_outputs: BTreeSet<_> = outputs
+            .iter()
+            .flat_map(|(n, p)| hugr.linked_inputs(*n, *p))
+            .collect();
+        if inputs.iter().flatten().any(|p| post_outputs.contains(p)) {
+            return Err(InvalidSubgraph::NotConvex);
+        }
 
-        let subg =
-            SiblingSubgraph::try_from_nodes(call_nodes[0..1].to_owned(), &hugr_call_subgraph)
-                .unwrap();
-        assert_eq!(subg.function_calls.len(), 1);
-        assert_eq!(subg.function_calls[0].len(), 1);
-    }
-
-    #[rstest]
-    fn test_call_subgraph_from_boundary(hugr_call_subgraph: Hugr) {
-        let call_nodes = hugr_call_subgraph
-            .children(hugr_call_subgraph.entrypoint())
-            .filter(|&n| hugr_call_subgraph.get_optype(n).is_call())
-            .collect_vec();
-        let not_node = hugr_call_subgraph
-            .children(hugr_call_subgraph.entrypoint())
-            .filter(|&n| hugr_call_subgraph.get_optype(n) == &LogicOp::Not.into())
-            .exactly_one()
-            .ok()
-            .unwrap();
-
-        let subg = SiblingSubgraph::try_new(
-            vec![
-                vec![(not_node, IncomingPort::from(0))],
-                call_nodes
-                    .iter()
-                    .map(|&n| (n, IncomingPort::from(1)))
-                    .collect_vec(),
-            ],
-            vec![(call_nodes[1], OutgoingPort::from(0))],
-            &hugr_call_subgraph,
-        )
-        .unwrap();
-
-        assert_eq!(subg.function_calls.len(), 1);
-        assert_eq!(subg.function_calls[0].len(), 2);
+        if self.checker.is_node_convex(node_indices) {
+            Ok(nodes)
+        } else {
+            Err(InvalidSubgraph::NotConvex)
+        }
     }
 }
+
+#[cfg(test)]
+mod test_traits_impld {
+    use crate::{Hugr, HugrView, builder::test::simple_dfg_hugr};
+    use portgraph::NodeIndex;
+    use rstest::rstest;
+
+    #[rstest]
+    fn test(simple_dfg_hugr: Hugr) {
+        let sg = simple_dfg_hugr.scheduling_graph(simple_dfg_hugr.module_root());
+        // Just to check that this compiles, never mind the actual result.
+        super::convex::TopoConvexChecker::new(sg.petgraph())
+            .is_node_convex([NodeIndex::new(0), NodeIndex::new(2)]);
+    }
+}
+
+#[cfg(test)]
+mod tests;

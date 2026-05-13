@@ -51,8 +51,8 @@ impl<AK: ArrayKind> FromStr for GenericArrayCloneDef<AK> {
 impl<AK: ArrayKind> GenericArrayCloneDef<AK> {
     /// To avoid recursion when defining the extension, take the type definition as an argument.
     fn signature_from_def(&self, array_def: &TypeDef) -> SignatureFunc {
-        let params = vec![TypeParam::max_nat_type(), TypeBound::Copyable.into()];
-        let size = TypeArg::new_var_use(0, TypeParam::max_nat_type());
+        let params = vec![TypeParam::max_nat_kind(), TypeBound::Copyable.into()];
+        let size = TypeArg::new_var_use(0, TypeParam::max_nat_kind());
         let element_ty = Type::new_var_use(1, TypeBound::Copyable);
         let array_ty = AK::instantiate_ty(array_def, size, element_ty)
             .expect("Array type instantiation failed");
@@ -180,8 +180,9 @@ impl<AK: ArrayKind> HasConcrete for GenericArrayCloneDef<AK> {
 
     fn instantiate(&self, type_args: &[TypeArg]) -> Result<Self::Concrete, OpLoadError> {
         match type_args {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] if ty.copyable() => {
-                Ok(GenericArrayClone::new(ty.clone(), *n).unwrap())
+            [TypeArg::BoundedNat(n), ty] if ty.copyable() => {
+                let ty = Type::try_from(ty.clone()).unwrap(); // succeeds as copyable
+                Ok(GenericArrayClone::new(ty, *n).unwrap())
             }
             _ => Err(SignatureError::InvalidTypeArgs.into()),
         }

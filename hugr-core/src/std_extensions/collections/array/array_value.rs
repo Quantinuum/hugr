@@ -94,8 +94,8 @@ impl<AK: ArrayKind> GenericArrayValue<AK> {
 
         // constant can only hold classic type.
         let ty = match typ.args() {
-            [TypeArg::BoundedNat(n), TypeArg::Runtime(ty)] if *n as usize == self.values.len() => {
-                ty
+            [TypeArg::BoundedNat(n), ty] if *n as usize == self.values.len() && ty.copyable() => {
+                Type::try_from(ty.clone()).unwrap() // succeeds as copyable
             }
             _ => {
                 return Err(CustomCheckFailure::Message(format!(
@@ -107,7 +107,7 @@ impl<AK: ArrayKind> GenericArrayValue<AK> {
 
         // check all values are instances of the element type
         for v in &self.values {
-            if v.get_type() != *ty {
+            if v.get_type() != ty {
                 return Err(CustomCheckFailure::Message(format!(
                     "Array element {v:?} is not of expected type {ty}"
                 )));

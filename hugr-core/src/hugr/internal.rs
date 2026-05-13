@@ -20,7 +20,9 @@ use crate::ops::handle::NodeHandle;
 /// Specifically, this trait provides access to the underlying portgraph
 /// view.
 pub trait HugrInternals {
-    /// The portgraph graph structure returned by [`HugrInternals::region_portgraph`].
+    /// The portgraph graph structure used internally by [`scheduling_graph`].
+    ///
+    /// [`scheduling_graph`]: HugrView::scheduling_graph
     type RegionPortgraph<'p>: LinkView<LinkEndpoint: Eq, NodeIndexBase = u32, PortIndexBase = u32, PortOffsetBase = u32>
         + Clone
         + 'p
@@ -31,25 +33,10 @@ pub trait HugrInternals {
     type Node: Copy + Ord + std::fmt::Debug + std::fmt::Display + std::hash::Hash;
 
     /// A mapping between HUGR nodes and portgraph nodes in the graph returned by
-    /// [`HugrInternals::region_portgraph`].
+    /// [`scheduling_graph`].
+    ///
+    /// [`scheduling_graph`]: HugrView::scheduling_graph
     type RegionPortgraphNodes: PortgraphNodeMap<Self::Node>;
-
-    /// Returns a flat portgraph view of a region in the HUGR, and a mapping between
-    /// HUGR nodes and portgraph nodes in the graph.
-    //
-    // NOTE: Ideally here we would just return `Self::RegionPortgraph<'_>`, but
-    // when doing so we are unable to restrict the type to implement petgraph's
-    // traits over references (e.g. `&MyGraph : IntoNodeIdentifiers`, which is
-    // needed if we want to use petgraph's algorithms on the region graph).
-    // This won't be solvable until we do the big petgraph refactor -.-
-    // In the meantime, just wrap the portgraph in a `FlatRegion` as needed.
-    fn region_portgraph(
-        &self,
-        parent: Self::Node,
-    ) -> (
-        portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>,
-        Self::RegionPortgraphNodes,
-    );
 
     /// Returns a metadata entry associated with a node.
     ///
@@ -59,8 +46,10 @@ pub trait HugrInternals {
     fn node_metadata_map(&self, node: Self::Node) -> &NodeMetadataMap;
 }
 
-/// A map between hugr nodes and portgraph nodes in the graph returned by
-/// [`HugrInternals::region_portgraph`].
+/// A map between hugr nodes and portgraph nodes in a [HugrInternals::RegionPortgraph]
+/// or [`scheduling_graph`].
+///
+/// [`scheduling_graph`]: HugrView::scheduling_graph
 pub trait PortgraphNodeMap<N>: Clone + Sized + std::fmt::Debug {
     /// Returns the portgraph index of a HUGR node in the associated region
     /// graph.
@@ -118,20 +107,6 @@ impl HugrInternals for Hugr {
     type Node = Node;
 
     type RegionPortgraphNodes = DefaultPGNodeMap;
-
-    #[inline]
-    fn region_portgraph(
-        &self,
-        parent: Self::Node,
-    ) -> (
-        portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>,
-        Self::RegionPortgraphNodes,
-    ) {
-        let root = parent.into_portgraph();
-        let region =
-            portgraph::view::FlatRegion::new_without_root(&self.graph, &self.hierarchy, root);
-        (region, DefaultPGNodeMap)
-    }
 
     #[inline]
     fn node_metadata_map(&self, node: Self::Node) -> &NodeMetadataMap {
@@ -389,22 +364,6 @@ impl HugrMutInternals for Hugr {
 
     fn extensions_mut(&mut self) -> &mut ExtensionRegistry {
         &mut self.extensions
-    }
-}
-
-impl Hugr {
-    /// Consumes the HUGR and return a flat portgraph view of the region rooted
-    /// at `parent`.
-    #[inline]
-    pub fn into_region_portgraph(
-        self,
-        parent: Node,
-    ) -> portgraph::view::FlatRegion<'static, MultiPortGraph<u32, u32, u32>> {
-        let root = parent.into_portgraph();
-        let Self {
-            graph, hierarchy, ..
-        } = self;
-        portgraph::view::FlatRegion::new_without_root(graph, hierarchy, root)
     }
 }
 

@@ -70,8 +70,8 @@
 //! // Create a conditional operation
 //! let conditional = Conditional {
 //!     sum_rows: vec![[usize_t()].into(), [bool_t()].into()],
-//!     other_inputs: vec![usize_t().into()].into(),
-//!     outputs: vec![bool_t()].into(),
+//!     other_inputs: [usize_t()].into(),
+//!     outputs: [bool_t()].into(),
 //! };
 //! let cond_op: OpType = conditional.into();
 //! assert!(cond_op.is_container()); // Contains case branches

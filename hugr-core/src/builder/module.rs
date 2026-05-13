@@ -306,7 +306,7 @@ mod test {
     use cool_asserts::assert_matches;
 
     use crate::builder::test::dfg_calling_defn_decl;
-    use crate::builder::{Dataflow, DataflowSubContainer, test::n_identity};
+    use crate::builder::{Dataflow, DataflowSubContainer};
     use crate::extension::prelude::usize_t;
     use crate::{hugr::linking::NodeLinkingDirective, ops::OpType, types::Signature};
 
@@ -325,29 +325,6 @@ mod test {
             let call = f_build.call(&f_id, &[], f_build.input_wires())?;
 
             f_build.finish_with_outputs(call.outputs())?;
-            module_builder.finish_hugr()
-        };
-        assert_matches!(build_result, Ok(_));
-        Ok(())
-    }
-
-    #[test]
-    #[ignore] // https://github.com/Quantinuum/hugr/issues/2828
-    fn simple_alias() -> Result<(), BuildError> {
-        let build_result = {
-            let mut module_builder = ModuleBuilder::new();
-
-            let qubit_state_type =
-                module_builder.add_alias_declare("qubit_state", TypeBound::Linear)?;
-
-            let f_build = module_builder.define_function(
-                "main",
-                Signature::new(
-                    vec![qubit_state_type.get_alias_type()],
-                    vec![qubit_state_type.get_alias_type()],
-                ),
-            )?;
-            n_identity(f_build)?;
             module_builder.finish_hugr()
         };
         assert_matches!(build_result, Ok(_));

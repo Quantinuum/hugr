@@ -481,8 +481,8 @@ pub(crate) mod test {
     use crate::metadata::Metadata;
     use crate::ops::{FuncDecl, FuncDefn, OpParent, OpTag, OpTrait, Value, handle::NodeHandle};
     use crate::std_extensions::logic::test::and_op;
-    use crate::types::type_param::TypeParam;
-    use crate::types::{EdgeKind, FuncValueType, RowVariable, Signature, Type, TypeBound, TypeRV};
+    use crate::types::type_param::{TermKindError, TypeParam};
+    use crate::types::{EdgeKind, FuncValueType, Signature, Term, Type, TypeBound, TypeRowRV};
     use crate::utils::test_quantum_extension::h_gate;
     use crate::{Wire, builder::test::n_identity, type_row};
 
@@ -926,32 +926,43 @@ pub(crate) mod test {
     #[test]
     fn no_outer_row_variables() -> Result<(), BuildError> {
         let e = crate::hugr::validate::test::extension_with_eval_parallel();
-        let tv = TypeRV::new_row_var_use(0, TypeBound::Copyable);
+        let rv = TypeRowRV::new_var_use(0, TypeBound::Copyable);
         // Can *declare* a function that takes a function-value of unknown #args
         FunctionBuilder::new(
             "bad_eval",
             PolyFuncType::new(
-                [TypeParam::new_list_type(TypeBound::Copyable)],
+                [TypeParam::new_list_kind(TypeBound::Copyable)],
                 Signature::new(
                     [Type::new_function(FuncValueType::new(
                         [usize_t()],
-                        [tv.clone()],
+                        rv.clone(),
                     ))],
                     [],
                 ),
             ),
         )?;
-
+        let rv: Term = rv.into();
         // But cannot eval it...
+        let ev = e.instantiate_extension_op("eval", [Term::new_list([usize_t()]), rv.clone()]);
+        assert_eq!(
+            ev,
+            Err(SignatureError::TypeArgMismatch(
+                TermKindError::InvalidValue(Box::new(rv.clone()))
+            ))
+        );
+
         let ev = e.instantiate_extension_op(
             "eval",
-            [vec![usize_t().into()].into(), vec![tv.into()].into()],
+            [Term::new_list([usize_t()]), Term::new_list([rv.clone()])],
         );
         assert_eq!(
             ev,
-            Err(SignatureError::RowVarWhereTypeExpected {
-                var: RowVariable(0, TypeBound::Copyable)
-            })
+            Err(SignatureError::TypeArgMismatch(
+                TermKindError::KindMismatch {
+                    term: Box::new(rv),
+                    kind: Box::new(TypeBound::Linear.into())
+                }
+            ))
         );
         Ok(())
     }

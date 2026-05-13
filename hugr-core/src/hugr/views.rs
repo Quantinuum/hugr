@@ -2,46 +2,43 @@
 
 mod impls;
 mod nodes_iter;
-pub mod petgraph;
 pub mod render;
 mod rerooted;
 mod root_checked;
 pub mod sibling_subgraph;
+mod syn_edge;
 
 #[cfg(test)]
 mod tests;
 
+use ::petgraph::visit as pv;
 use serde::de::Deserialize;
 use std::any::type_name;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
-#[deprecated(since = "0.26.0")]
-#[expect(deprecated)] // Remove at same time
-pub use self::petgraph::PetgraphWrapper;
 use self::render::MermaidFormatter;
 pub use nodes_iter::NodesIter;
 pub use rerooted::Rerooted;
 pub use root_checked::{InvalidSignature, RootChecked, check_tag};
 pub use sibling_subgraph::SiblingSubgraph;
 
-use itertools::Itertools;
+use itertools::{Either, Itertools};
 use portgraph::render::{DotFormat, MermaidFormat};
 use portgraph::{LinkView, PortView};
+
+use crate::core::HugrNode;
+use crate::extension::ExtensionRegistry;
+use crate::hugr::internal::{DefaultPGNodeMap, PortgraphNodeMap};
+use crate::hugr::views::syn_edge::SynEdgeWrapper;
+use crate::metadata::{Metadata, MetadataError, RawMetadataValue};
+use crate::ops::{OpParent, OpTag, OpTrait, OpType, handle::NodeHandle};
+use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
+use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
 use super::internal::{HugrInternals, HugrMutInternals};
 use super::validate::ValidationContext;
 use super::{Hugr, HugrMut, Node, ValidationError};
-use crate::core::HugrNode;
-use crate::extension::ExtensionRegistry;
-use crate::metadata::{Metadata, MetadataError, RawMetadataValue};
-use crate::ops::handle::NodeHandle;
-use crate::ops::{OpParent, OpTag, OpTrait, OpType};
-
-use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
-use crate::{Direction, IncomingPort, OutgoingPort, Port};
-
-use itertools::Either;
 
 /// A trait for inspecting HUGRs.
 /// For end users we intend this to be superseded by region-specific APIs.
@@ -105,10 +102,14 @@ pub trait HugrView: HugrInternals {
 
     /// Returns the metadata associated with a node.
     ///
+    /// Looks up metadata under `M::KEY`, then under entries of `M::ALIASES` in order.
+    ///
     /// For a non type-safe accessor use [`HugrView::get_metadata_any`] instead.
     #[inline]
     fn get_metadata<M: Metadata>(&self, node: Self::Node) -> Option<<M as Metadata>::Type<'_>> {
-        self.get_metadata_any(node, <M as Metadata>::KEY)
+        std::iter::once(<M as Metadata>::KEY)
+            .chain(<M as Metadata>::ALIASES.iter().copied())
+            .find_map(|key| self.get_metadata_any(node, key))
             .and_then(|value| <<M as Metadata>::Type<'_> as Deserialize>::deserialize(value).ok())
     }
 
@@ -412,19 +413,9 @@ pub trait HugrView: HugrInternals {
         }
     }
 
-    /// Return a wrapper over the view that can be used in petgraph algorithms.
-    #[inline]
-    #[deprecated(
-        since = "0.26.0",
-        note = "Use hugr_core::internal::HugrInternals::region_portgraph instead."
-    )]
-    #[expect(deprecated)] // Remove at same time as PetgraphWrapper
-    fn as_petgraph(&self) -> PetgraphWrapper<'_, Self>
-    where
-        Self: Sized,
-    {
-        PetgraphWrapper { hugr: self }
-    }
+    /// A view of a flat region, including ordering constraints from nonlocal edges,
+    /// suitable for use with petgraph algorithms.
+    fn scheduling_graph(&self, parent: Self::Node) -> SchedulingGraph<'_, Self>;
 
     /// Return the mermaid representation of the underlying hierarchical graph.
     ///
@@ -572,6 +563,69 @@ impl<S: HugrNode> ExtractionResult<S> for HashMap<S, Node> {
     #[inline]
     fn extracted_node(&self, node: S) -> Node {
         self[&node]
+    }
+}
+
+/// A graph of a flat region of a Hugr, including ordering constraints from nonlocal edges
+pub struct SchedulingGraph<'a, V: HugrView + ?Sized + 'a> {
+    graph: SynEdgeWrapper<portgraph::view::FlatRegion<'a, V::RegionPortgraph<'a>>>,
+    node_map: V::RegionPortgraphNodes,
+    region_parent: V::Node,
+}
+
+impl<'a, V: HugrView + 'a> SchedulingGraph<'a, V> {
+    /// Get the parent node of the region represented by this scheduling graph
+    pub fn region_parent(&self) -> V::Node {
+        self.region_parent
+    }
+
+    /// Converts a `V::Node` index in the original Hugr into
+    /// an index in [Self::petgraph]
+    ///
+    /// # Panics
+    ///
+    /// If `n` is not a child of [Self::region_parent]
+    pub fn node_to_pg(&self, n: V::Node) -> portgraph::NodeIndex {
+        self.node_map.to_portgraph(n)
+    }
+
+    /// Converts the index of a node in [Self::petgraph] to the corresponding
+    /// `V::Node` of the original Hugr.
+    ///
+    /// # Panics
+    ///
+    /// If `n` is not a node in `Self::petgraph`
+    pub fn pg_to_node(&self, n: portgraph::NodeIndex) -> V::Node {
+        self.node_map.from_portgraph(n)
+    }
+
+    /// Extracts the map between `V::Node` and the [NodeIndex] used in [Self::petgraph],
+    /// discarding the rest of `self`.
+    ///
+    /// [NodeIndex]: portgraph::NodeIndex
+    pub fn into_node_map(self) -> V::RegionPortgraphNodes {
+        self.node_map
+    }
+
+    // Just ignore the syn edges. Use at own peril!
+    fn portgraph_no_syn_edges(
+        self,
+    ) -> (
+        portgraph::view::FlatRegion<'a, V::RegionPortgraph<'a>>,
+        V::RegionPortgraphNodes,
+    ) {
+        (self.graph.region_view, self.node_map)
+    }
+
+    /// Access to the graph, sufficient to allow [pv::Topo]
+    pub fn petgraph(
+        &self,
+    ) -> impl pv::NodeCount
+    + pv::IntoNodeIdentifiers
+    + pv::IntoEdgeReferences
+    + pv::IntoNeighborsDirected
+    + pv::Visitable<NodeId = portgraph::NodeIndex> {
+        &self.graph
     }
 }
 
@@ -795,6 +849,102 @@ impl HugrView for Hugr {
             }
         }
         (extracted, DefaultNodeMap(inserted.node_map))
+    }
+
+    fn scheduling_graph(&self, parent: Self::Node) -> SchedulingGraph<'_, Self> {
+        let root = parent.into_portgraph();
+        let region_view =
+            portgraph::view::FlatRegion::new_without_root(&self.graph, &self.hierarchy, root);
+        let syn_edges = calc_syn_edges(self, parent);
+        let graph = SynEdgeWrapper {
+            region_view,
+            syn_edges,
+        };
+        SchedulingGraph {
+            graph,
+            node_map: DefaultPGNodeMap,
+            region_parent: parent,
+        }
+    }
+}
+
+fn calc_syn_edges<H: HugrView<Node = Node>>(
+    hugr: &H,
+    parent: H::Node,
+) -> Vec<(portgraph::NodeIndex, portgraph::NodeIndex)> {
+    let mut syn_edges = Vec::new();
+    if OpTag::DataflowParent.is_superset(hugr.get_optype(parent).tag()) {
+        let mut cache: HashMap<H::Node, H::Node> = HashMap::new();
+        fn find_sib_anc<N: HugrNode>(
+            n: N,
+            hugr: &(impl HugrView<Node = N> + ?Sized),
+            cache: &mut HashMap<N, N>,
+            parent: N,
+        ) -> Option<N> {
+            // If we don't hit parent, it's a Dom edge, so ignore.
+            let p = hugr.get_parent(n)?;
+            if p == parent {
+                return Some(n);
+            }
+            match cache.get(&p) {
+                Some(&cached) => Some(cached),
+                None => {
+                    // can't be borrowing cache during recursive call
+                    let anc = find_sib_anc(p, hugr, cache, parent);
+                    if let Some(anc) = anc {
+                        cache.insert(p, anc);
+                    }
+                    anc
+                }
+            }
+        }
+        for child in hugr.children(parent) {
+            for (p, _) in hugr.out_value_types(child) {
+                for (tgt, _) in hugr.linked_inputs(child, p) {
+                    if let Some(tgt_anc) = find_sib_anc(tgt, hugr, &mut cache, parent)
+                        && tgt_anc != tgt
+                    {
+                        syn_edges.push((child.into_portgraph(), tgt_anc.into_portgraph()));
+                    }
+                }
+            }
+        }
+    }
+    syn_edges
+}
+
+/// Like [HugrView::scheduling_graph], but returns a [SchedulingGraph] that owns its own view of the region,
+/// taken from the Hugr.
+///
+/// The API is designed for `hugr-persistent` and allows to implement [HugrView] such that
+/// [HugrInternals::RegionPortgraph] is not tied to the original view but rather an owned
+/// temporary [Hugr].
+pub fn owned_scheduling_graph<'a, N: HugrNode, V>(
+    hugr: Hugr,
+    region_parent: N,
+    node_map: V::RegionPortgraphNodes,
+) -> SchedulingGraph<'a, V>
+where
+    V: for<'p> HugrView<
+            Node = N,
+            RegionPortgraph<'p> = portgraph::MultiPortGraph<u32, u32, u32>,
+            RegionPortgraphNodes = HashMap<N, Node>,
+        > + 'a,
+{
+    let parent = node_map[&region_parent];
+    let root = parent.into_portgraph();
+    let syn_edges = calc_syn_edges(&hugr, parent);
+    let region_view =
+        portgraph::view::FlatRegion::new_without_root(hugr.graph, hugr.hierarchy, root);
+
+    let graph = SynEdgeWrapper {
+        region_view,
+        syn_edges,
+    };
+    SchedulingGraph {
+        graph,
+        node_map,
+        region_parent,
     }
 }
 

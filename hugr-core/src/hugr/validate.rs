@@ -18,8 +18,7 @@ use crate::ops::validate::{
     ChildrenEdgeData, ChildrenValidationError, EdgeValidationError, OpValidityFlags,
 };
 use crate::ops::{NamedOp, OpName, OpTag, OpTrait, OpType, ValidateOp};
-use crate::types::EdgeKind;
-use crate::types::type_param::TypeParam;
+use crate::types::{EdgeKind, type_param::TypeParam};
 use crate::{Direction, Port, Visibility};
 
 use super::internal::PortgraphNodeMap;
@@ -128,10 +127,10 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         &self,
         parent: H::Node,
     ) -> (Dominators<portgraph::NodeIndex>, H::RegionPortgraphNodes) {
-        let (region, node_map) = self.hugr.region_portgraph(parent);
+        let sg = self.hugr.scheduling_graph(parent);
         let entry_node = self.hugr.children(parent).next().unwrap();
-        let doms = dominators::simple_fast(&region, node_map.to_portgraph(entry_node));
-        (doms, node_map)
+        let doms = dominators::simple_fast(sg.petgraph(), sg.node_to_pg(entry_node));
+        (doms, sg.into_node_map())
     }
 
     /// Check the constraints on a single node.
@@ -422,11 +421,11 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
             return Ok(());
         }
 
-        let (region, node_map) = self.hugr.region_portgraph(parent);
-        let postorder = Topo::new(&region);
+        let sg = self.hugr.scheduling_graph(parent);
+        let postorder = Topo::new(sg.petgraph());
         let nodes_visited = postorder
-            .iter(&region)
-            .filter(|n| *n != node_map.to_portgraph(parent))
+            .iter(sg.petgraph())
+            .filter(|n| *n != sg.node_to_pg(parent))
             .count();
         let node_count = self.hugr.children(parent).count();
         if nodes_visited != node_count {
@@ -486,19 +485,6 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         {
             if ancestor_parent == from_parent {
                 // External edge.
-                if !is_static {
-                    // Must have an order edge.
-                    self.hugr
-                        .node_connections(from, ancestor)
-                        .find(|&[p, _]| from_optype.port_kind(p) == Some(EdgeKind::StateOrder))
-                        .ok_or(InterGraphEdgeError::MissingOrderEdge {
-                            from,
-                            from_offset,
-                            to,
-                            to_offset,
-                            to_ancestor: ancestor,
-                        })?;
-                }
                 return Ok(());
             } else if Some(ancestor_parent) == from_parent_parent && !is_static {
                 // Dominator edge
@@ -806,17 +792,6 @@ pub enum InterGraphEdgeError<N: HugrNode> {
         to: N,
         to_offset: Port,
         ancestor_parent_op: Box<OpType>,
-    },
-    /// The sibling ancestors of the external inter-graph edge endpoints must be have an order edge between them.
-    #[error(
-        "Missing state order between the external inter-graph source {from} and the ancestor of the target {to_ancestor}. In an external inter-graph edge from {from} ({from_offset}) to {to} ({to_offset})."
-    )]
-    MissingOrderEdge {
-        from: N,
-        from_offset: Port,
-        to: N,
-        to_offset: Port,
-        to_ancestor: N,
     },
     /// The ancestors of an inter-graph edge are not related.
     #[error(

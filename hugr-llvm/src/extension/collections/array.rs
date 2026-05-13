@@ -25,7 +25,7 @@ use hugr_core::ops::DataflowOpTrait;
 use hugr_core::std_extensions::collections::array::{
     self, ArrayClone, ArrayDiscard, ArrayOp, ArrayOpDef, ArrayRepeat, ArrayScan, array_type,
 };
-use hugr_core::types::{TypeArg, TypeEnum};
+use hugr_core::types::TypeArg;
 use hugr_core::{HugrView, Node};
 use inkwell::IntPredicate;
 use inkwell::builder::Builder;
@@ -498,7 +498,7 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
                 .ok_or(anyhow!("ArrayOp::get has no outputs"))?;
 
             let res_sum_ty = {
-                let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
+                let Some(st) = res_hugr_ty.as_sum() else {
                     Err(anyhow!("ArrayOp::get output is not a sum type"))?
                 };
                 ts.llvm_sum_type(st.clone())?
@@ -559,7 +559,7 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
                 .ok_or(anyhow!("ArrayOp::set has no outputs"))?;
 
             let res_sum_ty = {
-                let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
+                let Some(st) = res_hugr_ty.as_sum() else {
                     Err(anyhow!("ArrayOp::set output is not a sum type"))?
                 };
                 ts.llvm_sum_type(st.clone())?
@@ -621,7 +621,7 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
                 .ok_or(anyhow!("ArrayOp::swap has no outputs"))?;
 
             let res_sum_ty = {
-                let TypeEnum::Sum(st) = res_hugr_ty.as_type_enum() else {
+                let Some(st) = res_hugr_ty.as_sum() else {
                     Err(anyhow!("ArrayOp::swap output is not a sum type"))?
                 };
                 ts.llvm_sum_type(st.clone())?

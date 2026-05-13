@@ -22,10 +22,10 @@ use crate::ops::handle::NodeHandle;
 use crate::ops::{self, FuncDecl, FuncDefn, OpType, Value};
 use crate::std_extensions::logic::LogicOp;
 use crate::std_extensions::logic::test::{and_op, or_op};
-use crate::types::type_param::{TermTypeError, TypeArg};
+use crate::types::type_param::{TermKindError, TypeArg};
 use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Term, Type, TypeBound,
-    TypeRV, TypeRow,
+    TypeRow, TypeRowRV,
 };
 use crate::{Direction, Hugr, IncomingPort, Node, const_extension_ids, test_file, type_row};
 
@@ -193,45 +193,6 @@ fn df_children_restrictions() {
 }
 
 #[test]
-fn test_ext_edge() {
-    let mut h = closed_dfg_root_hugr(Signature::new(vec![bool_t(), bool_t()], vec![bool_t()]));
-    let [input, output] = h.get_io(h.entrypoint()).unwrap();
-
-    // Nested DFG bool_t() -> bool_t()
-    let sub_dfg = h.add_node_with_parent(
-        h.entrypoint(),
-        ops::DFG {
-            signature: Signature::new_endo([bool_t()]),
-        },
-    );
-    // this Xor has its 2nd input unconnected
-    let sub_op = {
-        let sub_input = h.add_node_with_parent(sub_dfg, ops::Input::new(vec![bool_t()]));
-        let sub_output = h.add_node_with_parent(sub_dfg, ops::Output::new(vec![bool_t()]));
-        let sub_op = h.add_node_with_parent(sub_dfg, and_op());
-        h.connect(sub_input, 0, sub_op, 0);
-        h.connect(sub_op, 0, sub_output, 0);
-        sub_op
-    };
-
-    h.connect(input, 0, sub_dfg, 0);
-    h.connect(sub_dfg, 0, output, 0);
-
-    assert_matches!(h.validate(), Err(ValidationError::UnconnectedPort { .. }));
-
-    h.connect(input, 1, sub_op, 1);
-    assert_matches!(
-        h.validate(),
-        Err(ValidationError::InterGraphEdgeError(
-            InterGraphEdgeError::MissingOrderEdge { .. }
-        ))
-    );
-    //Order edge. This will need metadata indicating its purpose.
-    h.add_other_edge(input, sub_dfg);
-    h.validate().unwrap();
-}
-
-#[test]
 fn test_local_const() {
     let mut h = closed_dfg_root_hugr(Signature::new_endo([bool_t()]));
     let [input, output] = h.get_io(h.entrypoint()).unwrap();
@@ -343,8 +304,8 @@ fn invalid_types() {
     );
     assert_eq!(
         validate_to_sig_error(element_outside_bound),
-        SignatureError::TypeArgMismatch(TermTypeError::TypeMismatch {
-            type_: Box::new(TypeBound::Copyable.into()),
+        SignatureError::TypeArgMismatch(TermKindError::KindMismatch {
+            kind: Box::new(TypeBound::Copyable.into()),
             term: Box::new(valid.into())
         })
     );
@@ -389,7 +350,7 @@ fn invalid_types() {
     );
     assert_eq!(
         validate_to_sig_error(too_many_type_args),
-        SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(2, 1))
+        SignatureError::TypeArgMismatch(TermKindError::WrongNumberArgs(2, 1))
     );
 }
 
@@ -460,7 +421,7 @@ fn no_nested_funcdefns() -> Result<(), Box<dyn std::error::Error>> {
 #[test]
 fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
     use crate::std_extensions::collections::list;
-    const BOUND: TypeParam = TypeParam::RuntimeType(TypeBound::Copyable);
+    const BOUND: TypeParam = TypeParam::TypeKind(TypeBound::Copyable);
     let list_of_var = Type::new_extension(
         list::EXTENSION
             .get_type(&list::LIST_TYPENAME)
@@ -493,30 +454,29 @@ fn no_polymorphic_consts() -> Result<(), Box<dyn std::error::Error>> {
 }
 
 pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
-    let rowp = TypeParam::new_list_type(TypeBound::Linear);
+    let rowp = TypeParam::new_list_kind(TypeBound::Linear);
     Extension::new_test_arc(EXT_ID, |ext, extension_ref| {
-        let inputs = TypeRV::new_row_var_use(0, TypeBound::Linear);
-        let outputs = TypeRV::new_row_var_use(1, TypeBound::Linear);
-        let evaled_fn =
-            TypeRV::new_function(FuncValueType::new([inputs.clone()], [outputs.clone()]));
+        let inputs = TypeRowRV::new_var_use(0, TypeBound::Linear);
+        let outputs = TypeRowRV::new_var_use(1, TypeBound::Linear);
+        let evaled_fn = Type::new_function(FuncValueType::new(inputs.clone(), outputs.clone()));
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone()],
-            FuncValueType::new([evaled_fn, inputs], [outputs]),
+            FuncValueType::new(TypeRowRV::from([evaled_fn]).concat(inputs), outputs),
         );
         ext.add_op("eval".into(), String::new(), pf, extension_ref)
             .unwrap();
 
-        let rv = |idx| TypeRV::new_row_var_use(idx, TypeBound::Linear);
+        let rv = |idx| TypeRowRV::new_var_use(idx, TypeBound::Linear);
         let pf = PolyFuncTypeRV::new(
             [rowp.clone(), rowp.clone(), rowp.clone(), rowp.clone()],
             Signature::new(
-                vec![
-                    Type::new_function(FuncValueType::new([rv(0)], [rv(2)])),
-                    Type::new_function(FuncValueType::new([rv(1)], [rv(3)])),
+                [
+                    Type::new_function(FuncValueType::new(rv(0), rv(2))),
+                    Type::new_function(FuncValueType::new(rv(1), rv(3))),
                 ],
                 [Type::new_function(FuncValueType::new(
-                    [rv(0), rv(1)],
-                    [rv(2), rv(3)],
+                    rv(0).concat(rv(1)),
+                    rv(2).concat(rv(3)),
                 ))],
             ),
         );
@@ -528,7 +488,7 @@ pub(crate) fn extension_with_eval_parallel() -> Arc<Extension> {
 #[test]
 fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     fn uint_seq(i: usize) -> Term {
-        vec![usize_t().into(); i].into()
+        Term::new_list(vec![usize_t(); i])
     }
     let e = extension_with_eval_parallel();
     let mut dfb = DFGBuilder::new(inout_sig(
@@ -552,20 +512,17 @@ fn instantiate_row_variables() -> Result<(), Box<dyn std::error::Error>> {
     Ok(())
 }
 
-fn list1ty(t: TypeRV) -> Term {
-    Term::new_list([t.into()])
-}
-
 #[test]
 fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     let e = extension_with_eval_parallel();
-    let tv = TypeRV::new_row_var_use(0, TypeBound::Linear);
-    let inner_ft = Type::new_function(FuncValueType::new_endo([tv.clone()]));
-    let ft_usz = Type::new_function(FuncValueType::new_endo([tv.clone(), usize_t().into()]));
+    let tv_row = TypeRowRV::new_var_use(0, TypeBound::Linear);
+    let tv = Term::from(tv_row.clone());
+    let inner_ft = Type::new_function(FuncValueType::new_endo(tv_row.clone()));
+    let ft_usz = Type::new_function(FuncValueType::new_endo(tv_row.concat([usize_t()])));
     let mut fb = FunctionBuilder::new(
         "id",
         PolyFuncType::new(
-            [TypeParam::new_list_type(TypeBound::Linear)],
+            [TypeParam::new_list_kind(TypeBound::Linear)],
             Signature::new([inner_ft.clone()], [ft_usz]),
         ),
     )?;
@@ -580,7 +537,12 @@ fn row_variables() -> Result<(), Box<dyn std::error::Error>> {
     };
     let par = e.instantiate_extension_op(
         "parallel",
-        [tv.clone(), usize_t().into(), tv.clone(), usize_t().into()].map(list1ty),
+        [
+            tv.clone(),
+            Term::new_list([usize_t()]),
+            tv.clone(),
+            Term::new_list([usize_t()]),
+        ],
     )?;
     let par_func = fb.add_dataflow_op(par, [func_arg, id_usz])?;
     fb.finish_hugr_with_outputs(par_func.outputs())?;

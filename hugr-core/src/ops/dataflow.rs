@@ -6,7 +6,9 @@ use super::{OpTag, OpTrait, impl_op_name};
 
 use crate::extension::SignatureError;
 use crate::ops::StaticTag;
-use crate::types::{EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow};
+use crate::types::{
+    EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow, TypeRowLike,
+};
 use crate::{IncomingPort, type_row};
 
 #[cfg(test)]

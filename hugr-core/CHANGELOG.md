@@ -1,6 +1,26 @@
 # Changelog
 
 
+## [0.27.1](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.27.0...hugr-core-v0.27.1) - 2026-05-05
+
+### Bug Fixes
+
+- InlineCall produces invalid hugr for polymorphic functions ([#3017](https://github.com/Quantinuum/hugr/pull/3017))
+
+### New Features
+
+- Return new nodes patch for inlining function calls ([#3029](https://github.com/Quantinuum/hugr/pull/3029))
+- Add qualified opdef id to `MakeOpDef` ([#3030](https://github.com/Quantinuum/hugr/pull/3030))
+
+### Refactor
+
+- add HugrView::scheduling_graph, deprecate region_portgraph ([#3015](https://github.com/Quantinuum/hugr/pull/3015))
+
+### Testing
+
+- Test execution results of float op LLVM lowering ([#3013](https://github.com/Quantinuum/hugr/pull/3013))
+- Hugr model tests validate payload before roundtrip ([#3016](https://github.com/Quantinuum/hugr/pull/3016))
+
 ## [0.27.0](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.26.1...hugr-core-v0.27.0) - 2026-03-31
 
 ### Bug Fixes
