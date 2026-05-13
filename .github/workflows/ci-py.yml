@@ -166,7 +166,7 @@ jobs:
 
       - name: Generate the updated files
         run: |
-          uv run test_files/import-tests/generate_import_tests.py
+          uv run test_files/import_tests/generate_import_tests.py
 
       - name: Check if the files are up to date
         run: |
