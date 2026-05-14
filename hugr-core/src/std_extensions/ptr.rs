@@ -120,6 +120,7 @@ fn ptr_custom_type(ty: impl Into<Type>, extension_ref: &Weak<Extension>) -> Cust
         PTR_TYPE_ID,
         [ty.into()],
         EXTENSION_ID,
+        VERSION,
         TypeBound::Copyable,
         extension_ref,
     )

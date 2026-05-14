@@ -8,7 +8,7 @@ use serde_with::serde_as;
 
 use super::{
     ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionSet,
-    SignatureError,
+    SignatureError, Version,
 };
 
 use crate::Hugr;
@@ -361,6 +361,15 @@ impl Debug for LowerFunc {
 pub struct OpDef {
     /// The unique Extension owning this `OpDef` (of which this `OpDef` is a member)
     extension: ExtensionId,
+    /// The version of the extension owning this `OpDef`, if known.
+    ///
+    /// Not included in the serialization since it can be filled in when the
+    /// OpDef is registered to an Extension.
+    //
+    // TODO: Remove the option and make this a required field once we remove
+    // JSON serialization support for extensions.
+    #[serde(skip)]
+    extension_version: Option<Version>,
     /// A weak reference to the extension defining this operation.
     #[serde(skip)]
     extension_ref: Weak<Extension>,
@@ -460,6 +469,21 @@ impl OpDef {
         &self.extension
     }
 
+    /// Returns the version of the extension that defines this operation.
+    ///
+    /// Panics if the version is not known. This should only happen when using
+    /// `serde_json` to deserialize the OpDef and not filling in the version
+    /// from the parent extension.
+    #[must_use]
+    pub fn extension_version(&self) -> Version {
+        self.extension_version.clone().unwrap_or_else(||
+            panic!(
+                "Extension version for operation definition {} not known. Was this deserialized using serde?",
+                self.name
+            )
+        )
+    }
+
     /// Returns a weak reference to the extension defining this operation.
     #[must_use]
     pub fn extension(&self) -> Weak<Extension> {
@@ -469,6 +493,12 @@ impl OpDef {
     /// Returns a mutable reference to the weak extension pointer in the operation definition.
     pub(super) fn extension_mut(&mut self) -> &mut Weak<Extension> {
         &mut self.extension_ref
+    }
+
+    /// Set the stored parent extension version if it is not already known.
+    pub(super) fn fill_extension_version(&mut self, version: &Version) {
+        self.extension_version
+            .get_or_insert_with(|| version.clone());
     }
 
     /// Returns a reference to the description of this [`OpDef`].
@@ -581,6 +611,7 @@ impl Extension {
     ) -> Result<&mut OpDef, ExtensionBuildError> {
         let op = OpDef {
             extension: self.name.clone(),
+            extension_version: Some(self.version.clone()),
             extension_ref: extension_ref.clone(),
             name,
             description,
@@ -654,6 +685,9 @@ pub(super) mod test {
         fn eq(&self, other: &Self) -> bool {
             let OpDef {
                 extension,
+                // Version ignored in testing, since it is not included in
+                // the serialization.
+                extension_version: _,
                 extension_ref: _,
                 name,
                 description,
@@ -664,6 +698,7 @@ pub(super) mod test {
             } = &self.0;
             let OpDef {
                 extension: other_extension,
+                extension_version: _,
                 extension_ref: _,
                 name: other_name,
                 description: other_description,
@@ -886,7 +921,9 @@ pub(super) mod test {
         use crate::package::Package;
         use crate::{
             builder::test::simple_dfg_hugr,
-            extension::{ExtensionId, ExtensionSet, OpDef, SignatureFunc, op_def::LowerFunc},
+            extension::{
+                ExtensionId, ExtensionSet, OpDef, SignatureFunc, Version, op_def::LowerFunc,
+            },
             types::PolyFuncTypeRV,
         };
 
@@ -927,6 +964,7 @@ pub(super) mod test {
                 let misc = hash_map(any_string(), any_serde_json_value(), 0..3);
                 (
                     any::<ExtensionId>(),
+                    any::<(u64, u64, u64)>(),
                     any_smolstr(),
                     any_string(),
                     misc,
@@ -934,9 +972,18 @@ pub(super) mod test {
                     vec(any::<LowerFunc>(), 0..2),
                 )
                     .prop_map(
-                        |(extension, name, description, misc, signature_func, lower_funcs)| {
+                        |(
+                            extension,
+                            (major, minor, patch),
+                            name,
+                            description,
+                            misc,
+                            signature_func,
+                            lower_funcs,
+                        )| {
                             Self::new(OpDef {
                                 extension,
+                                extension_version: Some(Version::new(major, minor, patch)),
                                 // Use a dead weak reference. Trying to access the extension will always return None.
                                 extension_ref: Weak::default(),
                                 name,

@@ -1,9 +1,8 @@
+use crate::builder::{DFGBuilder, Dataflow, DataflowHugr};
+use crate::hugr::serialize::test::{HugrDeser, HugrSer};
+use crate::hugr::test::check_hugr_equality;
 use crate::{
-    builder::{DFGBuilder, Dataflow, DataflowHugr},
-    extension::prelude::bool_t,
-    hugr::serialize::test::{HugrSer, check_hugr_deserialize},
-    std_extensions::logic::LogicOp,
-    types::Signature,
+    HugrView as _, extension::prelude::bool_t, std_extensions::logic::LogicOp, types::Signature,
 };
 use std::{
     fs::OpenOptions,
@@ -64,8 +63,17 @@ fn serial_upgrade(#[case] name: String, #[case] hugr: Hugr) {
         serde_json::to_writer_pretty(f, &HugrSer(&hugr)).unwrap();
     }
 
-    let val = serde_json::from_reader(std::fs::File::open(&path).unwrap()).unwrap();
     // we do not expect `val` to satisfy any schemas, it is a non-latest
     // version.
-    check_hugr_deserialize(&hugr, val, false);
+    let val = serde_json::from_reader(std::fs::File::open(&path).unwrap()).unwrap();
+
+    // We need to resolve extensions and correctly set the extension versions
+    // before checking for equality.
+    let mut new_hugr: HugrDeser = serde_json::from_value(val).unwrap();
+    new_hugr
+        .0
+        .resolve_extension_defs(hugr.extensions())
+        .unwrap();
+
+    check_hugr_equality(&hugr, &new_hugr.0);
 }
