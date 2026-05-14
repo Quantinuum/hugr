@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.28.0](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.27.1...hugr-cli-v0.28.0) - 2026-05-14
+
+### New Features
+
+- *(hugr-llvm)* [**breaking**] Add support for emitting debug locations ([#3026](https://github.com/Quantinuum/hugr/pull/3026))
+
 ## [0.27.0](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.26.1...hugr-cli-v0.27.0) - 2026-03-31
 
 ### Bug Fixes
