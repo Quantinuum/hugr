@@ -106,35 +106,35 @@ mod test {
     #[rstest]
     fn and(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_logic_extensions);
-        let hugr = test_logic_op(LogicOp::And, 2);
+        let mut hugr = test_logic_op(LogicOp::And, 2);
         check_emission!(hugr, llvm_ctx);
     }
 
     #[rstest]
     fn or(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_logic_extensions);
-        let hugr = test_logic_op(LogicOp::Or, 2);
+        let mut hugr = test_logic_op(LogicOp::Or, 2);
         check_emission!(hugr, llvm_ctx);
     }
 
     #[rstest]
     fn eq(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_logic_extensions);
-        let hugr = test_logic_op(LogicOp::Eq, 2);
+        let mut hugr = test_logic_op(LogicOp::Eq, 2);
         check_emission!(hugr, llvm_ctx);
     }
 
     #[rstest]
     fn not(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_logic_extensions);
-        let hugr = test_logic_op(LogicOp::Not, 1);
+        let mut hugr = test_logic_op(LogicOp::Not, 1);
         check_emission!(hugr, llvm_ctx);
     }
 
     #[rstest]
     fn xor(mut llvm_ctx: TestContext) {
         llvm_ctx.add_extensions(add_logic_extensions);
-        let hugr = test_logic_op(LogicOp::Xor, 2);
+        let mut hugr = test_logic_op(LogicOp::Xor, 2);
         check_emission!(hugr, llvm_ctx);
     }
 }

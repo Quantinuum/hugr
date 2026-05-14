@@ -7,7 +7,7 @@ source_filename = "test_context"
 
 @0 = private unnamed_addr constant [24 x i8] c"Attempted division by 0\00", align 1
 
-define internal { i1, { i32, ptr }, i8 } @_hl.main.1(i8 %0, i8 %1) {
+define internal { i1, { i32, ptr }, i8 } @_hl.main.1(i8 %0, i8 %1) !dbg !3 {
 alloca_block:
   %"0" = alloca { i1, { i32, ptr }, i8 }, align 8
   %"2_0" = alloca i8, align 1
@@ -20,24 +20,44 @@ entry_block:                                      ; preds = %alloca_block
   store i8 %1, ptr %"2_1", align 1
   %"2_01" = load i8, ptr %"2_0", align 1
   %"2_12" = load i8, ptr %"2_1", align 1
-  %valid_div = icmp ne i8 %"2_12", 0
-  %quotient = udiv i8 %"2_01", %"2_12"
-  %remainder = urem i8 %"2_01", %"2_12"
-  %2 = insertvalue { i8, i8 } poison, i8 %quotient, 0
-  %3 = insertvalue { i8, i8 } %2, i8 %remainder, 1
-  %4 = insertvalue { i1, { i8, i8 }, { i32, ptr } } { i1 true, { i8, i8 } poison, { i32, ptr } poison }, { i8, i8 } %3, 1
-  %5 = select i1 %valid_div, { i1, { i8, i8 }, { i32, ptr } } %4, { i1, { i8, i8 }, { i32, ptr } } { i1 false, { i8, i8 } poison, { i32, ptr } { i32 2, ptr @0 } }
-  %6 = extractvalue { i1, { i8, i8 }, { i32, ptr } } %5, 1
-  %7 = extractvalue { i8, i8 } %6, 0
-  %8 = extractvalue { i8, i8 } %6, 1
-  %9 = extractvalue { i1, { i8, i8 }, { i32, ptr } } %5, 2
-  %tag = extractvalue { i1, { i8, i8 }, { i32, ptr } } %5, 0
-  %data_variant = insertvalue { i1, { i32, ptr }, i8 } { i1 true, { i32, ptr } poison, i8 poison }, i8 %7, 2
-  %err_variant = insertvalue { i1, { i32, ptr }, i8 } { i1 false, { i32, ptr } poison, i8 poison }, { i32, ptr } %9, 1
-  %10 = select i1 %tag, { i1, { i32, ptr }, i8 } %data_variant, { i1, { i32, ptr }, i8 } %err_variant
-  store { i1, { i32, ptr }, i8 } %10, ptr %"4_0", align 8
+  %valid_div = icmp ne i8 %"2_12", 0, !dbg !15
+  %quotient = udiv i8 %"2_01", %"2_12", !dbg !15
+  %remainder = urem i8 %"2_01", %"2_12", !dbg !15
+  %2 = insertvalue { i8, i8 } poison, i8 %quotient, 0, !dbg !15
+  %3 = insertvalue { i8, i8 } %2, i8 %remainder, 1, !dbg !15
+  %4 = insertvalue { i1, { i8, i8 }, { i32, ptr } } { i1 true, { i8, i8 } poison, { i32, ptr } poison }, { i8, i8 } %3, 1, !dbg !15
+  %5 = select i1 %valid_div, { i1, { i8, i8 }, { i32, ptr } } %4, { i1, { i8, i8 }, { i32, ptr } } { i1 false, { i8, i8 } poison, { i32, ptr } { i32 2, ptr @0 } }, !dbg !15
+  %6 = extractvalue { i1, { i8, i8 }, { i32, ptr } } %5, 1, !dbg !15
+  %7 = extractvalue { i8, i8 } %6, 0, !dbg !15
+  %8 = extractvalue { i8, i8 } %6, 1, !dbg !15
+  %9 = extractvalue { i1, { i8, i8 }, { i32, ptr } } %5, 2, !dbg !15
+  %tag = extractvalue { i1, { i8, i8 }, { i32, ptr } } %5, 0, !dbg !15
+  %data_variant = insertvalue { i1, { i32, ptr }, i8 } { i1 true, { i32, ptr } poison, i8 poison }, i8 %7, 2, !dbg !15
+  %err_variant = insertvalue { i1, { i32, ptr }, i8 } { i1 false, { i32, ptr } poison, i8 poison }, { i32, ptr } %9, 1, !dbg !15
+  %10 = select i1 %tag, { i1, { i32, ptr }, i8 } %data_variant, { i1, { i32, ptr }, i8 } %err_variant, !dbg !15
+  store { i1, { i32, ptr }, i8 } %10, ptr %"4_0", align 8, !dbg !15
   %"4_03" = load { i1, { i32, ptr }, i8 }, ptr %"4_0", align 8
   store { i1, { i32, ptr }, i8 } %"4_03", ptr %"0", align 8
   %"04" = load { i1, { i32, ptr }, i8 }, ptr %"0", align 8
   ret { i1, { i32, ptr }, i8 } %"04"
 }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/lPNzlV/ClAphFG/yrhvZs/eDgUn/eIVwAutKJHaZEPSZwPXPeycUvnujGxZ")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{!7, !14, !14}
+!7 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, { i32, ptr }, i8 }", file: !2, size: 104, align: 8, elements: !8)
+!8 = !{!9, !10, !14}
+!9 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
+!10 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i32, ptr }", file: !2, size: 96, align: 8, elements: !11)
+!11 = !{!12, !13}
+!12 = !DIBasicType(name: "i32", size: 32, encoding: DW_ATE_unsigned)
+!13 = !DIBasicType(name: "ptr", size: 64, encoding: DW_ATE_address)
+!14 = !DIBasicType(name: "i8", size: 8, encoding: DW_ATE_unsigned)
+!15 = !DILocation(line: 27062, column: 402, scope: !3)

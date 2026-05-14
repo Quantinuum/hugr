@@ -5,7 +5,7 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define void @_hl.main_void.1() {
+define void @_hl.main_void.1() !dbg !3 {
 alloca_block:
   %"4_0" = alloca ptr, align 8
   br label %entry_block
@@ -13,11 +13,11 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   store ptr @_hl.main_void.1, ptr %"4_0", align 8
   %"4_01" = load ptr, ptr %"4_0", align 8
-  call void %"4_01"()
+  call void %"4_01"(), !dbg !7
   ret void
 }
 
-define i1 @_hl.main_unary.6(i1 %0) {
+define i1 @_hl.main_unary.6(i1 %0) !dbg !8 {
 alloca_block:
   %"0" = alloca i1, align 1
   %"9_0" = alloca ptr, align 8
@@ -30,15 +30,15 @@ entry_block:                                      ; preds = %alloca_block
   store i1 %0, ptr %"7_0", align 1
   %"9_01" = load ptr, ptr %"9_0", align 8
   %"7_02" = load i1, ptr %"7_0", align 1
-  %1 = call i1 %"9_01"(i1 %"7_02")
-  store i1 %1, ptr %"10_0", align 1
+  %1 = call i1 %"9_01"(i1 %"7_02"), !dbg !12
+  store i1 %1, ptr %"10_0", align 1, !dbg !12
   %"10_03" = load i1, ptr %"10_0", align 1
   store i1 %"10_03", ptr %"0", align 1
   %"04" = load i1, ptr %"0", align 1
   ret i1 %"04"
 }
 
-define { i1, i1 } @_hl.main_binary.11(i1 %0, i1 %1) {
+define { i1, i1 } @_hl.main_binary.11(i1 %0, i1 %1) !dbg !13 {
 alloca_block:
   %"0" = alloca i1, align 1
   %"1" = alloca i1, align 1
@@ -56,11 +56,11 @@ entry_block:                                      ; preds = %alloca_block
   %"14_01" = load ptr, ptr %"14_0", align 8
   %"12_02" = load i1, ptr %"12_0", align 1
   %"12_13" = load i1, ptr %"12_1", align 1
-  %2 = call { i1, i1 } %"14_01"(i1 %"12_02", i1 %"12_13")
-  %3 = extractvalue { i1, i1 } %2, 0
-  %4 = extractvalue { i1, i1 } %2, 1
-  store i1 %3, ptr %"15_0", align 1
-  store i1 %4, ptr %"15_1", align 1
+  %2 = call { i1, i1 } %"14_01"(i1 %"12_02", i1 %"12_13"), !dbg !17
+  %3 = extractvalue { i1, i1 } %2, 0, !dbg !17
+  %4 = extractvalue { i1, i1 } %2, 1, !dbg !17
+  store i1 %3, ptr %"15_0", align 1, !dbg !17
+  store i1 %4, ptr %"15_1", align 1, !dbg !17
   %"15_04" = load i1, ptr %"15_0", align 1
   %"15_15" = load i1, ptr %"15_1", align 1
   store i1 %"15_04", ptr %"0", align 1
@@ -71,3 +71,25 @@ entry_block:                                      ; preds = %alloca_block
   %mrv8 = insertvalue { i1, i1 } %mrv, i1 %"17", 1
   ret { i1, i1 } %mrv8
 }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/p/FGIyrhvZsHeDgUnyeIVw/u/KJHaZEPSZwPXPeycUvnujGxZKPRC/cNfsTEGLoPGC")
+!3 = distinct !DISubprogram(name: "_hl.main_void.1", linkageName: "_hl.main_void.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{null}
+!7 = !DILocation(line: 27062, column: 402, scope: !3)
+!8 = distinct !DISubprogram(name: "_hl.main_unary.6", linkageName: "_hl.main_unary.6", scope: null, file: !4, line: 25884, type: !9, scopeLine: 25885, spFlags: DISPFlagDefinition, unit: !1)
+!9 = !DISubroutineType(types: !10)
+!10 = !{!11, !11}
+!11 = !DIBasicType(name: "i1", size: 1, encoding: DW_ATE_unsigned)
+!12 = !DILocation(line: 8376, column: 157, scope: !8)
+!13 = distinct !DISubprogram(name: "_hl.main_binary.11", linkageName: "_hl.main_binary.11", scope: null, file: !4, line: 32551, type: !14, scopeLine: 32552, spFlags: DISPFlagDefinition, unit: !1)
+!14 = !DISubroutineType(types: !15)
+!15 = !{!16, !11, !11}
+!16 = !DICompositeType(tag: DW_TAG_structure_type, name: "{ i1, i1 }", file: !2, align: 8, elements: !10)
+!17 = !DILocation(line: 1712, column: 109, scope: !13)

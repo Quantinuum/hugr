@@ -17,7 +17,7 @@ source_filename = "test_context"
 @sa.inner.4d7c0c80.0 = constant { i64, [9 x i64] } { i64 9, [9 x i64] [i64 9, i64 9, i64 9, i64 9, i64 9, i64 9, i64 9, i64 9, i64 9] }
 @sa.outer.f1be8bcf.0 = constant { i64, [10 x ptr] } { i64 10, [10 x ptr] [ptr @sa.inner.ac73413c.0, ptr @sa.inner.3334f213.0, ptr @sa.inner.9447a20a.0, ptr @sa.inner.dfbce68f.0, ptr @sa.inner.5712c1c3.0, ptr @sa.inner.fc8747b9.0, ptr @sa.inner.aaa0b715.0, ptr @sa.inner.7aa729b2.0, ptr @sa.inner.66390c92.0, ptr @sa.inner.4d7c0c80.0] }
 
-define internal i64 @_hl.main.1() {
+define internal i64 @_hl.main.1() !dbg !3 {
 alloca_block:
   %"0" = alloca i64, align 8
   %"5_0" = alloca ptr, align 8
@@ -27,11 +27,24 @@ alloca_block:
 entry_block:                                      ; preds = %alloca_block
   store ptr @sa.outer.f1be8bcf.0, ptr %"5_0", align 8
   %"5_01" = load ptr, ptr %"5_0", align 8
-  %0 = getelementptr inbounds { i64, [0 x ptr] }, ptr %"5_01", i32 0, i32 0
-  %1 = load i64, ptr %0, align 4
-  store i64 %1, ptr %"6_0", align 4
+  %0 = getelementptr inbounds { i64, [0 x ptr] }, ptr %"5_01", i32 0, i32 0, !dbg !8
+  %1 = load i64, ptr %0, align 4, !dbg !8
+  store i64 %1, ptr %"6_0", align 4, !dbg !8
   %"6_02" = load i64, ptr %"6_0", align 4
   store i64 %"6_02", ptr %"0", align 4
   %"03" = load i64, ptr %"0", align 4
   ret i64 %"03"
 }
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/lPNzlV/ClAphFG/yrhvZs/eDgUn/eIVwAutKJHaZEPSZwPXPeycUvnujGxZ")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{!7}
+!7 = !DIBasicType(name: "i64", size: 64, encoding: DW_ATE_unsigned)
+!8 = !DILocation(line: 27062, column: 402, scope: !3)

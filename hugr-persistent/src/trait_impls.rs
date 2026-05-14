@@ -282,6 +282,9 @@ impl HugrView for PersistentHugr {
                     .collect();
                 NodeLabel::Custom(labels)
             }
+            NodeLabel::MetadataValues { print_keys } => NodeLabel::MetadataValues {
+                print_keys: print_keys.clone(),
+            },
         };
 
         // Map config accordingly

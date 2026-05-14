@@ -15,11 +15,12 @@ use inkwell::{
 };
 use std::{collections::HashSet, rc::Rc};
 
+use crate::emit::debug_info::DebugInfoContext;
 use crate::types::{HugrFuncType, HugrSumType, HugrType, TypingSession};
-
 use crate::{custom::CodegenExtsMap, types::LLVMSumType, utils::fat::FatNode};
 
 pub mod args;
+pub mod debug_info;
 pub mod func;
 pub mod libc;
 pub mod namer;
@@ -44,6 +45,7 @@ where
     module: Module<'c>,
     extensions: Rc<CodegenExtsMap<'a, H>>,
     namer: Rc<Namer>,
+    di_context: Option<DebugInfoContext<'c>>,
 }
 
 impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
@@ -69,6 +71,29 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         self.iw_context
     }
 
+    pub fn di_context(&self) -> Option<&DebugInfoContext<'c>> {
+        self.di_context.as_ref()
+    }
+
+    pub fn di_context_mut(&mut self) -> Option<&mut DebugInfoContext<'c>> {
+        self.di_context.as_mut()
+    }
+
+    /// If the Module has attached debug info, create a matching `di_context`.
+    /// Fails if `di_context` is not None.
+    pub fn try_di_init<HV: HugrView<Node = Node>>(
+        &mut self,
+        node: FatNode<'_, hugr_core::ops::Module, HV>,
+        ptr_bits: u32,
+    ) -> Result<()> {
+        if self.di_context.is_some() {
+            Err(anyhow!("Debug context already present"))
+        } else {
+            self.di_context = DebugInfoContext::try_from_hugr_module(node, &self.module, ptr_bits)?;
+            Ok(())
+        }
+    }
+
     /// Creates a new  `EmitModuleContext`. We take ownership of the [Module],
     /// and return it in [`EmitModuleContext::finish`].
     pub fn new(
@@ -82,6 +107,7 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
             module,
             extensions,
             namer,
+            di_context: None, // we decide whether to emit debug info by inspecting the HUGR Module
         }
     }
 
@@ -235,9 +261,13 @@ impl<'c, 'a, H> EmitModuleContext<'c, 'a, H> {
         }
     }
 
-    /// Consumes the `EmitModuleContext` and returns the internal [Module].
-    pub fn finish(self) -> Module<'c> {
-        self.module
+    /// Consumes the `EmitModuleContext` and returns the internal [Module] and
+    /// [DebugInfoContext] (if present). If the DebugInfoContext is Some,
+    /// the caller must call `finish` on it before calling `verify` on the Module.
+    pub fn finish(mut self) -> (Module<'c>, Option<DebugInfoContext<'c>>) {
+        // NOTE: We do not finish() the DebugInfoContext here because qis-compiler needs
+        // it to mark the `qmain` entry point wrapper as compiler-generated.
+        (self.module, self.di_context.take())
     }
 }
 
@@ -257,6 +287,10 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
         to self.module_context {
             /// Returns a reference to the inner [Context].
             pub fn iw_context(&self) -> &'c Context;
+            /// Returns an optional reference to the [DebugInfoContext].
+            pub fn di_context(&self) -> Option<&DebugInfoContext<'c>>;
+            /// Returns an optional, mutable reference to the [DebugInfoContext].
+            pub fn di_context_mut(&mut self) -> Option<&mut DebugInfoContext<'c>>;
             /// Returns a reference to the inner [Module]. Note that this type has
             /// "interior mutability", and this reference can be used to add functions
             /// and globals to the [Module].
@@ -321,7 +355,20 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
     /// and [`hugr_core::ops::FuncDecl`] nodes are not emitted directly, but instead by
     /// emission of ops with static edges from them. So [`FuncDefn`] are the only
     /// interesting children.
-    pub fn emit_module(mut self, node: FatNode<'_, hugr_core::ops::Module, H>) -> Result<Self> {
+    ///
+    /// If `emit_debug` is true, debug info will be included in the generated IR to the
+    /// extent it is present in the HUGR. If `emit_debug` is false, any debug info on
+    /// the HUGR will be ignored. `ptr_bits` gives the number of bits in a pointer on
+    /// target architecture - it is used only for generating debug info types.
+    pub fn emit_module(
+        mut self,
+        node: FatNode<'_, hugr_core::ops::Module, H>,
+        emit_debug: bool,
+        ptr_bits: u32,
+    ) -> Result<Self> {
+        if emit_debug {
+            self.module_context.try_di_init(node, ptr_bits)?;
+        }
         for c in node.children() {
             match c.as_ref() {
                 OpType::FuncDefn(fd) => {
@@ -343,6 +390,10 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
             return Ok((self, EmissionSet::default()));
         }
         let func = self.module_context.get_func_defn(node)?;
+        self.module_context
+            .di_context_mut()
+            .map_or(Ok(()), |di_ctx| di_ctx.try_add_di_func(node, func))?;
+
         let mut func_ctx = EmitFuncContext::new(self.module_context, func)?;
         let ret_rmb = func_ctx.new_row_mail_box(node.signature().body().output.iter(), "ret")?;
         ops::emit_dataflow_parent(
@@ -364,8 +415,10 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
         Ok((self, todos))
     }
 
-    /// Consumes the `EmitHugr` and returns the internal [Module].
-    pub fn finish(self) -> Module<'c> {
+    /// Consumes the `EmitHugr` and returns the internal [Module] and optional
+    /// [DebugInfoContext]. See the docs of EmitModuleContext::finish()
+    /// for an explanation of what to do with the DebugInfoContext.
+    pub fn finish(self) -> (Module<'c>, Option<DebugInfoContext<'c>>) {
         self.module_context.finish()
     }
 }

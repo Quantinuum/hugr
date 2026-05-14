@@ -20,6 +20,10 @@ use super::EmitHugr;
 
 mod panic_runtime;
 
+// currently all our targets have the same pointer size.
+// used for debug info.
+const TEST_PTR_SIZE: u32 = 64;
+
 #[allow(clippy::upper_case_acronyms)]
 pub type DFGW = DFGWrapper<Hugr, BuildHandle<FuncID<true>>>;
 
@@ -39,8 +43,12 @@ impl<'c> Emission<'c> {
     pub fn emit_hugr<'a: 'c, H: HugrView<Node = Node>>(
         hugr: FatNode<'c, hugr_core::ops::Module, H>,
         eh: EmitHugr<'c, 'a, H>,
+        emit_debug: bool,
     ) -> Result<Self> where {
-        let module = eh.emit_module(hugr)?.finish();
+        let (module, maybe_di_ctx) = eh.emit_module(hugr, emit_debug, TEST_PTR_SIZE)?.finish();
+        if let Some(di_ctx) = maybe_di_ctx {
+            di_ctx.finish();
+        }
         Ok(Self { module })
     }
 
@@ -317,9 +325,11 @@ pub use insta;
 macro_rules! check_emission {
     // Call the macro with a snapshot name.
     ($snapshot_name:expr, $hugr: ident, $test_ctx:ident) => {{
+        // We add random debug info to all test HUGRs for coverage.
+        $crate::emit::debug_info::test::add_random_debug_info(&mut $hugr);
         let root = $crate::utils::fat::FatExt::fat_root(&$hugr).unwrap();
         let emission =
-            $crate::emit::test::Emission::emit_hugr(root, $test_ctx.get_emit_hugr()).unwrap();
+            $crate::emit::test::Emission::emit_hugr(root, $test_ctx.get_emit_hugr(), true).unwrap();
 
         let mut settings = $crate::emit::test::insta::Settings::clone_current();
         let new_suffix = settings
@@ -406,7 +416,7 @@ mod test_fns {
     use crate::test::*;
     #[rstest]
     fn emit_hugr_tag(llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_outs([Type::new_unit_sum(3)])
             .finish(|mut builder: DFGW| {
                 let tag = builder
@@ -422,7 +432,7 @@ mod test_fns {
 
     #[rstest]
     fn emit_hugr_dfg(llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins([Type::UNIT])
             .with_outs([Type::UNIT])
             .finish(|mut builder: DFGW| {
@@ -440,7 +450,7 @@ mod test_fns {
 
     #[rstest]
     fn emit_hugr_conditional(llvm_ctx: TestContext) {
-        let hugr = {
+        let mut hugr = {
             let input_v_rows: Vec<TypeRow> =
                 (1..4).map(|n| [Type::new_unit_sum(n)].into()).collect_vec();
             let output_v_rows = {
@@ -493,7 +503,7 @@ mod test_fns {
             ConstInt::new_s(4, -24).unwrap().into(),
         ]);
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_outs([v.get_type()])
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder: DFGW| {
@@ -518,7 +528,7 @@ mod test_fns {
         build_recursive(&mut mod_b, "main_void", type_row![]);
         build_recursive(&mut mod_b, "main_unary", vec![bool_t()].into());
         build_recursive(&mut mod_b, "main_binary", vec![bool_t(), bool_t()].into());
-        let hugr = mod_b.finish_hugr().unwrap();
+        let mut hugr = mod_b.finish_hugr().unwrap();
         check_emission!(hugr, llvm_ctx);
     }
 
@@ -540,7 +550,7 @@ mod test_fns {
         build_recursive(&mut mod_b, "main_void", type_row![]);
         build_recursive(&mut mod_b, "main_unary", vec![bool_t()].into());
         build_recursive(&mut mod_b, "main_binary", vec![bool_t(), bool_t()].into());
-        let hugr = mod_b.finish_hugr().unwrap();
+        let mut hugr = mod_b.finish_hugr().unwrap();
         check_emission!(hugr, llvm_ctx);
     }
 
@@ -550,7 +560,7 @@ mod test_fns {
         let v1 = ConstInt::new_s(4, -24).unwrap();
         let v2 = ConstInt::new_s(4, 24).unwrap();
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_outs([v1.get_type()])
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder: DFGW| {
@@ -579,7 +589,7 @@ mod test_fns {
 
     #[rstest]
     fn diverse_module_children(llvm_ctx: TestContext) {
-        let hugr = {
+        let mut hugr = {
             let mut builder = ModuleBuilder::new();
             let _ = {
                 let fbuilder = builder
@@ -604,7 +614,7 @@ mod test_fns {
 
     #[rstest]
     fn diverse_cfg_children(llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_outs([bool_t()])
             .finish(|mut builder: DFGW| {
                 let [r] = {
@@ -629,7 +639,7 @@ mod test_fns {
 
     #[rstest]
     fn load_function(llvm_ctx: TestContext) {
-        let hugr = {
+        let mut hugr = {
             let mut builder = ModuleBuilder::new();
             let target_sig = Signature::new_endo(type_row![]);
             let target_func = builder
@@ -653,7 +663,7 @@ mod test_fns {
 
     #[rstest]
     fn tail_loop_simple(mut llvm_ctx: TestContext) {
-        let hugr = {
+        let mut hugr = {
             let just_input = usize_t();
             let just_output = Type::UNIT;
             let input_v = TypeRow::from(vec![just_input.clone()]);
@@ -813,7 +823,7 @@ mod test_fns {
     }
 
     #[rstest]
-    fn tail_loop(mut llvm_ctx: TestContext, #[with(3, 7)] terminal_loop: Hugr) {
+    fn tail_loop(mut llvm_ctx: TestContext, #[with(3, 7)] mut terminal_loop: Hugr) {
         llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
         check_emission!(terminal_loop, llvm_ctx);
     }
