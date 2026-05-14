@@ -1,5 +1,29 @@
 # Changelog
 
+## [0.17.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.16.0...hugr-py-v0.17.0) (2026-05-14)
+
+
+### ⚠ BREAKING CHANGES
+
+* **hugr-llvm:** `hugr-llvm::emit::EmitHugr::emit_hugr::emit_module` takes two new args: `emit_debug: bool` and `ptr_size: u32`. In addition, `hugr_core::views::render::NodeLabel` has a new variant `MetadataValues` which combines a numeric label and JSON metadata values.
+* Hugrs are no longer guaranteed to have an Order edge representing the ordering constraint from each nonlocal `Ext` edge; require HugrView impls to provide scheduling_graph; remove deprecated region_portgraph(), as_petgraph(), into_region_portgraph(),
+
+### Features
+
+* do not require an Order edge for each nonlocal `Ext` edge; compute on demand in scheduling_graph() ([#2951](https://github.com/Quantinuum/hugr/issues/2951)) ([deadaa6](https://github.com/Quantinuum/hugr/commit/deadaa6c1f972b6e0208f55f36e8ed3ee48ccfba))
+* **hugr-llvm:** Add support for emitting debug locations ([#3026](https://github.com/Quantinuum/hugr/issues/3026)) ([28ab1a7](https://github.com/Quantinuum/hugr/commit/28ab1a7b7c6c469485b9400b8b4576be4b68384e))
+* Metadata key aliases for non-breaking migrations ([#3057](https://github.com/Quantinuum/hugr/issues/3057)) ([e588703](https://github.com/Quantinuum/hugr/commit/e588703a281fa7f82c728f3704df7696e430b31e))
+
+
+### Bug Fixes
+
+* Export dataflow blocks with CFG node link merged into input port when possible ([#3060](https://github.com/Quantinuum/hugr/issues/3060)) ([6742c53](https://github.com/Quantinuum/hugr/commit/6742c53505b2e13c3234dd847a6201759e73b757)), closes [#3059](https://github.com/Quantinuum/hugr/issues/3059)
+
+
+### Documentation
+
+* Simplify package description. ([#3040](https://github.com/Quantinuum/hugr/issues/3040)) ([2868f4a](https://github.com/Quantinuum/hugr/commit/2868f4a5aae74f969ea47caef6a13cec7e8c898e))
+
 ## [0.16.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.4...hugr-py-v0.16.0) (2026-04-01)
 
 This release changes the default text serialization format from JSON to `MODEL_WITH_EXTS` (the JSON format is now deprecated).
