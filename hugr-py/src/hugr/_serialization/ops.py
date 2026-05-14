@@ -6,6 +6,7 @@ from abc import ABC, abstractmethod
 from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, RootModel
+from pydantic_extra_types.semantic_version import SemanticVersion  # noqa: TCH002
 
 from hugr import tys
 from hugr.hugr.node_port import (
@@ -498,6 +499,9 @@ class ExtensionOp(DataflowOp):
 
     op: Literal["Extension"] = "Extension"
     extension: ExtensionId
+    extension_version: SemanticVersion | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
     name: str
     signature: stys.FunctionType = Field(default_factory=stys.FunctionType.empty)
     args: list[stys.TypeArg] = Field(default_factory=list)
@@ -511,6 +515,7 @@ class ExtensionOp(DataflowOp):
     def deserialize(self) -> ops.Custom:
         return ops.Custom(
             extension=self.extension,
+            extension_version=self.extension_version,
             op_name=self.name,
             signature=self.signature.deserialize(),
             args=deser_it(self.args),

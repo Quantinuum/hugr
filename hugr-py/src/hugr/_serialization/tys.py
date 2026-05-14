@@ -18,11 +18,14 @@ from pydantic import (
     WrapValidator,
 )
 from pydantic_core import PydanticCustomError
+from pydantic_extra_types.semantic_version import SemanticVersion
 
 from hugr.utils import deser_it
 
 if TYPE_CHECKING:
     from collections.abc import Mapping
+
+    from semver import Version
 
 
 def _json_custom_error_validator(
@@ -50,6 +53,16 @@ def _json_custom_error_validator(
 
 ExtensionId = str
 ExtensionSet = list[ExtensionId]
+
+
+def to_semantic_version(version: Version | None) -> SemanticVersion | None:
+    """Convert an application semver value to the pydantic serialization adapter."""
+    if version is None:
+        return None
+    if isinstance(version, SemanticVersion):
+        return version
+    return SemanticVersion.parse(str(version))
+
 
 default_model_config = ConfigDict()
 
@@ -450,6 +463,9 @@ class Opaque(BaseType):
 
     t: Literal["Opaque"] = "Opaque"
     extension: ExtensionId
+    extension_version: SemanticVersion | None = Field(
+        default=None, exclude_if=lambda value: value is None
+    )
     id: str  # Unique identifier of the opaque type.
     args: list[TypeArg]
     bound: TypeBound
@@ -457,6 +473,7 @@ class Opaque(BaseType):
     def deserialize(self) -> tys.Opaque:
         return tys.Opaque(
             extension=self.extension,
+            extension_version=self.extension_version,
             id=self.id,
             args=deser_it(self.args),
             bound=self.bound,

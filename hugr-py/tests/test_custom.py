@@ -106,6 +106,7 @@ def test_custom_op(as_ext: AsExtOp, registry: ext.ExtensionRegistry):
     assert type(as_ext).from_ext(ext_op) == as_ext
     custom = as_ext._to_serial(Node(0)).deserialize()
     assert isinstance(custom, Custom)
+    assert custom.extension_version == ext_op.op_def().get_extension().version
     # ExtOp compared to Custom via `to_custom`
     assert custom.resolve(registry) == ext_op
     assert ext_op == as_ext
@@ -148,6 +149,7 @@ _BOOL_LIST_T = _LIST_T.instantiate([tys.Bool.type_arg()])
 def test_custom_type(ext_t: tys.ExtType, registry: ext.ExtensionRegistry):
     opaque = ext_t._to_serial().deserialize()
     assert isinstance(opaque, tys.Opaque)
+    assert opaque.extension_version == ext_t.type_def.get_extension().version
     resolved, _ = opaque._resolve_used_extensions(registry)
     assert resolved == ext_t
 

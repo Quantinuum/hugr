@@ -1343,7 +1343,9 @@ impl<'a> Context<'a> {
         // to declare operations as a node, in which case the description will be attached
         // to that node as metadata.
 
-        let optype = OpType::OpaqueOp(OpaqueOp::new(extension, name, args, signature));
+        // TODO: Set encode and decode the extension version for the custom op.
+
+        let optype = OpType::OpaqueOp(OpaqueOp::new_unversioned(extension, name, args, signature));
         self.make_node(node_id, optype, parent)
     }
 
@@ -1599,6 +1601,7 @@ impl<'a> Context<'a> {
                                 missing_ext: extension.clone(),
                                 available: self.extensions.ids().cloned().collect(),
                             })?;
+                    let extension_version = extension_ref.version().clone();
 
                     let ext_type =
                         extension_ref
@@ -1614,6 +1617,7 @@ impl<'a> Context<'a> {
                         id,
                         args,
                         extension,
+                        extension_version,
                         bound,
                         &Arc::downgrade(extension_ref),
                     ))

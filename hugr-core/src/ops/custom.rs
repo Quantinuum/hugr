@@ -13,7 +13,7 @@ use {
 
 use crate::core::HugrNode;
 use crate::extension::simple_op::MakeExtensionOp;
-use crate::extension::{ConstFoldResult, ExtensionId, OpDef, SignatureError};
+use crate::extension::{ConstFoldResult, ExtensionId, OpDef, SignatureError, Version};
 use crate::types::{Signature, type_param::TypeArg};
 use crate::{IncomingPort, ops};
 
@@ -113,6 +113,7 @@ impl ExtensionOp {
     pub fn make_opaque(&self) -> OpaqueOp {
         OpaqueOp {
             extension: self.def.extension_id().clone(),
+            extension_version: Some(self.extension_version()),
             name: self.def.name().clone(),
             args: self.args.clone(),
             signature: self.signature.clone(),
@@ -143,6 +144,12 @@ impl ExtensionOp {
         self.def.extension_id()
     }
 
+    /// Returns the version of the extension that defines this operation.
+    #[must_use]
+    pub fn extension_version(&self) -> Version {
+        self.def().extension_version()
+    }
+
     /// Returns the unqualified id of the operation. e.g. 'iadd'
     ///
     #[must_use]
@@ -166,6 +173,7 @@ impl From<ExtensionOp> for OpaqueOp {
         } = op;
         OpaqueOp {
             extension: def.extension_id().clone(),
+            extension_version: Some(def.extension_version()),
             name: def.name().clone(),
             args,
             signature,
@@ -235,6 +243,17 @@ impl DataflowOpTrait for ExtensionOp {
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct OpaqueOp {
     extension: ExtensionId,
+    /// Version of the extension that defines this op.
+    ///
+    /// This may be unset for backwards compatibility when loading older Hugrs.
+    /// In the future we may remove the option and require the version to always be set.
+    #[cfg_attr(
+        test,
+        proptest(strategy = "any::<Option<(u64, u64, u64)>>()
+                .prop_map(|v| v.map(|(major, minor, patch)| Version::new(major, minor, patch)))")
+    )]
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    extension_version: Option<Version>,
     #[cfg_attr(test, proptest(strategy = "any_nonempty_smolstr()"))]
     name: OpName,
     #[cfg_attr(test, proptest(strategy = "any_serde_type_arg_vec()"))]
@@ -254,12 +273,32 @@ impl OpaqueOp {
     /// Creates a new `OpaqueOp` from all the fields we'd expect to serialize.
     pub fn new(
         extension: ExtensionId,
+        extension_version: Version,
         name: impl Into<OpName>,
         args: impl Into<Vec<TypeArg>>,
         signature: Signature,
     ) -> Self {
         Self {
             extension,
+            extension_version: Some(extension_version),
+            name: name.into(),
+            args: args.into(),
+            signature,
+        }
+    }
+
+    /// Creates a new `OpaqueOp` with no known extension version.
+    ///
+    /// This is used for testing. We expect users to always provide an extension version when creating `OpaqueOp`s.
+    pub(crate) fn new_unversioned(
+        extension: ExtensionId,
+        name: impl Into<OpName>,
+        args: impl Into<Vec<TypeArg>>,
+        signature: Signature,
+    ) -> Self {
+        Self {
+            extension,
+            extension_version: None,
             name: name.into(),
             args: args.into(),
             signature,
@@ -301,6 +340,17 @@ impl OpaqueOp {
     #[must_use]
     pub fn extension(&self) -> &ExtensionId {
         &self.extension
+    }
+
+    /// Parent extension version, if it was known when this opaque operation was serialized.
+    #[must_use]
+    pub fn extension_version(&self) -> Option<&Version> {
+        self.extension_version.as_ref()
+    }
+
+    /// Update the parent extension version.
+    pub fn set_extension_version(&mut self, extension_version: Option<Version>) {
+        self.extension_version = extension_version;
     }
 
     /// Returns a mutable reference to the type arguments of the operation.
@@ -410,6 +460,7 @@ mod test {
         let sig = Signature::new_endo([qb_t()]);
         let op = OpaqueOp::new(
             "res".try_into().unwrap(),
+            Version::new(1, 2, 3),
             "op",
             vec![usize_t().into()],
             sig.clone(),
@@ -430,11 +481,54 @@ mod test {
     }
 
     #[test]
+    fn opaque_op_serializes_optional_extension_version() {
+        let sig = Signature::new_endo([qb_t()]);
+        let version = Version::new(1, 2, 3);
+        let op = OpaqueOp::new(
+            "res".try_into().unwrap(),
+            version.clone(),
+            "op",
+            vec![usize_t().into()],
+            sig,
+        );
+        let value = serde_json::to_value(&op).unwrap();
+        assert_eq!(
+            value.get("extension_version").and_then(|v| v.as_str()),
+            Some("1.2.3")
+        );
+        let decoded: OpaqueOp = serde_json::from_value(value).unwrap();
+        assert_eq!(decoded.extension_version(), Some(&version));
+    }
+
+    #[test]
+    fn extension_op_make_opaque_records_extension_version() {
+        let version = Version::new(1, 2, 3);
+        let ext = Extension::new_arc(
+            "ext".try_into().unwrap(),
+            version.clone(),
+            |ext, extension_ref| {
+                ext.add_op(
+                    "op".into(),
+                    String::new(),
+                    SignatureFunc::PolyFuncType(
+                        FuncValueType::from(Signature::new_endo([bool_t()])).into(),
+                    ),
+                    extension_ref,
+                )
+                .unwrap();
+            },
+        );
+        let ext_op = ext.instantiate_extension_op("op", []).unwrap();
+        assert_eq!(ext_op.make_opaque().extension_version(), Some(&version));
+    }
+
+    #[test]
     fn resolve_opaque_op() {
         let registry = &STD_REG;
         let i0: &Type = &INT_TYPES[0];
         let opaque = OpaqueOp::new(
             conversions::EXTENSION_ID,
+            conversions::VERSION,
             "itobool",
             vec![],
             Signature::new([i0.clone()], [bool_t()]),
@@ -476,8 +570,20 @@ mod test {
 
         let registry = ExtensionRegistry::new([ext]);
         registry.validate().unwrap();
-        let opaque_val = OpaqueOp::new(ext_id.clone(), val_name, vec![], endo_sig.clone());
-        let opaque_comp = OpaqueOp::new(ext_id.clone(), comp_name, vec![], endo_sig);
+        let opaque_val = OpaqueOp::new(
+            ext_id.clone(),
+            Version::new(0, 0, 0),
+            val_name,
+            vec![],
+            endo_sig.clone(),
+        );
+        let opaque_comp = OpaqueOp::new(
+            ext_id.clone(),
+            Version::new(0, 0, 0),
+            comp_name,
+            vec![],
+            endo_sig,
+        );
         let mut resolved_val = opaque_val.into();
         resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),
