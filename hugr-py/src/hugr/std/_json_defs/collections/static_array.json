@@ -35,6 +35,7 @@
             {
               "t": "Opaque",
               "extension": "collections.static_array",
+              "extension_version": "0.1.0",
               "id": "static_array",
               "args": [
                 {
@@ -88,6 +89,7 @@
             {
               "t": "Opaque",
               "extension": "collections.static_array",
+              "extension_version": "0.1.0",
               "id": "static_array",
               "args": [
                 {
