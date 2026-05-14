@@ -43,6 +43,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.1",
               "id": "array",
               "args": [
                 {
@@ -69,6 +70,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.1",
               "id": "array",
               "args": [
                 {
@@ -93,6 +95,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.1",
               "id": "array",
               "args": [
                 {
@@ -139,6 +142,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.1",
               "id": "array",
               "args": [
                 {
@@ -182,6 +186,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.1",
               "id": "array",
               "args": [
                 {
@@ -225,6 +230,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.1",
               "id": "array",
               "args": [
                 {
@@ -268,6 +274,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.1",
               "id": "array",
               "args": [
                 {
@@ -348,6 +355,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.1",
               "id": "array",
               "args": [
                 {
@@ -405,6 +413,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.1",
               "id": "array",
               "args": [
                 {
@@ -463,6 +472,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.1",
               "id": "array",
               "args": [
                 {
@@ -514,6 +524,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.1",
               "id": "array",
               "args": [
                 {
@@ -558,6 +569,7 @@
                   {
                     "t": "Opaque",
                     "extension": "collections.array",
+                    "extension_version": "0.1.1",
                     "id": "array",
                     "args": [
                       {
@@ -589,6 +601,7 @@
                   {
                     "t": "Opaque",
                     "extension": "collections.array",
+                    "extension_version": "0.1.1",
                     "id": "array",
                     "args": [
                       {
@@ -638,6 +651,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
+              "extension_version": "0.1.1",
               "id": "array",
               "args": [
                 {
@@ -675,6 +689,7 @@
                   {
                     "t": "Opaque",
                     "extension": "collections.array",
+                    "extension_version": "0.1.1",
                     "id": "array",
                     "args": [
                       {
@@ -701,6 +716,7 @@
                   {
                     "t": "Opaque",
                     "extension": "collections.array",
+                    "extension_version": "0.1.1",
                     "id": "array",
                     "args": [
                       {
