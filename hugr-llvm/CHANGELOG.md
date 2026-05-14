@@ -1,6 +1,18 @@
 # Changelog
 
 
+## [0.28.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.27.1...hugr-llvm-v0.28.0) - 2026-05-14
+
+### New Features
+
+- [**breaking**] do not require an Order edge for each nonlocal `Ext` edge; compute on demand in scheduling_graph() ([#2951](https://github.com/Quantinuum/hugr/pull/2951))
+- *(hugr-llvm)* [**breaking**] Add support for emitting debug locations ([#3026](https://github.com/Quantinuum/hugr/pull/3026))
+
+### Refactor
+
+- *(hugrv2)* [**breaking**] combine TypeEnum with Term, no RV parametrization ([#2895](https://github.com/Quantinuum/hugr/pull/2895))
+- *(hugrv2)* [**breaking**] Rename Terms to clarify (runtime) Types from static parameter Kinds ([#3019](https://github.com/Quantinuum/hugr/pull/3019))
+
 ## [0.27.1](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.27.0...hugr-llvm-v0.27.1) - 2026-05-05
 
 ### Documentation

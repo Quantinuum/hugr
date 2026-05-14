@@ -1060,7 +1060,7 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.27.1"
+version = "0.28.0"
 dependencies = [
  "bumpalo",
  "criterion",
@@ -1073,7 +1073,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.27.1"
+version = "0.28.0"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1097,7 +1097,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.27.1"
+version = "0.28.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -1142,7 +1142,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.27.1"
+version = "0.28.0"
 dependencies = [
  "anyhow",
  "cc",
@@ -1163,7 +1163,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.27.1"
+version = "0.28.0"
 dependencies = [
  "anyhow",
  "base64",
@@ -1189,7 +1189,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-persistent"
-version = "0.6.1"
+version = "0.7.0"
 dependencies = [
  "delegate",
  "derive_more 2.1.1",

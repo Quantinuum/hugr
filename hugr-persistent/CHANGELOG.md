@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.7.0](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.6.1...hugr-persistent-v0.7.0) - 2026-05-14
+
+### New Features
+
+- [**breaking**] do not require an Order edge for each nonlocal `Ext` edge; compute on demand in scheduling_graph() ([#2951](https://github.com/Quantinuum/hugr/pull/2951))
+- *(hugr-llvm)* [**breaking**] Add support for emitting debug locations ([#3026](https://github.com/Quantinuum/hugr/pull/3026))
+
 ## [0.6.1](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.6.0...hugr-persistent-v0.6.1) - 2026-05-05
 
 ### Refactor
