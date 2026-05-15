@@ -40,7 +40,7 @@ pub const LIST_TYPENAME: TypeName = TypeName::new_inline("List");
 /// Reported unique name of the extension
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("collections.list");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
 
 #[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
 /// Dynamically sized list of values, all of the same type.

@@ -2,7 +2,7 @@ use std::collections::btree_map::Entry;
 use std::sync::Weak;
 
 use super::{CustomConcrete, ExtensionBuildError};
-use super::{Extension, ExtensionId, SignatureError};
+use super::{Extension, ExtensionId, SignatureError, Version};
 
 use crate::types::{CustomType, TypeName, least_upper_bound};
 
@@ -60,6 +60,14 @@ impl TypeDefBound {
 pub struct TypeDef {
     /// The unique Extension owning this `TypeDef` (of which this `TypeDef` is a member)
     extension: ExtensionId,
+    /// The version of the extension owning this `TypeDef`, if known.
+    ///
+    /// Not included in the serialization since it can be filled in from the parent extension.
+    //
+    // TODO: Remove the option and require the version to be known at construction time.
+    // This will only be possible once JSON serialization of extensions is removed.
+    #[serde(skip)]
+    extension_version: Option<Version>,
     /// A weak reference to the extension defining this operation.
     #[serde(skip)]
     extension_ref: Weak<Extension>,
@@ -129,6 +137,7 @@ impl TypeDef {
             self.name().clone(),
             args,
             self.extension_id().clone(),
+            self.extension_version(),
             bound,
             &self.extension_ref,
         ))
@@ -173,6 +182,21 @@ impl TypeDef {
         &self.extension
     }
 
+    /// Returns the version of the extension that defines this type.
+    ///
+    /// Panics if the version is not known. This should only happen when using
+    /// `serde_json` to deserialize the TypeDef and not filling in the version
+    /// from the parent extension.
+    #[must_use]
+    pub fn extension_version(&self) -> Version {
+        self.extension_version.clone().unwrap_or_else(|| {
+            panic!(
+                "Extension version for type definition {} not known. Was this deserialized using serde?",
+                self.name
+            )
+        })
+    }
+
     /// Returns a weak reference to the extension defining this type.
     #[must_use]
     pub fn extension(&self) -> Weak<Extension> {
@@ -182,6 +206,12 @@ impl TypeDef {
     /// Returns a mutable reference to the weak extension pointer in the type def.
     pub(super) fn extension_mut(&mut self) -> &mut Weak<Extension> {
         &mut self.extension_ref
+    }
+
+    /// Set the stored parent extension version if it is not already known.
+    pub(super) fn fill_extension_version(&mut self, version: &Version) {
+        self.extension_version
+            .get_or_insert_with(|| version.clone());
     }
 }
 
@@ -222,6 +252,7 @@ impl Extension {
     ) -> Result<&TypeDef, ExtensionBuildError> {
         let ty = TypeDef {
             extension: self.name.clone(),
+            extension_version: Some(self.version.clone()),
             extension_ref: extension_ref.clone(),
             name,
             params,
@@ -237,6 +268,8 @@ impl Extension {
 
 #[cfg(test)]
 mod test {
+    use semver::Version;
+
     use crate::extension::SignatureError;
     use crate::extension::prelude::{qb_t, usize_t};
     use crate::std_extensions::arithmetic::float_types::float64_type;
@@ -251,6 +284,7 @@ mod test {
             name: "MyType".into(),
             params: vec![TypeParam::TypeKind(TypeBound::Copyable)],
             extension: "MyRsrc".try_into().unwrap(),
+            extension_version: Some(Version::new(0, 1, 0)),
             // Dummy extension. Will return `None` when trying to upgrade it into an `Arc`.
             extension_ref: Default::default(),
             description: "Some parametrised type".into(),

@@ -269,6 +269,7 @@ fn invalid_types() {
     });
     let reg = ExtensionRegistry::new([ext.clone(), PRELUDE.to_owned()]);
     reg.validate().unwrap();
+    let ext_version = ext.version().clone();
 
     let validate_to_sig_error = |t: CustomType| -> SignatureError {
         let (mut h, def) = identity_hugr_with_type(Type::new_extension(t));
@@ -287,6 +288,7 @@ fn invalid_types() {
         "MyContainer",
         vec![usize_t().into()],
         EXT_ID,
+        ext_version.clone(),
         TypeBound::Linear,
         &Arc::downgrade(&ext),
     ));
@@ -299,6 +301,7 @@ fn invalid_types() {
         "MyContainer",
         vec![valid.clone().into()],
         EXT_ID,
+        ext_version.clone(),
         TypeBound::Linear,
         &Arc::downgrade(&ext),
     );
@@ -314,6 +317,7 @@ fn invalid_types() {
         "MyContainer",
         vec![usize_t().into()],
         EXT_ID,
+        ext_version.clone(),
         TypeBound::Copyable,
         &Arc::downgrade(&ext),
     );
@@ -330,6 +334,7 @@ fn invalid_types() {
         "MyContainer",
         vec![Type::new_extension(bad_bound).into()],
         EXT_ID,
+        ext_version.clone(),
         TypeBound::Linear,
         &Arc::downgrade(&ext),
     );
@@ -345,6 +350,7 @@ fn invalid_types() {
         "MyContainer",
         vec![usize_t().into(), 3u64.into()],
         EXT_ID,
+        ext_version,
         TypeBound::Linear,
         &Arc::downgrade(&ext),
     );

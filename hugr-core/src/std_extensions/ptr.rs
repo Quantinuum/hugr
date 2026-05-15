@@ -90,7 +90,7 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("ptr");
 pub const PTR_TYPE_ID: TypeName = TypeName::new_inline("ptr");
 const TYPE_PARAMS: [TypeParam; 1] = [TypeParam::TypeKind(TypeBound::Copyable)];
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
 
 /// Extension for pointer operations.
 fn extension() -> Arc<Extension> {
@@ -120,6 +120,7 @@ fn ptr_custom_type(ty: impl Into<Type>, extension_ref: &Weak<Extension>) -> Cust
         PTR_TYPE_ID,
         [ty.into()],
         EXTENSION_ID,
+        VERSION,
         TypeBound::Copyable,
         extension_ref,
     )

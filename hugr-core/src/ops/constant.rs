@@ -517,6 +517,7 @@ pub(crate) mod test {
     };
     use cool_asserts::assert_matches;
     use rstest::{fixture, rstest};
+    use semver::Version;
 
     use super::*;
 
@@ -754,6 +755,7 @@ pub(crate) mod test {
             "my_type",
             vec![TypeArg::BoundedNat(8)],
             ex_id.clone(),
+            Version::new(0, 1, 0),
             TypeBound::Copyable,
             // Dummy extension reference.
             &Weak::default(),
@@ -767,6 +769,7 @@ pub(crate) mod test {
             "my_type",
             vec![],
             ex_id,
+            Version::new(0, 1, 0),
             TypeBound::Copyable,
             &Weak::default(),
         );

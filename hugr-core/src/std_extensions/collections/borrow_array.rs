@@ -45,7 +45,7 @@ pub const BORROW_ARRAY_VALUENAME: TypeName = TypeName::new_inline("borrow_array"
 /// Reported unique name of the extension
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("collections.borrow_arr");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 2, 0);
+pub const VERSION: semver::Version = semver::Version::new(0, 2, 1);
 
 /// A linear, unsafe, fixed-length collection of values.
 ///
