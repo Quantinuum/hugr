@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.1",
   "name": "arithmetic.float",
   "types": {},
   "operations": {
@@ -668,7 +668,7 @@
             {
               "t": "Opaque",
               "extension": "prelude",
-              "extension_version": "0.2.1",
+              "extension_version": "0.2.2",
               "id": "string",
               "args": [],
               "bound": "C"

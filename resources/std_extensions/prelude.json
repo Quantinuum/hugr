@@ -1,5 +1,5 @@
 {
-  "version": "0.2.1",
+  "version": "0.2.2",
   "name": "prelude",
   "types": {
     "error": {
@@ -91,7 +91,7 @@
             {
               "t": "Opaque",
               "extension": "prelude",
-              "extension_version": "0.2.1",
+              "extension_version": "0.2.2",
               "id": "string",
               "args": [],
               "bound": "C"
@@ -101,7 +101,7 @@
             {
               "t": "Opaque",
               "extension": "prelude",
-              "extension_version": "0.2.1",
+              "extension_version": "0.2.2",
               "id": "error",
               "args": [],
               "bound": "C"
@@ -249,7 +249,7 @@
             {
               "t": "Opaque",
               "extension": "prelude",
-              "extension_version": "0.2.1",
+              "extension_version": "0.2.2",
               "id": "error",
               "args": [],
               "bound": "C"
@@ -319,7 +319,7 @@
             {
               "t": "Opaque",
               "extension": "prelude",
-              "extension_version": "0.2.1",
+              "extension_version": "0.2.2",
               "id": "error",
               "args": [],
               "bound": "C"
@@ -352,7 +352,7 @@
             {
               "t": "Opaque",
               "extension": "prelude",
-              "extension_version": "0.2.1",
+              "extension_version": "0.2.2",
               "id": "string",
               "args": [],
               "bound": "C"

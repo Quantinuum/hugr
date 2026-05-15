@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.1",
   "name": "collections.static_array",
   "types": {
     "static_array": {
@@ -35,7 +35,7 @@
             {
               "t": "Opaque",
               "extension": "collections.static_array",
-              "extension_version": "0.1.0",
+              "extension_version": "0.1.1",
               "id": "static_array",
               "args": [
                 {
@@ -89,7 +89,7 @@
             {
               "t": "Opaque",
               "extension": "collections.static_array",
-              "extension_version": "0.1.0",
+              "extension_version": "0.1.1",
               "id": "static_array",
               "args": [
                 {
