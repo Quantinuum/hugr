@@ -30,8 +30,9 @@ use crate::{
 };
 use hugr_model::v0::table;
 use hugr_model::v0::{self as model};
+use indexmap::IndexMap;
 use itertools::{Either, Itertools};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::Deserialize as _;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
@@ -247,7 +248,7 @@ pub(crate) fn import_described_hugr(
     let mut ctx = Context {
         module,
         hugr: Hugr::new(),
-        link_ports: FxHashMap::default(),
+        link_ports: IndexMap::default(),
         static_edges: Vec::new(),
         extensions,
         nodes: FxHashMap::default(),
@@ -287,7 +288,7 @@ struct Context<'a> {
 
     /// The ports that are part of each link. This is used to connect the ports at the end of the
     /// import process.
-    link_ports: FxHashMap<(table::RegionId, table::LinkIndex), Vec<(Node, Port)>>,
+    link_ports: IndexMap<(table::RegionId, table::LinkIndex), Vec<(Node, Port)>, FxBuildHasher>,
 
     /// Pairs of nodes that should be connected by a static edge.
     /// These are collected during the import process and connected at the end.

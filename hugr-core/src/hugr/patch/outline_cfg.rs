@@ -1,6 +1,6 @@
 //! Rewrite for inserting a CFG-node into the hierarchy containing a subsection
 //! of an existing CFG
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 use itertools::Itertools;
 use thiserror::Error;
@@ -19,14 +19,14 @@ use super::{PatchHugrMut, PatchVerification};
 /// Moves some of the blocks in a Control-flow region into a new CFG-node that
 /// is the only child of a new Basic Block in the original region.
 pub struct OutlineCfg {
-    blocks: HashSet<Node>,
+    blocks: BTreeSet<Node>,
 }
 
 impl OutlineCfg {
     /// Create a new `OutlineCfg` rewrite that will move the provided blocks.
     pub fn new(blocks: impl IntoIterator<Item = Node>) -> Self {
         Self {
-            blocks: HashSet::from_iter(blocks),
+            blocks: BTreeSet::from_iter(blocks),
         }
     }
 
@@ -236,7 +236,7 @@ pub enum OutlineCfgError {
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashSet;
+    use std::collections::{BTreeSet, HashSet};
 
     use crate::builder::{
         BlockBuilder, BuildError, CFGBuilder, Container, Dataflow, DataflowSubContainer,
@@ -481,7 +481,7 @@ mod test {
         cfg: Node,
         blocks: Vec<Node>,
     ) -> (Node, Node, Node) {
-        let mut other_blocks = h.children(cfg).collect::<HashSet<_>>();
+        let mut other_blocks = h.children(cfg).collect::<BTreeSet<_>>();
         assert!(blocks.iter().all(|b| other_blocks.remove(b)));
         let [new_block, new_cfg] = h.apply_patch(OutlineCfg::new(blocks.clone())).unwrap();
 

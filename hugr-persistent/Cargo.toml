@@ -26,6 +26,7 @@ derive_more = { workspace = true, features = [
 ] }
 delegate.workspace = true
 itertools.workspace = true
+indexmap.workspace = true
 petgraph.workspace = true
 portgraph.workspace = true
 relrc = { workspace = true, features = ["petgraph", "serde"] }
