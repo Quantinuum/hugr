@@ -197,9 +197,16 @@ pub(super) fn resolve_custom_type_exts(
     }
 
     let ext_id = custom.extension();
-    let ext = extensions.get(ext_id).ok_or_else(|| {
-        ExtensionResolutionError::missing_type_extension(node, custom.name(), ext_id, extensions)
-    })?;
+    let ext = extensions
+        .get_req(ext_id, custom.extension_version())
+        .ok_or_else(|| {
+            ExtensionResolutionError::missing_type_extension(
+                node,
+                custom.name(),
+                ext_id,
+                extensions,
+            )
+        })?;
 
     // Add the extension to the used extensions registry,
     // and update the CustomType with the valid pointer.

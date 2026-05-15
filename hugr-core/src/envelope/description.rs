@@ -457,7 +457,7 @@ impl ModuleDesc {
     pub(crate) fn load_used_extensions_resolved(&mut self, hugr: &impl HugrView) {
         self.set_used_extensions_resolved(
             hugr.extensions()
-                .iter()
+                .iter_all()
                 .map(|ext| ExtensionDesc::new(&ext.name, ext.version.clone())),
         )
     }

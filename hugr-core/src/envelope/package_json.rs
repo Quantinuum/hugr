@@ -17,7 +17,10 @@ pub(super) fn to_json_writer<'h>(
 ) -> Result<(), PackageEncodingError> {
     let pkg_ser = PackageSer {
         modules: hugrs.into_iter().map(HugrSer).collect(),
-        extensions: extensions.iter().map(std::convert::AsRef::as_ref).collect(),
+        extensions: extensions
+            .iter_all()
+            .map(std::convert::AsRef::as_ref)
+            .collect(),
     };
 
     // Validate the hugr serializations against the schema.

@@ -1049,7 +1049,9 @@ class Opaque(Type):
 
         if registry is not None:
             try:
-                type_def = registry.get_extension(self.extension).get_type(self.id)
+                type_def = registry.get_extension(
+                    self.extension, self.extension_version
+                ).get_type(self.id)
             except (ExtensionRegistry.ExtensionNotFound, Extension.TypeNotFound):
                 pass
             else:

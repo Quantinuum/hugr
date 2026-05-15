@@ -123,7 +123,7 @@ fn import_package_with_extensions(#[case] format: EnvelopeFormat, simple_dfg_hug
         |_, _| {},
     );
     let mut package = Package::new([simple_dfg_hugr]);
-    package.extensions.register_updated(ext);
+    package.extensions.register(ext);
 
     let mut bytes: Vec<u8> = Vec::new();
     write_envelope(&mut bytes, &package, EnvelopeConfig::new(format)).unwrap();
@@ -132,7 +132,7 @@ fn import_package_with_extensions(#[case] format: EnvelopeFormat, simple_dfg_hug
     let (_, loaded_pkg) = read_envelope(buff, &std_reg()).unwrap();
 
     assert_eq!(loaded_pkg.extensions.len(), 1);
-    let read_ext = loaded_pkg.extensions.iter().next().unwrap();
+    let read_ext = loaded_pkg.extensions.iter_all().next().unwrap();
     assert_eq!(read_ext.name(), &"miniquantum".try_into().unwrap());
 
     assert_eq!(package, loaded_pkg);
