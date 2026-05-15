@@ -110,6 +110,7 @@
 use itertools::Itertools;
 use resolution::{ExtensionResolutionError, WeakExtensionRegistry};
 pub use semver::Version;
+use semver::{Comparator, Op as SemverOp};
 use serde::{Deserialize, Deserializer, Serialize};
 use std::cell::UnsafeCell;
 use std::collections::btree_map;
@@ -152,7 +153,7 @@ pub mod declarative;
 #[display("ExtensionRegistry[{}]", exts.keys().join(", "))]
 pub struct ExtensionRegistry {
     /// The extensions in the registry.
-    exts: BTreeMap<ExtensionId, Arc<Extension>>,
+    exts: BTreeMap<ExtensionId, ExtensionVersions>,
     /// A flag indicating whether the current set of extensions has been
     /// validated.
     ///
@@ -177,12 +178,187 @@ impl Clone for ExtensionRegistry {
     }
 }
 
+/// Retained versions for one extension id.
+///
+/// The registry keeps at most one extension per semver-compatible group: when a
+/// newer compatible version is registered, it replaces the older compatible
+/// definition. Incompatible versions are retained side by side so older HUGRs can
+/// still resolve against the appropriate definition.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ExtensionVersions {
+    id: ExtensionId,
+    versions: BTreeMap<Version, Arc<Extension>>,
+}
+
+impl ExtensionVersions {
+    /// Create a version collection containing one extension.
+    pub fn new(extension: Arc<Extension>) -> Self {
+        let id = extension.name().clone();
+        let versions = [(extension.version().clone(), extension)].into();
+        Self { id, versions }
+    }
+
+    /// The extension id shared by all versions in this collection.
+    #[must_use]
+    pub fn id(&self) -> &ExtensionId {
+        &self.id
+    }
+
+    /// Return the latest retained extension version.
+    #[must_use]
+    pub fn latest(&self) -> &Arc<Extension> {
+        self.versions
+            .last_key_value()
+            .expect("ExtensionVersions always contains at least one extension")
+            .1
+    }
+
+    /// Return the exact retained extension version, if available.
+    #[must_use]
+    pub fn exact(&self, version: &Version) -> Option<&Arc<Extension>> {
+        self.versions.get(version)
+    }
+
+    /// Return the highest retained extension compatible with `requested`.
+    #[must_use]
+    pub fn compatible(&self, requested: &Version) -> Option<&Arc<Extension>> {
+        let (version, extension) = self.versions.range(requested..).next()?;
+        semver_compatible(version, requested).then_some(extension)
+    }
+
+    /// Return the extension that should satisfy an optional serialized version.
+    ///
+    /// If `requested` is `Some(version)`, returns the highest retained
+    /// extension compatible with `version`. If `requested` is `None`, returns
+    /// the latest retained extension.
+    ///
+    /// This is used when deserializing older HUGRs that may not have a version
+    /// specified for their extensions.
+    #[must_use]
+    pub(crate) fn get_req(&self, requested: Option<&Version>) -> Option<&Arc<Extension>> {
+        requested
+            .and_then(|version| self.compatible(version))
+            .or_else(|| requested.is_none().then(|| self.latest()))
+    }
+
+    /// Register an extension version and report what happened.
+    ///
+    /// If we already have a compatible version, the extension with the higher
+    /// version is kept. If versions match exactly, the new extension replaces
+    /// the existing entry.
+    ///
+    /// Panics if the extension id does not match the collection's id.
+    pub fn register(&mut self, extension: Arc<Extension>) -> ExtensionRegisterResult {
+        assert_eq!(
+            extension.name(),
+            &self.id,
+            "extension id does not match ExtensionVersions id"
+        );
+
+        let version = extension.version().clone();
+        let compatible_version = self.compatible_registered_version(&version);
+
+        let Some(compatible_version) = compatible_version else {
+            self.versions.insert(version, extension);
+            return ExtensionRegisterResult::Inserted;
+        };
+
+        if compatible_version > version {
+            return ExtensionRegisterResult::KeptExisting {
+                version: compatible_version,
+            };
+        }
+
+        self.versions.remove(&compatible_version);
+        let replaced = compatible_version < version;
+        self.versions.insert(version, extension);
+        if replaced {
+            ExtensionRegisterResult::Replaced {
+                version: compatible_version,
+            }
+        } else {
+            ExtensionRegisterResult::ReplacedExact
+        }
+    }
+
+    // Find a registered extension version that is in the same semver
+    // compatibility group as `version`, if any.
+    fn compatible_registered_version(&self, version: &Version) -> Option<Version> {
+        if let Some((candidate, _)) = self.versions.range(..=version).next_back()
+            && semver_compatible(version, candidate)
+        {
+            return Some(candidate.clone());
+        }
+        self.versions
+            .range(version..)
+            .next()
+            .filter(|(candidate, _)| semver_compatible(candidate, version))
+            .map(|(candidate, _)| candidate.clone())
+    }
+
+    /// Return every retained version.
+    pub fn iter(&self) -> impl DoubleEndedIterator<Item = &Arc<Extension>> {
+        self.versions.values()
+    }
+
+    /// Return the retained version numbers.
+    pub fn versions(&self) -> impl DoubleEndedIterator<Item = &Version> {
+        self.versions.keys()
+    }
+
+    /// Return the number of retained versions.
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.versions.len()
+    }
+
+    /// Returns `true` if there are no retained versions.
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.versions.is_empty()
+    }
+}
+
+/// The result of registering an extension.
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum ExtensionRegisterResult {
+    /// A new incompatible version group was inserted.
+    Inserted,
+    /// An older compatible version was replaced by this extension.
+    Replaced {
+        /// The replaced version.
+        version: Version,
+    },
+    /// An exact version entry was replaced.
+    ReplacedExact,
+    /// A newer compatible version was already present and was kept.
+    KeptExisting {
+        /// The version that was kept.
+        version: Version,
+    },
+}
+
+/// Returns `true` if `candidate` is semver-compatible with `requested`.
+///
+/// That is, `candidate` is the same or a newer version than `requested`, without
+/// breaking changes according to semver rules.
+pub(crate) fn semver_compatible(candidate: &Version, requested: &Version) -> bool {
+    Comparator {
+        op: SemverOp::Caret,
+        major: requested.major,
+        minor: Some(requested.minor),
+        patch: Some(requested.patch),
+        pre: requested.pre.clone(),
+    }
+    .matches(candidate)
+}
+
 impl ExtensionRegistry {
     /// Create a new empty extension registry.
     pub fn new(extensions: impl IntoIterator<Item = Arc<Extension>>) -> Self {
         let mut res = Self::default();
         for ext in extensions {
-            res.register_updated(ext);
+            res.register(ext);
         }
         res
     }
@@ -207,6 +383,26 @@ impl ExtensionRegistry {
 
     /// Gets the Extension with the given name
     pub fn get(&self, name: &str) -> Option<&Arc<Extension>> {
+        self.exts.get(name).map(ExtensionVersions::latest)
+    }
+
+    /// Gets the exact Extension version with the given name.
+    pub fn get_exact(&self, name: &str, version: &Version) -> Option<&Arc<Extension>> {
+        self.exts.get(name).and_then(|ext| ext.exact(version))
+    }
+
+    /// Gets the highest Extension version compatible with `version`.
+    pub fn get_compatible(&self, name: &str, version: &Version) -> Option<&Arc<Extension>> {
+        self.exts.get(name).and_then(|ext| ext.compatible(version))
+    }
+
+    /// Gets the Extension matching an optional serialized version requirement.
+    pub fn get_req(&self, name: &str, version: Option<&Version>) -> Option<&Arc<Extension>> {
+        self.exts.get(name).and_then(|ext| ext.get_req(version))
+    }
+
+    /// Gets retained versions for the given extension name.
+    pub fn versions(&self, name: &str) -> Option<&ExtensionVersions> {
         self.exts.get(name)
     }
 
@@ -220,7 +416,7 @@ impl ExtensionRegistry {
         if self.valid.load(Ordering::Relaxed) {
             return Ok(());
         }
-        for ext in self.exts.values() {
+        for ext in self.iter_all() {
             ext.validate()
                 .map_err(|e| ExtensionRegistryError::InvalidSignature(ext.name().clone(), e))?;
         }
@@ -230,80 +426,33 @@ impl ExtensionRegistry {
 
     /// Registers a new extension to the registry.
     ///
-    /// Returns a reference to the registered extension if successful.
-    pub fn register(
-        &mut self,
-        extension: impl Into<Arc<Extension>>,
-    ) -> Result<(), ExtensionRegistryError> {
-        let extension = extension.into();
-        match self.exts.entry(extension.name().clone()) {
-            btree_map::Entry::Occupied(prev) => Err(ExtensionRegistryError::AlreadyRegistered(
-                extension.name().clone(),
-                Box::new(prev.get().version().clone()),
-                Box::new(extension.version().clone()),
-            )),
-            btree_map::Entry::Vacant(ve) => {
-                ve.insert(extension);
-                // Clear the valid flag so that the registry is re-validated.
-                self.valid.store(false, Ordering::Relaxed);
-
-                Ok(())
-            }
-        }
-    }
-
-    /// Registers a new extension to the registry, keeping the one most up to
-    /// date if the extension already exists.
+    /// If we already have a compatible version, the extension with the higher
+    /// version is kept. If versions match exactly, the new extension replaces
+    /// the existing entry.
     ///
-    /// If extension IDs match, the extension with the higher version is kept.
-    /// If versions match, the original extension is kept. Returns a reference
-    /// to the registered extension if successful.
-    ///
-    /// Takes an Arc to the extension. To avoid cloning Arcs unless necessary,
-    /// see [`ExtensionRegistry::register_updated_ref`].
-    pub fn register_updated(&mut self, extension: impl Into<Arc<Extension>>) {
+    pub fn register(&mut self, extension: impl Into<Arc<Extension>>) -> ExtensionRegisterResult {
+        use btree_map::Entry::*;
         let extension = extension.into();
-        match self.exts.entry(extension.name().clone()) {
-            btree_map::Entry::Occupied(mut prev) => {
-                if prev.get().version() < extension.version() {
-                    *prev.get_mut() = extension;
-                }
+        let result = match self.exts.entry(extension.name().clone()) {
+            Occupied(mut prev) => prev.get_mut().register(extension),
+            Vacant(ve) => {
+                ve.insert(ExtensionVersions::new(extension));
+                ExtensionRegisterResult::Inserted
             }
-            btree_map::Entry::Vacant(ve) => {
-                ve.insert(extension);
-            }
-        }
+        };
         // Clear the valid flag so that the registry is re-validated.
         self.valid.store(false, Ordering::Relaxed);
-    }
-
-    /// Registers a new extension to the registry, keeping the one most up to
-    /// date if the extension already exists.
-    ///
-    /// If extension IDs match, the extension with the higher version is kept.
-    /// If versions match, the original extension is kept. Returns a reference
-    /// to the registered extension if successful.
-    ///
-    /// Clones the Arc only when required. For no-cloning version see
-    /// [`ExtensionRegistry::register_updated`].
-    pub fn register_updated_ref(&mut self, extension: &Arc<Extension>) {
-        match self.exts.entry(extension.name().clone()) {
-            btree_map::Entry::Occupied(mut prev) => {
-                if prev.get().version() < extension.version() {
-                    *prev.get_mut() = extension.clone();
-                }
-            }
-            btree_map::Entry::Vacant(ve) => {
-                ve.insert(extension.clone());
-            }
-        }
-        // Clear the valid flag so that the registry is re-validated.
-        self.valid.store(false, Ordering::Relaxed);
+        result
     }
 
     /// Returns the number of extensions in the registry.
     pub fn len(&self) -> usize {
         self.exts.len()
+    }
+
+    /// Returns the number of retained extension versions in the registry.
+    pub fn len_all_versions(&self) -> usize {
+        self.exts.values().map(ExtensionVersions::len).sum()
     }
 
     /// Returns `true` if the registry contains no extensions.
@@ -312,8 +461,15 @@ impl ExtensionRegistry {
     }
 
     /// Returns an iterator over the extensions in the registry.
-    pub fn iter(&self) -> <&Self as IntoIterator>::IntoIter {
+    ///
+    /// For each extension id, it yields the set of non-compatible versions retained for it.
+    pub fn iter(&self) -> impl Iterator<Item = &ExtensionVersions> {
         self.exts.values()
+    }
+
+    /// Returns an iterator over every retained extension version in the registry.
+    pub fn iter_all(&self) -> impl Iterator<Item = &Arc<Extension>> {
+        self.exts.values().flat_map(ExtensionVersions::iter)
     }
 
     /// Returns an iterator over the extensions ids in the registry.
@@ -321,8 +477,8 @@ impl ExtensionRegistry {
         self.exts.keys()
     }
 
-    /// Delete an extension from the registry and return it if it was present.
-    pub fn remove_extension(&mut self, name: &ExtensionId) -> Option<Arc<Extension>> {
+    /// Delete an extension from the registry and return the [`ExtensionVersions`] sets if it was present.
+    pub fn remove_extension(&mut self, name: &ExtensionId) -> Option<ExtensionVersions> {
         // Clear the valid flag so that the registry is re-validated.
         self.valid.store(false, Ordering::Relaxed);
 
@@ -411,9 +567,9 @@ impl ExtensionRegistry {
 }
 
 impl IntoIterator for ExtensionRegistry {
-    type Item = Arc<Extension>;
+    type Item = ExtensionVersions;
 
-    type IntoIter = std::collections::btree_map::IntoValues<ExtensionId, Arc<Extension>>;
+    type IntoIter = std::collections::btree_map::IntoValues<ExtensionId, ExtensionVersions>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.exts.into_values()
@@ -421,9 +577,9 @@ impl IntoIterator for ExtensionRegistry {
 }
 
 impl<'a> IntoIterator for &'a ExtensionRegistry {
-    type Item = &'a Arc<Extension>;
+    type Item = &'a ExtensionVersions;
 
-    type IntoIter = std::collections::btree_map::Values<'a, ExtensionId, Arc<Extension>>;
+    type IntoIter = std::collections::btree_map::Values<'a, ExtensionId, ExtensionVersions>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.exts.values()
@@ -433,7 +589,7 @@ impl<'a> IntoIterator for &'a ExtensionRegistry {
 impl<'a> Extend<&'a Arc<Extension>> for ExtensionRegistry {
     fn extend<T: IntoIterator<Item = &'a Arc<Extension>>>(&mut self, iter: T) {
         for ext in iter {
-            self.register_updated_ref(ext);
+            self.register(ext.clone());
         }
     }
 }
@@ -441,7 +597,23 @@ impl<'a> Extend<&'a Arc<Extension>> for ExtensionRegistry {
 impl Extend<Arc<Extension>> for ExtensionRegistry {
     fn extend<T: IntoIterator<Item = Arc<Extension>>>(&mut self, iter: T) {
         for ext in iter {
-            self.register_updated(ext);
+            self.register(ext);
+        }
+    }
+}
+
+impl<'a> Extend<&'a ExtensionVersions> for ExtensionRegistry {
+    fn extend<T: IntoIterator<Item = &'a ExtensionVersions>>(&mut self, iter: T) {
+        for versions in iter {
+            self.extend(versions.iter());
+        }
+    }
+}
+
+impl Extend<ExtensionVersions> for ExtensionRegistry {
+    fn extend<T: IntoIterator<Item = ExtensionVersions>>(&mut self, iter: T) {
+        for versions in iter {
+            self.extend(versions.versions.into_values());
         }
     }
 }
@@ -465,7 +637,7 @@ impl Serialize for ExtensionRegistry {
     where
         S: serde::Serializer,
     {
-        let extensions: Vec<Arc<Extension>> = self.exts.values().cloned().collect();
+        let extensions: Vec<Arc<Extension>> = self.iter_all().cloned().collect();
         extensions.serialize(serializer)
     }
 }
@@ -975,7 +1147,6 @@ pub mod test {
     #[test]
     fn test_register_update() {
         // Two registers that should remain the same.
-        // We use them to test both `register_updated` and `register_updated_ref`.
         let mut reg = ExtensionRegistry::default();
         let mut reg_ref = ExtensionRegistry::default();
 
@@ -984,39 +1155,83 @@ pub mod test {
         let ext1 = Arc::new(Extension::new(ext_1_id.clone(), Version::new(1, 0, 0)));
         let ext1_1 = Arc::new(Extension::new(ext_1_id.clone(), Version::new(1, 1, 0)));
         let ext1_2 = Arc::new(Extension::new(ext_1_id.clone(), Version::new(0, 2, 0)));
+        let ext1_1_1 = Arc::new(Extension::new(ext_1_id.clone(), Version::new(1, 1, 1)));
         let ext2 = Arc::new(Extension::new(ext_2_id, Version::new(1, 0, 0)));
 
-        reg.register(ext1.clone()).unwrap();
-        reg_ref.register(ext1.clone()).unwrap();
+        assert_eq!(
+            reg.register(ext1.clone()),
+            ExtensionRegisterResult::Inserted
+        );
+        assert_eq!(
+            reg_ref.register(ext1.clone()),
+            ExtensionRegisterResult::Inserted
+        );
         assert_eq!(&reg, &reg_ref);
 
-        // normal registration fails
+        // Compatible registration replaces the older compatible group.
         assert_eq!(
             reg.register(ext1_1.clone()),
-            Err(ExtensionRegistryError::AlreadyRegistered(
-                ext_1_id.clone(),
-                Box::new(Version::new(1, 0, 0)),
-                Box::new(Version::new(1, 1, 0))
-            ))
+            ExtensionRegisterResult::Replaced {
+                version: Version::new(1, 0, 0)
+            }
+        );
+        assert_eq!(reg.get("ext1").unwrap().version(), &Version::new(1, 1, 0));
+        assert_eq!(reg.len_all_versions(), 1);
+
+        reg_ref.register(ext1_1.clone());
+        assert_eq!(reg.get("ext1").unwrap().version(), &Version::new(1, 1, 0));
+        assert_eq!(&reg, &reg_ref);
+
+        // Compatible lower versions do not replace a newer compatible entry.
+        assert_eq!(
+            reg.register(ext1.clone()),
+            ExtensionRegisterResult::KeptExisting {
+                version: Version::new(1, 1, 0)
+            }
+        );
+        assert_eq!(reg.get("ext1").unwrap().version(), &Version::new(1, 1, 0));
+
+        // Incompatible versions are retained.
+        reg.register(ext1_2.clone());
+        reg_ref.register(ext1_2.clone());
+        assert_eq!(reg.get("ext1").unwrap().version(), &Version::new(1, 1, 0));
+        assert_eq!(
+            reg.get_exact("ext1", &Version::new(0, 2, 0))
+                .unwrap()
+                .version(),
+            &Version::new(0, 2, 0)
+        );
+        assert_eq!(reg.len(), 1);
+        assert_eq!(reg.len_all_versions(), 2);
+        assert_eq!(&reg, &reg_ref);
+
+        // Newer compatible patch versions replace older compatible entries.
+        assert_eq!(
+            reg.register(ext1_1_1.clone()),
+            ExtensionRegisterResult::Replaced {
+                version: Version::new(1, 1, 0)
+            }
+        );
+        assert_eq!(
+            reg.get_compatible("ext1", &Version::new(1, 1, 0))
+                .unwrap()
+                .version(),
+            &Version::new(1, 1, 1)
+        );
+        assert_eq!(
+            reg.get_compatible("ext1", &Version::new(0, 2, 0))
+                .unwrap()
+                .version(),
+            &Version::new(0, 2, 0)
         );
 
-        // register with update works
-        reg_ref.register_updated_ref(&ext1_1);
-        reg.register_updated(ext1_1.clone());
-        assert_eq!(reg.get("ext1").unwrap().version(), &Version::new(1, 1, 0));
-        assert_eq!(&reg, &reg_ref);
-
-        // register with lower version does not change version
-        reg_ref.register_updated_ref(&ext1_2);
-        reg.register_updated(ext1_2.clone());
-        assert_eq!(reg.get("ext1").unwrap().version(), &Version::new(1, 1, 0));
-        assert_eq!(&reg, &reg_ref);
-
-        reg.register(ext2.clone()).unwrap();
+        reg.register(ext2.clone());
         assert_eq!(reg.get("ext2").unwrap().version(), &Version::new(1, 0, 0));
         assert_eq!(reg.len(), 2);
 
-        assert!(reg.remove_extension(&ext_1_id).unwrap().version() == &Version::new(1, 1, 0));
+        assert!(
+            reg.remove_extension(&ext_1_id).unwrap().latest().version() == &Version::new(1, 1, 1)
+        );
         assert_eq!(reg.len(), 1);
     }
 

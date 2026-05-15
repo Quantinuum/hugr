@@ -724,8 +724,8 @@ mod test_fns {
         let other_ty = int_ty.clone();
 
         let mut registry = PRELUDE_REGISTRY.clone();
-        registry.register(int_ops::EXTENSION.clone()).unwrap();
-        registry.register(int_types::EXTENSION.clone()).unwrap();
+        registry.register(int_ops::EXTENSION.clone());
+        registry.register(int_types::EXTENSION.clone());
 
         SimpleHugrConfig::new()
             .with_extensions(registry)
