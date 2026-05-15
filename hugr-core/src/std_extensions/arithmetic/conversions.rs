@@ -21,7 +21,7 @@ mod const_fold;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.conversions");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
 
 /// Extension for conversions between floats and integers.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]

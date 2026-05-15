@@ -49,7 +49,7 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_static_unchecked("collect
 /// Reported unique name of the array type.
 pub const STATIC_ARRAY_TYPENAME: TypeName = TypeName::new_inline("static_array");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, derive_more::From)]
 /// Statically sized array of values, all of the same [`TypeBound::Copyable`]

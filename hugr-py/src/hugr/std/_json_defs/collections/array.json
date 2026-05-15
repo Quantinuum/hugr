@@ -1,5 +1,5 @@
 {
-  "version": "0.1.1",
+  "version": "0.1.2",
   "name": "collections.array",
   "types": {
     "array": {
@@ -43,7 +43,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
-              "extension_version": "0.1.1",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -70,7 +70,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
-              "extension_version": "0.1.1",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -95,7 +95,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
-              "extension_version": "0.1.1",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -142,7 +142,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
-              "extension_version": "0.1.1",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -186,7 +186,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
-              "extension_version": "0.1.1",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -230,7 +230,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
-              "extension_version": "0.1.1",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -274,7 +274,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
-              "extension_version": "0.1.1",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -355,7 +355,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
-              "extension_version": "0.1.1",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -413,7 +413,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
-              "extension_version": "0.1.1",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -472,7 +472,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
-              "extension_version": "0.1.1",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -524,7 +524,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
-              "extension_version": "0.1.1",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -569,7 +569,7 @@
                   {
                     "t": "Opaque",
                     "extension": "collections.array",
-                    "extension_version": "0.1.1",
+                    "extension_version": "0.1.2",
                     "id": "array",
                     "args": [
                       {
@@ -601,7 +601,7 @@
                   {
                     "t": "Opaque",
                     "extension": "collections.array",
-                    "extension_version": "0.1.1",
+                    "extension_version": "0.1.2",
                     "id": "array",
                     "args": [
                       {
@@ -651,7 +651,7 @@
             {
               "t": "Opaque",
               "extension": "collections.array",
-              "extension_version": "0.1.1",
+              "extension_version": "0.1.2",
               "id": "array",
               "args": [
                 {
@@ -689,7 +689,7 @@
                   {
                     "t": "Opaque",
                     "extension": "collections.array",
-                    "extension_version": "0.1.1",
+                    "extension_version": "0.1.2",
                     "id": "array",
                     "args": [
                       {
@@ -716,7 +716,7 @@
                   {
                     "t": "Opaque",
                     "extension": "collections.array",
-                    "extension_version": "0.1.1",
+                    "extension_version": "0.1.2",
                     "id": "array",
                     "args": [
                       {

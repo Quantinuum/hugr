@@ -38,7 +38,7 @@ pub mod generic;
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 2, 1);
+pub const VERSION: semver::Version = semver::Version::new(0, 2, 2);
 /// Prelude extension, containing common types and operations.
 pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
     Extension::new_arc(PRELUDE_ID, VERSION, |prelude, extension_ref| {

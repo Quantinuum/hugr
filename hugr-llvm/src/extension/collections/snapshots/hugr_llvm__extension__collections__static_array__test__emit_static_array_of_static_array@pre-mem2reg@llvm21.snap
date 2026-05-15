@@ -5,17 +5,17 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-@sa.inner.2cf43f09.0 = constant { i64, [0 x i64] } zeroinitializer
-@sa.inner.d75f7617.0 = constant { i64, [1 x i64] } { i64 1, [1 x i64] [i64 1] }
-@sa.inner.21a00cb5.0 = constant { i64, [2 x i64] } { i64 2, [2 x i64] [i64 2, i64 2] }
-@sa.inner.e1666166.0 = constant { i64, [3 x i64] } { i64 3, [3 x i64] [i64 3, i64 3, i64 3] }
-@sa.inner.183a53c6.0 = constant { i64, [4 x i64] } { i64 4, [4 x i64] [i64 4, i64 4, i64 4, i64 4] }
-@sa.inner.1bb57728.0 = constant { i64, [5 x i64] } { i64 5, [5 x i64] [i64 5, i64 5, i64 5, i64 5, i64 5] }
-@sa.inner.f0edf803.0 = constant { i64, [6 x i64] } { i64 6, [6 x i64] [i64 6, i64 6, i64 6, i64 6, i64 6, i64 6] }
-@sa.inner.9c53f6af.0 = constant { i64, [7 x i64] } { i64 7, [7 x i64] [i64 7, i64 7, i64 7, i64 7, i64 7, i64 7, i64 7] }
-@sa.inner.2ac4ef21.0 = constant { i64, [8 x i64] } { i64 8, [8 x i64] [i64 8, i64 8, i64 8, i64 8, i64 8, i64 8, i64 8, i64 8] }
-@sa.inner.18c96803.0 = constant { i64, [9 x i64] } { i64 9, [9 x i64] [i64 9, i64 9, i64 9, i64 9, i64 9, i64 9, i64 9, i64 9, i64 9] }
-@sa.outer.7ae67c9d.0 = constant { i64, [10 x ptr] } { i64 10, [10 x ptr] [ptr @sa.inner.2cf43f09.0, ptr @sa.inner.d75f7617.0, ptr @sa.inner.21a00cb5.0, ptr @sa.inner.e1666166.0, ptr @sa.inner.183a53c6.0, ptr @sa.inner.1bb57728.0, ptr @sa.inner.f0edf803.0, ptr @sa.inner.9c53f6af.0, ptr @sa.inner.2ac4ef21.0, ptr @sa.inner.18c96803.0] }
+@sa.inner.4f55eaf7.0 = constant { i64, [0 x i64] } zeroinitializer
+@sa.inner.2546e132.0 = constant { i64, [1 x i64] } { i64 1, [1 x i64] [i64 1] }
+@sa.inner.1a8162f8.0 = constant { i64, [2 x i64] } { i64 2, [2 x i64] [i64 2, i64 2] }
+@sa.inner.3e38e812.0 = constant { i64, [3 x i64] } { i64 3, [3 x i64] [i64 3, i64 3, i64 3] }
+@sa.inner.7cdb51f8.0 = constant { i64, [4 x i64] } { i64 4, [4 x i64] [i64 4, i64 4, i64 4, i64 4] }
+@sa.inner.da029e6c.0 = constant { i64, [5 x i64] } { i64 5, [5 x i64] [i64 5, i64 5, i64 5, i64 5, i64 5] }
+@sa.inner.21a3310c.0 = constant { i64, [6 x i64] } { i64 6, [6 x i64] [i64 6, i64 6, i64 6, i64 6, i64 6, i64 6] }
+@sa.inner.35772130.0 = constant { i64, [7 x i64] } { i64 7, [7 x i64] [i64 7, i64 7, i64 7, i64 7, i64 7, i64 7, i64 7] }
+@sa.inner.81fd8af.0 = constant { i64, [8 x i64] } { i64 8, [8 x i64] [i64 8, i64 8, i64 8, i64 8, i64 8, i64 8, i64 8, i64 8] }
+@sa.inner.886d734f.0 = constant { i64, [9 x i64] } { i64 9, [9 x i64] [i64 9, i64 9, i64 9, i64 9, i64 9, i64 9, i64 9, i64 9, i64 9] }
+@sa.outer.6762cf65.0 = constant { i64, [10 x ptr] } { i64 10, [10 x ptr] [ptr @sa.inner.4f55eaf7.0, ptr @sa.inner.2546e132.0, ptr @sa.inner.1a8162f8.0, ptr @sa.inner.3e38e812.0, ptr @sa.inner.7cdb51f8.0, ptr @sa.inner.da029e6c.0, ptr @sa.inner.21a3310c.0, ptr @sa.inner.35772130.0, ptr @sa.inner.81fd8af.0, ptr @sa.inner.886d734f.0] }
 
 define internal i64 @_hl.main.1() !dbg !3 {
 alloca_block:
@@ -25,7 +25,7 @@ alloca_block:
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
-  store ptr @sa.outer.7ae67c9d.0, ptr %"5_0", align 8
+  store ptr @sa.outer.6762cf65.0, ptr %"5_0", align 8
   %"5_01" = load ptr, ptr %"5_0", align 8
   %0 = getelementptr inbounds { i64, [0 x ptr] }, ptr %"5_01", i32 0, i32 0, !dbg !8
   %1 = load i64, ptr %0, align 4, !dbg !8
