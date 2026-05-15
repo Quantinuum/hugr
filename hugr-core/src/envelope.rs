@@ -265,7 +265,7 @@ pub(crate) mod test {
         extensions: &'a ExtensionRegistry,
         other: &ExtensionRegistry,
     ) -> Cow<'a, ExtensionRegistry> {
-        if other.iter().all(|e| extensions.contains(e.name())) {
+        if other.iter_all().all(|e| extensions.contains(e.name())) {
             Cow::Borrowed(extensions)
         } else {
             let mut extensions = extensions.clone();

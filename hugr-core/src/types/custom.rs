@@ -170,11 +170,9 @@ impl CustomType {
 
     /// Update the internal extension reference with a new weak pointer.
     pub fn update_extension(&mut self, extension_ref: Weak<Extension>) {
-        if self.extension_version.is_none() {
-            self.extension_version = extension_ref
-                .upgrade()
-                .map(|extension| extension.version().clone());
-        }
+        self.extension_version = extension_ref
+            .upgrade()
+            .map(|extension| extension.version().clone());
         self.extension_ref = extension_ref;
     }
 }

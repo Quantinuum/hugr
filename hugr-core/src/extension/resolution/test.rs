@@ -15,11 +15,12 @@ use crate::extension::prelude::{ConstUsize, bool_t, usize_custom_t, usize_t};
 use crate::extension::resolution::WeakExtensionRegistry;
 use crate::extension::resolution::{resolve_op_extensions, resolve_op_types_extensions};
 use crate::extension::{
-    ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY, TypeDefBound,
+    ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY, TypeDefBound, Version,
 };
 use crate::ops::constant::CustomConst;
 use crate::ops::constant::test::CustomTestValue;
-use crate::ops::{CallIndirect, ExtensionOp, Input, NamedOp, OpType, Tag, Value};
+use crate::ops::dataflow::IOTrait;
+use crate::ops::{CallIndirect, ExtensionOp, Input, NamedOp, OpType, OpaqueOp, Tag, Value};
 use crate::package::Package;
 use crate::std_extensions::arithmetic::conversions::{self, ConvertOpDef};
 use crate::std_extensions::arithmetic::float_types::{self, ConstF64, float64_type};
@@ -28,7 +29,7 @@ use crate::std_extensions::arithmetic::int_types::{self, int_type};
 use crate::std_extensions::collections::list::ListValue;
 use crate::std_extensions::std_reg;
 use crate::types::type_param::TypeParam;
-use crate::types::{PolyFuncType, Signature, Type, TypeBound};
+use crate::types::{CustomType, PolyFuncType, Signature, Term, Type, TypeBound};
 use crate::{Extension, Hugr, HugrView, type_row};
 
 #[rstest]
@@ -71,6 +72,79 @@ fn resolve_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: Ex
         deser_extensions, extensions,
         "{deser_extensions} != {extensions}"
     );
+}
+
+fn make_versioned_extension(id: &ExtensionId, version: Version) -> Arc<Extension> {
+    Extension::new_arc(id.clone(), version, |ext, extension_ref| {
+        ext.add_type(
+            "MyType".into(),
+            vec![],
+            String::new(),
+            TypeDefBound::copyable(),
+            extension_ref,
+        )
+        .unwrap();
+        ext.add_op(
+            "my_op".into(),
+            String::new(),
+            Signature::new_endo([bool_t()]),
+            extension_ref,
+        )
+        .unwrap();
+    })
+}
+
+#[test]
+fn resolve_opaque_op_uses_highest_compatible_extension() {
+    let ext_id = ExtensionId::new_unchecked("versioned_ext");
+    let ext_0_2_5 = make_versioned_extension(&ext_id, Version::new(0, 2, 5));
+    let ext_0_3_0 = make_versioned_extension(&ext_id, Version::new(0, 3, 0));
+    let registry = ExtensionRegistry::new([ext_0_2_5, ext_0_3_0]);
+
+    let mut op: OpType = OpaqueOp::new(
+        ext_id.clone(),
+        Version::new(0, 2, 3),
+        "my_op",
+        [],
+        Signature::new_endo([bool_t()]),
+    )
+    .into();
+
+    let dummy_node = portgraph::NodeIndex::new(0).into();
+    resolve_op_extensions(dummy_node, &mut op, &registry).unwrap();
+
+    let ext_op = op.as_extension_op().unwrap();
+    assert_eq!(ext_op.extension_version(), Version::new(0, 2, 5));
+}
+
+#[test]
+fn resolve_custom_type_uses_highest_compatible_extension() {
+    let ext_id = ExtensionId::new_unchecked("versioned_type_ext");
+    let ext_0_2_5 = make_versioned_extension(&ext_id, Version::new(0, 2, 5));
+    let ext_0_3_0 = make_versioned_extension(&ext_id, Version::new(0, 3, 0));
+    let registry = ExtensionRegistry::new([ext_0_2_5, ext_0_3_0]);
+    let weak_registry = WeakExtensionRegistry::from(&registry);
+    let mut op = OpType::Input(Input::new(vec![Type::new_extension(CustomType::new(
+        "MyType",
+        [],
+        ext_id,
+        Version::new(0, 2, 3),
+        TypeBound::Copyable,
+        &Default::default(),
+    ))]));
+
+    let dummy_node = portgraph::NodeIndex::new(0).into();
+    resolve_op_types_extensions(Some(dummy_node), &mut op, &weak_registry)
+        .unwrap()
+        .for_each(|_| ());
+
+    let OpType::Input(input) = op else {
+        panic!("expected input op");
+    };
+    let Term::ExtensionType(custom) = &*input.types[0] else {
+        panic!("expected custom type");
+    };
+    assert_eq!(custom.extension_version(), Some(&Version::new(0, 2, 5)));
 }
 
 /// Create a new test extension with a single operation.
@@ -128,12 +202,10 @@ fn check_extension_resolution(mut hugr: Hugr) {
     resolution_extensions.extend(&build_extensions);
 
     // Check that the read-only methods collect the same extensions.
-    let collected_exts = ExtensionRegistry::new(hugr.nodes().flat_map(|node| {
-        hugr.get_optype(node)
-            .used_extensions()
-            .unwrap_or_default()
-            .into_iter()
-    }));
+    let mut collected_exts = ExtensionRegistry::default();
+    for node in hugr.nodes() {
+        collected_exts.extend(hugr.get_optype(node).used_extensions().unwrap_or_default());
+    }
     assert_eq!(
         collected_exts, build_extensions,
         "{collected_exts} != {build_extensions}"
@@ -413,7 +485,7 @@ fn resolve_lower_func_extensions() {
 
     // The lower func is stored as a Package so its extension definitions travel with it.
     let mut lower_pkg = Package::from_hugr(lower_hugr);
-    lower_pkg.extensions.register_updated(inner_ext.clone());
+    lower_pkg.extensions.register(inner_ext.clone());
 
     // Create an outer extension whose op has the lower func.
     let inner_ext_name = inner_ext.name().clone();
@@ -438,7 +510,7 @@ fn resolve_lower_func_extensions() {
     // Build a package containing only the outer extension.
     // The inner extension is embedded inside the lower func's Package.
     let mut outer_pkg = Package::default();
-    outer_pkg.extensions.register_updated(outer_ext.clone());
+    outer_pkg.extensions.register(outer_ext.clone());
 
     // Serialize and reload using only the standard extensions as the external registry.
     // The inner extension must be recovered from the embedded lower func package.

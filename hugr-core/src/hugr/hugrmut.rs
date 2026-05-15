@@ -387,7 +387,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// These can be queried using [`HugrView::extensions`].
     ///
-    /// See [`ExtensionRegistry::register_updated`] for more information.
+    /// See [`ExtensionRegistry::register`] for more information.
     fn use_extension(&mut self, extension: impl Into<Arc<Extension>>);
 
     /// Extend the set of extensions used by the hugr with the extensions in the
@@ -398,7 +398,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// These can be queried using [`HugrView::extensions`].
     ///
-    /// See [`ExtensionRegistry::register_updated`] for more information.
+    /// See [`ExtensionRegistry::register`] for more information.
     fn use_extensions<Reg>(&mut self, registry: impl IntoIterator<Item = Reg>)
     where
         ExtensionRegistry: Extend<Reg>;
@@ -737,7 +737,7 @@ impl HugrMut for Hugr {
 
     #[inline]
     fn use_extension(&mut self, extension: impl Into<Arc<Extension>>) {
-        self.extensions_mut().register_updated(extension);
+        self.extensions_mut().register(extension);
     }
 
     #[inline]

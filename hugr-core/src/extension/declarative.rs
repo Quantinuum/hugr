@@ -124,7 +124,7 @@ impl ExtensionSetDeclaration {
 
         // The prelude is auto-imported.
         if !registry.contains(&PRELUDE_ID) {
-            registry.register(PRELUDE.clone())?;
+            registry.register(PRELUDE.clone());
         }
         if !scope.contains(&PRELUDE_ID) {
             scope.insert(PRELUDE_ID);
@@ -138,7 +138,7 @@ impl ExtensionSetDeclaration {
             };
             let ext = decl.make_extension(&self.imports, ctx)?;
             scope.insert(ext.name().clone());
-            registry.register(ext)?;
+            registry.register(ext);
         }
 
         Ok(())
@@ -410,7 +410,7 @@ extensions:
         reg: &'a ExtensionRegistry,
         dependencies: &'a ExtensionRegistry,
     ) -> impl Iterator<Item = &'a Arc<Extension>> {
-        reg.iter()
+        reg.iter_all()
             .filter(move |ext| !dependencies.contains(ext.name()) && ext.name() != &PRELUDE_ID)
     }
 }

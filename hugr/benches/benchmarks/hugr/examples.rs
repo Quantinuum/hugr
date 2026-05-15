@@ -113,7 +113,7 @@ pub static QUANTUM_EXT: LazyLock<Arc<Extension>> = LazyLock::new(|| {
 
 pub static BENCH_EXTENSIONS: LazyLock<ExtensionRegistry> = LazyLock::new(|| {
     let mut reg = STD_REG.clone();
-    reg.register_updated(QUANTUM_EXT.clone());
+    reg.register(QUANTUM_EXT.clone());
     reg
 });
 

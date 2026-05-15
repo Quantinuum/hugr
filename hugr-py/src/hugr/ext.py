@@ -475,15 +475,40 @@ class ExtensionVersions:
         return frozenset(self._exts.keys())
 
     def add(self, extension: Extension) -> None:
-        """Add an extension to the set."""
+        """Add an extension to the set, coalescing compatible older versions."""
         if extension.name != self._id:
             msg = f"Extension {extension.name} has a different name than {self._id}"
             raise ValueError(msg)
+
+        compatible_versions = [
+            version
+            for version in self._exts
+            if _same_compatibility_group(version, extension.version)
+        ]
+        if compatible_versions:
+            latest_compatible = max(compatible_versions)
+            if latest_compatible > extension.version:
+                return
+            for version in compatible_versions:
+                del self._exts[version]
 
         self._exts[extension.version] = extension
 
         if extension.version > self._latest_version:
             self._latest_version = extension.version
+        else:
+            self._latest_version = max(self._exts)
+
+    def get_compatible(self, version: Version) -> Extension:
+        """Get the highest registered extension compatible with ``version``."""
+        compatible = [
+            extension
+            for ext_version, extension in self._exts.items()
+            if _semver_compatible(ext_version, version)
+        ]
+        if not compatible:
+            raise KeyError(version)
+        return max(compatible, key=lambda extension: extension.version)
 
     def __contains__(self, version: Version) -> bool:
         """Check if a version is in the set."""
@@ -575,11 +600,15 @@ class ExtensionRegistry:
             self.versioned_extensions[extension.name].add(extension)
         return self.versioned_extensions[extension.name][extension.version]
 
-    def get_extension(self, name: ExtensionId) -> Extension:
+    def get_extension(
+        self, name: ExtensionId, version: Version | None = None
+    ) -> Extension:
         """Retrieve an extension by name.
 
         Args:
             name: The name of the extension.
+            version: Optional serialized version requirement. If set, the
+                highest compatible registered version is returned.
 
         Returns:
             Extension in the registry.
@@ -588,7 +617,13 @@ class ExtensionRegistry:
             ExtensionNotFound: If the extension is not found in the registry.
         """
         try:
-            return self.versioned_extensions[name].latest
+            versions = self.versioned_extensions[name]
+        except KeyError as e:
+            raise self.ExtensionNotFound(name) from e
+        if version is None:
+            return versions.latest
+        try:
+            return versions.get_compatible(version)
         except KeyError as e:
             raise self.ExtensionNotFound(name) from e
 
@@ -673,3 +708,22 @@ class ExtensionResolutionResult:
                 if new_ext.name not in self.used_extensions:
                     self.used_extensions.register(new_ext)
                     queue.append(new_ext)
+
+
+def _semver_compatible(candidate: Version, requested: Version) -> bool:
+    """Return whether ``candidate`` can satisfy a request for ``requested``."""
+    # python-semver treats all 0.x releases as incompatible unless they are an
+    # exact match. For extension migration we follow caret-style semver
+    # compatibility, where 0.minor.patch releases may update the patch version.
+    if requested.major == 0 and requested.minor > 0:
+        return (
+            candidate >= requested
+            and candidate.major == requested.major
+            and candidate.minor == requested.minor
+        )
+    return requested.is_compatible(candidate)
+
+
+def _same_compatibility_group(left: Version, right: Version) -> bool:
+    """Return whether two versions are in the same semver-compatible group."""
+    return _semver_compatible(left, right) or _semver_compatible(right, left)
