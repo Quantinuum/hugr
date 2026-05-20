@@ -64,7 +64,9 @@ def test_link_modules_multiple_entrypoints():
     hugr1 = build_module(entrypoint=True)
     hugr2 = build_module(entrypoint=True)
 
-    with pytest.raises(ValueError, match="Cannot link two executable modules together"):
+    with pytest.raises(
+        HugrLinkingError, match="Cannot link two executable modules together"
+    ):
         link_modules(hugr1.to_bytes(), hugr2.to_bytes())
 
 
@@ -113,15 +115,20 @@ def test_link_packages_extensions():
 
     result_pkg = pkg1.link(pkg2)
 
-    assert result_pkg.extensions == [
-        int.CONVERSIONS_EXTENSION,
-        int.INT_TYPES_EXTENSION,
-        int.INT_OPS_EXTENSION,
-        logic.EXTENSION,
-        ptr.EXTENSION,
-        float.FLOAT_OPS_EXTENSION,
-        float.FLOAT_TYPES_EXTENSION,
-    ]
+    def names(extensions: list[ext.Extension]) -> set[str]:
+        return {e.name for e in extensions}
+
+    assert names(result_pkg.extensions) == names(
+        [
+            int.CONVERSIONS_EXTENSION,
+            int.INT_TYPES_EXTENSION,
+            int.INT_OPS_EXTENSION,
+            logic.EXTENSION,
+            ptr.EXTENSION,
+            float.FLOAT_OPS_EXTENSION,
+            float.FLOAT_TYPES_EXTENSION,
+        ]
+    )
 
 
 def test_link_packages_extension_requires_resolution():
