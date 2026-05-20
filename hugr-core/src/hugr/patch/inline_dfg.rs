@@ -158,7 +158,7 @@ mod test {
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
     use crate::ops::{OpType, Value};
-    use crate::std_extensions::arithmetic::float_types;
+    use crate::std_extensions::arithmetic::float_types::{self, float64_type};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
     use crate::types::Signature;
@@ -392,5 +392,51 @@ mod test {
             HashSet::from([h_a2.node(), cx.node()])
         );
         Ok(())
+    }
+
+    fn check_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) {
+        let mut visited = HashSet::new();
+        let mut to_visit = vec![src];
+        while let Some(n) = to_visit.pop() {
+            if visited.insert(n) {
+                if n == tgt {
+                    return;
+                }
+                to_visit.extend(h.output_neighbours(n));
+            }
+        }
+        panic!("Node {tgt:?} not reachable from {src:?}");
+    }
+
+    #[test]
+    fn order_edge_chain_broken() {
+        let mut h = DFGBuilder::new(endo_sig(vec![qb_t()])).unwrap();
+        let [q1] = h.input_wires_arr();
+        let qfree = h
+            .add_dataflow_op(test_quantum_extension::q_discard(), [q1])
+            .unwrap();
+        assert_eq!(qfree.num_value_outputs(), 0);
+        let mut inner = h.dfg_builder(inout_sig([], [float64_type()]), []).unwrap();
+        let f = inner.add_load_value(float_types::ConstF64::new(1.0));
+        let inner = inner.finish_with_outputs([f]).unwrap();
+        let [f] = inner.outputs_arr();
+        let qalloc = h
+            .add_dataflow_op(test_quantum_extension::q_alloc(), [])
+            .unwrap();
+        let [q2] = qalloc.outputs_arr();
+        let [q2] = h
+            .add_dataflow_op(test_quantum_extension::rz_f64(), [q2, f])
+            .unwrap()
+            .outputs_arr();
+
+        h.add_other_wire(qfree.node(), inner.node());
+        h.add_other_wire(inner.node(), qalloc.node());
+        let mut h = h.finish_hugr_with_outputs([q2]).unwrap();
+        check_reachable(&h, qfree.node(), qalloc.node());
+
+        h.apply_patch(InlineDFG(*inner.handle())).unwrap();
+        h.validate().unwrap();
+        // This was failing:
+        check_reachable(&h, qfree.node(), qalloc.node());
     }
 }
