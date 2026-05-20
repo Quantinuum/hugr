@@ -55,7 +55,9 @@ ExtensionId = str
 ExtensionSet = list[ExtensionId]
 
 
-def to_semantic_version(version: Version | None) -> SemanticVersion | None:
+def to_semantic_version(
+    version: Version | SemanticVersion | None,
+) -> SemanticVersion | None:
     """Convert an application semver value to the pydantic serialization adapter."""
     if version is None:
         return None

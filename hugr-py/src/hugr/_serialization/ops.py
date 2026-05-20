@@ -6,7 +6,9 @@ from abc import ABC, abstractmethod
 from typing import Any, Literal
 
 from pydantic import ConfigDict, Field, RootModel
-from pydantic_extra_types.semantic_version import SemanticVersion  # noqa: TCH002
+from pydantic_extra_types.semantic_version import (
+    SemanticVersion,  # noqa: TCH002 # Non-typecheck import required for pydantic to parse semantic versions in the ExtensionOp
+)
 
 from hugr import tys
 from hugr.hugr.node_port import (
