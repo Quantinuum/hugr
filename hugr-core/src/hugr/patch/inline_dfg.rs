@@ -78,12 +78,24 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
         for ch in h.children(n).skip(2).collect::<Vec<_>>() {
             h.set_parent(ch, parent);
         }
+        let internal_order_path = is_order_reachable(h, input, output);
         // DFG Inputs. Deal with Order inputs first
         for (src_n, src_p) in h.linked_outputs(n, oth_in).collect::<Vec<_>>() {
             // Order edge from src_n to DFG => add order edge to each successor of Input node
             debug_assert_eq!(Some(src_p), h.get_optype(src_n).other_output_port());
             for tgt_n in h.output_neighbours(input).collect::<Vec<_>>() {
                 h.add_other_edge(src_n, tgt_n);
+            }
+            if !internal_order_path {
+                // Ensure the order chain continues from the DFG's order-predecessors to its order-successors,
+                // even if e.g. the interior of the DFG is disconnected. (Check could be more precise.)
+                for tgt_n in h
+                    .linked_inputs(n, oth_out)
+                    .map(|(n, _)| n)
+                    .collect::<Vec<_>>()
+                {
+                    h.add_other_edge(src_n, tgt_n);
+                }
             }
         }
         // And remaining (Value) inputs
@@ -453,7 +465,8 @@ mod test {
 
         h.apply_patch(InlineDFG(*inner.handle())).unwrap();
         h.validate().unwrap();
-        // This was failing:
+        // These were both failing:
+        check_reachable(&h, qfree.node(), qalloc.node());
         assert!(is_order_reachable(&h, qfree.node(), qalloc.node()));
     }
 }
