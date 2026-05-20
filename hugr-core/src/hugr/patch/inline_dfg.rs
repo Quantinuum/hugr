@@ -347,11 +347,11 @@ mod test {
          *           |  | | .  Cst | NB. Order edge Input to LCst
          *           |  | |  . |   |
          *           |  | |   LCst |
-         *           |  |  \ /     |
-         *           |  |  RZ      |
-         *           |  |  |       |
-         *           |  |  meas    |
-         *           |  |  | \     |
+         *           |  |  \ /  .  |
+         *           |  |  RZ   .  |
+         *           |  |  |    .  |  Order edge LCst to if
+         *           |  |  meas .  |
+         *           |  |  | \  .  |
          *           |  |  |  if   |
          *           |  |  |  .    | NB. Order edge if to Output
          *           |  \--|-------/
@@ -380,6 +380,7 @@ mod test {
         if_n.case_builder(0)?.finish_with_outputs([])?;
         if_n.case_builder(1)?.finish_with_outputs([])?;
         let if_n = if_n.finish_sub_container()?;
+        inner.add_other_wire(f.node(), if_n.node());
         inner.add_other_wire(if_n.node(), inner.output().node());
         let inner = inner.finish_with_outputs([m])?;
         outer.add_other_wire(h_a.node(), inner.node());
