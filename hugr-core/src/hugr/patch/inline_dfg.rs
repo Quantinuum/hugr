@@ -2,6 +2,8 @@
 //! of the DFG except Input+Output into the DFG's parent,
 //! and deleting the DFG along with its Input + Output
 
+use std::collections::HashSet;
+
 use super::{PatchHugrMut, PatchVerification};
 use crate::core::HugrNode;
 use crate::ops::handle::{DfgID, NodeHandle};
@@ -144,6 +146,21 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
     }
 }
 
+fn is_order_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) -> bool {
+    let mut visited = HashSet::new();
+    let mut to_visit = vec![src];
+    while let Some(n) = to_visit.pop() {
+        if visited.insert(n) {
+            if n == tgt {
+                return true;
+            }
+            let order_outport = h.get_optype(n).other_output_port().unwrap();
+            to_visit.extend(h.linked_inputs(n, order_outport).map(|(n, _)| n));
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
@@ -166,7 +183,7 @@ mod test {
     use crate::{Direction, HugrView, Port, type_row};
     use crate::{Hugr, Wire};
 
-    use super::InlineDFG;
+    use super::{InlineDFG, is_order_reachable};
 
     fn find_dfgs<H: HugrView>(h: &H) -> Vec<H::Node> {
         h.entry_descendants()
@@ -432,11 +449,11 @@ mod test {
         h.add_other_wire(qfree.node(), inner.node());
         h.add_other_wire(inner.node(), qalloc.node());
         let mut h = h.finish_hugr_with_outputs([q2]).unwrap();
-        check_reachable(&h, qfree.node(), qalloc.node());
+        assert!(is_order_reachable(&h, qfree.node(), qalloc.node()));
 
         h.apply_patch(InlineDFG(*inner.handle())).unwrap();
         h.validate().unwrap();
         // This was failing:
-        check_reachable(&h, qfree.node(), qalloc.node());
+        assert!(is_order_reachable(&h, qfree.node(), qalloc.node()));
     }
 }
