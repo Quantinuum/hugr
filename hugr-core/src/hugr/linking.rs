@@ -766,7 +766,7 @@ fn check_directives<SRC: HugrView, TN: HugrNode>(
     /// Returns the minimum key in `children` for which `pred` returns true, or
     /// `None` if there is no such key.
     ///
-    /// Helper function to avoid indeterminism in error reporting from iterating
+    /// Helper function to avoid nondeterminism in error reporting from iterating
     /// over `children` (a `HashMap`).
     fn min_directive_key<SN: HugrNode, TN>(
         children: &NodeLinkingDirectives<SN, TN>,
