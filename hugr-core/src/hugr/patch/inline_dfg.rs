@@ -465,7 +465,7 @@ mod test {
 
         h.apply_patch(InlineDFG(*inner.handle())).unwrap();
         h.validate().unwrap();
-        // These were both failing:
+        // These were both failing prior to https://github.com/Quantinuum/hugr/pull/3072
         check_reachable(&h, qfree.node(), qalloc.node());
         assert!(is_order_reachable(&h, qfree.node(), qalloc.node()));
     }
