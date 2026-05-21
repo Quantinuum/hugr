@@ -10,16 +10,16 @@ use pyo3::{create_exception, pymodule};
 enum LinkError {
     #[display("Could not link modules: {_0}")]
     LinkError(String),
-    #[display("Cannot link two executable modules together.")]
-    BothExecutable,
+    #[display("Cannot link two modules with non-root entrypoints together.")]
+    BothNonRootEntrypoint,
 }
 
 fn link(hugr_into: &mut Hugr, hugr_from: Hugr) -> Result<(), LinkError> {
-    let into_executable = hugr_into.entrypoint() != hugr_into.module_root();
-    let from_executable = hugr_from.entrypoint() != hugr_from.module_root();
-    let replacement_entrypoint = if into_executable && from_executable {
-        return Err(LinkError::BothExecutable);
-    } else if !into_executable && from_executable {
+    let into_non_root_entrypoint = hugr_into.entrypoint() != hugr_into.module_root();
+    let from_non_root_entrypoint = hugr_from.entrypoint() != hugr_from.module_root();
+    let replacement_entrypoint = if into_non_root_entrypoint && from_non_root_entrypoint {
+        return Err(LinkError::BothNonRootEntrypoint);
+    } else if !into_non_root_entrypoint && from_non_root_entrypoint {
         Some(hugr_from.entrypoint())
     } else {
         None

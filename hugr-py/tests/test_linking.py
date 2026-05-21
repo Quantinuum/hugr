@@ -65,7 +65,8 @@ def test_link_modules_multiple_entrypoints():
     hugr2 = build_module(entrypoint=True)
 
     with pytest.raises(
-        HugrLinkingError, match="Cannot link two executable modules together"
+        HugrLinkingError,
+        match="Cannot link two modules with non-root entrypoints together",
     ):
         link_modules(hugr1.to_bytes(), hugr2.to_bytes())
 
