@@ -37,18 +37,19 @@ __all__ = [
 ]
 
 
-def link_packages(packages: list[bytes]) -> bytes:
+def link_packages(*packages: bytes) -> bytes:
     """Link all packages, returning a new package containing the extensions of all
     packages, as well as a single module created from linking the modules from all
     packages.
 
     Args:
-        packages: The packages to link, serialised as bytes.
+        *packages: The packages to link, serialised as bytes.
 
     Returns:
         A new package containing the modules and extensions of all packages.
     """
-    return link_packages_binding(packages)
+    pkg = list(packages)
+    return link_packages_binding(pkg)
 
 
 @dataclass(frozen=True)
@@ -248,7 +249,7 @@ class Package:
             A new package containing the modules and extensions of all packages.
         """
         return Package.from_bytes(
-            link_packages([pkg.to_bytes() for pkg in (self, *other)])
+            link_packages(*[pkg.to_bytes() for pkg in (self, *other)])
         )
 
 

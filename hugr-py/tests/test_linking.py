@@ -4,7 +4,7 @@ from hugr import Hugr, ext, tys
 from hugr._hugr.linking import HugrLinkingError, link_modules
 from hugr.build import Module
 from hugr.ops import FuncDefn
-from hugr.package import Package
+from hugr.package import Package, link_packages
 from hugr.std import float, int, logic, ptr
 
 
@@ -80,6 +80,48 @@ def test_link_modules_linking_error():
         match=r"Source \(Node\([0-9]+\)\) and target \(Node\([0-9]+\)\) both contained FuncDefn with same public name public_func",  # noqa: E501
     ):
         link_modules(hugr1.to_bytes(), hugr2.to_bytes())
+
+
+def test_link_package_bytes_no_entrypoints():
+    pkg1 = Package(modules=[build_module(entrypoint=False)])
+    pkg2 = Package(modules=[build_module(entrypoint=False)])
+
+    result_pkg = Package.from_bytes(link_packages(pkg1.to_bytes(), pkg2.to_bytes()))
+
+    assert len(result_pkg.modules) == 1
+    assert result_pkg.modules[0].entrypoint == result_pkg.modules[0].module_root
+
+
+def test_link_package_bytes_entrypoint():
+    pkg1 = Package(
+        modules=[build_module(entrypoint=False), build_module(entrypoint=True)]
+    )
+    pkg2 = Package(
+        modules=[build_module(entrypoint=False), build_module(entrypoint=False)]
+    )
+
+    result_pkg = Package.from_bytes(link_packages(pkg1.to_bytes(), pkg2.to_bytes()))
+    assert len(result_pkg.modules) == 1
+    linked = result_pkg.modules[0]
+    assert linked.entrypoint != linked.module_root
+    entrypoint = linked.entrypoint_op()
+    assert isinstance(entrypoint, FuncDefn)
+    assert entrypoint.f_name == "main"
+
+
+def test_link_package_bytes_multiple_entrypoints():
+    pkg1 = Package(
+        modules=[build_module(entrypoint=False), build_module(entrypoint=True)]
+    )
+    pkg2 = Package(
+        modules=[build_module(entrypoint=True), build_module(entrypoint=False)]
+    )
+
+    with pytest.raises(
+        HugrLinkingError,
+        match="Could not link module 2: Cannot link two modules with non-root entrypoints together",  # noqa: E501
+    ):
+        link_packages(pkg1.to_bytes(), pkg2.to_bytes())
 
 
 def test_link_packages_no_modules():

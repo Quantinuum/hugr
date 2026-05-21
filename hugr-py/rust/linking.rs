@@ -117,7 +117,7 @@ pub mod linking {
         if let Some(mut first_module) = modules.next() {
             for (i, next_module) in modules.enumerate() {
                 super::link(&mut first_module, next_module).map_err(|err| {
-                    HugrLinkingError::new_err(format!("Could not link module {i}: {err}"))
+                    HugrLinkingError::new_err(format!("Could not link module {}: {err}", i + 1))
                 })?;
             }
             result_pkg.modules.push(first_module);
