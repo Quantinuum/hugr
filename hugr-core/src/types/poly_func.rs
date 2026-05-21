@@ -160,6 +160,7 @@ pub(crate) mod test {
     use std::sync::Arc;
 
     use cool_asserts::assert_matches;
+    use semver::Version;
 
     use crate::Extension;
     use crate::extension::prelude::{bool_t, usize_t};
@@ -276,6 +277,7 @@ pub(crate) mod test {
             "array",
             [ty_var, size_var],
             array::EXTENSION_ID,
+            array::VERSION,
             TypeBound::Linear,
             &Arc::downgrade(&array::EXTENSION),
         ));
@@ -348,6 +350,7 @@ pub(crate) mod test {
                     TYPE_NAME,
                     [TypeArg::new_var_use(0, tp)],
                     EXT_ID,
+                    Version::new(0, 1, 0),
                     TypeBound::Linear,
                     &Arc::downgrade(&ext),
                 ))]),

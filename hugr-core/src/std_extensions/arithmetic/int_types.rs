@@ -33,6 +33,7 @@ pub fn int_custom_type(
         INT_TYPE_ID,
         [width_arg.into()],
         EXTENSION_ID,
+        VERSION,
         TypeBound::Copyable,
         extension_ref,
     )

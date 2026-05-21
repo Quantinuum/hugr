@@ -137,6 +137,9 @@ pub(super) fn resolve_typedef_exts(
 ) -> Result<(), ExtensionResolutionError> {
     match extensions.get(def.extension_id()) {
         Some(ext) => {
+            if let Some(extension) = ext.upgrade() {
+                def.fill_extension_version(extension.version());
+            }
             *def.extension_mut() = ext.clone();
         }
         None => {
@@ -163,6 +166,9 @@ pub(super) fn resolve_opdef_exts(
 ) -> Result<(), ExtensionResolutionError> {
     match extensions.get(def.extension_id()) {
         Some(ext) => {
+            if let Some(extension) = ext.upgrade() {
+                def.fill_extension_version(extension.version());
+            }
             *def.extension_mut() = ext.clone();
         }
         None => {

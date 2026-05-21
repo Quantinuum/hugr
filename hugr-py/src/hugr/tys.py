@@ -21,6 +21,8 @@ from hugr.utils import (
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
+    from semver import Version
+
     from hugr import ext
     from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
 
@@ -974,6 +976,7 @@ class ExtType(Type):
 
         return Opaque(
             extension=self.type_def._extension.name,
+            extension_version=self.type_def._extension.version,
             id=self.type_def.name,
             args=self.args,
             bound=self.type_bound(),
@@ -1015,10 +1018,12 @@ class Opaque(Type):
     bound: TypeBound
     args: list[TypeArg] = field(default_factory=list)
     extension: ExtensionId = ""
+    extension_version: Version | None = None
 
     def _to_serial(self) -> stys.Opaque:
         return stys.Opaque(
             extension=self.extension,
+            extension_version=stys.to_semantic_version(self.extension_version),
             id=self.id,
             args=[arg._to_serial_root() for arg in self.args],
             bound=self.bound,
@@ -1060,7 +1065,13 @@ class Opaque(Type):
             new_args.append(resolved_arg)
             result.extend(arg_result)
 
-        new_type = Opaque(self.id, self.bound, new_args, self.extension)
+        new_type = Opaque(
+            self.id,
+            self.bound,
+            new_args,
+            self.extension,
+            self.extension_version,
+        )
 
         result.unresolved_extensions.add(self.extension)
         if (self.extension, self.id) not in result.unresolved_types:

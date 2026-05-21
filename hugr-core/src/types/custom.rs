@@ -5,7 +5,7 @@ use std::fmt::{self, Display};
 use std::sync::{Arc, Weak};
 
 use crate::Extension;
-use crate::extension::{ExtensionId, SignatureError, TypeDef};
+use crate::extension::{ExtensionId, SignatureError, TypeDef, Version};
 
 use super::{
     Substitution, Type, TypeBound, TypeName,
@@ -17,6 +17,12 @@ use super::{
 pub struct CustomType {
     /// The identifier for the extension owning this type.
     extension: ExtensionId,
+    /// Version of the extension that defines this type.
+    ///
+    /// This may be unset for backwards compatibility when loading older Hugrs.
+    /// In the future we may remove the option and require the version to always be set.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    extension_version: Option<Version>,
     /// A weak reference to the extension defining this type.
     #[serde(skip)]
     extension_ref: Weak<Extension>,
@@ -34,6 +40,7 @@ pub struct CustomType {
 impl std::hash::Hash for CustomType {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         self.extension.hash(state);
+        self.extension_version.hash(state);
         self.id.hash(state);
         self.args.hash(state);
         self.bound.hash(state);
@@ -43,6 +50,7 @@ impl std::hash::Hash for CustomType {
 impl PartialEq for CustomType {
     fn eq(&self, other: &Self) -> bool {
         self.extension == other.extension
+            && self.extension_version == other.extension_version
             && self.id == other.id
             && self.args == other.args
             && self.bound == other.bound
@@ -57,6 +65,7 @@ impl CustomType {
         id: impl Into<TypeName>,
         args: impl Into<Vec<TypeArg>>,
         extension: ExtensionId,
+        extension_version: Version,
         bound: TypeBound,
         extension_ref: &Weak<Extension>,
     ) -> Self {
@@ -64,6 +73,7 @@ impl CustomType {
             id: id.into(),
             args: args.into(),
             extension,
+            extension_version: Some(extension_version),
             bound,
             extension_ref: extension_ref.clone(),
         }
@@ -146,6 +156,12 @@ impl CustomType {
         &self.extension
     }
 
+    /// Parent extension version, if it was known when this type was serialized.
+    #[must_use]
+    pub fn extension_version(&self) -> Option<&Version> {
+        self.extension_version.as_ref()
+    }
+
     /// Returns a weak reference to the extension defining this type.
     #[must_use]
     pub fn extension_ref(&self) -> Weak<Extension> {
@@ -154,6 +170,11 @@ impl CustomType {
 
     /// Update the internal extension reference with a new weak pointer.
     pub fn update_extension(&mut self, extension_ref: Weak<Extension>) {
+        if self.extension_version.is_none() {
+            self.extension_version = extension_ref
+                .upgrade()
+                .map(|extension| extension.version().clone());
+        }
         self.extension_ref = extension_ref;
     }
 }
@@ -178,6 +199,24 @@ impl From<CustomType> for Type {
 
 #[cfg(test)]
 mod test {
+    use std::sync::Arc;
+
+    use crate::std_extensions::arithmetic::int_types::{EXTENSION, VERSION, int_custom_type};
+
+    use super::*;
+
+    #[test]
+    fn custom_type_serializes_optional_extension_version() {
+        let ty = int_custom_type(4, &Arc::downgrade(&EXTENSION));
+        assert_eq!(ty.extension_version(), Some(&VERSION));
+        let value = serde_json::to_value(&ty).unwrap();
+        assert_eq!(
+            value.get("extension_version").and_then(|v| v.as_str()),
+            Some("0.1.0")
+        );
+        let decoded: CustomType = serde_json::from_value(value).unwrap();
+        assert_eq!(decoded.extension_version(), Some(&VERSION));
+    }
 
     pub mod proptest {
         use std::sync::Weak;
@@ -189,6 +228,7 @@ mod test {
         use crate::types::{CustomType, TypeBound};
         use ::proptest::collection::vec;
         use ::proptest::prelude::*;
+        use semver::Version;
 
         #[derive(Default)]
         pub struct CustomTypeArbitraryParameters(RecursionDepth, Option<TypeBound>);
@@ -223,9 +263,16 @@ mod test {
                     // a TypeArg may contain a CustomType, so we descend here
                     vec(any_serde_type_arg(depth.descend()), 0..3).boxed()
                 };
-                (any_nonempty_string(), args, any::<ExtensionId>(), bound)
-                    .prop_map(|(id, args, extension, bound)| {
-                        Self::new(id, args, extension, bound, &Weak::default())
+                (
+                    any_nonempty_string(),
+                    args,
+                    any::<ExtensionId>(),
+                    any::<(u64, u64, u64)>(),
+                    bound,
+                )
+                    .prop_map(|(id, args, extension, ext_version, bound)| {
+                        let ext_version = Version::new(ext_version.0, ext_version.1, ext_version.2);
+                        Self::new(id, args, extension, ext_version, bound, &Weak::default())
                     })
                     .boxed()
             }

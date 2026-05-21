@@ -1,5 +1,5 @@
 {
-  "version": "0.1.0",
+  "version": "0.1.1",
   "name": "collections.list",
   "types": {
     "List": {
@@ -37,6 +37,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
+              "extension_version": "0.1.1",
               "id": "List",
               "args": [
                 {
@@ -90,6 +91,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
+              "extension_version": "0.1.1",
               "id": "List",
               "args": [
                 {
@@ -116,6 +118,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
+              "extension_version": "0.1.1",
               "id": "List",
               "args": [
                 {
@@ -170,6 +173,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
+              "extension_version": "0.1.1",
               "id": "List",
               "args": [
                 {
@@ -188,6 +192,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
+              "extension_version": "0.1.1",
               "id": "List",
               "args": [
                 {
@@ -225,6 +230,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
+              "extension_version": "0.1.1",
               "id": "List",
               "args": [
                 {
@@ -243,6 +249,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
+              "extension_version": "0.1.1",
               "id": "List",
               "args": [
                 {
@@ -291,6 +298,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
+              "extension_version": "0.1.1",
               "id": "List",
               "args": [
                 {
@@ -314,6 +322,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
+              "extension_version": "0.1.1",
               "id": "List",
               "args": [
                 {
@@ -348,6 +357,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
+              "extension_version": "0.1.1",
               "id": "List",
               "args": [
                 {
@@ -374,6 +384,7 @@
             {
               "t": "Opaque",
               "extension": "collections.list",
+              "extension_version": "0.1.1",
               "id": "List",
               "args": [
                 {

@@ -603,6 +603,8 @@ pub(crate) mod test {
     use std::hash::{Hash, Hasher};
     use std::sync::Weak;
 
+    use semver::Version;
+
     use super::*;
     use crate::extension::TypeDefBound;
     use crate::extension::prelude::{option_type, qb_t, usize_t};
@@ -620,6 +622,7 @@ pub(crate) mod test {
                 "my_custom",
                 [],
                 "my_extension".try_into().unwrap(),
+                Version::new(0, 1, 0),
                 TypeBound::Copyable,
                 // Dummy extension reference.
                 &Weak::default(),

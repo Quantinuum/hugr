@@ -17,12 +17,15 @@ from typing import (
 from typing_extensions import Self
 
 import hugr._serialization.ops as sops
+import hugr._serialization.tys as stys
 from hugr import tys, val
 from hugr.hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
 from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 
 if TYPE_CHECKING:
     from collections.abc import Sequence
+
+    from semver import Version
 
     from hugr import ext
     from hugr._serialization.ops import BaseOp
@@ -464,11 +467,13 @@ class Custom(DataflowOp):
     signature: tys.FunctionType = field(default_factory=tys.FunctionType.empty)
     extension: tys.ExtensionId = ""
     args: list[tys.TypeArg] = field(default_factory=list)
+    extension_version: Version | None = None
 
     def _to_serial(self, parent: Node) -> sops.ExtensionOp:
         return sops.ExtensionOp(
             parent=parent.idx,
             extension=self.extension,
+            extension_version=stys.to_semantic_version(self.extension_version),
             name=self.op_name,
             signature=self.signature._to_serial(),
             args=ser_it(self.args),
@@ -527,7 +532,13 @@ class Custom(DataflowOp):
             new_args.append(resolved_arg)
             result.extend(arg_result)
 
-        new_op = Custom(self.op_name, signature, self.extension, new_args)
+        new_op = Custom(
+            self.op_name,
+            signature,
+            self.extension,
+            new_args,
+            self.extension_version,
+        )
 
         result.unresolved_extensions.add(self.extension)
         if (self.extension, self.op_name) not in result.unresolved_ops:
@@ -562,6 +573,7 @@ class ExtOp(AsExtOp):
             op_name=self._op_def.name,
             signature=sig,
             extension=ext.name if ext else "",
+            extension_version=ext.version if ext else None,
             args=self.args,
         )
 
