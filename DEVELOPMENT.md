@@ -187,7 +187,7 @@ Here is a list of common problems found during development, and how to solve the
 
 - `ImportError: cannot import name 'metadata' from 'hugr._hugr' (.../hugr/_hugr.abi3.so)` when running python tests.
 
-  The rust bindings need to be recompiled. Run `uv run maturin develop` to recompile them manually or use `just test-python` instead of `pytest` to do it automatically.
+  The Rust bindings need to be recompiled. Run `uv run maturin develop` to recompile them manually or use `just test-python` instead of `pytest` to do it automatically.
 
 - `ValueError: Missing 'project' metadata table in configuration` when running `maturin develop`.
 
