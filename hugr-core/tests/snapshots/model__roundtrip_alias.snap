@@ -6,11 +6,11 @@ expression: ast
 
 (mod)
 
-(import core.type)
-
 (import core.fn)
 
-(import arithmetic.int.types.int)
+(import core.type)
+
+(import arithmetic.int.types.int@0.1.0)
 
 (declare-alias local.float core.type)
 

@@ -126,10 +126,24 @@ class Package:
 
         if extensions is None:
             extensions = []
+        registry = ExtensionRegistry.from_extensions(extensions)
+        if resolve_from is not None:
+            registry.extend(resolve_from)
+
         pkg = Package([Hugr.from_model(hugr) for hugr in package.modules], extensions)
 
-        # Resolve extensions in the modules and inside the bundled extension definitions
-        pkg.resolve_extensions(resolve_from or ExtensionRegistry())
+        # Resolve extensions in the modules and inside the bundled extension
+        # definitions.
+        #
+        # TODO: Remove the None compatibility path once encoded HUGRs without
+        # extension version information are no longer supported.
+        # <http://github.com/Quantinuum/hugr/issues/???>
+        #
+        # If model import leaves a custom op/type version as None, this registry
+        # pass selects the latest registered extension version. That is only a
+        # compatibility path for old model encodings that omitted extension
+        # versions.
+        pkg.resolve_extensions(registry)
 
         return pkg
 

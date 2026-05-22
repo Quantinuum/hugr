@@ -4,7 +4,8 @@ use rustc_hash::FxHashMap;
 use thiserror::Error;
 
 use super::{
-    LinkName, Module, Node, Operation, Param, Region, SeqPart, Symbol, SymbolName, Term, VarName,
+    LinkName, Module, Node, Operation, Param, Region, SeqPart, Symbol, SymbolIdent, SymbolName,
+    Term, VarName,
 };
 use crate::v0::{RegionKind, ScopeClosure, table};
 use crate::v0::{
@@ -18,11 +19,20 @@ pub struct Context<'a> {
     vars: VarTable<'a>,
     links: LinkTable<&'a str>,
     symbols: SymbolTable<'a>,
-    imports: FxHashMap<SymbolName, NodeId>,
+    imports: FxHashMap<SymbolIdent, NodeId>,
     terms: FxHashMap<table::Term<'a>, TermId>,
 }
 
 impl<'a> Context<'a> {
+    /// Create an empty resolver context backed by `bump`.
+    ///
+    /// The context records explicit symbol versions from imports and
+    /// declarations. It does not fill missing versions from any external
+    /// registry; unresolved legacy versions remain `None` in the table model.
+    ///
+    /// TODO: Remove the `None` compatibility path once encoded HUGRs without
+    /// extension version information are no longer supported.
+    /// <http://github.com/Quantinuum/hugr/issues/???>
     pub fn new(bump: &'a Bump) -> Self {
         Self {
             module: table::Module::default(),
@@ -78,8 +88,8 @@ impl<'a> Context<'a> {
         let term = match term {
             Term::Wildcard => table::Term::Wildcard,
             Term::Var(var_name) => table::Term::Var(self.resolve_var(var_name)?),
-            Term::Apply(symbol_name, terms) => {
-                let symbol_id = self.resolve_symbol_name(symbol_name);
+            Term::Apply(symbol_ident, terms) => {
+                let symbol_id = self.resolve_symbol_ident(symbol_ident);
                 let terms = self.resolve_terms(terms)?;
                 table::Term::Apply(symbol_id, terms)
             }
@@ -123,10 +133,15 @@ impl<'a> Context<'a> {
         // so that the symbol is visible in the current region regardless of the
         // order of the nodes.
         for (id, node) in zip_eq(ids, nodes) {
-            if let Some(symbol_name) = node.operation.symbol_name() {
-                self.symbols
-                    .insert(symbol_name.as_ref(), *id)
-                    .map_err(|_| ResolveError::DuplicateSymbol(symbol_name.clone()))?;
+            if let Some((symbol_name, version)) = node.operation.symbol_binding() {
+                match &node.operation {
+                    Operation::Import(_) => {
+                        self.symbols
+                            .insert_import(symbol_name.as_ref(), version, *id)
+                    }
+                    _ => self.symbols.insert(symbol_name.as_ref(), version, *id),
+                }
+                .map_err(|_| ResolveError::DuplicateSymbol(symbol_name.clone()))?;
             }
         }
 
@@ -182,8 +197,9 @@ impl<'a> Context<'a> {
                 let symbol = self.resolve_symbol(symbol)?;
                 table::Operation::DeclareOperation(symbol)
             }
-            Operation::Import(symbol_name) => table::Operation::Import {
-                name: symbol_name.as_ref(),
+            Operation::Import(symbol_ident) => table::Operation::Import {
+                name: symbol_ident.name.as_ref(),
+                version: &symbol_ident.version,
             },
             Operation::Custom(term) => {
                 let term = self.resolve_term(term)?;
@@ -297,6 +313,7 @@ impl<'a> Context<'a> {
         Ok(self.bump.alloc(table::Symbol {
             visibility,
             name,
+            version: &symbol.version,
             params,
             constraints,
             signature,
@@ -336,21 +353,35 @@ impl<'a> Context<'a> {
             .map_err(|_| ResolveError::UnknownVar(var_name.clone()))
     }
 
-    /// Resolves a symbol name and returns the node that introduces the symbol.
+    /// Resolves a symbol identifier and returns the node that introduces it.
+    ///
+    /// Versioned references resolve exactly. Unversioned references first use
+    /// any unversioned binding, then the latest visible versioned binding.
+    /// If no binding exists, the implicitly created import preserves the
+    /// reference version as written, including `None` for legacy unversioned
+    /// references.
+    ///
+    /// TODO: Remove the legacy unversioned fallback once encoded HUGRs without
+    /// extension version information are no longer supported.
+    /// <http://github.com/Quantinuum/hugr/issues/???>
     ///
     /// When there is no symbol with this name in scope, we create a new import
     /// node in the module and record that the symbol has been implicitly
     /// imported. At the end of the building process, these import nodes are
     /// inserted into the module's scope.
-    fn resolve_symbol_name(&mut self, symbol_name: &'a SymbolName) -> NodeId {
-        if let Ok(node) = self.symbols.resolve(symbol_name.as_ref()) {
+    fn resolve_symbol_ident(&mut self, symbol_ident: &'a SymbolIdent) -> NodeId {
+        if let Ok(node) = self
+            .symbols
+            .resolve(symbol_ident.name.as_ref(), symbol_ident.version.as_ref())
+        {
             return node;
         }
 
-        *self.imports.entry(symbol_name.clone()).or_insert_with(|| {
+        *self.imports.entry(symbol_ident.clone()).or_insert_with(|| {
             self.module.insert_node(table::Node {
                 operation: table::Operation::Import {
-                    name: symbol_name.as_ref(),
+                    name: symbol_ident.name.as_ref(),
+                    version: &symbol_ident.version,
                 },
                 ..Default::default()
             })
@@ -394,15 +425,146 @@ fn try_alloc_slice<T, E>(
 
 #[cfg(test)]
 mod test {
-    use crate::v0::ast;
+    use crate::v0::{ast, table};
     use bumpalo::Bump;
+    use rstest::rstest;
     use std::str::FromStr as _;
 
-    #[test]
-    fn vars_in_root_scope() {
+    #[derive(Debug, Clone, Copy)]
+    enum SymbolUse {
+        Custom,
+        Meta(usize),
+    }
+
+    #[rstest]
+    fn root_var_errors() {
         let text = "(hugr 0) (mod) (meta ?x)";
-        let ast = ast::Package::from_str(text).unwrap();
+        let ast = ast::Package::from_str(text.trim()).unwrap();
+        assert!(ast.resolve(&Bump::new()).is_err());
+    }
+
+    /// Unversioned extension uses resolve to declarations in scope.
+    #[rstest]
+    #[case::operation(
+        "
+            (hugr 0)
+            (mod)
+            (import someOp@0.2.3)
+            (someOp)
+            (declare-operation someOp@0.3.0 (core.fn [] []))
+        ",
+        SymbolUse::Custom,
+        "someOp",
+        Some("0.3.0")
+    )]
+    #[case::type_term(
+        "
+            (hugr 0)
+            (mod)
+            (meta someType)
+            (import someType@0.2.3)
+        ",
+        SymbolUse::Meta(0),
+        "someType",
+        Some("0.2.3")
+    )]
+    #[case::type_latest(
+        "
+            (hugr 0)
+            (mod)
+            (meta someType)
+            (import someType@0.2.3)
+            (import someType@0.3.0)
+        ",
+        SymbolUse::Meta(0),
+        "someType",
+        Some("0.3.0")
+    )]
+    #[case::unversioned_import(
+        "
+            (hugr 0)
+            (mod)
+            (meta someType)
+            (import someType)
+        ",
+        SymbolUse::Meta(0),
+        "someType",
+        None
+    )]
+    #[case::unversioned_operation(
+        "
+            (hugr 0)
+            (mod)
+            (someOp)
+            (declare-operation someOp (core.fn [] []))
+        ",
+        SymbolUse::Custom,
+        "someOp",
+        None
+    )]
+    fn unversioned_resolution(
+        #[case] text: &str,
+        #[case] symbol_use: SymbolUse,
+        #[case] expected_name: &str,
+        #[case] expected_version: Option<&str>,
+    ) {
         let bump = Bump::new();
-        assert!(ast.resolve(&bump).is_err());
+        let ast = ast::Package::from_str(text.trim()).unwrap();
+        let package = ast.resolve(&bump).unwrap();
+        let module = &package.modules[0];
+
+        assert_symbol_use(module, symbol_use, expected_name, expected_version);
+    }
+
+    fn assert_symbol_use(
+        module: &table::Module<'_>,
+        symbol_use: SymbolUse,
+        expected_name: &str,
+        expected_version: Option<&str>,
+    ) {
+        let term = match symbol_use {
+            SymbolUse::Custom => custom_term(module),
+            SymbolUse::Meta(index) => module.get_region(module.root).unwrap().meta[index],
+        };
+
+        assert_symbol_application(module, term, expected_name, expected_version);
+    }
+
+    fn custom_term(module: &table::Module<'_>) -> table::TermId {
+        let root = module.get_region(module.root).unwrap();
+        root.children
+            .iter()
+            .find_map(|node_id| {
+                let node = module.get_node(*node_id).unwrap();
+                match node.operation {
+                    table::Operation::Custom(term) => Some(term),
+                    _ => None,
+                }
+            })
+            .expect("expected a custom operation node")
+    }
+
+    fn assert_symbol_application(
+        module: &table::Module<'_>,
+        term: table::TermId,
+        expected_name: &str,
+        expected_version: Option<&str>,
+    ) {
+        let table::Term::Apply(symbol, args) = module.get_term(term).unwrap() else {
+            panic!("expected term to be a symbol application");
+        };
+        assert!(args.is_empty());
+
+        let node = module.get_node(*symbol).unwrap();
+        let name = node.operation.symbol().expect("expected symbol node");
+        let version = node
+            .operation
+            .symbol_version()
+            .expect("expected symbol version");
+        assert_eq!(name, expected_name);
+        assert_eq!(
+            version.as_ref().map(ToString::to_string).as_deref(),
+            expected_version
+        );
     }
 }

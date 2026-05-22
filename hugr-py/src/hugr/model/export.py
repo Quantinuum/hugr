@@ -91,7 +91,9 @@ class ModelExport:
                 )
 
             case Custom() as op:
-                name = f"{op.extension}.{op.op_name}"
+                name = _versioned_symbol(
+                    f"{op.extension}.{op.op_name}", op.extension_version
+                )
                 args = cast(list[model.Term], [arg.to_model() for arg in op.args])
                 signature = op.signature.to_model()
 
@@ -104,7 +106,10 @@ class ModelExport:
                 )
 
             case AsExtOp() as op:
-                name = op.op_def().qualified_name()
+                op_def = op.op_def()
+                name = _versioned_symbol(
+                    op_def.qualified_name(), op_def.get_extension().version
+                )
                 args = cast(
                     list[model.Term], [arg.to_model() for arg in op.type_args()]
                 )
@@ -650,6 +655,13 @@ def _mangle_name(node: Node, name: str, visibility: Visibility) -> str:
         case _:
             error = f"Unexpected visibility {visibility}"
             raise ValueError(error)
+
+
+def _versioned_symbol(name: str, version: object | None) -> str:
+    """Return a model symbol name with its extension version suffix when known."""
+    if version is None:
+        return name
+    return f"{name}@{version}"
 
 
 T = TypeVar("T")

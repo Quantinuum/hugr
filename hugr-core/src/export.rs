@@ -24,9 +24,12 @@ use hugr_model::v0::{
     bumpalo::{Bump, collections::String as BumpString, collections::Vec as BumpVec},
     table,
 };
+use itertools::Itertools;
 use petgraph::unionfind::UnionFind;
 use rustc_hash::{FxBuildHasher, FxHashMap};
+use semver::Version;
 use smol_str::ToSmolStr;
+use std::collections::hash_map::Entry;
 use std::fmt::Write;
 
 /// Exports a deconstructed `Package` to its representation in the model.
@@ -75,7 +78,7 @@ struct Context<'a> {
     local_constraints: Vec<table::TermId>,
 
     /// Mapping from extension operations to their declarations.
-    decl_operations: FxHashMap<(ExtensionId, OpName), table::NodeId>,
+    decl_operations: FxHashMap<(ExtensionId, OpName, semver::Version), table::NodeId>,
 
     /// Auxiliary structure for tracking the links between ports.
     links: Links,
@@ -84,7 +87,14 @@ struct Context<'a> {
     symbols: model::scope::SymbolTable<'a>,
 
     /// Mapping from implicit imports to their node ids.
+    ///
+    /// These symbol exclude extension op and type imports. See `extension_exports` for those.
     implicit_imports: FxHashMap<&'a str, table::NodeId>,
+
+    /// Mapping from extension symbol exports (op and type qualified names, e.g. `arithmetic.float.const_f64`) to their node ids.
+    ///
+    /// The key is a tuple of the qualified symbol name and the extension version that defines it.
+    extension_exports: FxHashMap<(&'a str, semver::Version), table::NodeId>,
 
     /// Map from node ids in the [`Hugr`] to the corresponding node ids in the model.
     node_to_id: FxHashMap<Node, table::NodeId>,
@@ -96,6 +106,7 @@ struct Context<'a> {
 }
 
 const NO_VIS: Option<model::Visibility> = None;
+const NO_VERSION: Option<semver::Version> = None;
 
 impl<'a> Context<'a> {
     pub fn new(hugr: &'a Hugr, bump: &'a Bump) -> Self {
@@ -114,6 +125,7 @@ impl<'a> Context<'a> {
             local_constraints: Vec::new(),
             symbols: model::scope::SymbolTable::default(),
             implicit_imports: FxHashMap::default(),
+            extension_exports: FxHashMap::default(),
             node_to_id: FxHashMap::default(),
             id_to_node: FxHashMap::default(),
         }
@@ -139,12 +151,16 @@ impl<'a> Context<'a> {
         }
 
         let mut all_children = BumpVec::with_capacity_in(
-            children.len() + self.decl_operations.len() + self.implicit_imports.len(),
+            children.len()
+                + self.decl_operations.len()
+                + self.implicit_imports.len()
+                + self.extension_exports.len(),
             self.bump,
         );
 
-        all_children.extend(self.implicit_imports.drain().map(|(_, id)| id));
-        all_children.extend(self.decl_operations.values().copied());
+        all_children.extend(self.implicit_imports.drain().sorted().map(|(_, id)| id));
+        all_children.extend(self.extension_exports.drain().sorted().map(|(_, id)| id));
+        all_children.extend(self.decl_operations.values().sorted().copied());
         all_children.extend(children);
 
         let mut meta = Vec::new();
@@ -212,13 +228,15 @@ impl<'a> Context<'a> {
         output.into_bump_str()
     }
 
-    pub fn make_named_global_ref(
+    /// Create or resolve a global reference to a symbol introduced by an extension.
+    pub fn make_global_extension_symbol_ref(
         &mut self,
         extension: &IdentList,
         name: impl AsRef<str>,
+        version: semver::Version,
     ) -> table::NodeId {
         let symbol = self.make_qualified_name(extension, name);
-        self.resolve_symbol(symbol)
+        self.resolve_versioned_symbol(symbol, version)
     }
 
     /// Get the node that declares or defines the function associated with the given
@@ -274,7 +292,7 @@ impl<'a> Context<'a> {
 
         if let Some(symbol) = symbol {
             self.symbols
-                .insert(symbol, node_id)
+                .insert(symbol, None, node_id)
                 .expect("duplicate symbol");
         }
 
@@ -374,6 +392,7 @@ impl<'a> Context<'a> {
                 let symbol = this.bump.alloc(table::Symbol {
                     visibility: &NO_VIS, // not spec'd in hugr-core
                     name: &alias.name,
+                    version: &NO_VERSION,
                     params: &[],
                     constraints: &[],
                     signature,
@@ -388,6 +407,7 @@ impl<'a> Context<'a> {
                 let symbol = this.bump.alloc(table::Symbol {
                     visibility: &NO_VIS, // not spec'd in hugr-core
                     name: &alias.name,
+                    version: &NO_VERSION,
                     params: &[],
                     constraints: &[],
                     signature,
@@ -486,7 +506,18 @@ impl<'a> Context<'a> {
             }
 
             OpType::OpaqueOp(op) => {
-                let node = self.make_named_global_ref(op.extension(), op.unqualified_id());
+                // The extension version for an opaque operation should have
+                // been resolved while loading the hugr, so we can safely assume
+                // it's present here.
+                let version = op
+                    .extension_version()
+                    .cloned()
+                    .unwrap_or(Version::new(0, 0, 0));
+                let node = self.make_global_extension_symbol_ref(
+                    op.extension(),
+                    op.unqualified_id(),
+                    version,
+                );
                 let params = self
                     .bump
                     .alloc_slice_fill_iter(op.args().iter().map(|arg| self.export_term(arg, None)));
@@ -541,14 +572,24 @@ impl<'a> Context<'a> {
     /// at the end of the export, the operation declaration nodes can be added
     /// to the module as children of the module region.
     pub fn export_opdef(&mut self, opdef: &OpDef) -> table::NodeId {
-        use std::collections::hash_map::Entry;
+        let version = opdef.extension_version();
 
         let poly_func_type = match opdef.signature_func() {
             SignatureFunc::PolyFuncType(poly_func_type) => poly_func_type,
-            _ => return self.make_named_global_ref(opdef.extension_id(), opdef.name()),
+            _ => {
+                return self.make_global_extension_symbol_ref(
+                    opdef.extension_id(),
+                    opdef.name(),
+                    version,
+                );
+            }
         };
 
-        let key = (opdef.extension_id().clone(), opdef.name().clone());
+        let key = (
+            opdef.extension_id().clone(),
+            opdef.name().clone(),
+            version.clone(),
+        );
         let entry = self.decl_operations.entry(key);
 
         let node = match entry {
@@ -560,9 +601,14 @@ impl<'a> Context<'a> {
 
         let symbol = self.with_local_scope(node, |this| {
             let name = this.make_qualified_name(opdef.extension_id(), opdef.name());
-            this.export_poly_func_type(name, None, poly_func_type, |this, trv| {
-                this.export_term(trv, None)
-            })
+            let version = this.bump.alloc(Some(version));
+            this.export_versioned_poly_func_type(
+                name,
+                None,
+                version,
+                poly_func_type,
+                |this, trv| this.export_term(trv, None),
+            )
         });
 
         let meta = {
@@ -826,6 +872,22 @@ impl<'a> Context<'a> {
         t: &PolyFuncTypeBase<T>,
         export_io: impl FnMut(&mut Self, &T) -> table::TermId,
     ) -> &'a table::Symbol<'a> {
+        self.export_versioned_poly_func_type(name, visibility, &NO_VERSION, t, export_io)
+    }
+
+    /// Exports a polymorphic function type with an explicit model symbol version.
+    ///
+    /// Function declarations generally remain unversioned, while extension
+    /// operation declarations use this helper to preserve the extension version
+    /// attached to their defining extension.
+    fn export_versioned_poly_func_type<T: TypeRowLike>(
+        &mut self,
+        name: &'a str,
+        visibility: Option<model::Visibility>,
+        version: &'a Option<semver::Version>,
+        t: &PolyFuncTypeBase<T>,
+        export_io: impl FnMut(&mut Self, &T) -> table::TermId,
+    ) -> &'a table::Symbol<'a> {
         let mut params = BumpVec::with_capacity_in(t.params().len(), self.bump);
         let scope = self
             .local_scope
@@ -844,6 +906,7 @@ impl<'a> Context<'a> {
         self.bump.alloc(table::Symbol {
             visibility,
             name,
+            version,
             params: params.into_bump_slice(),
             constraints,
             signature: body,
@@ -866,7 +929,15 @@ impl<'a> Context<'a> {
     }
 
     pub fn export_custom_type(&mut self, t: &CustomType) -> table::TermId {
-        let symbol = self.make_named_global_ref(t.extension(), t.name());
+        // The extension version for an opaque type should have
+        // been resolved while loading the hugr, so we can safely assume
+        // it's present here.
+        let version = t
+            .extension_version()
+            .cloned()
+            .unwrap_or(Version::new(0, 0, 0));
+
+        let symbol = self.make_global_extension_symbol_ref(t.extension(), t.name(), version);
 
         let args = self
             .bump
@@ -1143,17 +1214,48 @@ impl<'a> Context<'a> {
         self.make_term_apply(model::COMPAT_META_JSON, &[name, value])
     }
 
+    /// Resolve an unversioned symbol identifier, creating an implicit import if needed.
+    ///
+    /// Versioned extension symbols (op and type names) should use [`resolve_versioned_symbol`] instead.
     fn resolve_symbol(&mut self, name: &'a str) -> table::NodeId {
-        let result = self.symbols.resolve(name);
+        let result = self.symbols.resolve(name, None);
 
         match result {
             Ok(node) => node,
             Err(_) => *self.implicit_imports.entry(name).or_insert_with(|| {
                 self.module.insert_node(table::Node {
-                    operation: table::Operation::Import { name },
+                    operation: table::Operation::Import {
+                        name,
+                        version: &NO_VERSION,
+                    },
                     ..table::Node::default()
                 })
             }),
+        }
+    }
+
+    /// Resolve an extension symbol identifier in the model, creating an implicit import if needed.
+    ///
+    /// The symbols are linked to an specific extension version.
+    fn resolve_versioned_symbol(
+        &mut self,
+        name: &'a str,
+        version: semver::Version,
+    ) -> table::NodeId {
+        let result = self.symbols.resolve(name, Some(&version));
+
+        match result {
+            Ok(node) => node,
+            Err(_) => *self
+                .extension_exports
+                .entry((name, version.clone()))
+                .or_insert_with(|| {
+                    let version = self.bump.alloc(Some(version));
+                    self.module.insert_node(table::Node {
+                        operation: table::Operation::Import { name, version },
+                        ..table::Node::default()
+                    })
+                }),
         }
     }
 

@@ -301,12 +301,12 @@ impl ExtensionVersions {
             .map(|(candidate, _)| candidate.clone())
     }
 
-    /// Return every retained version.
+    /// Return every retained version, in ascending version order.
     pub fn iter(&self) -> impl DoubleEndedIterator<Item = &Arc<Extension>> {
         self.versions.values()
     }
 
-    /// Return the retained version numbers.
+    /// Return the retained version numbers, in ascending order.
     pub fn versions(&self) -> impl DoubleEndedIterator<Item = &Version> {
         self.versions.keys()
     }

@@ -4,6 +4,8 @@ identifier         = @{ identifier_initial ~ identifier_rest* }
 identifier_initial = @{ ASCII_ALPHA | "_" | "-" }
 identifier_rest    = @{ ASCII_ALPHANUMERIC | "_" | "-" }
 symbol_name        = @{ !(reserved ~ !(identifier_rest | ".")) ~ (identifier ~ ("." ~ identifier)*) }
+version            = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
+symbol_ident         = { symbol_name ~ ("@" ~ version)? }
 link_name          = @{ "%" ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
 
 literal = { literal_string | literal_float | literal_nat | literal_bytes }
@@ -78,12 +80,12 @@ node_declare_ctr       = { "(" ~ "declare-ctr" ~ symbol ~ meta* ~ ")" }
 node_declare_operation = { "(" ~ "declare-operation" ~ symbol ~ meta* ~ ")" }
 node_tail_loop         = { "(" ~ "tail-loop" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 node_cond              = { "(" ~ "cond" ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
-node_import            = { "(" ~ "import" ~ symbol_name ~ meta* ~ ")" }
+node_import            = { "(" ~ "import" ~ symbol_ident ~ meta* ~ ")" }
 node_custom            = { "(" ~ term ~ port_lists? ~ signature? ~ meta* ~ region* ~ ")" }
 
 visibility = { "public" | "private" }
 
-symbol = { visibility? ~ symbol_name ~ param* ~ where_clause* ~ term }
+symbol = { visibility? ~ symbol_ident ~ param* ~ where_clause* ~ term }
 
 signature    = { "(" ~ "signature" ~ term ~ ")" }
 param        = { "(" ~ "param" ~ term_var ~ term ~ ")" }
@@ -104,7 +106,7 @@ term = {
 
 term_wildcard   = @{ "_" ~ !(ASCII_ALPHANUMERIC | "_" | "-") }
 term_var        =  { "?" ~ identifier }
-term_apply      =  { symbol_name | ("(" ~ symbol_name ~ term* ~ ")") }
+term_apply      =  { ("(" ~ symbol_ident ~ term* ~ ")") | symbol_ident }
 term_list       =  { "[" ~ part* ~ "]" }
 term_tuple      =  { "(" ~ "tuple" ~ part* ~ ")" }
 term_const_func =  { "(" ~ "fn" ~ term ~ ")" }
