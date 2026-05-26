@@ -21,13 +21,17 @@ pub struct ExtArgs {
         help = "Output directory."
     )]
     pub outdir: PathBuf,
-    /// Add the extension version to the output filename, e.g. "foo-1.2.3.json".
+    /// Do not add the extension version to the output filename, e.g. "foo.json".
+    ///
+    /// Only writes the latest version of each extension.
+    ///
+    /// If this flag is not present, extensions are written with the version in the filename, e.g. "foo-1.2.3.json".
     #[arg(
         long,
-        help = "Add the extension version to the output filename.",
+        help = "Do not add the extension version to the output filename.",
         default_value_t = false
     )]
-    pub versioned: bool,
+    pub unversioned: bool,
 }
 
 impl ExtArgs {
@@ -38,14 +42,12 @@ impl ExtArgs {
     ///
     /// E.g. extension "foo.bar.baz" will be written to "OUTPUT/foo/bar/baz-1.2.3.json".
     pub fn run_dump(&self, registry: &ExtensionRegistry) -> Result<()> {
-        if self.versioned {
+        if !self.unversioned {
             registry
                 .iter_all()
                 .try_for_each(|ext| self.dump_extension(ext))?;
         } else {
-            // The STD registry should only contain one version of each
-            // extension, so we can just take the latest version for each
-            // extension name and avoid overriding files.
+            // Only one version of each extension can be written out, so we take the latest version of each.
             registry
                 .iter()
                 .map(|ext| ext.latest())
@@ -64,11 +66,12 @@ impl ExtArgs {
                 continue;
             }
 
-            // Optionally add the extension version to the output filename, e.g. "foo-1.2.3.json".
-            if self.versioned {
-                path.push(format!("{part}-{}.json", ext.version()));
-            } else {
+            // Choose whether to add the extension version to the output
+            // filename or leave it without.
+            if self.unversioned {
                 path.push(format!("{part}.json"));
+            } else {
+                path.push(format!("{part}-{}.json", ext.version()));
             }
         }
 

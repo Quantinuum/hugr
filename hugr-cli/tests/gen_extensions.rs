@@ -18,31 +18,31 @@ fn cmd() -> Command {
 }
 
 #[rstest]
-fn test_extension_dump(mut cmd: Command) {
+#[case::versioned(false)]
+#[case::unversioned(true)]
+fn test_extension_dump(mut cmd: Command, #[case] unversioned: bool) {
     let temp_dir = assert_fs::TempDir::new()
         .expect("temp dir creation failure.")
         .into_persistent_if(std::env::var_os("HUGR_CLI_TEST_PERSIST_FILES").is_some());
     cmd.arg("-o");
     cmd.arg(temp_dir.path());
+    if unversioned {
+        cmd.arg("--unversioned");
+    }
     cmd.assert().success();
 
-    let expected_paths = BTreeSet::from(
-        [
-            "logic.json",
-            "prelude.json",
-            "ptr.json",
-            "arithmetic/int/types.json",
-            "arithmetic/float/types.json",
-            "arithmetic/int.json",
-            "arithmetic/float.json",
-            "arithmetic/conversions.json",
-            "collections/array.json",
-            "collections/borrow_arr.json",
-            "collections/list.json",
-            "collections/static_array.json",
-        ]
-        .map(std::path::PathBuf::from),
-    );
+    let expected_paths = hugr::std_extensions::STD_REG
+        .iter()
+        .map(|ext| {
+            let mut path = ext.id().replace('.', "/");
+            if unversioned {
+                path.push_str(".json");
+            } else {
+                path.push_str(&format!("-{}.json", ext.latest().version()));
+            }
+            std::path::PathBuf::from(path)
+        })
+        .collect::<BTreeSet<_>>();
 
     let existing_paths = WalkDir::new(&temp_dir)
         .into_iter()
@@ -70,39 +70,6 @@ fn test_extension_dump(mut cmd: Command) {
             }
         }
         panic!("Extension dump did not match expected paths.");
-    }
-
-    // temp dir deleted when dropped here
-}
-
-#[rstest]
-fn test_extension_versioned_dump(mut cmd: Command) {
-    let temp_dir = assert_fs::TempDir::new()
-        .expect("temp dir creation failure.")
-        .into_persistent_if(std::env::var_os("HUGR_CLI_TEST_PERSIST_FILES").is_some());
-    cmd.arg("-o");
-    cmd.arg(temp_dir.path());
-    cmd.arg("--versioned");
-    cmd.assert().success();
-
-    let expected_paths = [
-        "logic-0.1.0.json",
-        "prelude-0.2.2.json",
-        "ptr-0.1.1.json",
-        "arithmetic/int/types-0.1.0.json",
-        "arithmetic/float/types-0.1.0.json",
-        "arithmetic/int-0.1.1.json",
-        "arithmetic/float-0.1.1.json",
-        "arithmetic/conversions-0.1.1.json",
-        "collections/array-0.1.2.json",
-        "collections/borrow_arr-0.2.1.json",
-        "collections/list-0.1.1.json",
-        "collections/static_array-0.1.1.json",
-    ];
-    // check all paths exist
-    for path in &expected_paths {
-        let full_path = temp_dir.join(path);
-        assert!(full_path.exists());
     }
 
     // temp dir deleted when dropped here
