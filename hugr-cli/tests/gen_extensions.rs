@@ -4,8 +4,11 @@
 //! calling the CLI binary, which Miri doesn't support.
 #![cfg(all(test, not(miri)))]
 
+use std::collections::BTreeSet;
+
 use assert_cmd::Command;
 use rstest::{fixture, rstest};
+use walkdir::WalkDir;
 
 #[fixture]
 fn cmd() -> Command {
@@ -23,24 +26,50 @@ fn test_extension_dump(mut cmd: Command) {
     cmd.arg(temp_dir.path());
     cmd.assert().success();
 
-    let expected_paths = [
-        "logic.json",
-        "prelude.json",
-        "ptr.json",
-        "arithmetic/int/types.json",
-        "arithmetic/float/types.json",
-        "arithmetic/int.json",
-        "arithmetic/float.json",
-        "arithmetic/conversions.json",
-        "collections/array.json",
-        "collections/borrow_arr.json",
-        "collections/list.json",
-        "collections/static_array.json",
-    ];
-    // check all paths exist
-    for path in &expected_paths {
-        let full_path = temp_dir.join(path);
-        assert!(full_path.exists());
+    let expected_paths = BTreeSet::from(
+        [
+            "logic.json",
+            "prelude.json",
+            "ptr.json",
+            "arithmetic/int/types.json",
+            "arithmetic/float/types.json",
+            "arithmetic/int.json",
+            "arithmetic/float.json",
+            "arithmetic/conversions.json",
+            "collections/array.json",
+            "collections/borrow_arr.json",
+            "collections/list.json",
+            "collections/static_array.json",
+        ]
+        .map(std::path::PathBuf::from),
+    );
+
+    let existing_paths = WalkDir::new(&temp_dir)
+        .into_iter()
+        .filter_map(|e| e.ok())
+        .filter(|e| e.file_type().is_file())
+        .map(|e| e.path().strip_prefix(&temp_dir).unwrap().to_owned())
+        .collect::<BTreeSet<_>>();
+
+    // Check differences and print any missing or unexpected paths.
+    if expected_paths != existing_paths {
+        let missing_paths: Vec<_> = expected_paths.difference(&existing_paths).collect();
+        let unexpected_paths: Vec<_> = existing_paths.difference(&expected_paths).collect();
+
+        if !missing_paths.is_empty() {
+            eprintln!("Missing paths:");
+            for path in missing_paths {
+                eprintln!("  {}", path.display());
+            }
+        }
+
+        if !unexpected_paths.is_empty() {
+            eprintln!("Unexpected paths:");
+            for path in unexpected_paths {
+                eprintln!("  {}", path.display());
+            }
+        }
+        panic!("Extension dump did not match expected paths.");
     }
 
     // temp dir deleted when dropped here

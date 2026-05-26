@@ -71,6 +71,7 @@ static_assertions = "1.1.0"
 tempfile = "3.27"
 thiserror = "2.0.18"
 typetag = "0.2.21"
+walkdir = "2.5.0"
 clap = { version = "4.6.0" }
 clio = "0.3.5"
 clap-verbosity-flag = "3.0.4"

@@ -50,7 +50,8 @@ assert_cmd = { workspace = true }
 assert_fs = { workspace = true }
 predicates = { workspace = true }
 tempfile = { workspace = true }
-rstest.workspace = true
+rstest = { workspace = true }
+walkdir = { workspace = true }
 
 [[bin]]
 name = "hugr"
