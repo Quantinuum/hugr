@@ -150,7 +150,7 @@ impl<R: BufRead> EnvelopeReader<R> {
             desc.load_from_hugr(&module);
         }
 
-        for (index, ext) in package.extensions.iter().enumerate() {
+        for (index, ext) in package.extensions.iter_all().enumerate() {
             self.description.set_packaged_extension(index, ext);
         }
         Ok(package)
@@ -485,8 +485,7 @@ mod test {
 
         simple_package
             .extensions
-            .register(std::sync::Arc::new(extension))
-            .unwrap();
+            .register(std::sync::Arc::new(extension));
 
         let header = EnvelopeHeader {
             format: EnvelopeFormat::SExpressionWithExtensions,

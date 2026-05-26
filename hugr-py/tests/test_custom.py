@@ -179,3 +179,55 @@ def test_qualified_name():
 
     # Test OpDef with extension
     assert _STRINGLY_DEF.qualified_name() == "my_extension.StringlyOp"
+
+
+def _versioned_ext(version: ext.Version) -> ext.Extension:
+    """Helper function to create an extension with a given version for testing."""
+    extension = ext.Extension("versioned_ext", version)
+    extension.add_op_def(ext.OpDef("my_op", ext.OpDefSig(tys.FunctionType.endo([]))))
+    extension.add_type_def(
+        ext.TypeDef(
+            "MyType",
+            "A versioned type.",
+            [],
+            ext.ExplicitBound(tys.TypeBound.Copyable),
+        )
+    )
+    return extension
+
+
+def test_registry_version_resolution():
+    """Test that registry resolution picks the highest compatible version of an
+    extension."""
+
+    ext_0_2_5 = _versioned_ext(ext.Version(0, 2, 5))
+    ext_0_3_0 = _versioned_ext(ext.Version(0, 3, 0))
+    ext_1_3_0 = _versioned_ext(ext.Version(1, 3, 0))
+    reg = ext.ExtensionRegistry()
+    reg.register(ext_0_2_5)
+    reg.register(ext_0_3_0)
+    reg.register(ext_1_3_0)
+
+    assert reg.get_extension("versioned_ext", ext.Version(0, 2, 3)) is ext_0_2_5
+    assert reg.get_extension("versioned_ext", ext.Version(0, 3, 0)) is ext_0_3_0
+    assert reg.get_extension("versioned_ext", ext.Version(1, 2, 3)) is ext_1_3_0
+
+    custom = ops.Custom(
+        "my_op",
+        tys.FunctionType.endo([]),
+        "versioned_ext",
+        extension_version=ext.Version(0, 2, 3),
+    )
+    resolved = custom.resolve(reg)
+    assert isinstance(resolved, ops.ExtOp)
+    assert resolved.op_def().get_extension() is ext_0_2_5
+
+    opaque = tys.Opaque(
+        "MyType",
+        tys.TypeBound.Copyable,
+        extension="versioned_ext",
+        extension_version=ext.Version(0, 2, 3),
+    )
+    resolved_ty, _ = opaque._resolve_used_extensions(reg)
+    assert isinstance(resolved_ty, tys.ExtType)
+    assert resolved_ty.type_def.get_extension() is ext_0_2_5

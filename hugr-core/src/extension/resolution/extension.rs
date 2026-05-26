@@ -7,6 +7,8 @@
 use std::mem;
 use std::sync::Arc;
 
+use semver::Version;
+
 use crate::extension::resolution::types::collect_func_type_exts;
 use crate::extension::{
     Extension, ExtensionId, ExtensionRegistry, ExtensionSet, OpDef, SignatureFunc, TypeDef,
@@ -33,8 +35,8 @@ impl ExtensionRegistry {
     ) -> Result<ExtensionRegistry, ExtensionResolutionError> {
         Self::new_cyclic(extensions, |mut exts, weak_registry| {
             let mut weak_registry = weak_registry.clone();
-            for (other_id, other) in other_extensions.iter() {
-                weak_registry.register(other_id.clone(), other.clone());
+            for (other_id, other_version, other) in other_extensions.iter_all() {
+                weak_registry.register(other_id.clone(), other_version.clone(), other.clone());
             }
             for ext in &mut exts {
                 ext.resolve_references(&weak_registry)?;
@@ -48,15 +50,18 @@ impl ExtensionRegistry {
     /// This includes all extensions required to define the types in the
     /// operation signatures.
     pub fn extend_with_dependencies(&mut self) -> Result<(), ExtensionCollectionError> {
-        let mut queue: Vec<Arc<Extension>> = self.exts.values().cloned().collect();
-        let mut seen: std::collections::BTreeSet<ExtensionId> = self.exts.keys().cloned().collect();
+        let mut queue: Vec<Arc<Extension>> = self.iter_all().cloned().collect();
+        let mut seen: std::collections::BTreeSet<(ExtensionId, crate::extension::Version)> = self
+            .iter_all()
+            .map(|ext| (ext.name().clone(), ext.version().clone()))
+            .collect();
 
         while let Some(ext) = queue.pop() {
             let deps = collect_extension_deps(&ext)?;
-            for dep in deps {
-                let dep_id = dep.name().clone();
-                if seen.insert(dep_id.clone()) {
-                    self.register_updated(dep.clone());
+            for dep in deps.iter_all().cloned() {
+                let dep_key = (dep.name().clone(), dep.version().clone());
+                if seen.insert(dep_key) {
+                    self.register(dep.clone());
                     queue.push(dep);
                 }
             }
@@ -109,7 +114,13 @@ impl Extension {
         let mut used_extensions = WeakExtensionRegistry::default();
 
         for type_def in self.types.values_mut() {
-            resolve_typedef_exts(&self.name, type_def, extensions, &mut used_extensions)?;
+            resolve_typedef_exts(
+                &self.name,
+                &self.version,
+                type_def,
+                extensions,
+                &mut used_extensions,
+            )?;
         }
 
         let ops = mem::take(&mut self.operations);
@@ -117,7 +128,13 @@ impl Extension {
             // TODO: We should be able to clone the definition if needed by using `make_mut`,
             // but `OpDef` does not implement clone -.-
             let op_ref = Arc::<OpDef>::get_mut(&mut op_def).expect("OpDef is not unique");
-            resolve_opdef_exts(&self.name, op_ref, extensions, &mut used_extensions)?;
+            resolve_opdef_exts(
+                &self.name,
+                &self.version,
+                op_ref,
+                extensions,
+                &mut used_extensions,
+            )?;
             self.operations.insert(op_id, op_def);
         }
 
@@ -131,15 +148,14 @@ impl Extension {
 /// Adds the extensions used in the type to the `used_extensions` registry.
 pub(super) fn resolve_typedef_exts(
     extension: &ExtensionId,
+    version: &Version,
     def: &mut TypeDef,
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    match extensions.get(def.extension_id()) {
-        Some(ext) => {
-            if let Some(extension) = ext.upgrade() {
-                def.fill_extension_version(extension.version());
-            }
+    match extensions.get_req(def.extension_id(), Some(version)) {
+        Some((_, ext)) => {
+            def.fill_extension_version(version);
             *def.extension_mut() = ext.clone();
         }
         None => {
@@ -160,15 +176,14 @@ pub(super) fn resolve_typedef_exts(
 /// Adds the extensions used in the type to the `used_extensions` registry.
 pub(super) fn resolve_opdef_exts(
     extension: &ExtensionId,
+    version: &Version,
     def: &mut OpDef,
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    match extensions.get(def.extension_id()) {
-        Some(ext) => {
-            if let Some(extension) = ext.upgrade() {
-                def.fill_extension_version(extension.version());
-            }
+    match extensions.get_req(def.extension_id(), Some(version)) {
+        Some((_, ext)) => {
+            def.fill_extension_version(version);
             *def.extension_mut() = ext.clone();
         }
         None => {

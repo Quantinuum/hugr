@@ -82,7 +82,7 @@ fn encode_model_binary<'h>(
 
     // Append extensions for binary model.
     if format == EnvelopeFormat::ModelWithExtensions {
-        serde_json::to_writer(writer, &extensions.iter().collect_vec())?;
+        serde_json::to_writer(writer, &extensions.iter_all().collect_vec())?;
     }
 
     Ok(())
@@ -101,7 +101,7 @@ fn encode_model_text<'h>(
 
     // Prepend extensions for text model.
     if format == EnvelopeFormat::SExpressionWithExtensions {
-        serde_json::to_writer(&mut writer, &extensions.iter().collect_vec())?;
+        serde_json::to_writer(&mut writer, &extensions.iter_all().collect_vec())?;
     }
 
     let bump = Bump::default();

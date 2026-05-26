@@ -509,7 +509,9 @@ class Custom(DataflowOp):
 
         if registry is not None:
             try:
-                op_def = registry.get_extension(self.extension).get_op(self.op_name)
+                op_def = registry.get_extension(
+                    self.extension, self.extension_version
+                ).get_op(self.op_name)
             except (
                 Extension.OperationNotFound,
                 ExtensionRegistry.ExtensionNotFound,
