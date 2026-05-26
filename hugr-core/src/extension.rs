@@ -219,9 +219,9 @@ impl ExtensionVersions {
         self.versions.get(version)
     }
 
-    /// Return the highest retained extension compatible with `requested`.
+    /// Return the highest retained extension compatible with `requested`, if any.
     #[must_use]
-    pub fn compatible(&self, requested: &Version) -> Option<&Arc<Extension>> {
+    pub fn get_compatible(&self, requested: &Version) -> Option<&Arc<Extension>> {
         let (version, extension) = self.versions.range(requested..).next()?;
         semver_compatible(version, requested).then_some(extension)
     }
@@ -236,9 +236,10 @@ impl ExtensionVersions {
     /// specified for their extensions.
     #[must_use]
     pub(crate) fn get_req(&self, requested: Option<&Version>) -> Option<&Arc<Extension>> {
-        requested
-            .and_then(|version| self.compatible(version))
-            .or_else(|| requested.is_none().then(|| self.latest()))
+        match requested {
+            Some(version) => self.get_compatible(version),
+            None => Some(self.latest()),
+        }
     }
 
     /// Register an extension version and report what happened.
@@ -281,8 +282,12 @@ impl ExtensionVersions {
         }
     }
 
-    // Find a registered extension version that is in the same semver
-    // compatibility group as `version`, if any.
+    /// Returns a registered version that is in the same semver-compatibility group as the requested version, if any.
+    ///
+    /// The registry keeps at most one extension per semver-compatible group: when a
+    /// newer compatible version is registered, it replaces the older compatible
+    /// definition. Incompatible versions are retained side by side so older HUGRs can
+    /// still resolve against the appropriate definition.
     fn compatible_registered_version(&self, version: &Version) -> Option<Version> {
         if let Some((candidate, _)) = self.versions.range(..=version).next_back()
             && semver_compatible(version, candidate)
@@ -393,7 +398,9 @@ impl ExtensionRegistry {
 
     /// Gets the highest Extension version compatible with `version`.
     pub fn get_compatible(&self, name: &str, version: &Version) -> Option<&Arc<Extension>> {
-        self.exts.get(name).and_then(|ext| ext.compatible(version))
+        self.exts
+            .get(name)
+            .and_then(|ext| ext.get_compatible(version))
     }
 
     /// Gets the Extension matching an optional serialized version requirement.
@@ -542,7 +549,7 @@ impl ExtensionRegistry {
 
         let mut weak_registry = WeakExtensionRegistry::default();
         for (ext, weak) in extensions.iter().zip(weaks) {
-            weak_registry.register(ext.name().clone(), weak);
+            weak_registry.register(ext.name().clone(), ext.version().clone(), weak);
         }
 
         // Actual initialization here
