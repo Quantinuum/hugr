@@ -118,8 +118,8 @@ impl HugrInputArgs {
     /// Return a register with the selected extensions.
     ///
     /// This includes the standard extensions if [`HugrInputArgs::no_std`] is `false`,
-    /// and the extensions loaded from the paths in [`HugrInputArgs::extensions`] and
-    /// any valid `.json` files found under [`HugrInputArgs::extension_dirs`].
+    /// and the extensions loaded from [`HugrInputArgs::extensions`] and
+    /// [`HugrInputArgs::extension_dirs`].
     pub fn load_extensions(&self) -> Result<ExtensionRegistry, CliError> {
         let mut reg = if self.no_std {
             hugr::extension::PRELUDE_REGISTRY.to_owned()

@@ -50,6 +50,9 @@ const LIST_EXT_FILE: &str = concat!(
     "/../resources/std_extensions/collections/list.json"
 );
 
+// path to the directory containing all standard extensions
+const STD_EXT_DIR: &str = concat!(env!("CARGO_MANIFEST_DIR"), "/../resources/std_extensions");
+
 /// A test package, containing a module-rooted HUGR.
 #[fixture]
 fn test_package(#[default(bool_t())] id_type: Type) -> Package {
@@ -218,6 +221,17 @@ fn test_list_float_extension(float_list_hugr_string: String, mut val_cmd: Comman
     val_cmd.arg(LIST_EXT_FILE);
     val_cmd.arg("--extensions");
     val_cmd.arg(FLOAT_EXT_FILE);
+
+    val_cmd.assert().success().stderr(contains(VALID_PRINT));
+}
+
+#[rstest]
+fn test_extension_dir(float_list_hugr_string: String, mut val_cmd: Command) {
+    val_cmd.write_stdin(float_list_hugr_string);
+    val_cmd.arg("-");
+    val_cmd.arg("--no-std");
+    val_cmd.arg("--extension-dirs");
+    val_cmd.arg(STD_EXT_DIR);
 
     val_cmd.assert().success().stderr(contains(VALID_PRINT));
 }
