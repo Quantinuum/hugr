@@ -645,7 +645,7 @@ pub(super) mod test {
     use crate::package::Package;
     use crate::std_extensions::collections::list;
     use crate::types::type_param::{TermKindError, TypeParam};
-    use crate::types::{PolyFuncTypeRV, Signature, Term, Type, TypeArg, TypeBound};
+    use crate::types::{PolyFuncTypeRV, Signature, Term, Type, TypeArg, TypeBound, TypeRowRV};
     use crate::{Extension, const_extension_ids};
 
     const_extension_ids! {
@@ -910,6 +910,28 @@ pub(super) mod test {
             Ok(())
         })?;
         Ok(())
+    }
+
+    #[test]
+    fn invalid_extension() {
+        let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
+            ext.add_op(
+                "MyOp".into(),
+                "desc".into(),
+                PolyFuncTypeRV::new(
+                    [],
+                    Signature::new_endo([Type::new_tuple(
+                        // variable not declared
+                        TypeRowRV::new_var_use(0, TypeBound::Linear),
+                    )]),
+                ),
+                extension_ref,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+        let reg = ExtensionRegistry::new([PRELUDE.clone(), ext]);
+        reg.validate().unwrap(); // OOOPS, should be an error
     }
 
     mod proptest {
