@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cmp::min;
 use std::collections::HashMap;
 use std::collections::btree_map::Entry;
@@ -243,29 +244,42 @@ impl SignatureFunc {
         def: &OpDef,
         args: &[TypeArg],
     ) -> Result<Signature, SignatureError> {
-        let temp: PolyFuncTypeRV; // to keep alive
-        let (pf, args) = match &self {
-            SignatureFunc::CustomValidator(custom) => {
-                custom.validate.validate(args, def)?;
-                (&custom.poly_func, args)
-            }
-            SignatureFunc::PolyFuncType(ts) => (ts, args),
-            SignatureFunc::CustomFunc(func) => {
-                let static_params = func.static_params();
-                let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
-
-                check_term_kinds(static_args, static_params)?;
-                temp = func.compute_signature(static_args, def)?;
-                (&temp, other_args)
-            }
-            SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
-            // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
-            SignatureFunc::MissingValidateFunc(ts) => (ts, args),
-        };
+        let (pf, args) = self.comp_sig_helper(def, args)?;
         let res = pf.instantiate(args)?;
 
         // If there are any row variables left, this will fail with an error:
         res.try_into()
+    }
+
+    fn comp_sig_helper<'a, 'b>(
+        &'a self,
+        def: &OpDef,
+        args: &'b [TypeArg],
+    ) -> Result<(Cow<'a, PolyFuncTypeRV>, &'b [TypeArg]), SignatureError> {
+        Ok(match self {
+            SignatureFunc::CustomValidator(custom) => {
+                // ALAN previously we didn't do this for validate_args, which was a bug:
+                custom.validate.validate(args, def)?;
+                (Cow::Borrowed(&custom.poly_func), args)
+            }
+            SignatureFunc::PolyFuncType(ts) => (Cow::Borrowed(ts), args),
+            SignatureFunc::CustomFunc(func) => {
+                let static_params = func.static_params();
+                let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
+
+                // ALAN previously we only did this for validate_args, not compute_signature, but seems harmless
+                static_args.iter().try_for_each(|ta| ta.validate(&[]))?;
+
+                check_term_kinds(static_args, static_params)?;
+                (
+                    Cow::Owned(func.compute_signature(static_args, def)?),
+                    other_args,
+                )
+            }
+            SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
+            // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
+            SignatureFunc::MissingValidateFunc(ts) => (Cow::Borrowed(ts), args),
+        })
     }
 }
 
@@ -407,26 +421,7 @@ impl OpDef {
         args: &[TypeArg],
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
-        let temp: PolyFuncTypeRV; // to keep alive
-        let (pf, args) = match &self.signature_func {
-            SignatureFunc::CustomValidator(custom) => {
-                custom.validate.validate(args, self)?;
-                (&custom.poly_func, args)
-            }
-            SignatureFunc::PolyFuncType(ts) => (ts, args),
-            SignatureFunc::CustomFunc(custom) => {
-                let (static_args, other_args) =
-                    args.split_at(min(custom.static_params().len(), args.len()));
-                static_args.iter().try_for_each(|ta| ta.validate(&[]))?;
-                check_term_kinds(static_args, custom.static_params())?;
-                temp = custom.compute_signature(static_args, self)?;
-                (&temp, other_args)
-            }
-            SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
-            SignatureFunc::MissingValidateFunc(_) => {
-                return Err(SignatureError::MissingValidateFunc);
-            }
-        };
+        let (pf, args) = self.signature_func.comp_sig_helper(self, args)?;
         args.iter().try_for_each(|ta| ta.validate(var_decls))?;
         check_term_kinds(args, pf.params())?;
         Ok(())
@@ -863,19 +858,12 @@ pub(super) mod test {
             // First arg must be concrete, not a variable
             let kind = TypeParam::bounded_nat_kind(NonZeroU64::new(5).unwrap());
             let args = [TypeArg::new_var_use(0, kind.clone()), usize_t().into()];
-            // We can't prevent this from getting into our compute_signature implementation:
-            assert_eq!(
-                def.compute_signature(&args),
-                Err(SignatureError::InvalidTypeArgs)
-            );
-            // But validation rules it out, even when the variable is declared:
-            assert_eq!(
-                def.validate_args(&args, &[kind]),
-                Err(SignatureError::FreeTypeVar {
-                    idx: 0,
-                    num_decls: 0
-                })
-            );
+            let err = SignatureError::FreeTypeVar {
+                idx: 0,
+                num_decls: 0,
+            };
+            assert_eq!(def.compute_signature(&args), Err(err.clone()));
+            assert_eq!(def.validate_args(&args, &[kind]), Err(err));
 
             Ok(())
         })?;
