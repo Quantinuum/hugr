@@ -515,11 +515,14 @@ impl OpDef {
     pub(super) fn validate(&self) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate declared TypeParams
         // for both type scheme and custom binary
-        if let SignatureFunc::CustomValidator(ts) = &self.signature_func {
-            // The type scheme may contain row variables so be of variable length;
-            // these will have to be substituted to fixed-length concrete types when
-            // the OpDef is instantiated into an actual OpType.
-            ts.poly_func.validate()?;
+        match &self.signature_func {
+            SignatureFunc::PolyFuncType(pft) | SignatureFunc::MissingValidateFunc(pft) => {
+                pft.validate()?
+            }
+            SignatureFunc::CustomValidator(custom_validator) => {
+                custom_validator.poly_func.validate()?
+            }
+            SignatureFunc::CustomFunc(_) | SignatureFunc::MissingComputeFunc => (), // can't check anything
         }
         Ok(())
     }
@@ -637,10 +640,10 @@ pub(super) mod test {
 
     use super::SignatureFromArgs;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig};
-    use crate::extension::SignatureError;
     use crate::extension::op_def::{CustomValidator, LowerFunc, OpDef, SignatureFunc};
     use crate::extension::prelude::usize_t;
     use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
+    use crate::extension::{ExtensionRegistryError, SignatureError};
     use crate::ops::OpName;
     use crate::package::Package;
     use crate::std_extensions::collections::list;
@@ -912,7 +915,7 @@ pub(super) mod test {
         Ok(())
     }
 
-    #[test]
+    #[test] // failing before https://github.com/Quantinuum/hugr/pull/3081
     fn invalid_extension() {
         let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
             ext.add_op(
@@ -931,7 +934,16 @@ pub(super) mod test {
         })
         .unwrap();
         let reg = ExtensionRegistry::new([PRELUDE.clone(), ext]);
-        reg.validate().unwrap(); // OOOPS, should be an error
+        assert_eq!(
+            reg.validate(),
+            Err(ExtensionRegistryError::InvalidSignature(
+                EXT_ID,
+                SignatureError::FreeTypeVar {
+                    idx: 0,
+                    num_decls: 0
+                }
+            ))
+        );
     }
 
     mod proptest {
