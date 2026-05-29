@@ -642,7 +642,7 @@ pub(super) mod test {
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig};
     use crate::extension::op_def::{CustomValidator, LowerFunc, OpDef, SignatureFunc};
     use crate::extension::prelude::usize_t;
-    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
+    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, ValidateJustArgs};
     use crate::extension::{ExtensionRegistryError, SignatureError};
     use crate::ops::OpName;
     use crate::package::Package;
@@ -944,6 +944,36 @@ pub(super) mod test {
                 }
             ))
         );
+    }
+
+    #[test]
+    fn validate_args() {
+        struct TestValidator;
+        impl ValidateJustArgs for TestValidator {
+            fn validate(&self, arg_values: &[TypeArg]) -> Result<(), SignatureError> {
+                if matches!(arg_values, [TypeArg::BoundedNat(n)] if *n % 2 == 1) {
+                    return Ok(());
+                }
+                Err(SignatureError::InvalidTypeArgs)
+            }
+        }
+        let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
+            ext.add_op(
+                "TestOp".into(),
+                "Type arg must be odd but is otherwise ignored".into(),
+                CustomValidator::new(
+                    PolyFuncTypeRV::new([Term::max_nat_kind()], Signature::new_endo([usize_t()])),
+                    TestValidator,
+                ),
+                extension_ref,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+        ext.get_op("TestOp")
+            .unwrap()
+            .validate_args(&[TypeArg::BoundedNat(2)], &[])
+            .unwrap(); // OOOPS, should reject even
     }
 
     mod proptest {
