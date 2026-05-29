@@ -409,7 +409,10 @@ impl OpDef {
     ) -> Result<(), SignatureError> {
         let temp: PolyFuncTypeRV; // to keep alive
         let (pf, args) = match &self.signature_func {
-            SignatureFunc::CustomValidator(ts) => (&ts.poly_func, args),
+            SignatureFunc::CustomValidator(custom) => {
+                custom.validate.validate(args, self)?;
+                (&custom.poly_func, args)
+            }
             SignatureFunc::PolyFuncType(ts) => (ts, args),
             SignatureFunc::CustomFunc(custom) => {
                 let (static_args, other_args) =
@@ -970,10 +973,12 @@ pub(super) mod test {
             Ok(())
         })
         .unwrap();
-        ext.get_op("TestOp")
-            .unwrap()
-            .validate_args(&[TypeArg::BoundedNat(2)], &[])
-            .unwrap(); // OOOPS, should reject even
+        assert_eq!(
+            ext.get_op("TestOp")
+                .unwrap()
+                .validate_args(&[TypeArg::BoundedNat(2)], &[]),
+            Err(SignatureError::InvalidTypeArgs)
+        );
     }
 
     mod proptest {
