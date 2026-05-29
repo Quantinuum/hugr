@@ -9,6 +9,7 @@ use hugr::package::Package;
 use hugr::{Extension, Hugr};
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
+use walkdir::WalkDir;
 
 use crate::CliError;
 
@@ -34,6 +35,15 @@ pub struct HugrInputArgs {
         help = "Paths to additional serialised extensions needed to load the Hugr."
     )]
     pub extensions: Vec<PathBuf>,
+    /// Extension directories.
+    #[arg(
+        short = 'E',
+        long,
+        help_heading = "Input",
+        help = "Directories to recursively search for serialised extensions (*.json) needed to load the Hugr. \
+        Files not matching the extension schema are ignored."
+    )]
+    pub extension_dirs: Vec<PathBuf>,
 }
 
 impl HugrInputArgs {
@@ -108,7 +118,8 @@ impl HugrInputArgs {
     /// Return a register with the selected extensions.
     ///
     /// This includes the standard extensions if [`HugrInputArgs::no_std`] is `false`,
-    /// and the extensions loaded from the paths in [`HugrInputArgs::extensions`].
+    /// and the extensions loaded from the paths in [`HugrInputArgs::extensions`] and
+    /// any valid `.json` files found under [`HugrInputArgs::extension_dirs`].
     pub fn load_extensions(&self) -> Result<ExtensionRegistry, CliError> {
         let mut reg = if self.no_std {
             hugr::extension::PRELUDE_REGISTRY.to_owned()
@@ -121,6 +132,19 @@ impl HugrInputArgs {
             let f = std::fs::File::open(ext)?;
             let ext: Extension = serde_json::from_reader(f)?;
             extensions.push(ext);
+        }
+
+        for dir in &self.extension_dirs {
+            for entry in WalkDir::new(dir)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
+            {
+                let f = std::fs::File::open(entry.path())?;
+                if let Ok(ext) = serde_json::from_reader::<_, Extension>(f) {
+                    extensions.push(ext);
+                }
+            }
         }
 
         // After deserialization, we need to update all the internal
