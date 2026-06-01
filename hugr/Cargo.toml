@@ -11,7 +11,7 @@ homepage = { workspace = true }
 repository = { workspace = true }
 description = "Quantinuum's Hierarchical Unified Graph Representation"
 keywords = ["Quantum", "Quantinuum"]
-categories = ["compilers"]
+categories = ["compilers", "science::quantum-computing"]
 
 [lints]
 workspace = true
