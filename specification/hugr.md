@@ -147,9 +147,8 @@ Nonetheless, like `Value` edges, an order edge indicates that the source node
 will, at runtime, produce some hidden state or value that is (in some way)
 consumed by the edge's target; thus during execution we can at least ask
 *whether* that state (or unit value) has been produced - no later than
-<!-- even if not *what* value was produced.-->
 evaluation of the node being complete, see [Evaluation Semantics](#evaluation-semantics).
-
+<!-- even if not *what* value was produced.-->
 
 Source and target nodes must have the same parent. There can be at
 most one `Order` edge between any two nodes.
