@@ -158,6 +158,9 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
     }
 }
 
+/// Determines whether there is a path along [Order] edges only from `src` to `tgt`.
+///
+/// [Order]: crate::types::EdgeKind::StateOrder
 fn is_order_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) -> bool {
     let mut visited = HashSet::new();
     let mut to_visit = vec![src];
