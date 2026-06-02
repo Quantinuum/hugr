@@ -147,8 +147,9 @@ Nonetheless, like `Value` edges, an order edge indicates that the source node
 will, at runtime, produce some hidden state or value that is (in some way)
 consumed by the edge's target; thus during execution we can at least ask
 *whether* that state (or unit value) has been produced - no later than
+<!-- even if not *what* value was produced.-->
 evaluation of the node being complete, see [Evaluation Semantics](#evaluation-semantics).
-# even if not *what* value was produced.
+
 
 Source and target nodes must have the same parent. There can be at
 most one `Order` edge between any two nodes.
@@ -731,12 +732,12 @@ implementation) this will respect the Dataflow and Order edges. However *in
 general* Hugr allows:
 * Nodes to execute non-atomically, perhaps in parallel/overlapping other nodes
 * Nodes to execute partially or totally before all inputs are ready (if the
- op is able to ``do'' anything without all its inputs)
+  op is able to "do" anything without all its inputs)
   * A specific exception here is that a node $n$ may not produce its `Order`
    output until all other nodes connected to $n$'s `Order` input have produced
    theirs.
-  * Similarly, nodes with side-effects (e.g. panic or print) may not have those
-  side effects until all their `Order` inputs are ready.
+  * Similarly, a node with side-effects (e.g. panic or print) must not have
+   those side effects before all its `Order` inputs are ready.
 
 This applies both to extension ops and core constructs such as DFG, CFG, or a
 Call to a function, but may be refined (introducing more precise guarantees
