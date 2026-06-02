@@ -12,9 +12,9 @@ expression: ast
 
 (import core.fn)
 
-(import arithmetic.int.types.int)
-
 (import core.load_const)
+
+(import arithmetic.int.types.int@0.1.0)
 
 (declare-func
   public

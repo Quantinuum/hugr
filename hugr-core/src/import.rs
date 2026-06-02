@@ -15,7 +15,8 @@ use crate::types::{
 use crate::{
     Direction, Hugr, HugrView, Node, Port,
     extension::{
-        ExtensionId, ExtensionRegistry, SignatureError, resolution::ExtensionResolutionError,
+        ExtensionId, ExtensionRegistry, SignatureError, Version,
+        resolution::ExtensionResolutionError,
     },
     hugr::HugrMut,
     ops::{
@@ -119,6 +120,7 @@ impl From<TermKindError> for ImportErrorInner {
 }
 
 #[derive(Debug, Clone, Error)]
+#[non_exhaustive]
 enum ExtensionError {
     /// An extension is missing.
     #[error("Importing the hugr requires extension {missing_ext}, which was not found in the registry. The available extensions are: [{}]",
@@ -139,6 +141,27 @@ enum ExtensionError {
         ext: ExtensionId,
         /// The name of the missing type.
         name: TypeName,
+    },
+
+    /// An unversioned extension symbol cannot be resolved.
+    ///
+    /// These symbols originate from older encoded HUGRs that did not include
+    /// version information for extension symbols.
+    ///
+    /// TODO: Remove the unversioned compatibility path once encoded HUGRs
+    /// without extension version information are no longer supported.
+    /// <http://github.com/Quantinuum/hugr/issues/3086>
+    ///
+    /// We attempt to resolve these symbols by finding the latest matching extension that defines the op or type in [`Context::Extensions`].
+    /// If there is no matching extension, this error is raised.
+    #[error(
+        "Importing the hugr requires an extension symbol named {name} from extension {ext}, but no version of this symbol was found in the loaded extensions."
+    )]
+    UnversionedSymbol {
+        /// The extension that defines the symbol.
+        ext: ExtensionId,
+        /// The name of the missing symbol.
+        name: SmolStr,
     },
 }
 
@@ -511,6 +534,7 @@ impl<'a> Context<'a> {
         Ok(())
     }
 
+    /// Get the identifier of the symbol introduced by a model node.
     fn get_symbol_name(&self, node_id: table::NodeId) -> Result<&'a str, ImportErrorInner> {
         let node_data = self.get_node(node_id)?;
         let name = node_data
@@ -520,6 +544,33 @@ impl<'a> Context<'a> {
         Ok(name)
     }
 
+    /// Get the identifier and version of the symbol introduced by a model node.
+    ///
+    /// Only extension op and type symbols may include version information.
+    ///
+    /// TODO: Remove the `None` path once encoded HUGRs without extension
+    /// version information are no longer supported.
+    /// <http://github.com/Quantinuum/hugr/issues/3086>
+    ///
+    /// The field may be empty if the HUGR was encoded with an older version of
+    /// the model format. In this case, the version is returned as `None`.
+    fn get_extension_symbol_info(
+        &self,
+        node_id: table::NodeId,
+    ) -> Result<(&'a str, Option<&'a Version>), ImportErrorInner> {
+        let node_data = self.get_node(node_id)?;
+        let name = node_data
+            .operation
+            .symbol()
+            .ok_or_else(|| error_invalid!("node {} is expected to be a symbol", node_id))?;
+        let version = node_data
+            .operation
+            .symbol_version()
+            .and_then(|version| version.as_ref());
+        Ok((name, version))
+    }
+
+    /// Return the function signature of a function declaration or definition node.
     fn get_func_signature(
         &mut self,
         func_node: table::NodeId,
@@ -1330,12 +1381,12 @@ impl<'a> Context<'a> {
                 "custom operations expect a symbol application referencing an operation"
             ));
         };
-        let name = self.get_symbol_name(*node)?;
+        let (symbol_name, symbol_version) = self.get_extension_symbol_info(*node)?;
         let args = params
             .iter()
             .map(|param| self.import_term(*param))
             .collect::<Result<Vec<_>, _>>()?;
-        let (extension, name) = self.import_custom_name(name)?;
+        let (extension, name) = self.import_custom_name(symbol_name)?;
         let signature = self.get_node_signature(node_id)?;
 
         // TODO: Currently we do not have the description or any other metadata for
@@ -1343,10 +1394,59 @@ impl<'a> Context<'a> {
         // to declare operations as a node, in which case the description will be attached
         // to that node as metadata.
 
-        // TODO: Set encode and decode the extension version for the custom op.
-
-        let optype = OpType::OpaqueOp(OpaqueOp::new_unversioned(extension, name, args, signature));
+        let extension_version =
+            self.resolve_extension_symbol_version(&extension, &name, symbol_version)?;
+        let optype = OpType::OpaqueOp(match extension_version {
+            Some(version) => OpaqueOp::new(extension, version, name, args, signature),
+            None => OpaqueOp::new_unversioned(extension, name, args, signature),
+        });
         self.make_node(node_id, optype, parent)
+    }
+
+    /// Determine the extension version to store on an imported custom
+    /// operation or type.
+    ///
+    /// - If the model symbol specifies an extension version, return that
+    ///   version.
+    /// - If the model symbol is unversioned, find the latest extension version
+    ///   in the [`Context::extensions`] registry that contains the symbol and
+    ///   return it if it exists.
+    /// - If the model symbol is unversioned and we don't have a matching
+    ///   extensions in [`Context::extensions`], return `None`.
+    ///
+    /// TODO: Remove the unversioned fallback once encoded HUGRs without
+    /// extension version information are no longer supported. Return an
+    /// [`ExtensionError::UnversionedSymbol`] error instead of `Ok(None)` in
+    /// that case.
+    /// <http://github.com/Quantinuum/hugr/issues/3086>
+    fn resolve_extension_symbol_version(
+        &self,
+        extension: &ExtensionId,
+        name: &SmolStr,
+        requested: Option<&Version>,
+    ) -> Result<Option<Version>, ImportErrorInner> {
+        if let Some(requested) = requested {
+            return Ok(Some(requested.clone()));
+        }
+
+        let Some(versions) = self.extensions.versions(extension) else {
+            return Ok(None);
+        };
+
+        // Return the latest extension version that defines the symbol, if any.
+        for ext in versions.iter().rev() {
+            if ext.get_op(name).is_some() || ext.get_type(name).is_some() {
+                return Ok(Some(ext.version().clone()));
+            }
+        }
+
+        // TODO: Remove this fallback once encoded HUGRs without extension
+        // version information are no longer supported.
+        // <http://github.com/Quantinuum/hugr/issues/3086>
+        //
+        // If no extension version defines the symbol, keep the `CustomOp` /
+        // `CustomType` unversioned.
+        Ok(None)
     }
 
     fn import_node_define_alias(
@@ -1582,39 +1682,51 @@ impl<'a> Context<'a> {
                 table::Term::Func { .. } => Err(error_unsupported!("function constant")),
 
                 table::Term::Apply(symbol, args) => {
-                    let name = self.get_symbol_name(*symbol)?;
+                    let (symbol_name, symbol_version) = self.get_extension_symbol_info(*symbol)?;
+                    let (extension, type_name) = self.import_custom_name(symbol_name)?;
+                    let extension_version = self.resolve_extension_symbol_version(
+                        &extension,
+                        &type_name,
+                        symbol_version,
+                    )?;
 
                     let args = args
                         .iter()
                         .map(|arg| self.import_term(*arg))
                         .collect::<Result<Vec<_>, _>>()
                         .map_err(|err| {
-                            error_context!(err, "type argument of custom type `{}`", name)
+                            error_context!(err, "type argument of custom type `{}`", type_name)
                         })?;
 
-                    let (extension, id) = self.import_custom_name(name)?;
+                    let Some(extension_version) = extension_version else {
+                        return Err(ImportErrorInner::Extension(
+                            ExtensionError::UnversionedSymbol {
+                                ext: extension.clone(),
+                                name: type_name.clone(),
+                            },
+                        ));
+                    };
 
-                    let extension_ref =
-                        self.extensions
-                            .get(&extension)
-                            .ok_or_else(|| ExtensionError::Missing {
-                                missing_ext: extension.clone(),
-                                available: self.extensions.ids().cloned().collect(),
-                            })?;
+                    let extension_ref = self
+                        .extensions
+                        .get_req(&extension, Some(&extension_version))
+                        .ok_or_else(|| ExtensionError::Missing {
+                            missing_ext: extension.clone(),
+                            available: self.extensions.ids().cloned().collect(),
+                        })?;
                     let extension_version = extension_ref.version().clone();
 
-                    let ext_type =
-                        extension_ref
-                            .get_type(&id)
-                            .ok_or_else(|| ExtensionError::MissingType {
-                                ext: extension.clone(),
-                                name: id.clone(),
-                            })?;
+                    let ext_type = extension_ref.get_type(&type_name).ok_or_else(|| {
+                        ExtensionError::MissingType {
+                            ext: extension.clone(),
+                            name: type_name.clone(),
+                        }
+                    })?;
 
                     let bound = ext_type.bound(&args);
 
                     Ok(Type::new_extension(CustomType::new(
-                        id,
+                        type_name,
                         args,
                         extension,
                         extension_version,

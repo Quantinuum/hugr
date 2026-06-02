@@ -6,18 +6,18 @@ expression: ast
 
 (mod)
 
-(import core.meta.description)
-
 (import core.adt)
 
 (import core.fn)
 
-(import arithmetic.int.types.int)
+(import core.meta.description)
 
 (import core.nat)
 
+(import arithmetic.int.types.int@0.1.0)
+
 (declare-operation
-  arithmetic.int.ineg
+  arithmetic.int.ineg@0.1.1
   (param ?_0 core.nat)
   (core.fn [(arithmetic.int.types.int ?_0)] [(arithmetic.int.types.int ?_0)])
   (meta

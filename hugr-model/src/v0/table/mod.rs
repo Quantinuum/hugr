@@ -244,6 +244,8 @@ pub enum Operation<'a> {
     Import {
         /// The name of the symbol to be imported.
         name: &'a str,
+        /// The extension version associated with this imported symbol, if known.
+        version: &'a Option<semver::Version>,
     },
 }
 
@@ -258,7 +260,22 @@ impl<'a> Operation<'a> {
             Operation::DeclareAlias(symbol) => Some(symbol.name),
             Operation::DeclareConstructor(symbol) => Some(symbol.name),
             Operation::DeclareOperation(symbol) => Some(symbol.name),
-            Operation::Import { name } => Some(name),
+            Operation::Import { name, .. } => Some(name),
+            _ => None,
+        }
+    }
+
+    /// Returns the extension version associated with the introduced symbol, if any.
+    #[must_use]
+    pub fn symbol_version(&self) -> Option<&'a Option<semver::Version>> {
+        match self {
+            Operation::DefineFunc(symbol)
+            | Operation::DeclareFunc(symbol)
+            | Operation::DeclareAlias(symbol)
+            | Operation::DeclareConstructor(symbol)
+            | Operation::DeclareOperation(symbol)
+            | Operation::DefineAlias(symbol, _) => Some(symbol.version),
+            Operation::Import { version, .. } => Some(version),
             _ => None,
         }
     }
@@ -307,6 +324,8 @@ pub struct Symbol<'a> {
     pub visibility: &'a Option<Visibility>,
     /// The name of the symbol.
     pub name: &'a str,
+    /// The extension version associated with this symbol, if known.
+    pub version: &'a Option<semver::Version>,
     /// The static parameters.
     pub params: &'a [Param<'a>],
     /// The constraints on the static parameters.
@@ -496,8 +515,8 @@ pub enum ModelError {
     /// Invalid variable reference.
     #[error("variable {0} invalid")]
     InvalidVar(VarId),
-    /// Invalid symbol reference.
-    #[error("symbol reference {0} invalid")]
+    /// Invalid symbol identifier.
+    #[error("symbol identifier {0} invalid")]
     InvalidSymbol(NodeId),
     /// The model contains an operation in a place where it is not allowed.
     #[error("unexpected operation on node: {0}")]
