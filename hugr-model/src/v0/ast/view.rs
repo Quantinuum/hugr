@@ -1,6 +1,9 @@
 use std::sync::Arc;
 
-use super::{LinkName, Node, Operation, Param, Region, SeqPart, Symbol, SymbolName, Term, VarName};
+use super::{
+    LinkName, Node, Operation, Param, Region, SeqPart, Symbol, SymbolIdent, SymbolName, Term,
+    VarName,
+};
 use crate::v0::table::{self, NodeId, TermId, VarId, View};
 
 impl<'a> View<'a, TermId> for Term {
@@ -54,7 +57,10 @@ impl<'a> View<'a, NodeId> for Node {
             }
             table::Operation::TailLoop => Operation::TailLoop,
             table::Operation::Conditional => Operation::Conditional,
-            table::Operation::Import { name } => Operation::Import(SymbolName::new(name)),
+            table::Operation::Import { name, version } => Operation::Import(SymbolIdent {
+                name: SymbolName::new(name),
+                version: (*version).clone(),
+            }),
         };
 
         let meta = module.view(node.meta)?;
@@ -99,6 +105,7 @@ impl<'a> View<'a, table::Symbol<'a>> for Symbol {
         Some(Symbol {
             visibility,
             name,
+            version: (*id.version).clone(),
             params,
             constraints,
             signature,
@@ -158,5 +165,16 @@ impl<'a> View<'a, NodeId> for SymbolName {
         let node = module.get_node(id)?;
         let name = node.operation.symbol()?;
         Some(Self(name.into()))
+    }
+}
+
+impl<'a> View<'a, NodeId> for SymbolIdent {
+    fn view(module: &'a table::Module<'a>, id: NodeId) -> Option<Self> {
+        let node = module.get_node(id)?;
+        let name = node.operation.symbol()?;
+        Some(Self {
+            name: SymbolName(name.into()),
+            version: None,
+        })
     }
 }

@@ -1040,7 +1040,12 @@ class Opaque(Type):
         # actual type or a row variable.
         args = [cast(model.Term, arg.to_model()) for arg in self.args]
 
-        return model.Apply(f"{self.extension}.{self.id}", args)
+        if self.extension_version is None:
+            name = f"{self.extension}.{self.id}"
+        else:
+            name = f"{self.extension}.{self.id}@{self.extension_version}"
+
+        return model.Apply(name, args)
 
     def _resolve_used_extensions(
         self, registry: ExtensionRegistry | None = None

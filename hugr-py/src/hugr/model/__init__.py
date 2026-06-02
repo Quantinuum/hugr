@@ -133,13 +133,23 @@ class Param:
 
 @dataclass
 class Symbol:
-    """A named symbol."""
+    """A named symbol.
+
+    Attributes:
+        name: The name of the symbol.
+        visibility: The visibility of the symbol.
+        params: The parameters of the symbol.
+        constraints: The constraints on the symbol's parameters.
+        signature: The signature of the symbol.
+        version: The extension version where this symbol was declared, if any.
+    """
 
     name: str
     visibility: Visibility
     params: Sequence[Param] = field(default_factory=list)
     constraints: Sequence[Term] = field(default_factory=list)
     signature: Term = field(default_factory=Wildcard)
+    version: Version | None = None
 
     def __str__(self):
         """Convert the symbol to its string representation."""
@@ -262,6 +272,7 @@ class Import(Op):
     """Import operation."""
 
     name: str
+    version: Version | None = None
 
     def symbol_name(self) -> str | None:
         return self.name

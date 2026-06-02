@@ -77,3 +77,8 @@ pub fn test_const() {
 pub fn test_entrypoint() {
     binary_roundtrip(include_str!("fixtures/model-entrypoint.edn"));
 }
+
+#[test]
+pub fn test_versioned_symbols() {
+    binary_roundtrip(include_str!("fixtures/model-versioned-symbols.edn"));
+}

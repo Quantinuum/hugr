@@ -82,6 +82,11 @@ impl Module {
     ///
     /// This conversion resolves the names of variables, symbols and links
     /// according to their scoping rules described in the [`scope`] module.
+    ///
+    /// Symbols may be versioned either at their import/declaration/definition
+    /// site or at their use site. Unversioned references will be resolved to
+    /// the latest declared version if one is available.
+    ///
     /// Whenever a symbol is used but not defined in scope, an import node will
     /// be inserted into the module region and all references to that symbol will
     /// refer to the import node. This gives the opportunity to link the missing symbols.
@@ -158,17 +163,30 @@ pub enum Operation {
     /// Operation declarations.
     DeclareOperation(Box<Symbol>),
     /// Symbol imports.
-    Import(SymbolName),
+    Import(SymbolIdent),
 }
 
 impl Operation {
     /// The name of the symbol introduced by this operation, if any.
     #[must_use]
     pub fn symbol_name(&self) -> Option<&SymbolName> {
-        if let Operation::Import(symbol_name) = self {
-            Some(symbol_name)
+        if let Operation::Import(symbol_ident) = self {
+            Some(&symbol_ident.name)
         } else {
             Some(&self.symbol()?.name)
+        }
+    }
+
+    /// The name and version of the symbol introduced by this operation, if any.
+    #[must_use]
+    pub fn symbol_binding(&self) -> Option<(&SymbolName, Option<&semver::Version>)> {
+        match self {
+            Operation::Import(symbol_ident) => {
+                Some((&symbol_ident.name, symbol_ident.version.as_ref()))
+            }
+            _ => self
+                .symbol()
+                .map(|symbol| (&symbol.name, symbol.version.as_ref())),
         }
     }
 
@@ -187,6 +205,15 @@ impl Operation {
     }
 }
 
+/// An identifier for a possibly versioned symbol in the hugr AST.
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct SymbolIdent {
+    /// The symbol name.
+    pub name: SymbolName,
+    /// The extension version associated with the symbol use, if specified.
+    pub version: Option<semver::Version>,
+}
+
 /// A symbol declaration in the hugr AST.
 ///
 /// See [`table::Symbol`] for the table representation.
@@ -198,6 +225,8 @@ pub struct Symbol {
     pub visibility: Option<Visibility>,
     /// The name of the symbol.
     pub name: SymbolName,
+    /// The extension version associated with this symbol declaration, if any.
+    pub version: Option<semver::Version>,
     /// The parameters of the symbol.
     pub params: Box<[Param]>,
     /// Constraints that the symbol imposes on the parameters.j
@@ -256,7 +285,7 @@ pub enum Term {
     /// Local variable, identified by its name.
     Var(VarName),
     /// Symbol application.
-    Apply(SymbolName, Arc<[Term]>),
+    Apply(SymbolIdent, Arc<[Term]>),
     /// List of static data.
     List(Arc<[SeqPart]>),
     /// Static literal value.

@@ -25,7 +25,7 @@ use pest_parser::{HugrParser, Rule};
 use smol_str::SmolStr;
 use thiserror::Error;
 
-use crate::v0::ast::{LinkName, Module, Operation, SeqPart};
+use crate::v0::ast::{LinkName, Module, Operation, SeqPart, SymbolIdent};
 use crate::v0::{Literal, RegionKind};
 
 use super::{Node, Package, Param, Region, Symbol, VarName, Visibility};
@@ -47,6 +47,21 @@ fn parse_symbol_name(pair: Pair<Rule>) -> ParseResult<SymbolName> {
     Ok(SymbolName(pair.as_str().into()))
 }
 
+fn parse_version(pair: Pair<Rule>) -> ParseResult<semver::Version> {
+    debug_assert_eq!(Rule::version, pair.as_rule());
+    pair.as_str()
+        .parse()
+        .map_err(|_| ParseError::custom("invalid semver version", pair.as_span()))
+}
+
+fn parse_symbol_ident(pair: Pair<Rule>) -> ParseResult<SymbolIdent> {
+    debug_assert_eq!(Rule::symbol_ident, pair.as_rule());
+    let mut pairs = pair.into_inner();
+    let name = parse_symbol_name(pairs.next().unwrap())?;
+    let version = pairs.next().map(parse_version).transpose()?;
+    Ok(SymbolIdent { name, version })
+}
+
 fn parse_var_name(pair: Pair<Rule>) -> ParseResult<VarName> {
     debug_assert_eq!(Rule::term_var, pair.as_rule());
     Ok(VarName(pair.as_str()[1..].into()))
@@ -66,7 +81,7 @@ fn parse_term(pair: Pair<Rule>) -> ParseResult<Term> {
         Rule::term_var => Term::Var(parse_var_name(pair)?),
         Rule::term_apply => {
             let mut pairs = pair.into_inner();
-            let symbol = parse_symbol_name(pairs.next().unwrap())?;
+            let symbol = parse_symbol_ident(pairs.next().unwrap())?;
             let terms = pairs.map(parse_term).collect::<ParseResult<_>>()?;
             Term::Apply(symbol, terms)
         }
@@ -199,8 +214,8 @@ fn parse_node(pair: Pair<Rule>) -> ParseResult<Node> {
         Rule::node_cond => Operation::Conditional,
 
         Rule::node_import => {
-            let name = parse_symbol_name(pairs.next().unwrap())?;
-            Operation::Import(name)
+            let symbol_ident = parse_symbol_ident(pairs.next().unwrap())?;
+            Operation::Import(symbol_ident)
         }
 
         Rule::node_custom => {
@@ -302,7 +317,7 @@ fn parse_symbol(pair: Pair<Rule>) -> ParseResult<Symbol> {
             _ => unreachable!("Expected 'public' or 'private', got {}", pair.as_str()),
         })
         .transpose()?;
-    let name = parse_symbol_name(pairs.next().unwrap())?;
+    let SymbolIdent { name, version } = parse_symbol_ident(pairs.next().unwrap())?;
     let params = parse_params(&mut pairs)?;
     let constraints = parse_constraints(&mut pairs)?;
     let signature = parse_term(pairs.next().unwrap())?;
@@ -310,6 +325,7 @@ fn parse_symbol(pair: Pair<Rule>) -> ParseResult<Symbol> {
     Ok(Symbol {
         visibility,
         name,
+        version,
         params,
         constraints,
         signature,
@@ -454,6 +470,7 @@ macro_rules! impl_from_str {
 }
 
 impl_from_str!(SymbolName, symbol_name, parse_symbol_name);
+impl_from_str!(SymbolIdent, symbol_ident, parse_symbol_ident);
 impl_from_str!(VarName, term_var, parse_var_name);
 impl_from_str!(LinkName, link_name, parse_link_name);
 impl_from_str!(Term, term, parse_term);
