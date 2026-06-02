@@ -138,10 +138,19 @@ edges; see [operations](#node-operations).
 
 ### `Order` edges
 
-`Order` edges represent explicit constraints on ordering between nodes
-(e.g. useful for stateful operations). These can be seen as
-local value edges of unit type `()`, i.e. that pass no data, and where
-the source and target nodes must have the same parent. There can be at
+`Order` edges provide a way to express constraints on ordering between nodes
+(e.g. useful for stateful operations). They can be seen as local value edges
+of unit type `()`, i.e. that pass no data - or where the data is hidden,
+rather than represented in the graph.
+
+Nonetheless, like `Value` edges, an order edge indicates that the source node
+will, at runtime, produce some hidden state or value that is (in some way)
+consumed by the edge's target; thus during execution we can at least ask
+*whether* that state (or unit value) has been produced - no later than
+evaluation of the node being complete, see [Evaluation Semantics](#evaluation-semantics).
+# even if not *what* value was produced.
+
+Source and target nodes must have the same parent. There can be at
 most one `Order` edge between any two nodes.
 
 ### `ControlFlow` edges
@@ -297,12 +306,6 @@ flowchart
 
 (control-flow)=
 ### Control Flow
-
-In a dataflow graph, the evaluation semantics are simple: all nodes in
-the graph are necessarily evaluated, in some order (perhaps parallel)
-respecting the Dataflow and Order edges. This may include interleaving or
-overlapping evaluation of siblings and descendants as long as said edges
-are respected.
 
 The following operations are used to
 express control flow, i.e. conditional or repeated evaluation.
@@ -716,6 +719,30 @@ flowchart
     F == "angle" ==> G
     linkStyle 12,13,14,15,16,17 stroke:#ff3,stroke-width:4px;
 ```
+
+(evaluation-semantics)=
+## Evaluation Semantics
+
+In a dataflow graph, the evaluation semantics are simple: all nodes in the
+graph are necessarily evaluated. (For hierarchical nodes, this may entail
+evaluating some children, according to the node.) Evaluation may occur in
+some order, and for nodes that execute strictly and atomically (according to
+implementation) this will respect the Dataflow and Order edges. However *in
+general* Hugr allows:
+* Nodes to execute non-atomically, perhaps in parallel/overlapping other nodes
+* Nodes to execute partially or totally before all inputs are ready (if the
+ op is able to ``do'' anything without all its inputs)
+  * A specific exception here is that a node $n$ may not produce its `Order`
+   output until all other nodes connected to $n$'s `Order` input have produced
+   theirs.
+  * Similarly, nodes with side-effects (e.g. panic or print) may not have those
+  side effects until all their `Order` inputs are ready.
+
+This applies both to extension ops and core constructs such as DFG, CFG, or a
+Call to a function, but may be refined (introducing more precise guarantees
+such as atomicity or strictness) for specific ops and/or by specific
+implementations.
+
 
 ## Exception Handling
 
