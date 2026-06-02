@@ -137,7 +137,7 @@ class Package:
         #
         # TODO: Remove the None compatibility path once encoded HUGRs without
         # extension version information are no longer supported.
-        # <http://github.com/Quantinuum/hugr/issues/???>
+        # <http://github.com/Quantinuum/hugr/issues/3086>
         #
         # If model import leaves a custom op/type version as None, this registry
         # pass selects the latest registered extension version. That is only a

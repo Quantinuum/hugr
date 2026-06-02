@@ -275,7 +275,7 @@ impl<'a> SymbolTable<'a> {
 ///
 /// TODO: Remove the legacy unversioned path once encoded HUGRs without
 /// extension version information are no longer supported.
-/// <http://github.com/Quantinuum/hugr/issues/???>
+/// <http://github.com/Quantinuum/hugr/issues/3086>
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 struct SymbolKey<'a> {
     name: SymbolName<'a>,

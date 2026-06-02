@@ -32,7 +32,7 @@ impl<'a> Context<'a> {
     ///
     /// TODO: Remove the `None` compatibility path once encoded HUGRs without
     /// extension version information are no longer supported.
-    /// <http://github.com/Quantinuum/hugr/issues/???>
+    /// <http://github.com/Quantinuum/hugr/issues/3086>
     pub fn new(bump: &'a Bump) -> Self {
         Self {
             module: table::Module::default(),
@@ -363,7 +363,7 @@ impl<'a> Context<'a> {
     ///
     /// TODO: Remove the legacy unversioned fallback once encoded HUGRs without
     /// extension version information are no longer supported.
-    /// <http://github.com/Quantinuum/hugr/issues/???>
+    /// <http://github.com/Quantinuum/hugr/issues/3086>
     ///
     /// When there is no symbol with this name in scope, we create a new import
     /// node in the module and record that the symbol has been implicitly

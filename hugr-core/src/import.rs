@@ -150,7 +150,7 @@ enum ExtensionError {
     ///
     /// TODO: Remove the unversioned compatibility path once encoded HUGRs
     /// without extension version information are no longer supported.
-    /// <http://github.com/Quantinuum/hugr/issues/???>
+    /// <http://github.com/Quantinuum/hugr/issues/3086>
     ///
     /// We attempt to resolve these symbols by finding the latest matching extension that defines the op or type in [`Context::Extensions`].
     /// If there is no matching extension, this error is raised.
@@ -550,7 +550,7 @@ impl<'a> Context<'a> {
     ///
     /// TODO: Remove the `None` path once encoded HUGRs without extension
     /// version information are no longer supported.
-    /// <http://github.com/Quantinuum/hugr/issues/???>
+    /// <http://github.com/Quantinuum/hugr/issues/3086>
     ///
     /// The field may be empty if the HUGR was encoded with an older version of
     /// the model format. In this case, the version is returned as `None`.
@@ -1418,7 +1418,7 @@ impl<'a> Context<'a> {
     /// extension version information are no longer supported. Return an
     /// [`ExtensionError::UnversionedSymbol`] error instead of `Ok(None)` in
     /// that case.
-    /// <http://github.com/Quantinuum/hugr/issues/???>
+    /// <http://github.com/Quantinuum/hugr/issues/3086>
     fn resolve_extension_symbol_version(
         &self,
         extension: &ExtensionId,
@@ -1442,7 +1442,7 @@ impl<'a> Context<'a> {
 
         // TODO: Remove this fallback once encoded HUGRs without extension
         // version information are no longer supported.
-        // <http://github.com/Quantinuum/hugr/issues/???>
+        // <http://github.com/Quantinuum/hugr/issues/3086>
         //
         // If no extension version defines the symbol, keep the `CustomOp` /
         // `CustomType` unversioned.
