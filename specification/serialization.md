@@ -105,7 +105,7 @@ used by the binary format.
 ## The `hugr-model` intermediate serialization format
 
 `hugr-model` is the serialization-oriented representation of HUGR. It sits
-between the runtime graph implementation and the concrete wire formats.
+between the in-memory HUGR objects and the serialized formats.
 
 The runtime HUGR data structures are optimized for construction, querying, and
 transformation. The model data structures are optimized for a stable serialized
