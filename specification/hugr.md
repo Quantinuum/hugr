@@ -733,7 +733,7 @@ general* Hugr allows:
 * Nodes to execute non-atomically, perhaps in parallel/overlapping other nodes
 * Nodes to execute partially or totally before all inputs are ready (if the
   op is able to "do" anything without all its inputs)
-  * A specific exception here is that a node $n$ may not produce its `Order`
+  * A specific exception here is that a node $n$ must not produce its `Order`
    output until all other nodes connected to $n$'s `Order` input have produced
    theirs.
   * Similarly, a node with side-effects (e.g. panic or print) must not have
