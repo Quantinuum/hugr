@@ -9,11 +9,7 @@ Goals:
 - Fast serialization/deserialization in Rust.
 - Ability to generate and consume from Python.
 - Reasonably small files and payloads.
-- Ability to send over the wire. Nexus will need to do things like:
-  - Store the program in a database
-  - Validate the data
-  - **Most important:** version the data for compiler/runtime compatibility
-  - Migrate from older versions of the data to newer versions, to keep backwards compatibility with older compiled programs.
+- Ability to send over the wire.
 
 Non-goals:
 
