@@ -4,6 +4,8 @@
 
 use itertools::Itertools;
 
+use std::collections::HashSet;
+
 use super::{PatchHugrMut, PatchVerification};
 use crate::core::HugrNode;
 use crate::hugr::HugrMut;
@@ -72,24 +74,12 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
             )
         };
 
-        // Order edges. Any paths A -> DFG -> B, where both edges are Order edges,
-        // must be preserved as A -> B. (These new edges may be redundant if there
-        // are paths through the nodes *inside* the DFG, but that's fine.)
-
-        for ((src_n, src_p), (tgt_n, tgt_p)) in h
-            .linked_outputs(n, oth_in)
-            .collect::<Vec<_>>()
-            .into_iter()
-            .cartesian_product(&h.linked_inputs(n, oth_out).collect::<Vec<_>>())
-        {
-            h.connect(src_n, src_p, *tgt_n, *tgt_p);
-        }
-
         let parent = h.get_parent(n).unwrap();
         let [input, output] = h.get_io(n).unwrap();
         for ch in h.children(n).skip(2).collect::<Vec<_>>() {
             h.set_parent(ch, parent);
         }
+        let internal_order_path = is_order_reachable(h, input, output);
 
         // DFG Inputs.
         for inp in h.node_inputs(n).collect::<Vec<_>>() {
@@ -97,13 +87,17 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
             assert!(inp == oth_in || dfg_preds.len() == 1); // Any number of order preds
             h.disconnect(n, inp); // These disconnects allow permutations to work trivially.
             let outp = OutgoingPort::from(inp.index());
-            let targets = h.linked_inputs(input, outp).collect::<Vec<_>>();
+            let mut targets = h.linked_inputs(input, outp).collect::<Vec<_>>();
             h.disconnect(input, outp);
+            if inp == oth_in && !internal_order_path {
+                // Ensure the order chain continues from the DFG's order-predecessors to its order-successors,
+                // even if e.g. the interior of the DFG is disconnected. (Check could be more precise.)
+                targets.extend(h.linked_inputs(n, oth_out));
+            }
 
-            for ((src_n, src_p), (tgt_n, tgt_p)) in
-                dfg_preds.into_iter().cartesian_product(&targets)
+            for ((src_n, src_p), (tgt_n, tgt_p)) in dfg_preds.into_iter().cartesian_product(targets)
             {
-                h.connect(src_n, src_p, *tgt_n, *tgt_p);
+                h.connect(src_n, src_p, tgt_n, tgt_p);
             }
         }
         // DFG Outputs.
@@ -113,11 +107,11 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
             assert!(outport == oth_out || sources.len() == 1); // Any number of order sources
             h.disconnect(output, inpp);
 
-            let targets = h.linked_inputs(n, outport).collect::<Vec<_>>();
+            let dfg_succs = h.linked_inputs(n, outport).collect::<Vec<_>>();
             h.disconnect(n, outport);
-            for ((src_n, src_p), (tgt_n, tgt_p)) in sources.into_iter().cartesian_product(&targets)
+            for ((src_n, src_p), (tgt_n, tgt_p)) in sources.into_iter().cartesian_product(dfg_succs)
             {
-                h.connect(src_n, src_p, *tgt_n, *tgt_p);
+                h.connect(src_n, src_p, tgt_n, tgt_p);
             }
         }
         h.remove_node(input);
@@ -126,6 +120,24 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
         h.remove_node(n);
         Ok([n, input, output])
     }
+}
+
+/// Determines whether there is a path along [Order] edges only from `src` to `tgt`.
+///
+/// [Order]: crate::types::EdgeKind::StateOrder
+fn is_order_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) -> bool {
+    let mut visited = HashSet::new();
+    let mut to_visit = vec![src];
+    while let Some(n) = to_visit.pop() {
+        if visited.insert(n) {
+            if n == tgt {
+                return true;
+            }
+            let order_outport = h.get_optype(n).other_output_port().unwrap();
+            to_visit.extend(h.linked_inputs(n, order_outport).map(|(n, _)| n));
+        }
+    }
+    false
 }
 
 #[cfg(test)]
@@ -143,7 +155,7 @@ mod test {
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
     use crate::ops::{OpType, Value};
-    use crate::std_extensions::arithmetic::float_types;
+    use crate::std_extensions::arithmetic::float_types::{self, float64_type};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
     use crate::types::Signature;
@@ -151,7 +163,7 @@ mod test {
     use crate::{Direction, HugrView, Port, type_row};
     use crate::{Hugr, Wire};
 
-    use super::InlineDFG;
+    use super::{InlineDFG, is_order_reachable};
 
     fn find_dfgs<H: HugrView>(h: &H) -> Vec<H::Node> {
         h.entry_descendants()
@@ -308,11 +320,11 @@ mod test {
          *           |  | |?.  Cst | NB. Order edge Input to LCst
          *           |  | |? . |   | NB. Optional(o2) Order edge from Input to RZ
          *           |  | |?  LCst |
-         *           |  | \? /     |
-         *           |  |  RZ      |
-         *           |  |  |       |
-         *           |  |  meas    |
-         *           |  |  |? \    |
+         *           |  | \? /  .  |
+         *           |  |  RZ   .  |
+         *           |  |  |    .  |  Order edge LCst to if
+         *           |  |  meas .  |
+         *           |  |  |? \ .  |
          *           |  |  |? if   | NB. Optional(o3) Order edge from meas to Output
          *           |  |  |? .    | NB. Order edge if to Output
          *           |  \--|-------/
@@ -343,6 +355,7 @@ mod test {
         if_n.case_builder(0)?.finish_with_outputs([])?;
         if_n.case_builder(1)?.finish_with_outputs([])?;
         let if_n = if_n.finish_sub_container()?;
+        inner.add_other_wire(f.node(), if_n.node());
         inner.add_other_wire(if_n.node(), inner.output().node());
         if o3 {
             inner.add_other_wire(m.node(), inner.output().node());
@@ -373,19 +386,19 @@ mod test {
                 .collect::<HashSet<_>>()
         };
         // h_a, and optionally h_b, should have Order edges to the F64 load_const,
-        // optionally the Rz, also the Order-successors of the DFG
+        // optionally the Rz
         let input_ord_srcs = HashSet::from_iter(once(h_a.node()).chain(o1.then_some(h_b.node())));
         let input_ord_tgts = HashSet::from_iter(once(f.node()).chain(o2.then_some(r.node())));
 
         // h_a2, and optionally the CX, should have Order edges from the if,
-        // optionally meas, and the Order-predecessors of the DFG
+        // optionally meas
         let output_ord_tgts = HashSet::from_iter(once(h_a2.node()).chain(o4.then_some(cx.node())));
         let output_ord_srcs = HashSet::from_iter(once(if_n.node()).chain(o3.then_some(m.node())));
 
         for input_ord_src in &input_ord_srcs {
             assert_eq!(
                 order_neighbours(*input_ord_src, Direction::Outgoing),
-                HashSet::from_iter(input_ord_tgts.union(&output_ord_tgts).copied())
+                input_ord_tgts
             );
         }
         for input_ord_tgt in &input_ord_tgts {
@@ -403,9 +416,56 @@ mod test {
         for output_ord_tgt in &output_ord_tgts {
             assert_eq!(
                 order_neighbours(*output_ord_tgt, Direction::Incoming),
-                HashSet::from_iter(output_ord_srcs.union(&input_ord_srcs).copied())
+                output_ord_srcs
             );
         }
         Ok(())
+    }
+
+    fn check_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) {
+        let mut visited = HashSet::new();
+        let mut to_visit = vec![src];
+        while let Some(n) = to_visit.pop() {
+            if visited.insert(n) {
+                if n == tgt {
+                    return;
+                }
+                to_visit.extend(h.output_neighbours(n));
+            }
+        }
+        panic!("Node {tgt:?} not reachable from {src:?}");
+    }
+
+    #[test]
+    fn order_edge_chain_broken() {
+        let mut h = DFGBuilder::new(endo_sig(vec![qb_t()])).unwrap();
+        let [q1] = h.input_wires_arr();
+        let qfree = h
+            .add_dataflow_op(test_quantum_extension::q_discard(), [q1])
+            .unwrap();
+        assert_eq!(qfree.num_value_outputs(), 0);
+        let mut inner = h.dfg_builder(inout_sig([], [float64_type()]), []).unwrap();
+        let f = inner.add_load_value(float_types::ConstF64::new(1.0));
+        let inner = inner.finish_with_outputs([f]).unwrap();
+        let [f] = inner.outputs_arr();
+        let qalloc = h
+            .add_dataflow_op(test_quantum_extension::q_alloc(), [])
+            .unwrap();
+        let [q2] = qalloc.outputs_arr();
+        let [q2] = h
+            .add_dataflow_op(test_quantum_extension::rz_f64(), [q2, f])
+            .unwrap()
+            .outputs_arr();
+
+        h.add_other_wire(qfree.node(), inner.node());
+        h.add_other_wire(inner.node(), qalloc.node());
+        let mut h = h.finish_hugr_with_outputs([q2]).unwrap();
+        assert!(is_order_reachable(&h, qfree.node(), qalloc.node()));
+
+        h.apply_patch(InlineDFG(*inner.handle())).unwrap();
+        h.validate().unwrap();
+        // These were both failing prior to https://github.com/Quantinuum/hugr/pull/3072
+        check_reachable(&h, qfree.node(), qalloc.node());
+        assert!(is_order_reachable(&h, qfree.node(), qalloc.node()));
     }
 }

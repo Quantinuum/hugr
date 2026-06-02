@@ -13,6 +13,7 @@ mod tests;
 
 use ::petgraph::visit as pv;
 use serde::de::Deserialize;
+use std::any::type_name;
 use std::borrow::Cow;
 use std::collections::HashMap;
 
@@ -30,7 +31,7 @@ use crate::core::HugrNode;
 use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::{DefaultPGNodeMap, PortgraphNodeMap};
 use crate::hugr::views::syn_edge::SynEdgeWrapper;
-use crate::metadata::{Metadata, RawMetadataValue};
+use crate::metadata::{Metadata, MetadataError, RawMetadataValue};
 use crate::ops::{OpParent, OpTag, OpTrait, OpType, handle::NodeHandle};
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
@@ -110,6 +111,31 @@ pub trait HugrView: HugrInternals {
             .chain(<M as Metadata>::ALIASES.iter().copied())
             .find_map(|key| self.get_metadata_any(node, key))
             .and_then(|value| <<M as Metadata>::Type<'_> as Deserialize>::deserialize(value).ok())
+    }
+
+    /// Returns the metadata associated with a node, differentiating between a missing and
+    /// invalid payload.
+    ///
+    /// If there is no metadata found with a key matching `M::KEY` or `M::ALIASES`, returns Ok(None)
+    /// If metadata is present but it does not deserialize into M, return Err
+    /// Otherwise, return Ok(Some(metadata)).
+    #[inline]
+    fn try_get_metadata<M: Metadata>(
+        &self,
+        node: Self::Node,
+    ) -> Result<Option<<M as Metadata>::Type<'_>>, MetadataError> {
+        if let Some(raw_value) = std::iter::once(<M as Metadata>::KEY)
+            .chain(<M as Metadata>::ALIASES.iter().copied())
+            .find_map(|key| self.get_metadata_any(node, key))
+        {
+            <<M as Metadata>::Type<'_> as Deserialize>::deserialize(raw_value)
+                .map_err(|json_err| {
+                    MetadataError::MetadataDeserializationError(type_name::<M>(), json_err)
+                })
+                .map(Some)
+        } else {
+            Ok(None)
+        }
     }
 
     /// Returns a metadata entry associated with a node and a string key.

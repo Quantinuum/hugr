@@ -1281,7 +1281,7 @@ mod test {
             _ => panic!("unexpected number of args to the op!"),
         };
         insta.bind(|| {
-            let hugr = single_op_hugr(concrete.into());
+            let mut hugr = single_op_hugr(concrete.into());
             check_emission!(hugr, int_llvm_ctx);
         });
     }
@@ -1296,7 +1296,7 @@ mod test {
     #[case::imod_s("imod_s", 3)]
     fn test_binop_emission(int_llvm_ctx: TestContext, #[case] op: String, #[case] width: u8) {
         let ext_op = make_int_op(op.clone(), width);
-        let hugr = test_binary_int_op(ext_op, width);
+        let mut hugr = test_binary_int_op(ext_op, width);
         check_emission!(op.clone(), hugr, int_llvm_ctx);
     }
 
@@ -1315,7 +1315,7 @@ mod test {
         let ext_op = int_ops::EXTENSION
             .instantiate_extension_op(&op, [u64::from(from).into(), u64::from(to).into()])
             .unwrap();
-        let hugr = test_int_op_with_results::<1>(ext_op, from, None, out_ty);
+        let mut hugr = test_int_op_with_results::<1>(ext_op, from, None, out_ty);
 
         check_emission!(
             format!("{}_{}_{}", op.clone(), from, to),
@@ -1337,7 +1337,7 @@ mod test {
         let ext_op = int_ops::EXTENSION
             .instantiate_extension_op(&op, [u64::from(from).into(), u64::from(to).into()])
             .unwrap();
-        let hugr = test_int_op_with_results::<1>(ext_op, from, None, out_ty.into());
+        let mut hugr = test_int_op_with_results::<1>(ext_op, from, None, out_ty.into());
 
         check_emission!(
             format!("{}_{}_{}", op.clone(), from, to),
@@ -1351,7 +1351,7 @@ mod test {
     #[case::ilt_s("ilt_s", 0)]
     fn test_cmp_emission(int_llvm_ctx: TestContext, #[case] op: String, #[case] width: u8) {
         let ext_op = make_int_op(op.clone(), width);
-        let hugr = test_binary_icmp_op(ext_op, width);
+        let mut hugr = test_binary_icmp_op(ext_op, width);
         check_emission!(op.clone(), hugr, int_llvm_ctx);
     }
 

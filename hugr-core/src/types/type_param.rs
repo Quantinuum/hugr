@@ -454,7 +454,7 @@ impl Term {
     }
 
     /// Checks whether the term is parametric, i.e. it (recursively) contains variables.
-    pub(crate) fn is_parametrized(&self) -> bool {
+    pub fn is_parametrized(&self) -> bool {
         match self {
             Term::SumType(SumType::General { rows }) => {
                 rows.iter().any(|row| row.is_parametrized())

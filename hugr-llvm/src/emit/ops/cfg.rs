@@ -239,7 +239,7 @@ mod test {
         llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
         let t1 = INT_TYPES[0].clone();
         let t2 = INT_TYPES[1].clone();
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins([t1.clone(), t2.clone()])
             .with_outs([t2.clone()])
             .with_extensions(ExtensionRegistry::new([
@@ -288,7 +288,7 @@ mod test {
     #[rstest]
     fn nested(llvm_ctx: TestContext) {
         let t1 = HugrType::new_unit_sum(3);
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins(vec![t1.clone(), bool_t()])
             .with_outs([bool_t()])
             .finish(|mut builder| {

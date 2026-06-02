@@ -26,6 +26,7 @@ pub fn float64_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
         FLOAT_TYPE_ID,
         vec![],
         EXTENSION_ID,
+        VERSION,
         TypeBound::Copyable,
         extension_ref,
     )

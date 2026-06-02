@@ -15,7 +15,9 @@ use rstest::fixture;
 
 use crate::{
     custom::{CodegenExtsBuilder, CodegenExtsMap},
-    emit::{EmitHugr, EmitModuleContext, Namer, test::Emission},
+    emit::{
+        EmitHugr, EmitModuleContext, Namer, debug_info::test::add_random_debug_info, test::Emission,
+    },
     types::{TypeConverter, TypingSession},
     utils::fat::FatExt as _,
 };
@@ -169,8 +171,11 @@ impl TestContext {
     /// by `entry_point` in the inner module.
     ///
     /// That function must take no arguments and return FFI-compatible type `T`.
-    pub fn exec_hugr<T>(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> T {
-        let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
+    pub fn exec_hugr<T>(&self, mut hugr: THugrView, entry_point: impl AsRef<str>) -> T {
+        // We add random debug info to all test HUGRs for coverage.
+        add_random_debug_info(&mut hugr);
+        let emission =
+            Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr(), true).unwrap();
         emission.verify().unwrap();
 
         emission.jit_exec::<T>(entry_point).unwrap()
@@ -226,8 +231,11 @@ impl TestContext {
     ///
     /// For this to work, [`Emission::exec_panicking`] must be used together with the
     /// [`crate::emit::test::PanicTestPreludeCodegen`].
-    pub fn exec_hugr_panicking(&self, hugr: THugrView, entry_point: impl AsRef<str>) -> String {
-        let emission = Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr()).unwrap();
+    pub fn exec_hugr_panicking(&self, mut hugr: THugrView, entry_point: impl AsRef<str>) -> String {
+        // We add random debug info to all test HUGRs for coverage.
+        add_random_debug_info(&mut hugr);
+        let emission =
+            Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr(), true).unwrap();
         emission.verify().unwrap();
 
         emission.exec_panicking(entry_point).unwrap()

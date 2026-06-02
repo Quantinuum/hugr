@@ -6,24 +6,24 @@ expression: ast
 
 (mod)
 
-(import core.order_hint.output_key)
-
-(import core.order_hint.key)
-
 (import core.fn)
-
-(import core.order_hint.input_key)
-
-(import core.order_hint.order)
 
 (import core.meta.description)
 
-(import arithmetic.int.types.int)
-
 (import core.nat)
 
+(import core.order_hint.input_key)
+
+(import core.order_hint.key)
+
+(import core.order_hint.order)
+
+(import core.order_hint.output_key)
+
+(import arithmetic.int.types.int@0.1.0)
+
 (declare-operation
-  arithmetic.int.ineg
+  arithmetic.int.ineg@0.1.1
   (param ?_0 core.nat)
   (core.fn [(arithmetic.int.types.int ?_0)] [(arithmetic.int.types.int ?_0)])
   (meta

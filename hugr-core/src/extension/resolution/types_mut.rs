@@ -121,7 +121,7 @@ pub fn resolve_op_types_extensions(
         // Ignore optypes that do not store a signature.
         OpType::Module(_) | OpType::AliasDecl(_) | OpType::AliasDefn(_) => {}
     }
-    Ok(used.into_iter())
+    Ok(used.into_iter().map(|(_, _, ext)| ext))
 }
 
 /// Update all weak Extension pointers in the [`CustomType`]s inside a [Signature].
@@ -197,13 +197,20 @@ pub(super) fn resolve_custom_type_exts(
     }
 
     let ext_id = custom.extension();
-    let ext = extensions.get(ext_id).ok_or_else(|| {
-        ExtensionResolutionError::missing_type_extension(node, custom.name(), ext_id, extensions)
-    })?;
+    let (version, ext) = extensions
+        .get_req(ext_id, custom.extension_version())
+        .ok_or_else(|| {
+            ExtensionResolutionError::missing_type_extension(
+                node,
+                custom.name(),
+                ext_id,
+                extensions,
+            )
+        })?;
 
     // Add the extension to the used extensions registry,
     // and update the CustomType with the valid pointer.
-    used_extensions.register(ext_id.clone(), ext.clone());
+    used_extensions.register(ext_id.clone(), version.clone(), ext.clone());
     custom.update_extension(ext.clone());
 
     Ok(())

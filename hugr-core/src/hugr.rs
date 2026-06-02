@@ -313,7 +313,7 @@ impl Hugr {
             let op = &mut self.op_types[pg_node];
 
             if let Some(extension) = resolve_op_extensions(node, op, extensions)? {
-                used_extensions.register_updated_ref(extension);
+                used_extensions.register(extension.clone());
             }
             used_extensions.extend(
                 resolve_op_types_extensions(Some(node), op, &weak_extensions)?.map(|weak| {
@@ -874,7 +874,7 @@ pub(crate) mod test {
         });
 
         let mut package = simple_package();
-        package.extensions.register(my_ext).unwrap();
+        package.extensions.register(my_ext);
         let mut hugr_str = Vec::new();
         package
             .store(&mut hugr_str, EnvelopeConfig::default())

@@ -504,7 +504,7 @@ impl OpType {
         let mut reg = collect_op_types_extensions(None, self)?;
         // And on the operation definition itself.
         if let Some(ext) = collect_op_extension(None, self)? {
-            reg.register_updated(ext);
+            reg.register(ext);
         }
         reg.extend_with_dependencies()?;
         Ok(reg)

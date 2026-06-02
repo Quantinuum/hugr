@@ -5,6 +5,8 @@ from collections.abc import Generator, Iterable
 from dataclasses import dataclass, field
 from typing import cast
 
+from semver import Version
+
 import hugr.model as model
 from hugr import val
 from hugr.hugr import InPort, OutPort
@@ -175,6 +177,68 @@ def _collect_meta_order_keys(node: model.Node) -> list[int]:
     return keys
 
 
+# Identifier for a symbol in the model. Normally a string separated by dots.
+#
+# These can represent extension ops and types (e.g. `myext.myop`), but also
+# built-in symbols (e.g. `core.fn`).
+SymbolName = str
+
+
+class SymbolVersions:
+    """Versioned bindings for a single root symbol name.
+
+    Only extension ops and types have versions. All other symbols are expected
+    to be unversioned, but we cannot differentiate between them and validate the
+    property at this stage of the import.
+    """
+
+    versions: dict[Version | None, model.Node]
+
+    def __init__(self) -> None:
+        self.versions = {}
+
+    def insert(
+        self, name: SymbolName, version: Version | None, node: model.Node
+    ) -> None:
+        """Record one version binding for this symbol.
+
+        A single model node can only introduce one version of a symbol. Seeing
+        the same name/version pair twice is therefore a duplicate binding, not
+        another version attached to an existing node.
+        """
+        if version in self.versions:
+            error = f"Duplicate symbol name `{name}`."
+            raise ModelImportError(error, node)
+
+        self.versions[version] = node
+
+    def resolve_unversioned(self) -> Version | None:
+        """Resolve an unversioned use of this symbol.
+
+        If there is an explicit unversioned declaration of a symbol, it is used.
+        If there is no unversioned binding, the latest explicit version declared
+        for the symbol is used instead.
+
+        # Example:
+        ```lisp
+        ;; extA has an explicit unversioned import
+        (import extA@1.0)
+        (import extA)
+
+        ;; extB has only versioned imports
+        (import extB@1.0)
+
+        (meta extA 1) ;; Uses the unversioned declaration
+        (meta extB 1) ;; Uses the latest versioned declaration
+        ```
+        """
+        if None in self.versions:
+            return None
+
+        versions = [version for version in self.versions if version is not None]
+        return max(versions) if versions else None
+
+
 class ModelImport:
     """Helper to import a Hugr."""
 
@@ -185,7 +249,7 @@ class ModelImport:
     static_edges: list[tuple[Node, Node]]
 
     module: model.Module
-    symbols: dict[str, model.Node]
+    symbols: dict[SymbolName, SymbolVersions]
     fn_nodes: dict[str, Node]
     fn_calls: list[tuple[str, Node]]
     hugr: Hugr
@@ -203,16 +267,36 @@ class ModelImport:
         self.fn_calls = []
 
         for node in module.root.children:
-            symbol_name = node.operation.symbol_name()
+            self.record_root_symbol(node)
 
-            if symbol_name is None:
-                continue
+    def record_root_symbol(self, node: model.Node) -> None:
+        """Record the symbol introduced by a root module node, if any."""
+        symbol = _operation_symbol(node.operation, node)
+        if symbol is None:
+            return
 
-            if symbol_name in self.symbols:
-                error = f"Duplicate symbol name `{symbol_name}`."
-                raise ModelImportError(error, node)
+        name, version = symbol
+        versions = self.symbols.setdefault(name, SymbolVersions())
+        versions.insert(name, version, node)
 
-            self.symbols[symbol_name] = node
+    def symbol_version(
+        self, name: SymbolName, version: Version | None
+    ) -> Version | None:
+        """Resolve a symbol version from the model import context.
+
+        If a version is explicitly provided, it is returned as is.
+        Otherwise, an exact unversioned model binding is preferred, then the
+        latest explicit version declared for the symbol in the model is
+        returned. If neither exists, None is returned.
+        """
+        if version is not None:
+            return version
+
+        versions = self.symbols.get(name)
+        if versions is None:
+            return None
+
+        return versions.resolve_unversioned()
 
     def add_node(
         self, node: model.Node, operation: Op, parent: Node, num_outs: int | None = None
@@ -554,12 +638,19 @@ class ModelImport:
                     )
                 # Others are imported as Custom nodes.
                 case _:
-                    extension, op_name = _split_extension_name(symbol)
+                    extension, op_name, extension_version = (
+                        _split_versioned_extension_name(symbol)
+                    )
+                    symbol_name = _join_extension_symbol_name(extension, op_name)
+                    extension_version = self.symbol_version(
+                        symbol_name, extension_version
+                    )
                     return self.add_node(
                         node,
                         Custom(
                             op_name=op_name,
                             extension=extension,
+                            extension_version=extension_version,
                             signature=signature,
                             args=[self.import_type_arg(arg) for arg in args],
                         ),
@@ -893,10 +984,15 @@ class ModelImport:
             case model.Apply("prelude.qubit", []):
                 return _QubitDef()
             case model.Apply(symbol, args):
-                extension, type_id = _split_extension_name(symbol)
+                extension, type_id, extension_version = _split_versioned_extension_name(
+                    symbol
+                )
+                symbol_name = _join_extension_symbol_name(extension, type_id)
+                extension_version = self.symbol_version(symbol_name, extension_version)
                 return Opaque(
                     id=type_id,
                     extension=extension,
+                    extension_version=extension_version,
                     # TODO How to determine the type bound (Copyable or Linear)?
                     bound=TypeBound.Copyable,
                     args=[self.import_type_arg(arg) for arg in args],
@@ -981,7 +1077,15 @@ class ModelImport:
                                         error = f"Unexpected term: {term}"
                                         raise ModelImportError(error)
                             case _:
-                                extension, type_id = _split_extension_name(typename)
+                                extension, type_id, extension_version = (
+                                    _split_versioned_extension_name(typename)
+                                )
+                                symbol_name = _join_extension_symbol_name(
+                                    extension, type_id
+                                )
+                                extension_version = self.symbol_version(
+                                    symbol_name, extension_version
+                                )
                                 match json_dict:
                                     case {"c": name, "v": value}:
                                         # Determine appropriate TypeBound
@@ -1001,6 +1105,7 @@ class ModelImport:
                                                     for arg in args
                                                 ],
                                                 extension=extension,
+                                                extension_version=extension_version,
                                             ),
                                             val=value,
                                         )
@@ -1108,11 +1213,66 @@ def _import_closed_tuple(term: model.Term) -> Generator[model.Term]:
             yield part
 
 
-def _split_extension_name(name: str) -> tuple[str, str]:
+def _split_versioned_extension_name(name: str) -> tuple[str, str, Version | None]:
+    """Split a model symbol into extension id, local name, and optional version."""
+    stem, separator, version_text = name.rpartition("@")
+    if separator:
+        name = stem
+        version = Version.parse(version_text)
+    else:
+        version = None
+
     match name.rsplit(".", 1):
         case [extension, id]:
-            return (extension, id)
+            return (extension, id, version)
         case [id]:
-            return ("", id)
+            return ("", id, version)
         case _:
             raise AssertionError
+
+
+def _join_extension_symbol_name(extension: str, name: str) -> SymbolName:
+    """Return the root symbol name without any version suffix."""
+    if extension:
+        return f"{extension}.{name}"
+    return name
+
+
+def _operation_symbol(
+    operation: model.Op, node: model.Node
+) -> tuple[SymbolName, Version | None] | None:
+    """Return the root name and version introduced by an operation, if any."""
+    name = operation.symbol_name()
+    if name is None:
+        return None
+
+    extension, local_name, name_version = _split_versioned_extension_name(name)
+    field_version = _operation_symbol_version(operation)
+    if (
+        name_version is not None
+        and field_version is not None
+        and name_version != field_version
+    ):
+        error = f"Symbol `{name}` has conflicting version fields."
+        raise ModelImportError(error, node)
+
+    version = field_version if field_version is not None else name_version
+    return _join_extension_symbol_name(extension, local_name), version
+
+
+def _operation_symbol_version(operation: model.Op) -> Version | None:
+    """Return the version attached to the symbol introduced by an operation, if any."""
+    match operation:
+        case model.Import(version=version):
+            return version
+        case (
+            model.DefineFunc(symbol=symbol)
+            | model.DeclareFunc(symbol=symbol)
+            | model.DefineAlias(symbol=symbol)
+            | model.DeclareAlias(symbol=symbol)
+            | model.DeclareConstructor(symbol=symbol)
+            | model.DeclareOperation(symbol=symbol)
+        ):
+            return symbol.version
+        case _:
+            return None

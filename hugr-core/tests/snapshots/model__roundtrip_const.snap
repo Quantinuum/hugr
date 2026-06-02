@@ -6,34 +6,32 @@ expression: ast
 
 (mod)
 
-(import collections.array.const)
-
-(import core.const)
-
-(import core.adt)
-
-(import core.fn)
-
-(import core.const.adt)
+(import arithmetic.float.const_f64)
 
 (import arithmetic.int.const)
 
-(import arithmetic.float.const_f64)
-
-(import arithmetic.float.types.float64)
-
-(import core.load_const)
+(import collections.array.const)
 
 (import compat.const_json)
 
-(import arithmetic.int.types.int)
+(import core.adt)
 
-(import collections.array.array)
+(import core.const)
+
+(import core.const.adt)
+
+(import core.fn)
+
+(import core.load_const)
+
+(import arithmetic.float.types.float64@0.1.0)
+
+(import arithmetic.int.types.int@0.1.0)
+
+(import collections.array.array@0.1.2)
 
 (define-func
-  public
-  example.bools
-  (core.fn [] [(core.adt [[] []]) (core.adt [[] []])])
+  public example.bools (core.fn [] [(core.adt [[] []]) (core.adt [[] []])])
   (dfg [] [%0 %1]
     (signature (core.fn [] [(core.adt [[] []]) (core.adt [[] []])]))
     ((core.load_const (core.const.adt [[] []] _ 0 (tuple))) [] [%0]

@@ -194,7 +194,7 @@ pub(crate) fn collect_term_exts(
             // Check if the extension reference is still valid.
             match ext_ref.upgrade() {
                 Some(ext) => {
-                    used_extensions.register(ext.name().clone(), ext_ref);
+                    used_extensions.register(ext.name().clone(), ext.version().clone(), ext_ref);
                 }
                 None => {
                     missing_extensions.insert(custom.extension().clone());

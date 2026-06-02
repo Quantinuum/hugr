@@ -744,7 +744,7 @@ mod test {
         let bar = ext.instantiate_extension_op("bar", []).unwrap();
         let baz = ext.instantiate_extension_op("baz", []).unwrap();
         let mut registry = test_quantum_extension::REG.clone();
-        registry.register(ext).unwrap();
+        registry.register(ext);
 
         let mut h =
             DFGBuilder::new(Signature::new(vec![usize_t(), bool_t()], vec![usize_t()])).unwrap();

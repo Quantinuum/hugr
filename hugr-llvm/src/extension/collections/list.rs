@@ -391,7 +391,7 @@ mod test {
             .unwrap();
         let es = ExtensionRegistry::new([list::EXTENSION.to_owned(), prelude::PRELUDE.to_owned()]);
         es.validate().unwrap();
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins(ext_op.signature().input().clone())
             .with_outs(ext_op.signature().output().clone())
             .with_extensions(es)
@@ -414,7 +414,7 @@ mod test {
         let es = ExtensionRegistry::new([list::EXTENSION.to_owned(), prelude::PRELUDE.to_owned()]);
         es.validate().unwrap();
 
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_ins(vec![])
             .with_outs(vec![list_type(elem_ty.clone())])
             .with_extensions(es)
