@@ -5,7 +5,7 @@ identifier_initial = @{ ASCII_ALPHA | "_" | "-" }
 identifier_rest    = @{ ASCII_ALPHANUMERIC | "_" | "-" }
 symbol_name        = @{ !(reserved ~ !(identifier_rest | ".")) ~ (identifier ~ ("." ~ identifier)*) }
 version            = @{ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ ~ "." ~ ASCII_DIGIT+ }
-symbol_ident         = { symbol_name ~ ("@" ~ version)? }
+symbol_ident       = { symbol_name ~ ("@" ~ version)? }
 link_name          = @{ "%" ~ (ASCII_ALPHANUMERIC | "_" | "-")* }
 
 literal = { literal_string | literal_float | literal_nat | literal_bytes }

@@ -88,7 +88,7 @@ struct Context<'a> {
 
     /// Mapping from implicit imports to their node ids.
     ///
-    /// These symbol exclude extension op and type imports. See `extension_exports` for those.
+    /// These symbols exclude extension op and type imports. See `extension_exports` for those.
     implicit_imports: FxHashMap<&'a str, table::NodeId>,
 
     /// Mapping from extension symbol exports (op and type qualified names, e.g. `arithmetic.float.const_f64`) to their node ids.
@@ -1236,7 +1236,7 @@ impl<'a> Context<'a> {
 
     /// Resolve an extension symbol identifier in the model, creating an implicit import if needed.
     ///
-    /// The symbols are linked to an specific extension version.
+    /// The symbols are linked to a specific extension version.
     fn resolve_versioned_symbol(
         &mut self,
         name: &'a str,
