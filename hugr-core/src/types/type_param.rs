@@ -385,7 +385,7 @@ impl Term {
         }
     }
 
-    pub(crate) fn least_upper_bound(&self) -> Option<TypeBound> {
+    pub(crate) const fn least_upper_bound(&self) -> Option<TypeBound> {
         match self {
             Self::ExtensionType(ct) => Some(ct.bound()),
             Self::SumType(st) => Some(st.bound()),
@@ -428,8 +428,18 @@ impl Term {
     /// - this is left to [check_term_kind].
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         match self {
-            Term::SumType(SumType::General { rows }) => {
-                rows.iter().try_for_each(|row| row.validate(var_decls))?;
+            Term::SumType(SumType::General(gs)) => {
+                gs.rows()
+                    .iter()
+                    .try_for_each(|row| row.validate(var_decls))?;
+                debug_assert!(
+                    gs.bound() == TypeBound::Linear
+                        || gs.rows().iter().all(|row| check_term_kind(
+                            row,
+                            &Term::new_list_kind(gs.bound())
+                        )
+                        .is_ok())
+                );
                 Ok(())
             }
             Term::SumType(SumType::Unit { .. }) => Ok(()), // No leaves there
@@ -456,8 +466,8 @@ impl Term {
     /// Checks whether the term is parametric, i.e. it (recursively) contains variables.
     pub fn is_parametrized(&self) -> bool {
         match self {
-            Term::SumType(SumType::General { rows }) => {
-                rows.iter().any(|row| row.is_parametrized())
+            Term::SumType(SumType::General(gs)) => {
+                gs.rows().iter().any(|row| row.is_parametrized())
             }
             Term::SumType(SumType::Unit { .. }) => false, // No leaves there
             Term::ExtensionType(custy) => custy.args().iter().any(Term::is_parametrized),
@@ -480,10 +490,10 @@ impl Term {
     pub(crate) fn substitute(&self, t: &Substitution) -> Self {
         match self {
             TypeArg::SumType(SumType::Unit { .. }) => self.clone(),
-            TypeArg::SumType(SumType::General { rows }) => {
+            TypeArg::SumType(SumType::General(gs)) => {
                 // A substitution of a row variable for an empty list,
                 // could make the general case into a unary SumType.
-                Term::SumType(SumType::new(rows.iter().map(|r| r.substitute(t))))
+                Term::SumType(SumType::new(gs.rows().iter().map(|r| r.substitute(t))))
             }
             TypeArg::ExtensionType(cty) => Term::ExtensionType(cty.substitute(t)),
             TypeArg::FunctionType(bf) => Term::FunctionType(Box::new(bf.substitute(t))),

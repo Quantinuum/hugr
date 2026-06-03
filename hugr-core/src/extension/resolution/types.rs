@@ -205,8 +205,8 @@ pub(crate) fn collect_term_exts(
             collect_term_exts(&f.input, used_extensions, missing_extensions);
             collect_term_exts(&f.output, used_extensions, missing_extensions);
         }
-        Term::SumType(SumType::General { rows }) => {
-            for row in rows {
+        Term::SumType(SumType::General(general)) => {
+            for row in general.rows() {
                 collect_term_exts(row, used_extensions, missing_extensions);
             }
         }
@@ -271,8 +271,8 @@ fn collect_value_exts(
             collect_term_exts(&typ, used_extensions, missing_extensions);
         }
         Value::Sum(s) => {
-            if let SumType::General { rows } = &s.sum_type {
-                for row in rows {
+            if let SumType::General(general) = &s.sum_type {
+                for row in general.rows() {
                     collect_term_exts(row, used_extensions, missing_extensions);
                 }
             }
