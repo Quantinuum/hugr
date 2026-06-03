@@ -118,15 +118,23 @@ fn operation_extension<'e>(
     op: &OpType,
     extensions: &'e ExtensionRegistry,
 ) -> Result<Option<&'e Arc<Extension>>, ExtensionResolutionError> {
-    let Some(ext) = op.extension_id() else {
+    let Some(ext_id) = op.extension_id() else {
         return Ok(None);
     };
-    match extensions.get(ext) {
+    let extension = match op {
+        OpType::OpaqueOp(opaque) => extensions.get_req(ext_id, opaque.extension_version()),
+        OpType::ExtensionOp(ext_op) => {
+            let version = ext_op.extension_version();
+            extensions.get_exact(ext_id, &version)
+        }
+        _ => extensions.get(ext_id),
+    };
+    match extension {
         Some(e) => Ok(Some(e)),
         None => Err(ExtensionResolutionError::missing_op_extension(
             Some(node),
             op,
-            ext,
+            ext_id,
             extensions,
         )),
     }

@@ -1,6 +1,7 @@
 //! Helper methods to compute the node/edge/port style when rendering a HUGR
 //! into dot or mermaid format.
 
+use itertools::Itertools;
 use std::collections::HashMap;
 
 use portgraph::render::{EdgeStyle, NodeStyle, PortStyle, PresentationStyle};
@@ -179,6 +180,12 @@ pub enum NodeLabel<N: HugrNode = Node> {
     /// Display the node index as a number.
     #[default]
     Numeric,
+    /// Display the numeric node index and a list of metadata keys and their JSON values.
+    /// Prints "null" if a key is not present on a node.
+    MetadataValues {
+        /// List of metadata keys to display
+        print_keys: Vec<String>,
+    },
     /// Display the labels corresponding to the node indices.
     Custom(HashMap<N, String>),
 }
@@ -196,6 +203,14 @@ pub(in crate::hugr) fn node_style<'a>(
         }
     }
 
+    fn numeric_label(h: &Hugr, n: NodeIndex, is_entry: bool) -> String {
+        if is_entry {
+            format!("({}) [**{}**]", n.index(), node_name(h, n))
+        } else {
+            format!("({}) {}", n.index(), node_name(h, n))
+        }
+    }
+
     let mut entrypoint_style = PresentationStyle::default();
     entrypoint_style.stroke = Some("#832561".to_string());
     entrypoint_style.stroke_width = Some("3px".to_string());
@@ -204,18 +219,9 @@ pub(in crate::hugr) fn node_style<'a>(
     match formatter.node_labels {
         NodeLabel::Numeric => Box::new(move |n| {
             if Some(n) == entrypoint {
-                NodeStyle::boxed(format!(
-                    "({ni}) [**{name}**]",
-                    ni = n.index(),
-                    name = node_name(h, n)
-                ))
-                .with_attrs(entrypoint_style.clone())
+                NodeStyle::boxed(numeric_label(h, n, true)).with_attrs(entrypoint_style.clone())
             } else {
-                NodeStyle::boxed(format!(
-                    "({ni}) {name}",
-                    ni = n.index(),
-                    name = node_name(h, n)
-                ))
+                NodeStyle::boxed(numeric_label(h, n, false))
             }
         }),
         NodeLabel::None => Box::new(move |n| {
@@ -224,6 +230,32 @@ pub(in crate::hugr) fn node_style<'a>(
                     .with_attrs(entrypoint_style.clone())
             } else {
                 NodeStyle::boxed(node_name(h, n))
+            }
+        }),
+        NodeLabel::MetadataValues { print_keys } => Box::new(move |n| {
+            let kv_str = print_keys
+                .iter()
+                .filter_map(|key| {
+                    h.get_metadata_any(n.into(), key).map(|json_value| {
+                        format!(
+                            "{key}={}",
+                            serde_json::to_string(json_value)
+                                .expect("JSON metadata should be serializable")
+                                // the mermaid renderer in portgraph generates verbose escapes
+                                // for double quotes and newlines, so we replace them with
+                                // single quotes and spaces
+                                .replace('\n', " ")
+                                .replace('"', "\'")
+                        )
+                    })
+                })
+                .join("; ");
+
+            if Some(n) == entrypoint {
+                NodeStyle::boxed(format!("{}; {kv_str}", numeric_label(h, n, true)))
+                    .with_attrs(entrypoint_style.clone())
+            } else {
+                NodeStyle::boxed(format!("{}; {kv_str}", numeric_label(h, n, false)))
             }
         }),
         NodeLabel::Custom(labels) => Box::new(move |n| {

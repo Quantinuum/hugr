@@ -10,7 +10,7 @@ from typing_extensions import deprecated
 import hugr._serialization.extension as ext_s
 import hugr.model as model
 from hugr import ext
-from hugr._hugr.linking import link_modules
+from hugr._hugr.linking import link_packages as link_packages_binding
 from hugr.envelope import (
     EnvelopeConfig,
     _make_envelope,
@@ -33,7 +33,23 @@ __all__ = [
     "NodePointer",
     "FuncDeclPointer",
     "FuncDefnPointer",
+    "link_packages",
 ]
+
+
+def link_packages(*packages: bytes) -> bytes:
+    """Link all packages, returning a new package containing the extensions of all
+    packages, as well as a single module created from linking the modules from all
+    packages.
+
+    Args:
+        *packages: The packages to link, serialised as bytes.
+
+    Returns:
+        A new package containing the modules and extensions of all packages.
+    """
+    pkg = list(packages)
+    return link_packages_binding(pkg)
 
 
 @dataclass(frozen=True)
@@ -110,10 +126,24 @@ class Package:
 
         if extensions is None:
             extensions = []
+        registry = ExtensionRegistry.from_extensions(extensions)
+        if resolve_from is not None:
+            registry.extend(resolve_from)
+
         pkg = Package([Hugr.from_model(hugr) for hugr in package.modules], extensions)
 
-        # Resolve extensions in the modules and inside the bundled extension definitions
-        pkg.resolve_extensions(resolve_from or ExtensionRegistry())
+        # Resolve extensions in the modules and inside the bundled extension
+        # definitions.
+        #
+        # TODO: Remove the None compatibility path once encoded HUGRs without
+        # extension version information are no longer supported.
+        # <http://github.com/Quantinuum/hugr/issues/3086>
+        #
+        # If model import leaves a custom op/type version as None, this registry
+        # pass selects the latest registered extension version. That is only a
+        # compatibility path for old model encodings that omitted extension
+        # versions.
+        pkg.resolve_extensions(registry)
 
         return pkg
 
@@ -232,27 +262,8 @@ class Package:
         Returns:
             A new package containing the modules and extensions of all packages.
         """
-        from hugr.ext import ExtensionRegistry
-
-        modules = self.modules[:]
-        registry = ExtensionRegistry.from_extensions(self.extensions)
-        for pkg in other:
-            modules.extend(pkg.modules)
-            for new_ext in pkg.extensions:
-                registry.register(new_ext)
-
-        if len(modules) == 0:
-            return Package([], list(registry.all_extensions))
-
-        result_module_bytes = modules[0].to_bytes(include_extensions=registry)
-        for module in modules[1:]:
-            result_module_bytes = link_modules(
-                result_module_bytes, module.to_bytes(include_extensions=registry)
-            )
-
-        return Package(
-            [Hugr.from_bytes(result_module_bytes)],
-            list(registry.all_extensions),
+        return Package.from_bytes(
+            link_packages(*[pkg.to_bytes() for pkg in (self, *other)])
         )
 
 

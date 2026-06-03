@@ -1,13 +1,69 @@
+use std::str::FromStr as _;
 use std::sync::Arc;
 
 use crate::v0::Visibility;
 
-use super::{Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, Term};
+use super::{Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, SymbolIdent, Term};
 use pyo3::{
     PyAny,
     exceptions::PyTypeError,
     types::{PyAnyMethods, PyStringMethods as _, PyTypeMethods as _},
 };
+
+/// Convert a Python semver value to the AST's compact `major.minor.patch` version.
+///
+/// The model format stores extension versions without prerelease or build metadata,
+/// so the Python boundary only reads the numeric components from `semver.Version`.
+fn extract_python_version(
+    version: pyo3::Bound<'_, PyAny>,
+) -> pyo3::PyResult<Option<semver::Version>> {
+    if version.is_none() {
+        return Ok(None);
+    }
+
+    let major = version.getattr("major")?.extract()?;
+    let minor = version.getattr("minor")?.extract()?;
+    let patch = version.getattr("patch")?.extract()?;
+    Ok(Some(semver::Version::new(major, minor, patch)))
+}
+
+/// Convert an AST extension version to the Python model's `semver.Version` value.
+///
+/// Keeping the Python side typed as `Version | None` avoids losing information
+/// when a model package is round-tripped through the Python bindings.
+fn version_into_python<'py>(
+    version: Option<&semver::Version>,
+    py: pyo3::Python<'py>,
+) -> pyo3::PyResult<Option<pyo3::Bound<'py, PyAny>>> {
+    version
+        .map(|version| {
+            py.import("semver")?
+                .getattr("Version")?
+                .call_method1("parse", (version.to_string(),))
+        })
+        .transpose()
+}
+
+impl<'py> pyo3::FromPyObject<'_, 'py> for SymbolIdent {
+    type Error = pyo3::PyErr;
+
+    fn extract(ob: pyo3::Borrowed<'_, 'py, PyAny>) -> pyo3::PyResult<Self> {
+        let name: String = ob.extract()?;
+        Self::from_str(&name).map_err(|err| PyTypeError::new_err(err.to_string()))
+    }
+}
+
+impl<'py> pyo3::IntoPyObject<'py> for &SymbolIdent {
+    // The Python model still represents term application targets as strings, so
+    // preserve the `name@version` text spelling at this boundary.
+    type Target = pyo3::types::PyString;
+    type Output = pyo3::Bound<'py, Self::Target>;
+    type Error = pyo3::PyErr;
+
+    fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
+        Ok(self.to_string().into_pyobject(py)?)
+    }
+}
 
 impl<'py> pyo3::FromPyObject<'_, 'py> for Term {
     type Error = pyo3::PyErr;
@@ -70,7 +126,7 @@ impl<'py> pyo3::IntoPyObject<'py> for &Term {
             }
             Term::Apply(symbol_name, terms) => {
                 let py_class = py_module.getattr("Apply")?;
-                py_class.call1((symbol_name.as_ref(), terms.as_ref()))
+                py_class.call1((symbol_name, terms.as_ref()))
             }
             Term::List(parts) => {
                 let py_class = py_module.getattr("List")?;
@@ -180,6 +236,7 @@ impl<'py> pyo3::FromPyObject<'_, 'py> for Symbol {
 
     fn extract(symbol: pyo3::Borrowed<'_, 'py, PyAny>) -> pyo3::PyResult<Self> {
         let name = symbol.getattr("name")?.extract()?;
+        let version = extract_python_version(symbol.getattr("version")?)?;
         let params: Vec<_> = symbol.getattr("params")?.extract()?;
         let visibility = symbol.getattr("visibility")?.extract()?;
         let constraints: Vec<_> = symbol.getattr("constraints")?.extract()?;
@@ -187,6 +244,7 @@ impl<'py> pyo3::FromPyObject<'_, 'py> for Symbol {
         Ok(Self {
             visibility,
             name,
+            version,
             signature,
             params: params.into(),
             constraints: constraints.into(),
@@ -202,12 +260,14 @@ impl<'py> pyo3::IntoPyObject<'py> for &Symbol {
     fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
         let py_module = py.import("hugr.model")?;
         let py_class = py_module.getattr("Symbol")?;
+        let version = version_into_python(self.version.as_ref(), py)?;
         py_class.call1((
             self.name.as_ref(),
             &self.visibility,
             self.params.as_ref(),
             self.constraints.as_ref(),
             &self.signature,
+            version,
         ))
     }
 }
@@ -292,7 +352,19 @@ impl<'py> pyo3::FromPyObject<'_, 'py> for Operation {
             "TailLoop" => Self::TailLoop,
             "Conditional" => Self::Conditional,
             "Import" => {
-                let name = op.getattr("name")?.extract()?;
+                let mut name: SymbolIdent = op.getattr("name")?.extract()?;
+                if let Some(version) = extract_python_version(op.getattr("version")?)? {
+                    if name
+                        .version
+                        .as_ref()
+                        .is_some_and(|existing| existing != &version)
+                    {
+                        return Err(PyTypeError::new_err(
+                            "Import name and version fields specify different versions.",
+                        ));
+                    }
+                    name.version = Some(version);
+                }
                 Self::Import(name)
             }
             "CustomOp" => {
@@ -362,7 +434,8 @@ impl<'py> pyo3::IntoPyObject<'py> for &Operation {
             }
             Operation::Import(name) => {
                 let py_class = py_module.getattr("Import")?;
-                py_class.call1((name.as_ref(),))
+                let version = version_into_python(name.version.as_ref(), py)?;
+                py_class.call1((name.name.as_ref(), version))
             }
             Operation::Custom(term) => {
                 let py_class = py_module.getattr("CustomOp")?;

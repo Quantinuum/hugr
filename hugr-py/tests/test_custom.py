@@ -2,7 +2,7 @@ from dataclasses import dataclass
 
 import pytest
 
-from hugr import ext, ops, tys
+from hugr import ext, model, ops, tys
 from hugr.build.dfg import Dfg
 from hugr.hugr import Hugr, Node
 from hugr.ops import AsExtOp, Custom, ExtOp
@@ -106,6 +106,7 @@ def test_custom_op(as_ext: AsExtOp, registry: ext.ExtensionRegistry):
     assert type(as_ext).from_ext(ext_op) == as_ext
     custom = as_ext._to_serial(Node(0)).deserialize()
     assert isinstance(custom, Custom)
+    assert custom.extension_version == ext_op.op_def().get_extension().version
     # ExtOp compared to Custom via `to_custom`
     assert custom.resolve(registry) == ext_op
     assert ext_op == as_ext
@@ -148,6 +149,7 @@ _BOOL_LIST_T = _LIST_T.instantiate([tys.Bool.type_arg()])
 def test_custom_type(ext_t: tys.ExtType, registry: ext.ExtensionRegistry):
     opaque = ext_t._to_serial().deserialize()
     assert isinstance(opaque, tys.Opaque)
+    assert opaque.extension_version == ext_t.type_def.get_extension().version
     resolved, _ = opaque._resolve_used_extensions(registry)
     assert resolved == ext_t
 
@@ -177,3 +179,193 @@ def test_qualified_name():
 
     # Test OpDef with extension
     assert _STRINGLY_DEF.qualified_name() == "my_extension.StringlyOp"
+
+
+def _versioned_ext(version: ext.Version) -> ext.Extension:
+    """Helper function to create an extension with a given version for testing."""
+    extension = ext.Extension("versioned_ext", version)
+    extension.add_op_def(ext.OpDef("my_op", ext.OpDefSig(tys.FunctionType.endo([]))))
+    extension.add_type_def(
+        ext.TypeDef(
+            "MyType",
+            "A versioned type.",
+            [],
+            ext.ExplicitBound(tys.TypeBound.Copyable),
+        )
+    )
+    return extension
+
+
+def test_registry_version_resolution():
+    """Test that registry resolution picks the highest compatible version of an
+    extension."""
+
+    ext_0_2_5 = _versioned_ext(ext.Version(0, 2, 5))
+    ext_0_3_0 = _versioned_ext(ext.Version(0, 3, 0))
+    ext_1_3_0 = _versioned_ext(ext.Version(1, 3, 0))
+    reg = ext.ExtensionRegistry()
+    reg.register(ext_0_2_5)
+    reg.register(ext_0_3_0)
+    reg.register(ext_1_3_0)
+
+    assert reg.get_extension("versioned_ext", ext.Version(0, 2, 3)) is ext_0_2_5
+    assert reg.get_extension("versioned_ext", ext.Version(0, 3, 0)) is ext_0_3_0
+    assert reg.get_extension("versioned_ext", ext.Version(1, 2, 3)) is ext_1_3_0
+
+    custom = ops.Custom(
+        "my_op",
+        tys.FunctionType.endo([]),
+        "versioned_ext",
+        extension_version=ext.Version(0, 2, 3),
+    )
+    resolved = custom.resolve(reg)
+    assert isinstance(resolved, ops.ExtOp)
+    assert resolved.op_def().get_extension() is ext_0_2_5
+
+    opaque = tys.Opaque(
+        "MyType",
+        tys.TypeBound.Copyable,
+        extension="versioned_ext",
+        extension_version=ext.Version(0, 2, 3),
+    )
+    resolved_ty, _ = opaque._resolve_used_extensions(reg)
+    assert isinstance(resolved_ty, tys.ExtType)
+    assert resolved_ty.type_def.get_extension() is ext_0_2_5
+
+
+def test_model_versions():
+    """Model import/export keeps extension versions on custom ops and types."""
+
+    version = ext.Version(0, 2, 3)
+    opaque = tys.Opaque(
+        "MyType",
+        tys.TypeBound.Copyable,
+        extension="versioned_ext",
+        extension_version=version,
+    )
+    signature = tys.FunctionType(input=[], output=[opaque])
+    dfg = Dfg()
+    [out] = dfg.add(
+        ops.Custom(
+            "my_op",
+            signature=signature,
+            extension="versioned_ext",
+            extension_version=version,
+        )()
+    )
+    dfg.set_outputs(out)
+
+    model_pkg = Package([dfg.hugr]).to_model()
+    assert "versioned_ext.my_op@0.2.3" in str(model_pkg)
+    assert "versioned_ext.MyType@0.2.3" in str(model_pkg)
+
+    [hugr] = Package.from_model(model_pkg).modules
+    custom = next(
+        data.op for _, data in hugr.nodes() if isinstance(data.op, ops.Custom)
+    )
+
+    assert custom.extension_version == version
+    [output] = custom.signature.output
+    assert isinstance(output, tys.Opaque)
+    assert output.extension_version == version
+
+
+@pytest.mark.parametrize(
+    ("imports", "resolve_from", "expected"),
+    [
+        (
+            "(import versioned_ext.my_op@0.2.3)\n"
+            "(import versioned_ext.MyType@0.2.3)",
+            None,
+            "0.2.3",
+        ),
+        (
+            """
+            (import versioned_ext.my_op@0.2.3)
+            (import versioned_ext.my_op@0.3.0)
+            (import versioned_ext.MyType@0.2.3)
+            (import versioned_ext.MyType@0.3.0)
+            """,
+            None,
+            "0.3.0",
+        ),
+        (
+            "(import versioned_ext.my_op)\n(import versioned_ext.MyType)",
+            None,
+            None,
+        ),
+        (
+            "(import versioned_ext.my_op)\n(import versioned_ext.MyType)",
+            ext.Version(0, 3, 0),
+            "0.3.0",
+        ),
+        (
+            """
+            (import versioned_ext.my_op)
+            (import versioned_ext.my_op@0.2.3)
+            (import versioned_ext.MyType)
+            (import versioned_ext.MyType@0.2.3)
+            """,
+            None,
+            None,
+        ),
+        (
+            """
+            (import versioned_ext.my_op)
+            (import versioned_ext.my_op@0.2.3)
+            (import versioned_ext.MyType)
+            (import versioned_ext.MyType@0.2.3)
+            """,
+            ext.Version(0, 3, 0),
+            "0.3.0",
+        ),
+    ],
+)
+def test_model_import_versions_from_imports(
+    imports: str, resolve_from: ext.Version | None, expected: str | None
+):
+    """Unversioned model uses explicit versions before registry fallback."""
+    registry = None
+    if resolve_from is not None:
+        registry = ext.ExtensionRegistry()
+        registry.register(_versioned_ext(resolve_from))
+
+    expected_version = ext.Version.parse(expected) if expected is not None else None
+
+    source = f"""
+        (hugr 0)
+
+        (mod)
+
+        {imports}
+
+        (define-func public main (core.fn [] [versioned_ext.MyType])
+          (dfg [] [%0]
+            (signature (core.fn [] [versioned_ext.MyType]))
+            ((versioned_ext.my_op) [] [%0]
+                  (signature (core.fn [] [versioned_ext.MyType])))))
+    """
+
+    [hugr] = Package.from_model(
+        model.Package.from_str(source.strip()), resolve_from=registry
+    ).modules
+    custom = next(
+        data.op
+        for _, data in hugr.nodes()
+        if isinstance(data.op, ops.Custom | ops.ExtOp)
+    )
+
+    if isinstance(custom, ops.Custom):
+        assert custom.extension_version == expected_version
+    else:
+        assert custom.op_def().get_extension().version == expected_version
+    assert custom.signature is not None
+    [output] = custom.signature.output
+    match output:
+        case tys.Opaque(extension_version=extension_version):
+            assert extension_version == expected_version
+        case tys.ExtType(type_def=type_def):
+            assert type_def.get_extension().version == expected_version
+        case _:
+            msg = f"unexpected output type: {output}"
+            raise AssertionError(msg)

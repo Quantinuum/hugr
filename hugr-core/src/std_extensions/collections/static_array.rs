@@ -38,7 +38,7 @@ use crate::{
     types::{
         ConstTypeError, CustomCheckFailure, CustomType, PolyFuncType, Signature, Type, TypeArg,
         TypeBound, TypeName,
-        type_param::{TermTypeError, TypeParam},
+        type_param::{TermKindError, TypeParam},
     },
 };
 
@@ -49,7 +49,7 @@ pub const EXTENSION_ID: ExtensionId = ExtensionId::new_static_unchecked("collect
 /// Reported unique name of the array type.
 pub const STATIC_ARRAY_TYPENAME: TypeName = TypeName::new_inline("static_array");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 0);
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
 
 #[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize, derive_more::From)]
 /// Statically sized array of values, all of the same [`TypeBound::Copyable`]
@@ -311,8 +311,8 @@ impl HasConcrete for StaticArrayOpDef {
         match type_args {
             [arg] => {
                 if !arg.copyable() {
-                    Err(SignatureError::from(TermTypeError::TypeMismatch {
-                        type_: Box::new(Copyable.into()),
+                    Err(SignatureError::from(TermKindError::KindMismatch {
+                        kind: Box::new(Copyable.into()),
                         term: Box::new(arg.clone()),
                     }))?
                 }
@@ -324,7 +324,7 @@ impl HasConcrete for StaticArrayOpDef {
                 })
             }
             _ => Err(
-                SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(type_args.len(), 1))
+                SignatureError::TypeArgMismatch(TermKindError::WrongNumberArgs(type_args.len(), 1))
                     .into(),
             ),
         }

@@ -216,9 +216,9 @@ macro_rules! impl_serde_as_string_envelope {
                 // Include any additional extension required to load the HUGR in the envelope.
                 let extensions: &$crate::extension::ExtensionRegistry = $extension_reg;
                 let mut extra_extensions = $crate::extension::ExtensionRegistry::default();
-                for ext in $crate::hugr::views::HugrView::extensions(source).iter() {
+                for ext in $crate::hugr::views::HugrView::extensions(source).iter_all() {
                     if !extensions.contains(ext.name()) {
-                        extra_extensions.register_updated(ext.clone());
+                        extra_extensions.register(ext.clone());
                     }
                 }
 
@@ -394,9 +394,9 @@ macro_rules! impl_serde_as_binary_envelope {
                 // Include any additional extension required to load the HUGR in the envelope.
                 let extensions: &$crate::extension::ExtensionRegistry = $extension_reg;
                 let mut extra_extensions = $crate::extension::ExtensionRegistry::default();
-                for ext in $crate::hugr::views::HugrView::extensions(source).iter() {
+                for ext in $crate::hugr::views::HugrView::extensions(source).iter_all() {
                     if !extensions.contains(ext.name()) {
-                        extra_extensions.register_updated(ext.clone());
+                        extra_extensions.register(ext.clone());
                     }
                 }
                 use $crate::envelope::serde_with::base64::{EncoderStringWriter, STANDARD};

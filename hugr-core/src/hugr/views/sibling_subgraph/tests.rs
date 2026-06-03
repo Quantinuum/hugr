@@ -1,3 +1,6 @@
+use crate::std_extensions::collections::array::array_type_parametric;
+use crate::types::TypeArg;
+use crate::types::type_param::TypeParam;
 use std::collections::BTreeSet;
 
 use cool_asserts::assert_matches;
@@ -181,6 +184,92 @@ fn test_signature() -> Result<(), InvalidSubgraph> {
     assert_eq!(
         sub.signature(&func),
         Signature::new_endo([qb_t(), qb_t(), qb_t()])
+    );
+    Ok(())
+}
+
+#[test]
+fn test_polymorphic_signature() -> Result<(), InvalidSubgraph> {
+    let mut mod_builder = ModuleBuilder::new();
+    let arr_type =
+        array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_kind()), bool_t())
+            .unwrap();
+    let func_id = {
+        let mut h = mod_builder
+            .define_function(
+                "test",
+                PolyFuncType::new(
+                    vec![TypeParam::max_nat_kind()],
+                    Signature::new_endo(vec![arr_type.clone()]),
+                ),
+            )
+            .unwrap();
+        let [arr] = h.input_wires_arr();
+        let tuple = h.make_tuple([arr]).unwrap();
+        let op = UnpackTuple::new(vec![arr_type.clone()].into());
+        let [arr] = h.add_dataflow_op(op, [tuple]).unwrap().outputs_arr();
+        h.finish_with_outputs([arr]).unwrap()
+    };
+    let hugr = mod_builder.finish_hugr().unwrap();
+
+    let func = hugr.with_entrypoint(func_id.node());
+    let sub = SiblingSubgraph::try_new_dataflow_subgraph::<_, FuncID<true>>(
+        RootChecked::try_new(&func).expect("Root should be FuncDefn."),
+    )?;
+    assert!(sub.validate_default(&func).is_ok());
+    assert_eq!(
+        sub.poly_func_type(&func),
+        PolyFuncType::new(
+            vec![TypeParam::max_nat_kind()],
+            Signature::new_endo(vec![arr_type]),
+        ),
+    );
+    Ok(())
+}
+
+#[test]
+fn test_polymorphic_signature_nested() -> Result<(), InvalidSubgraph> {
+    let mut mod_builder = ModuleBuilder::new();
+    let arr_type =
+        array_type_parametric(TypeArg::new_var_use(0, TypeParam::max_nat_kind()), bool_t())
+            .unwrap();
+    let dfg_node = {
+        let mut h = mod_builder
+            .define_function(
+                "test",
+                PolyFuncType::new(
+                    vec![TypeParam::max_nat_kind()],
+                    Signature::new_endo(vec![arr_type.clone()]),
+                ),
+            )
+            .unwrap();
+        let [arr] = h.input_wires_arr();
+        // Nest target subgraph inside a DFG
+        let mut dfg = h
+            .dfg_builder(Signature::new_endo(vec![arr_type.clone()]), [arr])
+            .unwrap();
+        let [arr] = dfg.input_wires_arr();
+        let tuple = dfg.make_tuple([arr]).unwrap();
+        let op = UnpackTuple::new(vec![arr_type.clone()].into());
+        let [arr] = dfg.add_dataflow_op(op, [tuple]).unwrap().outputs_arr();
+        let dfg = dfg.finish_with_outputs([arr]).unwrap();
+        let [arr] = dfg.outputs_arr();
+        h.finish_with_outputs([arr]).unwrap();
+
+        dfg.node()
+    };
+    let hugr = mod_builder.finish_hugr().unwrap();
+
+    // Skip the input and output nodes of the dfg
+    let nodes = hugr.children(dfg_node).skip(2).collect_vec();
+    let sub = SiblingSubgraph::try_from_nodes(nodes, &hugr)?;
+    assert!(sub.validate_default(&hugr).is_ok(),);
+    assert_eq!(
+        sub.poly_func_type(&hugr),
+        PolyFuncType::new(
+            vec![TypeParam::max_nat_kind()],
+            Signature::new_endo(vec![arr_type]),
+        ),
     );
     Ok(())
 }
@@ -794,7 +883,7 @@ fn test_nonlocal_edge_excluding_target() {
     // Sanity check - simple SSG without the nonlocal edge
     assert_eq!(
         h.output_neighbours(not_op.node()).collect_vec(),
-        vec![nested_not.node(), dfg.node()]
+        vec![nested_not.node()]
     );
     let outer_not_inputs = vec![vec![(not_op.node(), IncomingPort::from(0))]];
     let ss = SiblingSubgraph::try_new(
@@ -803,15 +892,8 @@ fn test_nonlocal_edge_excluding_target() {
         &h,
     )
     .unwrap();
-    // Nodes include the DFG (by following Order edge) and Output (edge from DFG)
-    assert_eq!(
-        ss.nodes(),
-        &[
-            h.get_io(h.entrypoint()).unwrap()[1],
-            not_op.node(),
-            dfg.node()
-        ]
-    );
+    // Does not include the DFG as does not follow the Syn edge
+    assert_eq!(ss.nodes, &[not_op.node()]);
     ss.validate_default(&h).unwrap();
 
     // We can't "not" follow the Order edge....
@@ -826,7 +908,12 @@ fn test_nonlocal_edge_excluding_target() {
         ],
         &h,
     );
-    assert_matches!(ss2, Err(InvalidSubgraph::UnsupportedEdgeKind(_, _)));
+    assert_matches!(
+        ss2,
+        Err(InvalidSubgraph::InvalidBoundary(
+            InvalidSubgraphBoundary::DisconnectedBoundaryPort(_, _)
+        ))
+    );
 
     // Now try to make an SSG with the outer Not and the DFG...this should not be possible ATM
     // (it would contain an edge to the inner Not, thus contain the inner Not, thus is not a sibling subgraph).

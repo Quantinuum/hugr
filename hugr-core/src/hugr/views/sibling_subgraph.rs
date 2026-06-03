@@ -13,6 +13,7 @@ use portgraph::{PortView, algorithms::CreateConvexChecker, boundary::Boundary};
 use rustc_hash::FxHashSet;
 use thiserror::Error;
 
+use super::{RootChecked, SchedulingGraph, SynEdgeWrapper};
 use crate::builder::{Container, FunctionBuilder};
 use crate::core::HugrNode;
 use crate::hugr::internal::{HugrInternals, PortgraphNodeMap};
@@ -20,10 +21,8 @@ use crate::hugr::{HugrMut, HugrView};
 use crate::ops::dataflow::DataflowOpTrait;
 use crate::ops::handle::{ContainerHandle, DataflowOpID};
 use crate::ops::{NamedOp, OpTag, OpTrait, OpType};
-use crate::types::{Signature, Type};
+use crate::types::{PolyFuncType, Signature, Type};
 use crate::{Hugr, IncomingPort, Node, OutgoingPort, Port, SimpleReplacement};
-
-use super::{RootChecked, SchedulingGraph, SynEdgeWrapper};
 
 mod convex;
 
@@ -266,7 +265,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     /// You MUST make sure that the boundary ports and nodes provided satisfy
     /// the SiblingSubgraph validity conditions described in
     /// [`SiblingSubgraph::try_new`] and which can be checked using
-    /// [`SiblingSubgraph::validate`].
+    /// [`SiblingSubgraph::validate_with_checker`] or friends.
     ///
     /// See [`SiblingSubgraph::try_new`] for the full documentation.
     ///
@@ -518,25 +517,6 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 
     /// Check the validity of the subgraph, as described in the docs of
-    /// [`SiblingSubgraph::try_new`].
-    #[deprecated(
-        note = "Use `validate_with_checker`, `validate_default` or `validate_skip_convexity`",
-        since = "0.27.1"
-    )]
-    #[expect(deprecated)] // Remove with ValidationMode
-    pub fn validate<'h, H: HugrView<Node = N>>(
-        &self,
-        hugr: &'h H,
-        mode: ValidationMode<'_, 'h, H>,
-    ) -> Result<(), InvalidSubgraph<N>> {
-        match mode {
-            ValidationMode::WithChecker(checker) => self.validate_with_checker(hugr, Some(checker)),
-            ValidationMode::CheckConvexity => self.validate_default(hugr),
-            ValidationMode::SkipConvexity => self.validate_skip_convexity(hugr),
-        }
-    }
-
-    /// Check the validity of the subgraph, as described in the docs of
     /// [`SiblingSubgraph::try_new`], using a new [`SchedGraphChecker`] for the convexity check.
     pub fn validate_default(
         &self,
@@ -550,7 +530,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 
     /// Check the validity of the subgraph, as described in the docs of
-    /// [`SiblingSubgraph::try_new`], but do not check convexity.    
+    /// [`SiblingSubgraph::try_new`], but do not check convexity.
     pub fn validate_skip_convexity(
         &self,
         hugr: &impl HugrView<Node = N>,
@@ -652,7 +632,17 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 
     /// The signature of the subgraph.
+    ///
+    /// Panics if the signature contains unresolved type variables, i.e. is polymorphic. Use
+    /// [`SiblingSubgraph::poly_func_type`] instead.
     pub fn signature(&self, hugr: &impl HugrView<Node = N>) -> Signature {
+        let poly_func_type = self.poly_func_type(hugr);
+        assert_eq!(poly_func_type.params(), &[]);
+        poly_func_type.into_body()
+    }
+
+    /// The (potentially polymorphic) signature of the subgraph.
+    pub fn poly_func_type(&self, hugr: &impl HugrView<Node = N>) -> PolyFuncType {
         let input = self
             .inputs
             .iter()
@@ -670,7 +660,26 @@ impl<N: HugrNode> SiblingSubgraph<N> {
                 sig.port_type(p).cloned().expect("must be dataflow edge")
             })
             .collect_vec();
-        Signature::new(input, output)
+
+        // Discover type variable declarations from the closest function definition, if type
+        // variable usages are found.
+        let params = if input.iter().any(|t| t.is_parametrized())
+            || output.iter().any(|t| t.is_parametrized())
+        {
+            let mut parent = self.get_parent(hugr);
+            while !hugr.get_optype(parent).is_func_defn() {
+                parent = hugr.get_parent(parent).unwrap();
+            }
+            hugr.get_optype(parent)
+                .as_func_defn()
+                .unwrap()
+                .signature()
+                .params()
+        } else {
+            &[]
+        };
+
+        PolyFuncType::new(params, Signature::new(input, output))
     }
 
     /// The parent of the sibling subgraph.
@@ -768,7 +777,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         hugr: &impl HugrView<Node = N>,
         name: impl Into<String>,
     ) -> Hugr {
-        let mut builder = FunctionBuilder::new(name, self.signature(hugr)).unwrap();
+        let mut builder = FunctionBuilder::new(name, self.poly_func_type(hugr)).unwrap();
         // Take the unfinished Hugr from the builder, to avoid unnecessary
         // validation checks that require connecting the inputs and outputs.
         let mut extracted = mem::take(builder.hugr_mut());
@@ -827,23 +836,6 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         self.outputs = ports;
         Ok(())
     }
-}
-
-/// Specify the checks to perform for [`SiblingSubgraph::validate`].
-#[allow(deprecated)] // Remove enum along with TopoConvexChecker
-#[deprecated(
-    note = "Call validate_with_checker or validate_default instead",
-    since = "0.27.1"
-)]
-#[derive(Default)]
-pub enum ValidationMode<'t, 'h, H: HugrView> {
-    /// Check convexity with the given checker.
-    WithChecker(&'t TopoConvexChecker<'h, H>),
-    /// Construct a checker and check convexity.
-    #[default]
-    CheckConvexity,
-    /// Skip convexity check.
-    SkipConvexity,
 }
 
 fn make_pg_subgraph<'h, H: HugrView>(
@@ -1054,22 +1046,6 @@ type CheckerRegion<'g, Base> =
 /// This can be used when constructing multiple sibling subgraphs to speed up
 /// convexity checking.
 ///
-/// This a good default choice for most convexity checking use cases.
-#[deprecated(
-    note = "Use SchedGraphChecker or LineConvexChecker instead",
-    since = "0.27.1"
-)]
-pub type TopoConvexChecker<'g, Base> = PortgraphCheckerWithNodes<
-    'g,
-    Base,
-    portgraph::algorithms::TopoConvexChecker<CheckerRegion<'g, Base>>,
->;
-
-/// Precompute convexity information for a HUGR.
-///
-/// This can be used when constructing multiple sibling subgraphs to speed up
-/// convexity checking.
-///
 /// This is a good choice for checking convexity of circuit-like graphs,
 /// particularly when many checks must be performed.
 pub type LineConvexChecker<'g, Base> = PortgraphCheckerWithNodes<
@@ -1085,7 +1061,6 @@ pub type LineConvexChecker<'g, Base> = PortgraphCheckerWithNodes<
 ///
 /// This type is generic over the convexity checker used. If checking convexity
 /// for circuit-like graphs, use [`LineConvexChecker`]. Alternatively, use [SchedGraphChecker].
-/// [`TopoConvexChecker`].
 #[derive(Clone)]
 pub struct PortgraphCheckerWithNodes<'g, Base: HugrView, Checker> {
     /// The base HUGR to check convexity on.
@@ -1097,10 +1072,6 @@ pub struct PortgraphCheckerWithNodes<'g, Base: HugrView, Checker> {
     /// a map from nodes in the region to `Base` nodes.
     node_map: Base::RegionPortgraphNodes,
 }
-
-#[deprecated(note = "Use PortgraphCheckerWithNodes instead", since = "0.27.1")]
-/// Use [PortgraphCheckerWithNodes]
-pub type ConvexChecker<'g, Base, Checker> = PortgraphCheckerWithNodes<'g, Base, Checker>;
 
 impl<'g, Base, Checker> PortgraphCheckerWithNodes<'g, Base, Checker>
 where
@@ -1460,9 +1431,9 @@ pub enum InvalidReplacement {
     ]
     InvalidSignature {
         /// The expected signature.
-        expected: Box<Signature>,
+        expected: Box<PolyFuncType>,
         /// The actual signature.
-        actual: Option<Box<Signature>>,
+        actual: Option<Box<PolyFuncType>>,
     },
     /// `SiblingSubgraph` is not convex.
     #[error("SiblingSubgraph is not convex.")]

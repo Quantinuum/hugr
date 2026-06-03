@@ -2,6 +2,8 @@
 //! of the DFG except Input+Output into the DFG's parent,
 //! and deleting the DFG along with its Input + Output
 
+use std::collections::HashSet;
+
 use super::{PatchHugrMut, PatchVerification};
 use crate::core::HugrNode;
 use crate::ops::handle::{DfgID, NodeHandle};
@@ -76,12 +78,24 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
         for ch in h.children(n).skip(2).collect::<Vec<_>>() {
             h.set_parent(ch, parent);
         }
+        let internal_order_path = is_order_reachable(h, input, output);
         // DFG Inputs. Deal with Order inputs first
         for (src_n, src_p) in h.linked_outputs(n, oth_in).collect::<Vec<_>>() {
             // Order edge from src_n to DFG => add order edge to each successor of Input node
             debug_assert_eq!(Some(src_p), h.get_optype(src_n).other_output_port());
             for tgt_n in h.output_neighbours(input).collect::<Vec<_>>() {
                 h.add_other_edge(src_n, tgt_n);
+            }
+            if !internal_order_path {
+                // Ensure the order chain continues from the DFG's order-predecessors to its order-successors,
+                // even if e.g. the interior of the DFG is disconnected. (Check could be more precise.)
+                for tgt_n in h
+                    .linked_inputs(n, oth_out)
+                    .map(|(n, _)| n)
+                    .collect::<Vec<_>>()
+                {
+                    h.add_other_edge(src_n, tgt_n);
+                }
             }
         }
         // And remaining (Value) inputs
@@ -144,6 +158,24 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
     }
 }
 
+/// Determines whether there is a path along [Order] edges only from `src` to `tgt`.
+///
+/// [Order]: crate::types::EdgeKind::StateOrder
+fn is_order_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) -> bool {
+    let mut visited = HashSet::new();
+    let mut to_visit = vec![src];
+    while let Some(n) = to_visit.pop() {
+        if visited.insert(n) {
+            if n == tgt {
+                return true;
+            }
+            let order_outport = h.get_optype(n).other_output_port().unwrap();
+            to_visit.extend(h.linked_inputs(n, order_outport).map(|(n, _)| n));
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
@@ -158,7 +190,7 @@ mod test {
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
     use crate::ops::{OpType, Value};
-    use crate::std_extensions::arithmetic::float_types;
+    use crate::std_extensions::arithmetic::float_types::{self, float64_type};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
     use crate::types::Signature;
@@ -166,7 +198,7 @@ mod test {
     use crate::{Direction, HugrView, Port, type_row};
     use crate::{Hugr, Wire};
 
-    use super::InlineDFG;
+    use super::{InlineDFG, is_order_reachable};
 
     fn find_dfgs<H: HugrView>(h: &H) -> Vec<H::Node> {
         h.entry_descendants()
@@ -318,11 +350,11 @@ mod test {
          *           |  | | .  Cst | NB. Order edge Input to LCst
          *           |  | |  . |   |
          *           |  | |   LCst |
-         *           |  |  \ /     |
-         *           |  |  RZ      |
-         *           |  |  |       |
-         *           |  |  meas    |
-         *           |  |  | \     |
+         *           |  |  \ /  .  |
+         *           |  |  RZ   .  |
+         *           |  |  |    .  |  Order edge LCst to if
+         *           |  |  meas .  |
+         *           |  |  | \  .  |
          *           |  |  |  if   |
          *           |  |  |  .    | NB. Order edge if to Output
          *           |  \--|-------/
@@ -351,6 +383,7 @@ mod test {
         if_n.case_builder(0)?.finish_with_outputs([])?;
         if_n.case_builder(1)?.finish_with_outputs([])?;
         let if_n = if_n.finish_sub_container()?;
+        inner.add_other_wire(f.node(), if_n.node());
         inner.add_other_wire(if_n.node(), inner.output().node());
         let inner = inner.finish_with_outputs([m])?;
         outer.add_other_wire(h_a.node(), inner.node());
@@ -392,5 +425,52 @@ mod test {
             HashSet::from([h_a2.node(), cx.node()])
         );
         Ok(())
+    }
+
+    fn check_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) {
+        let mut visited = HashSet::new();
+        let mut to_visit = vec![src];
+        while let Some(n) = to_visit.pop() {
+            if visited.insert(n) {
+                if n == tgt {
+                    return;
+                }
+                to_visit.extend(h.output_neighbours(n));
+            }
+        }
+        panic!("Node {tgt:?} not reachable from {src:?}");
+    }
+
+    #[test]
+    fn order_edge_chain_broken() {
+        let mut h = DFGBuilder::new(endo_sig(vec![qb_t()])).unwrap();
+        let [q1] = h.input_wires_arr();
+        let qfree = h
+            .add_dataflow_op(test_quantum_extension::q_discard(), [q1])
+            .unwrap();
+        assert_eq!(qfree.num_value_outputs(), 0);
+        let mut inner = h.dfg_builder(inout_sig([], [float64_type()]), []).unwrap();
+        let f = inner.add_load_value(float_types::ConstF64::new(1.0));
+        let inner = inner.finish_with_outputs([f]).unwrap();
+        let [f] = inner.outputs_arr();
+        let qalloc = h
+            .add_dataflow_op(test_quantum_extension::q_alloc(), [])
+            .unwrap();
+        let [q2] = qalloc.outputs_arr();
+        let [q2] = h
+            .add_dataflow_op(test_quantum_extension::rz_f64(), [q2, f])
+            .unwrap()
+            .outputs_arr();
+
+        h.add_other_wire(qfree.node(), inner.node());
+        h.add_other_wire(inner.node(), qalloc.node());
+        let mut h = h.finish_hugr_with_outputs([q2]).unwrap();
+        assert!(is_order_reachable(&h, qfree.node(), qalloc.node()));
+
+        h.apply_patch(InlineDFG(*inner.handle())).unwrap();
+        h.validate().unwrap();
+        // These were both failing prior to https://github.com/Quantinuum/hugr/pull/3072
+        check_reachable(&h, qfree.node(), qalloc.node());
+        assert!(is_order_reachable(&h, qfree.node(), qalloc.node()));
     }
 }

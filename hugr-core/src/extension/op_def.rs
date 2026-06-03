@@ -8,14 +8,14 @@ use serde_with::serde_as;
 
 use super::{
     ConstFold, ConstFoldResult, Extension, ExtensionBuildError, ExtensionId, ExtensionSet,
-    SignatureError,
+    SignatureError, Version,
 };
 
 use crate::Hugr;
 use crate::envelope::serde_with::AsBinaryEnvelope;
 use crate::ops::{OpName, OpNameRef};
 use crate::package::Package;
-use crate::types::type_param::{TypeArg, TypeParam, check_term_types};
+use crate::types::type_param::{TypeArg, TypeParam, check_term_kinds};
 use crate::types::{FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature};
 mod serialize_signature_func;
 
@@ -254,7 +254,7 @@ impl SignatureFunc {
                 let static_params = func.static_params();
                 let (static_args, other_args) = args.split_at(min(static_params.len(), args.len()));
 
-                check_term_types(static_args, static_params)?;
+                check_term_kinds(static_args, static_params)?;
                 temp = func.compute_signature(static_args, def)?;
                 (&temp, other_args)
             }
@@ -361,6 +361,15 @@ impl Debug for LowerFunc {
 pub struct OpDef {
     /// The unique Extension owning this `OpDef` (of which this `OpDef` is a member)
     extension: ExtensionId,
+    /// The version of the extension owning this `OpDef`, if known.
+    ///
+    /// Not included in the serialization since it can be filled in when the
+    /// OpDef is registered to an Extension.
+    //
+    // TODO: Remove the option and make this a required field once we remove
+    // JSON serialization support for extensions.
+    #[serde(skip)]
+    extension_version: Option<Version>,
     /// A weak reference to the extension defining this operation.
     #[serde(skip)]
     extension_ref: Weak<Extension>,
@@ -400,13 +409,16 @@ impl OpDef {
     ) -> Result<(), SignatureError> {
         let temp: PolyFuncTypeRV; // to keep alive
         let (pf, args) = match &self.signature_func {
-            SignatureFunc::CustomValidator(ts) => (&ts.poly_func, args),
+            SignatureFunc::CustomValidator(custom) => {
+                custom.validate.validate(args, self)?;
+                (&custom.poly_func, args)
+            }
             SignatureFunc::PolyFuncType(ts) => (ts, args),
             SignatureFunc::CustomFunc(custom) => {
                 let (static_args, other_args) =
                     args.split_at(min(custom.static_params().len(), args.len()));
                 static_args.iter().try_for_each(|ta| ta.validate(&[]))?;
-                check_term_types(static_args, custom.static_params())?;
+                check_term_kinds(static_args, custom.static_params())?;
                 temp = custom.compute_signature(static_args, self)?;
                 (&temp, other_args)
             }
@@ -416,7 +428,7 @@ impl OpDef {
             }
         };
         args.iter().try_for_each(|ta| ta.validate(var_decls))?;
-        check_term_types(args, pf.params())?;
+        check_term_kinds(args, pf.params())?;
         Ok(())
     }
 
@@ -460,6 +472,21 @@ impl OpDef {
         &self.extension
     }
 
+    /// Returns the version of the extension that defines this operation.
+    ///
+    /// Panics if the version is not known. This should only happen when using
+    /// `serde_json` to deserialize the OpDef and not filling in the version
+    /// from the parent extension.
+    #[must_use]
+    pub fn extension_version(&self) -> Version {
+        self.extension_version.clone().unwrap_or_else(||
+            panic!(
+                "Extension version for operation definition {} not known. Was this deserialized using serde?",
+                self.name
+            )
+        )
+    }
+
     /// Returns a weak reference to the extension defining this operation.
     #[must_use]
     pub fn extension(&self) -> Weak<Extension> {
@@ -469,6 +496,12 @@ impl OpDef {
     /// Returns a mutable reference to the weak extension pointer in the operation definition.
     pub(super) fn extension_mut(&mut self) -> &mut Weak<Extension> {
         &mut self.extension_ref
+    }
+
+    /// Set the stored parent extension version if it is not already known.
+    pub(super) fn fill_extension_version(&mut self, version: &Version) {
+        self.extension_version
+            .get_or_insert_with(|| version.clone());
     }
 
     /// Returns a reference to the description of this [`OpDef`].
@@ -485,11 +518,14 @@ impl OpDef {
     pub(super) fn validate(&self) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate declared TypeParams
         // for both type scheme and custom binary
-        if let SignatureFunc::CustomValidator(ts) = &self.signature_func {
-            // The type scheme may contain row variables so be of variable length;
-            // these will have to be substituted to fixed-length concrete types when
-            // the OpDef is instantiated into an actual OpType.
-            ts.poly_func.validate()?;
+        match &self.signature_func {
+            SignatureFunc::PolyFuncType(pft) | SignatureFunc::MissingValidateFunc(pft) => {
+                pft.validate()?
+            }
+            SignatureFunc::CustomValidator(custom_validator) => {
+                custom_validator.poly_func.validate()?
+            }
+            SignatureFunc::CustomFunc(_) | SignatureFunc::MissingComputeFunc => (), // can't check anything
         }
         Ok(())
     }
@@ -581,6 +617,7 @@ impl Extension {
     ) -> Result<&mut OpDef, ExtensionBuildError> {
         let op = OpDef {
             extension: self.name.clone(),
+            extension_version: Some(self.version.clone()),
             extension_ref: extension_ref.clone(),
             name,
             description,
@@ -606,15 +643,15 @@ pub(super) mod test {
 
     use super::SignatureFromArgs;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig};
-    use crate::extension::SignatureError;
     use crate::extension::op_def::{CustomValidator, LowerFunc, OpDef, SignatureFunc};
     use crate::extension::prelude::usize_t;
-    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
+    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, ValidateJustArgs};
+    use crate::extension::{ExtensionRegistryError, SignatureError};
     use crate::ops::OpName;
     use crate::package::Package;
     use crate::std_extensions::collections::list;
-    use crate::types::type_param::{TermTypeError, TypeParam};
-    use crate::types::{PolyFuncTypeRV, Signature, Term, Type, TypeArg, TypeBound};
+    use crate::types::type_param::{TermKindError, TypeParam};
+    use crate::types::{PolyFuncTypeRV, Signature, Term, Type, TypeArg, TypeBound, TypeRowRV};
     use crate::{Extension, const_extension_ids};
 
     const_extension_ids! {
@@ -654,6 +691,9 @@ pub(super) mod test {
         fn eq(&self, other: &Self) -> bool {
             let OpDef {
                 extension,
+                // Version ignored in testing, since it is not included in
+                // the serialization.
+                extension_version: _,
                 extension_ref: _,
                 name,
                 description,
@@ -664,6 +704,7 @@ pub(super) mod test {
             } = &self.0;
             let OpDef {
                 extension: other_extension,
+                extension_version: _,
                 extension_ref: _,
                 name: other_name,
                 description: other_description,
@@ -716,7 +757,7 @@ pub(super) mod test {
         const OP_NAME: OpName = OpName::new_inline("Reverse");
 
         let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
-            const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
+            const TP: TypeParam = TypeParam::TypeKind(TypeBound::Linear);
             let list_of_var =
                 Type::new_extension(list_def.instantiate(vec![TypeArg::new_var_use(0, TP)])?);
             let type_scheme = PolyFuncTypeRV::new(vec![TP], Signature::new_endo([list_of_var]));
@@ -762,7 +803,7 @@ pub(super) mod test {
                 &self,
                 arg_values: &[TypeArg],
             ) -> Result<PolyFuncTypeRV, SignatureError> {
-                const TP: TypeParam = TypeParam::RuntimeType(TypeBound::Linear);
+                const TP: TypeParam = TypeParam::TypeKind(TypeBound::Linear);
                 let [TypeArg::BoundedNat(n)] = arg_values else {
                     return Err(SignatureError::InvalidTypeArgs);
                 };
@@ -777,7 +818,7 @@ pub(super) mod test {
             }
 
             fn static_params(&self) -> &[TypeParam] {
-                const MAX_NAT: &[TypeParam] = &[TypeParam::max_nat_type()];
+                const MAX_NAT: &[TypeParam] = &[TypeParam::max_nat_kind()];
                 MAX_NAT
             }
         }
@@ -820,7 +861,7 @@ pub(super) mod test {
             );
 
             // First arg must be concrete, not a variable
-            let kind = TypeParam::bounded_nat_type(NonZeroU64::new(5).unwrap());
+            let kind = TypeParam::bounded_nat_kind(NonZeroU64::new(5).unwrap());
             let args = [TypeArg::new_var_use(0, kind.clone()), usize_t().into()];
             // We can't prevent this from getting into our compute_signature implementation:
             assert_eq!(
@@ -866,8 +907,8 @@ pub(super) mod test {
             assert_eq!(
                 def.compute_signature(std::slice::from_ref(&arg)),
                 Err(SignatureError::TypeArgMismatch(
-                    TermTypeError::TypeMismatch {
-                        type_: Box::new(TypeBound::Linear.into()),
+                    TermKindError::KindMismatch {
+                        kind: Box::new(TypeBound::Linear.into()),
                         term: Box::new(arg),
                     }
                 ))
@@ -875,6 +916,69 @@ pub(super) mod test {
             Ok(())
         })?;
         Ok(())
+    }
+
+    #[test] // failing before https://github.com/Quantinuum/hugr/pull/3081
+    fn invalid_extension() {
+        let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
+            ext.add_op(
+                "MyOp".into(),
+                "desc".into(),
+                PolyFuncTypeRV::new(
+                    [],
+                    Signature::new_endo([Type::new_tuple(
+                        // variable not declared
+                        TypeRowRV::new_var_use(0, TypeBound::Linear),
+                    )]),
+                ),
+                extension_ref,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+        let reg = ExtensionRegistry::new([PRELUDE.clone(), ext]);
+        assert_eq!(
+            reg.validate(),
+            Err(ExtensionRegistryError::InvalidSignature(
+                EXT_ID,
+                SignatureError::FreeTypeVar {
+                    idx: 0,
+                    num_decls: 0
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn validate_args() {
+        struct TestValidator;
+        impl ValidateJustArgs for TestValidator {
+            fn validate(&self, arg_values: &[TypeArg]) -> Result<(), SignatureError> {
+                if matches!(arg_values, [TypeArg::BoundedNat(n)] if *n % 2 == 1) {
+                    return Ok(());
+                }
+                Err(SignatureError::InvalidTypeArgs)
+            }
+        }
+        let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
+            ext.add_op(
+                "TestOp".into(),
+                "Type arg must be odd but is otherwise ignored".into(),
+                CustomValidator::new(
+                    PolyFuncTypeRV::new([Term::max_nat_kind()], Signature::new_endo([usize_t()])),
+                    TestValidator,
+                ),
+                extension_ref,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(
+            ext.get_op("TestOp")
+                .unwrap()
+                .validate_args(&[TypeArg::BoundedNat(2)], &[]),
+            Err(SignatureError::InvalidTypeArgs)
+        );
     }
 
     mod proptest {
@@ -886,7 +990,9 @@ pub(super) mod test {
         use crate::package::Package;
         use crate::{
             builder::test::simple_dfg_hugr,
-            extension::{ExtensionId, ExtensionSet, OpDef, SignatureFunc, op_def::LowerFunc},
+            extension::{
+                ExtensionId, ExtensionSet, OpDef, SignatureFunc, Version, op_def::LowerFunc,
+            },
             types::PolyFuncTypeRV,
         };
 
@@ -927,6 +1033,7 @@ pub(super) mod test {
                 let misc = hash_map(any_string(), any_serde_json_value(), 0..3);
                 (
                     any::<ExtensionId>(),
+                    any::<(u64, u64, u64)>(),
                     any_smolstr(),
                     any_string(),
                     misc,
@@ -934,9 +1041,18 @@ pub(super) mod test {
                     vec(any::<LowerFunc>(), 0..2),
                 )
                     .prop_map(
-                        |(extension, name, description, misc, signature_func, lower_funcs)| {
+                        |(
+                            extension,
+                            (major, minor, patch),
+                            name,
+                            description,
+                            misc,
+                            signature_func,
+                            lower_funcs,
+                        )| {
                             Self::new(OpDef {
                                 extension,
+                                extension_version: Some(Version::new(major, minor, patch)),
                                 // Use a dead weak reference. Trying to access the extension will always return None.
                                 extension_ref: Weak::default(),
                                 name,

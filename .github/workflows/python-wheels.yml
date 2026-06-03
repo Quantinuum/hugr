@@ -111,7 +111,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --profile release-py --strip --out ../dist -i python3.13t
+          args: --profile release-py --strip --out ../dist -i python3.14t
           sccache: "true"
           manylinux: ${{ matrix.platform.manylinux }}
           working-directory: ${{ env.MODULE_DIR }}
@@ -153,7 +153,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --profile release-py --strip --out ../dist -i python3.13t
+          args: --profile release-py --strip --out ../dist -i python3.14t
           sccache: "true"
           manylinux: musllinux_1_2
           working-directory: ${{ env.MODULE_DIR }}
@@ -220,7 +220,7 @@ jobs:
         uses: PyO3/maturin-action@v1
         with:
           target: ${{ matrix.platform.target }}
-          args: --profile release-py --strip --out ../dist -i python3.13t
+          args: --profile release-py --strip --out ../dist -i python3.14t
           sccache: "true"
           working-directory: ${{ env.MODULE_DIR }}
       - name: Upload wheels

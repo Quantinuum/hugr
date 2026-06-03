@@ -26,15 +26,15 @@ expression: ast
 
 (mod)
 
-(import core.entrypoint)
-
-(import core.make_adt)
+(import core.adt)
 
 (import core.ctrl)
 
-(import core.adt)
+(import core.entrypoint)
 
 (import core.fn)
+
+(import core.make_adt)
 
 (define-func public wrapper_cfg (core.fn [] [])
   (dfg

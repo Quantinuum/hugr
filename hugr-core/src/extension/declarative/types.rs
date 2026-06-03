@@ -129,6 +129,6 @@ impl TypeParamDeclaration {
         _extension: &Extension,
         _ctx: DeclarationContext<'_>,
     ) -> Result<TypeParam, ExtensionDeclarationError> {
-        Ok(TypeParam::StringType)
+        Ok(TypeParam::StringKind)
     }
 }

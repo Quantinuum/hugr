@@ -5,15 +5,15 @@ expression: mod_str
 ; ModuleID = 'test_context'
 source_filename = "test_context"
 
-define internal void @_hl.main.1() {
+define internal void @_hl.main.1() !dbg !3 {
 alloca_block:
   %"7_0" = alloca i64, align 8
   %"5_0" = alloca i64, align 8
   %"8_0" = alloca { ptr, i64 }, align 8
   %"9_0" = alloca { i1, i64 }, align 8
   %"9_1" = alloca { ptr, i64 }, align 8
-  %"0" = alloca { i1, i64 }, align 8
-  %"1" = alloca { ptr, i64 }, align 8
+  %"0" = alloca { i1, i64 }, align 8, !dbg !7
+  %"1" = alloca { ptr, i64 }, align 8, !dbg !7
   br label %entry_block
 
 entry_block:                                      ; preds = %alloca_block
@@ -21,47 +21,61 @@ entry_block:                                      ; preds = %alloca_block
   store i64 1, ptr %"5_0", align 4
   %"5_01" = load i64, ptr %"5_0", align 4
   %"7_02" = load i64, ptr %"7_0", align 4
-  %0 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64)
-  %1 = call ptr @malloc(i64 %0)
-  %2 = insertvalue { ptr, i64 } poison, ptr %1, 0
-  %3 = insertvalue { ptr, i64 } %2, i64 0, 1
-  %4 = getelementptr inbounds i64, ptr %1, i64 0
-  store i64 %"5_01", ptr %4, align 4
-  %5 = getelementptr inbounds i64, ptr %1, i64 1
-  store i64 %"7_02", ptr %5, align 4
-  store { ptr, i64 } %3, ptr %"8_0", align 8
+  %0 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !8
+  %1 = call ptr @malloc(i64 %0), !dbg !8
+  %2 = insertvalue { ptr, i64 } poison, ptr %1, 0, !dbg !8
+  %3 = insertvalue { ptr, i64 } %2, i64 0, 1, !dbg !8
+  %4 = getelementptr inbounds i64, ptr %1, i64 0, !dbg !8
+  store i64 %"5_01", ptr %4, align 4, !dbg !8
+  %5 = getelementptr inbounds i64, ptr %1, i64 1, !dbg !8
+  store i64 %"7_02", ptr %5, align 4, !dbg !8
+  store { ptr, i64 } %3, ptr %"8_0", align 8, !dbg !8
   %"8_03" = load { ptr, i64 }, ptr %"8_0", align 8
   %"5_04" = load i64, ptr %"5_0", align 4
-  %array_ptr = extractvalue { ptr, i64 } %"8_03", 0
-  %array_offset = extractvalue { ptr, i64 } %"8_03", 1
-  %6 = icmp ult i64 %"5_04", 2
-  br i1 %6, label %8, label %7
+  %array_ptr = extractvalue { ptr, i64 } %"8_03", 0, !dbg !7
+  %array_offset = extractvalue { ptr, i64 } %"8_03", 1, !dbg !7
+  %6 = icmp ult i64 %"5_04", 2, !dbg !7
+  br i1 %6, label %8, label %7, !dbg !7
 
 7:                                                ; preds = %entry_block
-  store { i1, i64 } { i1 false, i64 poison }, ptr %"0", align 4
-  store { ptr, i64 } %"8_03", ptr %"1", align 8
-  br label %13
+  store { i1, i64 } { i1 false, i64 poison }, ptr %"0", align 4, !dbg !7
+  store { ptr, i64 } %"8_03", ptr %"1", align 8, !dbg !7
+  br label %13, !dbg !7
 
 8:                                                ; preds = %entry_block
-  %9 = add i64 %"5_04", %array_offset
-  %10 = getelementptr inbounds i64, ptr %array_ptr, i64 %9
-  %11 = load i64, ptr %10, align 4
-  %12 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %11, 1
-  store { i1, i64 } %12, ptr %"0", align 4
-  store { ptr, i64 } %"8_03", ptr %"1", align 8
-  br label %13
+  %9 = add i64 %"5_04", %array_offset, !dbg !7
+  %10 = getelementptr inbounds i64, ptr %array_ptr, i64 %9, !dbg !7
+  %11 = load i64, ptr %10, align 4, !dbg !7
+  %12 = insertvalue { i1, i64 } { i1 true, i64 poison }, i64 %11, 1, !dbg !7
+  store { i1, i64 } %12, ptr %"0", align 4, !dbg !7
+  store { ptr, i64 } %"8_03", ptr %"1", align 8, !dbg !7
+  br label %13, !dbg !7
 
 13:                                               ; preds = %7, %8
-  %"05" = load { i1, i64 }, ptr %"0", align 4
-  %"16" = load { ptr, i64 }, ptr %"1", align 8
-  store { i1, i64 } %"05", ptr %"9_0", align 4
-  store { ptr, i64 } %"16", ptr %"9_1", align 8
+  %"05" = load { i1, i64 }, ptr %"0", align 4, !dbg !7
+  %"16" = load { ptr, i64 }, ptr %"1", align 8, !dbg !7
+  store { i1, i64 } %"05", ptr %"9_0", align 4, !dbg !7
+  store { ptr, i64 } %"16", ptr %"9_1", align 8, !dbg !7
   %"9_17" = load { ptr, i64 }, ptr %"9_1", align 8
-  %array_ptr8 = extractvalue { ptr, i64 } %"9_17", 0
-  call void @free(ptr %array_ptr8)
+  %array_ptr8 = extractvalue { ptr, i64 } %"9_17", 0, !dbg !9
+  call void @free(ptr %array_ptr8), !dbg !9
   ret void
 }
 
 declare ptr @malloc(i64)
 
 declare void @free(ptr)
+
+!llvm.module.flags = !{!0}
+!llvm.dbg.cu = !{!1}
+
+!0 = !{i32 2, !"Debug Info Version", i32 3}
+!1 = distinct !DICompileUnit(language: DW_LANG_Python, file: !2, producer: "hugr_llvm_test", isOptimized: false, runtimeVersion: 0, emissionKind: FullDebug)
+!2 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "/lVLClAphFGIyrhvZsHeDgUnyeIVwAut")
+!3 = distinct !DISubprogram(name: "_hl.main.1", linkageName: "_hl.main.1", scope: null, file: !4, line: 25254, type: !5, scopeLine: 25255, spFlags: DISPFlagLocalToUnit | DISPFlagDefinition, unit: !1)
+!4 = !DIFile(filename: "/cmJrSnVYeXFf/zCkHdtWCCnkJhPKiWSKICgZuRNRvR/mbrfVq.gpy.py", directory: "")
+!5 = !DISubroutineType(types: !6)
+!6 = !{null}
+!7 = !DILocation(line: 5388, column: 404, scope: !3)
+!8 = !DILocation(line: 27062, column: 402, scope: !3)
+!9 = !DILocation(line: 10060, column: 368, scope: !3)

@@ -300,7 +300,11 @@ flowchart
 
 In a dataflow graph, the evaluation semantics are simple: all nodes in
 the graph are necessarily evaluated, in some order (perhaps parallel)
-respecting the Dataflow edges. The following operations are used to
+respecting the Dataflow and Order edges. This may include interleaving or
+overlapping evaluation of siblings and descendants as long as said edges
+are respected.
+
+The following operations are used to
 express control flow, i.e. conditional or repeated evaluation.
 
 #### `Conditional` nodes
@@ -407,7 +411,7 @@ flowchart TB
 (control-flow-graphs)=
 #### Control Flow Graphs
 
-When Conditional and `TailLoop` are not sufficient, the HUGR allows
+When `Conditional` and `TailLoop` are not sufficient, the HUGR allows
 arbitrarily-complex (even irreducible) control flow via an explicit `CFG` node:
 a dataflow node defined by a child control sibling graph. This sibling
 graph contains `BasicBlock` nodes (and [scoped definitions](#scoped-definitions)),
@@ -545,9 +549,12 @@ graph:
 cycles. The common parent is a CFG-node.
 
 **Dataflow Sibling Graph (DSG)**: nodes are operations, `CFG`,
-`Conditional`, `TailLoop` and `DFG` nodes; edges are `Value`, `Order` and `Static`, and must be acyclic.
+`Conditional`, `TailLoop` and `DFG` nodes; edges are `Value`, `Order` and `Static`.
+The edges, along with the constraints that the source of any nonlocal edge must be before
+the sibling that is ancestor of its target, must be acyclic.
 (Thus a valid ordering of operations can be achieved by topologically sorting the
-nodes.)
+nodes respecting the edges and this constraint.)
+
 There is a unique Input node and Output node.
 The common parent may be a `FuncDefn`, `TailLoop`, `DFG`, `Case` or `DFB` node.
 
@@ -578,19 +585,7 @@ parent(n<sub>2</sub>) when the edge's locality is:
 Each of these localities have additional constraints as follows:
 
 1. For Ext edges, we require parent(n<sub>1</sub>) ==
-   parent<sup>i</sup>(n<sub>2</sub>) for some i\>1, *and* for Value edges only there must be a order edge from n<sub>1</sub> to
-   parent<sup>i-1</sup>(n<sub>2</sub>).
-
-   The order edge records the
-   ordering requirement that results, i.e. it must be possible to
-   execute the entire n<sub>1</sub> node before executing
-   parent<sup>i-1</sup>(n<sub>2</sub>). (Further recall that
-   order+value edges together must be acyclic). We record the
-   relationship between the Value edge and the
-   corresponding order edge via metadata on each edge.
-
-   For Static edges this order edge is not required since the source is
-   guaranteed to causally precede the target.
+   parent<sup>i</sup>(n<sub>2</sub>) for some i\>1.
 
 2. For Dom edges, we must have that parent<sup>2</sup>(n<sub>1</sub>)
    == parent<sup>i</sup>(n<sub>2</sub>) is a CFG-node, for some i\>1,

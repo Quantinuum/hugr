@@ -1737,7 +1737,7 @@ mod test {
 
     #[rstest]
     fn emit_all_ops(mut llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 build_all_borrow_array_ops(builder.dfg_builder_endo([]).unwrap())
@@ -1754,7 +1754,7 @@ mod test {
 
     #[rstest]
     fn emit_get(mut llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let us1 = builder.add_load_value(ConstUsize::new(1));
@@ -1775,7 +1775,7 @@ mod test {
 
     #[rstest]
     fn emit_clone(mut llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_extensions(STD_REG.to_owned())
             .finish(|mut builder| {
                 let us1 = builder.add_load_value(ConstUsize::new(1));
@@ -1799,7 +1799,7 @@ mod test {
 
     #[rstest]
     fn emit_array_value(mut llvm_ctx: TestContext) {
-        let hugr = SimpleHugrConfig::new()
+        let mut hugr = SimpleHugrConfig::new()
             .with_extensions(STD_REG.to_owned())
             .with_outs(vec![borrow_array_type(2, usize_t())])
             .finish(|mut builder| {

@@ -2,11 +2,11 @@ use std::collections::btree_map::Entry;
 use std::sync::Weak;
 
 use super::{CustomConcrete, ExtensionBuildError};
-use super::{Extension, ExtensionId, SignatureError};
+use super::{Extension, ExtensionId, SignatureError, Version};
 
 use crate::types::{CustomType, TypeName, least_upper_bound};
 
-use crate::types::type_param::{TypeArg, check_term_types};
+use crate::types::type_param::{TypeArg, check_term_kinds};
 
 use crate::types::type_param::TypeParam;
 
@@ -60,6 +60,14 @@ impl TypeDefBound {
 pub struct TypeDef {
     /// The unique Extension owning this `TypeDef` (of which this `TypeDef` is a member)
     extension: ExtensionId,
+    /// The version of the extension owning this `TypeDef`, if known.
+    ///
+    /// Not included in the serialization since it can be filled in from the parent extension.
+    //
+    // TODO: Remove the option and require the version to be known at construction time.
+    // This will only be possible once JSON serialization of extensions is removed.
+    #[serde(skip)]
+    extension_version: Option<Version>,
     /// A weak reference to the extension defining this operation.
     #[serde(skip)]
     extension_ref: Weak<Extension>,
@@ -79,7 +87,7 @@ pub struct TypeDef {
 impl TypeDef {
     /// Check provided type arguments are valid against parameters.
     pub fn check_args(&self, args: &[TypeArg]) -> Result<(), SignatureError> {
-        Ok(check_term_types(args, &self.params)?)
+        Ok(check_term_kinds(args, &self.params)?)
     }
 
     /// Check [`CustomType`] is a valid instantiation of this definition.
@@ -102,7 +110,7 @@ impl TypeDef {
             ));
         }
 
-        check_term_types(custom.type_args(), &self.params)?;
+        check_term_kinds(custom.type_args(), &self.params)?;
 
         let calc_bound = self.bound(custom.args());
         if calc_bound == custom.bound() {
@@ -123,12 +131,13 @@ impl TypeDef {
     /// valid instances of the type parameters.
     pub fn instantiate(&self, args: impl Into<Vec<TypeArg>>) -> Result<CustomType, SignatureError> {
         let args = args.into();
-        check_term_types(&args, &self.params)?;
+        check_term_kinds(&args, &self.params)?;
         let bound = self.bound(&args);
         Ok(CustomType::new(
             self.name().clone(),
             args,
             self.extension_id().clone(),
+            self.extension_version(),
             bound,
             &self.extension_ref,
         ))
@@ -173,6 +182,21 @@ impl TypeDef {
         &self.extension
     }
 
+    /// Returns the version of the extension that defines this type.
+    ///
+    /// Panics if the version is not known. This should only happen when using
+    /// `serde_json` to deserialize the TypeDef and not filling in the version
+    /// from the parent extension.
+    #[must_use]
+    pub fn extension_version(&self) -> Version {
+        self.extension_version.clone().unwrap_or_else(|| {
+            panic!(
+                "Extension version for type definition {} not known. Was this deserialized using serde?",
+                self.name
+            )
+        })
+    }
+
     /// Returns a weak reference to the extension defining this type.
     #[must_use]
     pub fn extension(&self) -> Weak<Extension> {
@@ -182,6 +206,12 @@ impl TypeDef {
     /// Returns a mutable reference to the weak extension pointer in the type def.
     pub(super) fn extension_mut(&mut self) -> &mut Weak<Extension> {
         &mut self.extension_ref
+    }
+
+    /// Set the stored parent extension version if it is not already known.
+    pub(super) fn fill_extension_version(&mut self, version: &Version) {
+        self.extension_version
+            .get_or_insert_with(|| version.clone());
     }
 }
 
@@ -222,6 +252,7 @@ impl Extension {
     ) -> Result<&TypeDef, ExtensionBuildError> {
         let ty = TypeDef {
             extension: self.name.clone(),
+            extension_version: Some(self.version.clone()),
             extension_ref: extension_ref.clone(),
             name,
             params,
@@ -237,10 +268,12 @@ impl Extension {
 
 #[cfg(test)]
 mod test {
+    use semver::Version;
+
     use crate::extension::SignatureError;
     use crate::extension::prelude::{qb_t, usize_t};
     use crate::std_extensions::arithmetic::float_types::float64_type;
-    use crate::types::type_param::{TermTypeError, TypeParam};
+    use crate::types::type_param::{TermKindError, TypeParam};
     use crate::types::{Signature, Type, TypeBound};
 
     use super::{TypeDef, TypeDefBound};
@@ -249,8 +282,9 @@ mod test {
     fn test_instantiate_typedef() {
         let def = TypeDef {
             name: "MyType".into(),
-            params: vec![TypeParam::RuntimeType(TypeBound::Copyable)],
+            params: vec![TypeParam::TypeKind(TypeBound::Copyable)],
             extension: "MyRsrc".try_into().unwrap(),
+            extension_version: Some(Version::new(0, 1, 0)),
             // Dummy extension. Will return `None` when trying to upgrade it into an `Arc`.
             extension_ref: Default::default(),
             description: "Some parametrised type".into(),
@@ -270,22 +304,22 @@ mod test {
         assert_eq!(
             def.instantiate([qb_t().into()]),
             Err(SignatureError::TypeArgMismatch(
-                TermTypeError::TypeMismatch {
+                TermKindError::KindMismatch {
                     term: Box::new(qb_t().into()),
-                    type_: Box::new(TypeBound::Copyable.into())
+                    kind: Box::new(TypeBound::Copyable.into())
                 }
             ))
         );
         // Too few arguments:
         assert_eq!(
             def.instantiate([]).unwrap_err(),
-            SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(0, 1))
+            SignatureError::TypeArgMismatch(TermKindError::WrongNumberArgs(0, 1))
         );
         // Too many arguments:
         assert_eq!(
             def.instantiate([float64_type().into(), float64_type().into(),])
                 .unwrap_err(),
-            SignatureError::TypeArgMismatch(TermTypeError::WrongNumberArgs(2, 1))
+            SignatureError::TypeArgMismatch(TermKindError::WrongNumberArgs(2, 1))
         );
     }
 }

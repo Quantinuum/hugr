@@ -2,7 +2,7 @@
 
 use std::{borrow::Cow, rc::Rc, sync::Arc};
 
-use super::HugrView;
+use super::{HugrView, SchedulingGraph};
 use crate::hugr::internal::{HugrInternals, HugrMutInternals};
 use crate::hugr::{HugrMut, hugrmut::InsertForestResult};
 
@@ -11,8 +11,6 @@ macro_rules! hugr_internal_methods {
     ($arg:ident, $e:expr) => {
         delegate::delegate! {
             to ({let $arg=self; $e}) {
-                #[expect(deprecated)] // Remove delegate along with region_portgraph
-                fn region_portgraph(&self, parent: Self::Node) -> (portgraph::view::FlatRegion<'_, Self::RegionPortgraph<'_>>, Self::RegionPortgraphNodes);
                 fn node_metadata_map(&self, node: Self::Node) -> &crate::hugr::NodeMetadataMap;
             }
         }
@@ -69,6 +67,11 @@ macro_rules! hugr_view_methods {
                 fn validate(&self) -> Result<(), crate::hugr::ValidationError<Self::Node>>;
                 fn extract_hugr(&self, parent: Self::Node) -> (crate::Hugr, impl crate::hugr::views::ExtractionResult<Self::Node> + 'static);
             }
+        }
+        fn scheduling_graph(&self, parent: Self::Node) -> crate::hugr::views::SchedulingGraph<'_, Self> {
+            let $arg = self;
+            let SchedulingGraph {graph, node_map, region_parent} = $e.scheduling_graph(parent);
+            SchedulingGraph {graph, node_map, region_parent}
         }
     }
 }

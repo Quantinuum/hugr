@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from typing import Any
+from typing import Any, ClassVar
 
+import pytest
 from semver import Version
 
 from hugr import ops, tys
@@ -14,12 +15,25 @@ from hugr.metadata import (
     HugrGenerator,
     HugrUsedExtensions,
     Metadata,
+    NodeMetadata,
 )
 from hugr.utils import JsonType
 
 
 class CustomMetadata(Metadata[list[JsonType]]):
     KEY = "custom.metadata"
+
+
+class AliasedMetadata(Metadata[int]):
+    KEY = "custom.metadata.new"
+    ALIASES: ClassVar[list[str]] = ["custom.metadata.old", "custom.metadata.older"]
+
+    @classmethod
+    def from_json(cls, value: JsonType) -> int:
+        if not isinstance(value, int):
+            msg = f"Expected aliased metadata to be an int, but got {type(value)}"
+            raise TypeError(msg)
+        return value
 
 
 def test_metadata_properties() -> None:
@@ -94,6 +108,28 @@ def test_metadata_default() -> None:
     ) == GeneratorDesc("hugr-py-test", Version.parse("1.2.3"))
     assert node.metadata.get("missing.metadata") is None
     assert node.metadata.get("missing.metadata", [1, 2, 3]) == [1, 2, 3]
+
+
+def test_metadata_aliases() -> None:
+    metadata = NodeMetadata(
+        {
+            "custom.metadata.older": 1,
+            "custom.metadata.old": 2,
+        }
+    )
+
+    assert AliasedMetadata in metadata
+    assert metadata[AliasedMetadata] == 2
+    assert metadata.get(AliasedMetadata) == 2
+    assert metadata.get(AliasedMetadata.KEY) is None
+
+    metadata[AliasedMetadata] = 3
+    assert metadata[AliasedMetadata] == 3
+    assert metadata[AliasedMetadata.KEY] == 3
+
+    metadata[AliasedMetadata.KEY] = "not an int"
+    with pytest.raises(TypeError):
+        metadata[AliasedMetadata]
 
 
 def test_debug_info_roundtrip() -> None:

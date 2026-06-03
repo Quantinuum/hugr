@@ -53,6 +53,7 @@ fn write_package(mut builder: hugr_capnp::package::Builder, package: &table::Pac
 fn write_version(mut builder: hugr_capnp::version::Builder, version: &semver::Version) {
     builder.set_major(version.major as u32);
     builder.set_minor(version.minor as u32);
+    builder.set_patch(version.patch as u32);
 }
 
 fn write_module(mut builder: hugr_capnp::module::Builder, module: &table::Module) {
@@ -108,8 +109,12 @@ fn write_operation(mut builder: hugr_capnp::operation::Builder, operation: &tabl
             write_symbol(builder, symbol);
         }
 
-        table::Operation::Import { name } => {
-            builder.set_import(*name);
+        table::Operation::Import { name, version } => {
+            let mut builder = builder.init_import();
+            builder.set_name(*name);
+            if let Some(version) = version {
+                write_version(builder.init_version(), version);
+            }
         }
 
         table::Operation::Invalid => builder.set_invalid(()),
@@ -124,6 +129,9 @@ fn write_symbol(mut builder: hugr_capnp::symbol::Builder, symbol: &table::Symbol
             model::Visibility::Public => hugr_capnp::Visibility::Public,
         })
     } // else, None -> use capnp default == Unspecified
+    if let Some(version) = symbol.version {
+        write_version(builder.reborrow().init_version(), version);
+    }
     write_list!(builder, init_params, write_param, symbol.params);
     let _ = builder.set_constraints(table::TermId::unwrap_slice(symbol.constraints));
     builder.set_signature(symbol.signature.0);

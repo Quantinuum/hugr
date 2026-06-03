@@ -387,7 +387,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// These can be queried using [`HugrView::extensions`].
     ///
-    /// See [`ExtensionRegistry::register_updated`] for more information.
+    /// See [`ExtensionRegistry::register`] for more information.
     fn use_extension(&mut self, extension: impl Into<Arc<Extension>>);
 
     /// Extend the set of extensions used by the hugr with the extensions in the
@@ -398,7 +398,7 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// These can be queried using [`HugrView::extensions`].
     ///
-    /// See [`ExtensionRegistry::register_updated`] for more information.
+    /// See [`ExtensionRegistry::register`] for more information.
     fn use_extensions<Reg>(&mut self, registry: impl IntoIterator<Item = Reg>)
     where
         ExtensionRegistry: Extend<Reg>;
@@ -737,7 +737,7 @@ impl HugrMut for Hugr {
 
     #[inline]
     fn use_extension(&mut self, extension: impl Into<Arc<Extension>>) {
-        self.extensions_mut().register_updated(extension);
+        self.extensions_mut().register(extension);
     }
 
     #[inline]
@@ -895,6 +895,13 @@ pub(super) mod test {
             type Type<'hugr> = MetaSelf;
         }
 
+        struct MetaAliased;
+        impl Metadata for MetaAliased {
+            const KEY: &'static str = "meta_aliased";
+            const ALIASES: &'static [&'static str] = &["meta_aliased_old", "meta_aliased_older"];
+            type Type<'hugr> = &'hugr str;
+        }
+
         assert_eq!(hugr.get_metadata::<MetaString>(root), None);
         *hugr.get_metadata_any_mut(root, MetaString::KEY) = "test".into();
         assert_eq!(hugr.get_metadata::<MetaString>(root), Some("test"));
@@ -909,6 +916,18 @@ pub(super) mod test {
 
         hugr.remove_metadata::<MetaSelf>(root);
         assert_eq!(hugr.get_metadata::<MetaSelf>(root), None);
+
+        *hugr.get_metadata_any_mut(root, "meta_aliased_older") = "older".into();
+        assert_eq!(hugr.get_metadata::<MetaAliased>(root), Some("older"));
+
+        *hugr.get_metadata_any_mut(root, "meta_aliased_old") = "old".into();
+        assert_eq!(hugr.get_metadata::<MetaAliased>(root), Some("old"));
+
+        hugr.set_metadata::<MetaAliased>(root, "new");
+        assert_eq!(hugr.get_metadata::<MetaAliased>(root), Some("new"));
+
+        *hugr.get_metadata_any_mut(root, MetaAliased::KEY) = 42.into();
+        assert_eq!(hugr.get_metadata::<MetaAliased>(root), None);
     }
 
     #[test]

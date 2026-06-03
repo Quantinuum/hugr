@@ -108,7 +108,12 @@ fn read_package<'a>(
 fn read_version(reader: hugr_capnp::version::Reader) -> ReadResult<semver::Version> {
     let major = reader.get_major();
     let minor = reader.get_minor();
-    Ok(semver::Version::new(major as u64, minor as u64, 0))
+    let patch = reader.get_patch();
+    Ok(semver::Version::new(
+        major as u64,
+        minor as u64,
+        patch as u64,
+    ))
 }
 
 fn read_module<'a>(
@@ -190,9 +195,17 @@ fn read_operation<'a>(
         Which::Custom(operation) => table::Operation::Custom(table::TermId(operation)),
         Which::TailLoop(()) => table::Operation::TailLoop,
         Which::Conditional(()) => table::Operation::Conditional,
-        Which::Import(name) => table::Operation::Import {
-            name: bump.alloc_str(name?.to_str()?),
-        },
+        Which::Import(reader) => {
+            let version = if reader.has_version() {
+                Some(read_version(reader.get_version()?)?)
+            } else {
+                None
+            };
+            table::Operation::Import {
+                name: bump.alloc_str(reader.get_name()?.to_str()?),
+                version: bump.alloc(version),
+            }
+        }
     })
 }
 
@@ -254,6 +267,12 @@ fn read_symbol<'a>(
     let name = bump.alloc_str(reader.get_name()?.to_str()?);
     let visibility = reader.get_visibility()?.into();
     let visibility = bump.alloc(visibility);
+    let version = if reader.has_version() {
+        Some(read_version(reader.get_version()?)?)
+    } else {
+        None
+    };
+    let version = bump.alloc(version);
     let params = read_list!(bump, reader.get_params()?, read_param);
     let constraints = match constraints {
         Some(cs) => cs,
@@ -263,6 +282,7 @@ fn read_symbol<'a>(
     Ok(bump.alloc(table::Symbol {
         visibility,
         name,
+        version,
         params,
         constraints,
         signature,

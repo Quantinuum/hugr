@@ -38,7 +38,7 @@ pub mod generic;
 /// Name of prelude extension.
 pub const PRELUDE_ID: ExtensionId = ExtensionId::new_unchecked("prelude");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 2, 1);
+pub const VERSION: semver::Version = semver::Version::new(0, 2, 2);
 /// Prelude extension, containing common types and operations.
 pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
     Extension::new_arc(PRELUDE_ID, VERSION, |prelude, extension_ref| {
@@ -109,8 +109,8 @@ pub static PRELUDE: LazyLock<Arc<Extension>> = LazyLock::new(|| {
             .unwrap();
         let panic_exit_sig = PolyFuncTypeRV::new(
             [
-                TypeParam::new_list_type(TypeBound::Linear),
-                TypeParam::new_list_type(TypeBound::Linear),
+                TypeParam::new_list_kind(TypeBound::Linear),
+                TypeParam::new_list_kind(TypeBound::Linear),
             ],
             FuncValueType::new(
                 TypeRowRV::from([Type::new_extension(error_type.clone())])
@@ -153,6 +153,7 @@ pub(crate) fn usize_custom_t(extension_ref: &Weak<Extension>) -> CustomType {
         TypeName::new_inline("usize"),
         vec![],
         PRELUDE_ID,
+        VERSION,
         TypeBound::Copyable,
         extension_ref,
     )
@@ -163,6 +164,7 @@ pub(crate) fn qb_custom_t(extension_ref: &Weak<Extension>) -> CustomType {
         TypeName::new_inline("qubit"),
         vec![],
         PRELUDE_ID,
+        VERSION,
         TypeBound::Linear,
         extension_ref,
     )
@@ -229,6 +231,7 @@ fn string_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
         STRING_TYPE_NAME,
         vec![],
         PRELUDE_ID,
+        VERSION,
         TypeBound::Copyable,
         extension_ref,
     )
@@ -285,6 +288,7 @@ fn error_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
         ERROR_TYPE_NAME,
         vec![],
         PRELUDE_ID,
+        VERSION,
         TypeBound::Copyable,
         extension_ref,
     )
@@ -624,7 +628,7 @@ impl MakeOpDef for TupleOpDef {
         let rv = TypeRowRV::new_var_use(0, TypeBound::Linear);
         let tuple_type = Type::new_tuple(rv.clone());
 
-        let param = TypeParam::new_list_type(TypeBound::Linear);
+        let param = TypeParam::new_list_kind(TypeBound::Linear);
         match self {
             TupleOpDef::MakeTuple => {
                 PolyFuncTypeRV::new([param], FuncValueType::new(rv, [tuple_type]))
@@ -893,7 +897,7 @@ impl MakeOpDef for BarrierDef {
 
     fn init_signature(&self, _extension_ref: &Weak<Extension>) -> SignatureFunc {
         PolyFuncTypeRV::new(
-            vec![TypeParam::new_list_type(TypeBound::Linear)],
+            vec![TypeParam::new_list_kind(TypeBound::Linear)],
             FuncValueType::new_endo(TypeRowRV::new_var_use(0, TypeBound::Linear)),
         )
         .into()
