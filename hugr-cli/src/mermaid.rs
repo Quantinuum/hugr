@@ -9,7 +9,6 @@ use clio::Output;
 use hugr::HugrView;
 use hugr::hugr::views::render::NodeLabel;
 use hugr::metadata::DEBUGINFO_META_KEY;
-use hugr::package::PackageValidationError;
 
 /// Dump the standard extensions.
 #[derive(Parser, Debug)]
@@ -94,28 +93,6 @@ impl MermaidArgs {
         Ok(())
     }
 
-    /// Write the mermaid diagram for a legacy HUGR json with optional I/O overrides.
-    #[expect(deprecated)]
-    fn run_print_hugr_with_io<R: Read, W: Write>(
-        &mut self,
-        input_override: Option<R>,
-        mut output_override: Option<W>,
-    ) -> Result<()> {
-        let hugr = self.input_args.get_hugr_with_reader(input_override)?;
-
-        if self.validate {
-            hugr.validate()
-                .map_err(PackageValidationError::Validation)?;
-        }
-
-        if let Some(ref mut writer) = output_override {
-            writeln!(writer, "{}", hugr.mermaid_string())?;
-        } else {
-            writeln!(self.output, "{}", hugr.mermaid_string())?;
-        }
-        Ok(())
-    }
-
     /// Write the mermaid diagram to the output.
     pub fn run_print(&mut self) -> Result<()> {
         self.run_print_with_io(None::<&[u8]>, None::<Vec<u8>>)
@@ -124,11 +101,5 @@ impl MermaidArgs {
     /// Write the mermaid diagram for a HUGR envelope.
     pub fn run_print_envelope(&mut self) -> Result<()> {
         self.run_print_envelope_with_io(None::<&[u8]>, None::<Vec<u8>>)
-    }
-
-    /// Write the mermaid diagram for a legacy HUGR json.
-    #[deprecated(since = "0.27.0")]
-    pub fn run_print_hugr(&mut self) -> Result<()> {
-        self.run_print_hugr_with_io(None::<&[u8]>, None::<Vec<u8>>)
     }
 }

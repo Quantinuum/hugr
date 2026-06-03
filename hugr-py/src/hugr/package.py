@@ -5,8 +5,6 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generic, TypeVar, cast
 
-from typing_extensions import deprecated
-
 import hugr._serialization.extension as ext_s
 import hugr.model as model
 from hugr import ext
@@ -163,26 +161,6 @@ class Package:
         """
         config = config or EnvelopeConfig.TEXT
         return _make_envelope_str(self, config)
-
-    @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
-    def to_json(self) -> str:
-        """Serialize the package to a printable HUGR envelope string."""
-        return self._to_serial().model_dump_json()
-
-    @classmethod
-    @deprecated(
-        "Use HUGR envelopes instead. See the `from_bytes` and `from_str` methods."
-    )
-    def from_json(cls, json_str: str) -> Package:
-        """Deserialize a JSON string to a Package object.
-
-        Args:
-            json_str: The JSON string representing a Package.
-
-        Returns:
-            The deserialized Package object.
-        """
-        return ext_s.Package.model_validate_json(json_str).deserialize()
 
     def to_model(self) -> model.Package:
         """Export the package as its hugr model representation.
