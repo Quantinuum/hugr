@@ -77,6 +77,23 @@ impl ExtensionOp {
         })
     }
 
+    /// Replace this operation's definition with the matching definition from
+    /// another registry.
+    ///
+    /// This is used while resolving HUGRs to make sure already-resolved
+    /// operations keep their cached definition in the same registry as the
+    /// HUGR's retained extensions.
+    pub(crate) fn relink_def(&mut self, def: Arc<OpDef>) -> Result<(), SignatureError> {
+        let signature = match def.compute_signature(&self.args) {
+            Ok(sig) => sig,
+            Err(SignatureError::MissingComputeFunc) => self.signature.clone(),
+            Err(e) => return Err(e),
+        };
+        self.def = def;
+        self.signature = signature;
+        Ok(())
+    }
+
     /// Return the argument values for this operation.
     #[must_use]
     pub fn args(&self) -> &[TypeArg] {

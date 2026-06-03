@@ -9,7 +9,7 @@ use std::sync::Arc;
 
 use super::{Extension, ExtensionCollectionError, ExtensionResolutionError};
 use crate::Node;
-use crate::extension::ExtensionRegistry;
+use crate::extension::{ExtensionId, ExtensionRegistry};
 use crate::ops::custom::OpaqueOpError;
 use crate::ops::{DataflowOpTrait, ExtensionOp, NamedOp, OpType};
 
@@ -49,8 +49,8 @@ pub(crate) fn collect_op_extension(
 /// Compute the required extension for an operation.
 ///
 /// If the op is a [`OpType::OpaqueOp`], replace it with a resolved
-/// [`OpType::ExtensionOp`] by looking searching for the operation in the
-/// extension registries.
+/// [`OpType::ExtensionOp`] by searching for the operation in the extension
+/// registries.
 ///
 /// If `op` was an opaque or extension operation, the result contains the
 /// extension reference that should be added to the hugr's extension registry.
@@ -64,78 +64,85 @@ pub(crate) fn resolve_op_extensions<'e>(
     op: &mut OpType,
     extensions: &'e ExtensionRegistry,
 ) -> Result<Option<&'e Arc<Extension>>, ExtensionResolutionError> {
-    let extension = operation_extension(node, op, extensions)?;
-
-    let OpType::OpaqueOp(opaque) = op else {
-        return Ok(extension);
-    };
-
-    // Fail if the Extension is not in the registry, or if the Extension was
-    // found but did not have the expected operation.
-    let extension = extension.expect("OpaqueOp should have an extension");
-    let Some(def) = extension.get_op(opaque.unqualified_id()) else {
-        return Err(OpaqueOpError::OpNotFoundInExtension {
+    let ext_not_found_error =
+        |ext_id: &ExtensionId, op_id| ExtensionResolutionError::MissingOpExtension {
+            node: Some(node),
+            op: op_id,
+            missing_extension: ext_id.clone(),
+            available_extensions: extensions.ids().cloned().collect(),
+        };
+    let op_not_found_error =
+        |extension: &Arc<Extension>, op_id| OpaqueOpError::OpNotFoundInExtension {
             node,
-            op: opaque.name().clone(),
+            op: op_id,
             extension: extension.name().clone(),
             available_ops: extension
                 .operations()
                 .map(|(name, _)| name.clone())
                 .collect(),
-        }
-        .into());
-    };
+        };
 
-    let ext_op = ExtensionOp::new_with_cached(def.clone(), opaque.args().to_vec(), opaque)
-        .map_err(|e| OpaqueOpError::SignatureError {
-            node,
-            name: opaque.name().clone(),
-            cause: e,
-        })?;
-
-    if opaque.signature().io() != ext_op.signature().io() {
-        return Err(OpaqueOpError::SignatureMismatch {
-            node,
-            extension: opaque.extension().clone(),
-            op: def.name().clone(),
-            computed: Box::new(ext_op.signature().into_owned()),
-            stored: Box::new(opaque.signature().into_owned()),
-        }
-        .into());
-    }
-
-    // Replace the opaque operation with the resolved extension operation.
-    *op = ext_op.into();
-
-    Ok(Some(extension))
-}
-
-/// Returns the extension in the registry required by the operation.
-///
-/// If the operation does not require an extension, returns `None`.
-fn operation_extension<'e>(
-    node: Node,
-    op: &OpType,
-    extensions: &'e ExtensionRegistry,
-) -> Result<Option<&'e Arc<Extension>>, ExtensionResolutionError> {
-    let Some(ext_id) = op.extension_id() else {
-        return Ok(None);
-    };
-    let extension = match op {
-        OpType::OpaqueOp(opaque) => extensions.get_req(ext_id, opaque.extension_version()),
+    match op {
         OpType::ExtensionOp(ext_op) => {
-            let version = ext_op.extension_version();
-            extensions.get_exact(ext_id, &version)
+            let ext_id = ext_op.extension_id();
+            let ext_version = ext_op.extension_version();
+
+            let extension = extensions
+                .get_req(ext_id, Some(&ext_version))
+                .ok_or_else(|| ext_not_found_error(ext_id, ext_op.qualified_id()))?;
+            let op_def = extension
+                .get_op(ext_op.unqualified_id())
+                .ok_or_else(|| op_not_found_error(extension, ext_op.qualified_id()))?;
+
+            // Relink the extension operation to an OpDef from the registry.
+            //
+            // This ensures we don't keep around stale OpDefs that may have
+            // their Weak extension reference dropped.
+            ext_op
+                .relink_def(op_def.clone())
+                .map_err(|e| OpaqueOpError::SignatureError {
+                    node,
+                    name: ext_op.qualified_id(),
+                    cause: e,
+                })?;
+
+            Ok(Some(extension))
         }
-        _ => extensions.get(ext_id),
-    };
-    match extension {
-        Some(e) => Ok(Some(e)),
-        None => Err(ExtensionResolutionError::missing_op_extension(
-            Some(node),
-            op,
-            ext_id,
-            extensions,
-        )),
+        OpType::OpaqueOp(opaque) => {
+            let ext_id = opaque.extension();
+            let ext_version = opaque.extension_version();
+
+            let extension = extensions
+                .get_req(ext_id, ext_version)
+                .ok_or_else(|| ext_not_found_error(ext_id, opaque.qualified_id()))?;
+            let op_def = extension
+                .get_op(opaque.unqualified_id())
+                .ok_or_else(|| op_not_found_error(extension, opaque.qualified_id()))?;
+
+            let ext_op =
+                ExtensionOp::new_with_cached(op_def.clone(), opaque.args().to_vec(), opaque)
+                    .map_err(|e| OpaqueOpError::SignatureError {
+                        node,
+                        name: opaque.name().clone(),
+                        cause: e,
+                    })?;
+
+            if opaque.signature().io() != ext_op.signature().io() {
+                return Err(OpaqueOpError::SignatureMismatch {
+                    node,
+                    extension: opaque.extension().clone(),
+                    op: op_def.name().clone(),
+                    computed: Box::new(ext_op.signature().into_owned()),
+                    stored: Box::new(opaque.signature().into_owned()),
+                }
+                .into());
+            }
+
+            // Replace the opaque operation with the resolved extension operation.
+            *op = ext_op.into();
+
+            Ok(Some(extension))
+        }
+        _ => Ok(None),
     }
 }
