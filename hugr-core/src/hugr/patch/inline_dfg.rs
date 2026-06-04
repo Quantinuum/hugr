@@ -2,8 +2,6 @@
 //! of the DFG except Input+Output into the DFG's parent,
 //! and deleting the DFG along with its Input + Output
 
-use std::collections::HashSet;
-
 use super::{PatchHugrMut, PatchVerification};
 use crate::core::HugrNode;
 use crate::ops::handle::{DfgID, NodeHandle};
@@ -78,7 +76,7 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
         for ch in h.children(n).skip(2).collect::<Vec<_>>() {
             h.set_parent(ch, parent);
         }
-        let internal_order_path = is_order_reachable(h, input, output);
+
         // DFG Inputs. Deal with Order inputs first
         for (src_n, src_p) in h.linked_outputs(n, oth_in).collect::<Vec<_>>() {
             // Order edge from src_n to DFG => add order edge to each successor of Input node
@@ -86,16 +84,18 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
             for tgt_n in h.output_neighbours(input).collect::<Vec<_>>() {
                 h.add_other_edge(src_n, tgt_n);
             }
-            if !internal_order_path {
-                // Ensure the order chain continues from the DFG's order-predecessors to its order-successors,
-                // even if e.g. the interior of the DFG is disconnected. (Check could be more precise.)
-                for tgt_n in h
-                    .linked_inputs(n, oth_out)
-                    .map(|(n, _)| n)
-                    .collect::<Vec<_>>()
-                {
-                    h.add_other_edge(src_n, tgt_n);
-                }
+
+            // In order to ensure that any nodes A, B with Order edges A->DFG->B are still ordered
+            // after inlining, connect all such pairs A and B directly. This is not strictly necessary
+            // in all cases (specifically if there are Order paths from the DFG's Input to Output),
+            // but the redundant edges shouldn't cause any issues and can potentially be removed by
+            // a later pass.
+            for tgt_n in h
+                .linked_inputs(n, oth_out)
+                .map(|(n, _)| n)
+                .collect::<Vec<_>>()
+            {
+                h.add_other_edge(src_n, tgt_n);
             }
         }
         // And remaining (Value) inputs
@@ -158,24 +158,6 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
     }
 }
 
-/// Determines whether there is a path along [Order] edges only from `src` to `tgt`.
-///
-/// [Order]: crate::types::EdgeKind::StateOrder
-fn is_order_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) -> bool {
-    let mut visited = HashSet::new();
-    let mut to_visit = vec![src];
-    while let Some(n) = to_visit.pop() {
-        if visited.insert(n) {
-            if n == tgt {
-                return true;
-            }
-            let order_outport = h.get_optype(n).other_output_port().unwrap();
-            to_visit.extend(h.linked_inputs(n, order_outport).map(|(n, _)| n));
-        }
-    }
-    false
-}
-
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
@@ -195,10 +177,9 @@ mod test {
     use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
     use crate::types::Signature;
     use crate::utils::test_quantum_extension;
-    use crate::{Direction, HugrView, Port, type_row};
-    use crate::{Hugr, Wire};
+    use crate::{Direction, Hugr, HugrView, Port, Wire, type_row};
 
-    use super::{InlineDFG, is_order_reachable};
+    use super::InlineDFG;
 
     fn find_dfgs<H: HugrView>(h: &H) -> Vec<H::Node> {
         h.entry_descendants()
@@ -364,7 +345,7 @@ mod test {
          *             \  /
          *              CX
          */
-        // Extension inference here relies on quantum ops not requiring their own test_quantum_extension
+
         let mut outer = DFGBuilder::new(endo_sig(vec![qb_t(), qb_t()]))?;
         let [a, b] = outer.input_wires_arr();
         let h_a = outer.add_dataflow_op(test_quantum_extension::h_gate(), [a])?;
@@ -404,20 +385,20 @@ mod test {
                 .map(|(n, _)| n)
                 .collect::<HashSet<_>>()
         };
-        // h_a should have Order edges added to Rz and the F64 load_const
+        // h_a should have Order edges added to Rz, the F64 load_const and H_a2 (the DFG's Order successor)
         assert_eq!(
             order_neighbours(h_a.node(), Direction::Outgoing),
-            HashSet::from([r.node(), f.node()])
+            HashSet::from([r.node(), f.node(), h_a2.node()])
         );
-        // Likewise the load_const should have Order edges from the inputs to the inner DFG, i.e. h_a and h_b
+        // The load_const should have Order edges from the inputs to the inner DFG, i.e. h_a and h_b
         assert_eq!(
             order_neighbours(f.node(), Direction::Incoming),
             HashSet::from([h_a.node(), h_b.node()])
         );
-        // h_a2 should have Order edges from the measure and if
+        // h_a2 should have Order edges from the measure, if, and H_a (the DFG's Order predecessor)
         assert_eq!(
             order_neighbours(h_a2.node(), Direction::Incoming),
-            HashSet::from([m.node(), if_n.node()])
+            HashSet::from([h_a.node(), m.node(), if_n.node()])
         );
         // the if should have Order edges to the CX and h_a2
         assert_eq!(
@@ -427,7 +408,10 @@ mod test {
         Ok(())
     }
 
-    fn check_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) {
+    /// Determines whether there is a path along [Order] edges only from `src` to `tgt`.
+    ///
+    /// [Order]: crate::types::EdgeKind::StateOrder
+    fn check_order_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) {
         let mut visited = HashSet::new();
         let mut to_visit = vec![src];
         while let Some(n) = to_visit.pop() {
@@ -435,7 +419,8 @@ mod test {
                 if n == tgt {
                     return;
                 }
-                to_visit.extend(h.output_neighbours(n));
+                let order_outport = h.get_optype(n).other_output_port().unwrap();
+                to_visit.extend(h.linked_inputs(n, order_outport).map(|(n, _)| n));
             }
         }
         panic!("Node {tgt:?} not reachable from {src:?}");
@@ -465,12 +450,11 @@ mod test {
         h.add_other_wire(qfree.node(), inner.node());
         h.add_other_wire(inner.node(), qalloc.node());
         let mut h = h.finish_hugr_with_outputs([q2]).unwrap();
-        assert!(is_order_reachable(&h, qfree.node(), qalloc.node()));
+        check_order_reachable(&h, qfree.node(), qalloc.node());
 
         h.apply_patch(InlineDFG(*inner.handle())).unwrap();
         h.validate().unwrap();
-        // These were both failing prior to https://github.com/Quantinuum/hugr/pull/3072
-        check_reachable(&h, qfree.node(), qalloc.node());
-        assert!(is_order_reachable(&h, qfree.node(), qalloc.node()));
+        // This was failing prior to https://github.com/Quantinuum/hugr/pull/3072
+        check_order_reachable(&h, qfree.node(), qalloc.node());
     }
 }
