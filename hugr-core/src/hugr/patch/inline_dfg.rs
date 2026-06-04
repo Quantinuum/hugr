@@ -89,7 +89,7 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
             // after inlining, connect all such pairs A and B directly. This is not strictly necessary
             // in all cases (specifically if there are Order paths from the DFG's Input to Output),
             // but the redundant edges shouldn't cause any issues and can potentially be removed by
-            // a later pass.
+            // a later pass, if we care.
             for tgt_n in h
                 .linked_inputs(n, oth_out)
                 .map(|(n, _)| n)
@@ -328,14 +328,14 @@ mod test {
          *           |.    /         NB. Order edge H_a to nested DFG
          *           | .  |
          *           |  /-|--------\
-         *           |  | | .  Cst | NB. Order edge Input to LCst
+         *           |  | |  . Cst | NB. Order edge Input to LCst
          *           |  | |  . |   |
          *           |  | |   LCst |
-         *           |  |  \ /  .  |
-         *           |  |  RZ   .  |
-         *           |  |  |    .  |  Order edge LCst to if
-         *           |  |  meas .  |
-         *           |  |  | \  .  |
+         *           |  |  \ /     |
+         *           |  |  RZ      |
+         *           |  |  |       |
+         *           |  |  meas    |
+         *           |  |  | \     |
          *           |  |  |  if   |
          *           |  |  |  .    | NB. Order edge if to Output
          *           |  \--|-------/
@@ -364,7 +364,6 @@ mod test {
         if_n.case_builder(0)?.finish_with_outputs([])?;
         if_n.case_builder(1)?.finish_with_outputs([])?;
         let if_n = if_n.finish_sub_container()?;
-        inner.add_other_wire(f.node(), if_n.node());
         inner.add_other_wire(if_n.node(), inner.output().node());
         let inner = inner.finish_with_outputs([m])?;
         outer.add_other_wire(h_a.node(), inner.node());
