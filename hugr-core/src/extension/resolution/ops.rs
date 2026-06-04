@@ -7,11 +7,13 @@
 
 use std::sync::Arc;
 
+use semver::Version;
+
 use super::{Extension, ExtensionCollectionError, ExtensionResolutionError};
 use crate::Node;
-use crate::extension::{ExtensionId, ExtensionRegistry};
+use crate::extension::{ExtensionId, ExtensionRegistry, OpDef};
 use crate::ops::custom::OpaqueOpError;
-use crate::ops::{DataflowOpTrait, ExtensionOp, NamedOp, OpType};
+use crate::ops::{DataflowOpTrait, ExtensionOp, NamedOp, OpNameRef, OpType};
 
 /// Returns the extension in the registry required by the operation.
 ///
@@ -64,35 +66,52 @@ pub(crate) fn resolve_op_extensions<'e>(
     op: &mut OpType,
     extensions: &'e ExtensionRegistry,
 ) -> Result<Option<&'e Arc<Extension>>, ExtensionResolutionError> {
-    let ext_not_found_error =
-        |ext_id: &ExtensionId, op_id| ExtensionResolutionError::MissingOpExtension {
-            node: Some(node),
-            op: op_id,
-            missing_extension: ext_id.clone(),
-            available_extensions: extensions.ids().cloned().collect(),
+    /// Returns the OpDef and Extension for the given operation, or an error if either is not found.
+    fn op_and_ext<'a, 'e>(
+        extensions: &'e ExtensionRegistry,
+        node: Node,
+        ext_id: &'a ExtensionId,
+        ext_version: Option<&'a Version>,
+        qualified_id: impl AsRef<OpNameRef>,
+        unqualified_id: impl AsRef<OpNameRef>,
+    ) -> Result<(&'e Arc<OpDef>, &'e Arc<Extension>), ExtensionResolutionError> {
+        let Some(extension) = extensions.get_req(ext_id, ext_version) else {
+            return Err(ExtensionResolutionError::MissingOpExtension {
+                node: Some(node),
+                op: qualified_id.as_ref().into(),
+                missing_extension: ext_id.clone(),
+                available_extensions: extensions.ids().cloned().collect(),
+            });
         };
-    let op_not_found_error =
-        |extension: &Arc<Extension>, op_id| OpaqueOpError::OpNotFoundInExtension {
-            node,
-            op: op_id,
-            extension: extension.name().clone(),
-            available_ops: extension
-                .operations()
-                .map(|(name, _)| name.clone())
-                .collect(),
+        let Some(op_def) = extension.get_op(unqualified_id.as_ref()) else {
+            return Err(OpaqueOpError::OpNotFoundInExtension {
+                node,
+                op: qualified_id.as_ref().into(),
+                extension: ext_id.clone(),
+                available_ops: extension
+                    .operations()
+                    .map(|(name, _)| name.clone())
+                    .collect(),
+            }
+            .into());
         };
+
+        Ok((op_def, extension))
+    }
 
     match op {
         OpType::ExtensionOp(ext_op) => {
             let ext_id = ext_op.extension_id();
             let ext_version = ext_op.extension_version();
 
-            let extension = extensions
-                .get_req(ext_id, Some(&ext_version))
-                .ok_or_else(|| ext_not_found_error(ext_id, ext_op.qualified_id()))?;
-            let op_def = extension
-                .get_op(ext_op.unqualified_id())
-                .ok_or_else(|| op_not_found_error(extension, ext_op.qualified_id()))?;
+            let (op_def, extension) = op_and_ext(
+                extensions,
+                node,
+                ext_id,
+                Some(&ext_version),
+                ext_op.qualified_id(),
+                ext_op.unqualified_id(),
+            )?;
 
             // Relink the extension operation to an OpDef from the registry.
             //
@@ -112,12 +131,14 @@ pub(crate) fn resolve_op_extensions<'e>(
             let ext_id = opaque.extension();
             let ext_version = opaque.extension_version();
 
-            let extension = extensions
-                .get_req(ext_id, ext_version)
-                .ok_or_else(|| ext_not_found_error(ext_id, opaque.qualified_id()))?;
-            let op_def = extension
-                .get_op(opaque.unqualified_id())
-                .ok_or_else(|| op_not_found_error(extension, opaque.qualified_id()))?;
+            let (op_def, extension) = op_and_ext(
+                extensions,
+                node,
+                ext_id,
+                ext_version,
+                opaque.qualified_id(),
+                opaque.unqualified_id(),
+            )?;
 
             let ext_op =
                 ExtensionOp::new_with_cached(op_def.clone(), opaque.args().to_vec(), opaque)
