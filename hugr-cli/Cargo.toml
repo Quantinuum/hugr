@@ -10,7 +10,7 @@ homepage = { workspace = true }
 repository = { workspace = true }
 description = "Compiler passes for Quantinuum's HUGR"
 keywords = ["Quantum", "Quantinuum"]
-categories = ["compilers"]
+categories = ["compilers", "science::quantum-computing"]
 
 [lib]
 bench = false
