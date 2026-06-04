@@ -150,6 +150,10 @@ consumed by the edge's target; thus during execution we can at least ask
 evaluation of the node being complete, see [Evaluation Semantics](#evaluation-semantics).
 <!-- even if not *what* value was produced.-->
 
+However whereas value inports must have exactly one incoming edge,
+the node's unique Order inport may have any number of incoming edges
+(including zero), which are implicitly joined together.
+
 Source and target nodes must have the same parent. There can be at
 most one `Order` edge between any two nodes.
 
