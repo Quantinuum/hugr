@@ -640,7 +640,7 @@ impl<'a> IntoIterator for &'a ExtensionRegistry {
 impl<'a> Extend<&'a Arc<Extension>> for ExtensionRegistry {
     fn extend<T: IntoIterator<Item = &'a Arc<Extension>>>(&mut self, iter: T) {
         for ext in iter {
-            self.register(ext.clone());
+            self.register_if_new(ext.clone());
         }
     }
 }
@@ -648,7 +648,7 @@ impl<'a> Extend<&'a Arc<Extension>> for ExtensionRegistry {
 impl Extend<Arc<Extension>> for ExtensionRegistry {
     fn extend<T: IntoIterator<Item = Arc<Extension>>>(&mut self, iter: T) {
         for ext in iter {
-            self.register(ext);
+            self.register_if_new(ext);
         }
     }
 }
