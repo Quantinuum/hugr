@@ -6,8 +6,8 @@ use pretty::{Arena, DocAllocator as _, RefDoc};
 use crate::v0::{Literal, RegionKind};
 
 use super::{
-    LinkName, Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, SymbolName, Term,
-    VarName, Visibility,
+    LinkName, Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, SymbolIdent,
+    SymbolName, Term, VarName, Visibility,
 };
 
 struct Printer<'a> {
@@ -119,10 +119,10 @@ fn print_term<'a>(printer: &mut Printer<'a>, term: &'a Term) {
         Term::Var(var) => print_var_name(printer, var),
         Term::Apply(symbol, terms) => {
             if terms.is_empty() {
-                print_symbol_name(printer, symbol);
+                print_symbol_ident(printer, symbol);
             } else {
                 printer.parens_enter();
-                print_symbol_name(printer, symbol);
+                print_symbol_ident(printer, symbol);
 
                 for term in terms.iter() {
                     print_term(printer, term);
@@ -214,6 +214,21 @@ fn print_tuple_parts<'a>(printer: &mut Printer<'a>, parts: &'a [SeqPart]) {
 
 fn print_symbol_name<'a>(printer: &mut Printer<'a>, name: &'a SymbolName) {
     printer.text(name.0.as_str());
+}
+
+fn print_symbol_ident<'a>(printer: &mut Printer<'a>, symbol_ident: &'a SymbolIdent) {
+    print_versioned_symbol_name(printer, &symbol_ident.name, symbol_ident.version.as_ref());
+}
+
+fn print_versioned_symbol_name<'a>(
+    printer: &mut Printer<'a>,
+    name: &'a SymbolName,
+    version: Option<&semver::Version>,
+) {
+    match version {
+        Some(version) => printer.text(format!("{name}@{version}")),
+        None => print_symbol_name(printer, name),
+    }
 }
 
 fn print_var_name<'a>(printer: &mut Printer<'a>, name: &'a VarName) {
@@ -318,7 +333,7 @@ fn print_node<'a>(printer: &mut Printer<'a>, node: &'a Node) {
         }
         Operation::Import(symbol) => {
             printer.text("import");
-            print_symbol_name(printer, symbol);
+            print_symbol_ident(printer, symbol);
         }
     }
 
@@ -369,13 +384,15 @@ fn print_region<'a>(printer: &mut Printer<'a>, region: &'a Region) {
 }
 
 fn print_symbol<'a>(printer: &mut Printer<'a>, symbol: &'a Symbol) {
+    printer.group_enter();
+
     match symbol.visibility {
         None => (),
         Some(Visibility::Private) => printer.text("private"),
         Some(Visibility::Public) => printer.text("public"),
     }
 
-    print_symbol_name(printer, &symbol.name);
+    print_versioned_symbol_name(printer, &symbol.name, symbol.version.as_ref());
 
     for param in &symbol.params {
         print_param(printer, param);
@@ -386,6 +403,7 @@ fn print_symbol<'a>(printer: &mut Printer<'a>, symbol: &'a Symbol) {
     }
 
     print_term(printer, &symbol.signature);
+    printer.group_exit();
 }
 
 fn print_param<'a>(printer: &mut Printer<'a>, param: &'a Param) {
@@ -440,6 +458,7 @@ impl_display!(Term, print_term);
 impl_display!(SeqPart, print_seq_part);
 impl_display!(Literal, print_literal);
 impl_display!(Symbol, print_symbol);
+impl_display!(SymbolIdent, print_symbol_ident);
 
 impl Display for VarName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {

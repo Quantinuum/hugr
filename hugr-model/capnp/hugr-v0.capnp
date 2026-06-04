@@ -26,6 +26,7 @@ struct Package {
 struct Version {
     major @0 :UInt32;
     minor @1 :UInt32;
+    patch @2 :UInt32;
 }
 
 struct Module {
@@ -60,7 +61,10 @@ struct Operation {
         invalid @8 :Void;
         tailLoop @9 :Void;
         conditional @10 :Void;
-        import @11 :Text;
+        import :group {
+            name @11 :Text;
+            version @15 :Version;
+        }
         constructorDecl @12 :Symbol;
         operationDecl @13 :Symbol;
     }
@@ -72,6 +76,7 @@ struct Symbol {
     params @1 :List(Param);
     constraints @2 :List(TermId);
     signature @3 :TermId;
+    version @5 :Version;
 }
 
 struct Region {

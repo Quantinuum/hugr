@@ -191,6 +191,81 @@ fn make_extension_self_referencing(name: &str, op_name: &str, type_name: &str) -
     })
 }
 
+/// Create two extensions where one operation's signature uses the other's type.
+fn make_dependent_extensions() -> (Arc<Extension>, Arc<Extension>) {
+    let dep_ext =
+        Extension::new_test_arc(ExtensionId::new_unchecked("dummy.dep"), |ext, ext_ref| {
+            ext.add_type(
+                "dep_type".into(),
+                vec![],
+                String::new(),
+                TypeDefBound::copyable(),
+                ext_ref,
+            )
+            .unwrap();
+        });
+    let dep_ty = dep_ext
+        .get_type("dep_type")
+        .unwrap()
+        .instantiate([])
+        .unwrap();
+    let op_ext = Extension::new_test_arc(ExtensionId::new_unchecked("dummy.op"), |ext, ext_ref| {
+        ext.add_op(
+            "uses_dep".into(),
+            String::new(),
+            Signature::new(vec![dep_ty.into()], vec![]),
+            ext_ref,
+        )
+        .unwrap();
+    });
+    (dep_ext, op_ext)
+}
+
+/// Check that resolved extension operations are relinked to OpDefs from the
+/// registry when doing resolution, and that the resolved extensions are correct
+/// even when there are multiple compatible versions in the registry.
+#[test]
+fn ext_resolution_relinks_opdefs() {
+    let (original_dep, original_op_ext) = make_dependent_extensions();
+    let dep_ty = original_dep
+        .get_type("dep_type")
+        .unwrap()
+        .instantiate([])
+        .unwrap();
+    let op = original_op_ext
+        .instantiate_extension_op("uses_dep", [])
+        .unwrap();
+
+    let mut build = DFGBuilder::new(Signature::new(vec![dep_ty.into()], vec![])).unwrap();
+    let [input] = build.input_wires_arr();
+    build.add_dataflow_op(op, [input]).unwrap();
+    let mut hugr = build.finish_hugr_with_outputs([]).unwrap();
+
+    let (canonical_dep, canonical_op_ext) = make_dependent_extensions();
+    let resolution_extensions =
+        ExtensionRegistry::new([canonical_dep.clone(), canonical_op_ext.clone()]);
+
+    // After dropping the extensions here and running extension resolution (so the hugr's internal register also drops the old references),
+    // the old OpDefs in the ExtensionOp should lose its reference.
+    drop(original_dep);
+    drop(original_op_ext);
+    hugr.resolve_extension_defs(&resolution_extensions).unwrap();
+
+    // Check that the ExtensionOp was relinked to the new OpDef from the registry.
+    let op = hugr
+        .nodes()
+        .map(|node| hugr.get_optype(node))
+        .find_map(OpType::as_extension_op)
+        .unwrap();
+    let canonical_def = canonical_op_ext.get_op("uses_dep").unwrap();
+    assert!(Arc::ptr_eq(op.def_arc(), canonical_def));
+
+    let rebuilt_op = ExtensionOp::new(op.def_arc().clone(), []).unwrap();
+    let rebuilt_op: OpType = rebuilt_op.into();
+    let rebuilt_extensions = rebuilt_op.used_extensions().unwrap();
+    assert!(rebuilt_extensions.contains(canonical_dep.name()));
+}
+
 /// Check that the extensions added during building coincide with read-only collected extensions
 /// and that they survive a serialization roundtrip.
 fn check_extension_resolution(mut hugr: Hugr) {

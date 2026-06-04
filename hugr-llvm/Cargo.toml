@@ -13,7 +13,7 @@ repository.workspace = true
 documentation = "https://docs.rs/hugr-llvm"
 authors = ["TKET development team <tket-support@quantinuum.com>"]
 keywords = ["Quantum", "Quantinuum"]
-categories = ["compilers"]
+categories = ["compilers", "science::quantum-computing"]
 
 [features]
 test-utils = ["insta", "rstest", "portgraph", "rand"]
@@ -44,4 +44,4 @@ hugr-llvm = { "path" = ".", features = ["test-utils"] }
 serde_json.workspace = true
 
 [build-dependencies]
-cc = "1.2.62"
+cc = "1.2.63"

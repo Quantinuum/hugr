@@ -3,12 +3,13 @@
 use anyhow::Result;
 use rstest::{fixture, rstest};
 use std::str::FromStr;
+use std::sync::Arc;
 
 use hugr::{
     Extension, Hugr,
     builder::{Dataflow as _, DataflowHugr as _},
     envelope::{EnvelopeConfig, EnvelopeFormat, read_envelope, write_envelope},
-    extension::prelude::bool_t,
+    extension::{TypeDefBound, Version, prelude::bool_t},
     package::Package,
     std_extensions::std_reg,
     types::Signature,
@@ -17,18 +18,72 @@ use hugr_core::{export::export_package, import::import_package};
 use hugr_model::v0 as model;
 
 fn roundtrip(source: &str) -> Result<String> {
+    roundtrip_with_reg(source, &std_reg())
+}
+
+/// Import and export a model package using the supplied extension registry.
+fn roundtrip_with_reg(source: &str, reg: &hugr::extension::ExtensionRegistry) -> Result<String> {
     let bump = model::bumpalo::Bump::new();
     let package_ast = model::ast::Package::from_str(source)?;
     let package_table = package_ast.resolve(&bump)?;
-    let reg = std_reg();
-    let mut core = import_package(&package_table, Default::default(), &reg)?;
+    let mut core = import_package(&package_table, Default::default(), reg)?;
     for module in core.modules.iter_mut() {
-        module.resolve_extension_defs(&reg)?;
+        module.resolve_extension_defs(reg)?;
     }
     let exported_table = export_package(&core.modules, &core.extensions, &bump);
     let exported_ast = exported_table.as_ast().unwrap();
 
     Ok(exported_ast.to_string())
+}
+
+/// Extension fixture with one custom operation and one custom type.
+#[fixture]
+fn versioned_extension() -> Arc<Extension> {
+    Extension::new_arc(
+        "model.versioned".try_into().unwrap(),
+        Version::new(0, 2, 3),
+        |extension, extension_ref| {
+            extension
+                .add_type(
+                    "MyType".into(),
+                    vec![],
+                    String::new(),
+                    TypeDefBound::copyable(),
+                    extension_ref,
+                )
+                .unwrap();
+            extension
+                .add_op(
+                    "my_op".into(),
+                    String::new(),
+                    Signature::new(vec![], vec![]),
+                    extension_ref,
+                )
+                .unwrap();
+        },
+    )
+}
+
+/// Model package source with either explicit or omitted extension version suffixes.
+fn versioned_source(symbol_suffix: &str) -> String {
+    format!(
+        r#"(hugr 0)
+
+(mod)
+
+(import model.versioned.my_op{symbol_suffix})
+
+(import model.versioned.MyType{symbol_suffix})
+
+(declare-func public typed (core.fn [] [model.versioned.MyType]))
+
+(define-func public main (core.fn [] [])
+  (dfg [] []
+    (signature (core.fn [] []))
+    ((model.versioned.my_op) [] []
+      (signature (core.fn [] [])))))
+"#
+    )
 }
 
 /// Ensure a fixture edn represents a valid HUGR.
@@ -136,6 +191,19 @@ fn import_package_with_extensions(#[case] format: EnvelopeFormat, simple_dfg_hug
     assert_eq!(read_ext.name(), &"miniquantum".try_into().unwrap());
 
     assert_eq!(package, loaded_pkg);
+}
+
+#[rstest]
+#[case("@0.2.3")]
+#[case("")]
+fn core_versions(#[case] symbol_suffix: &str, versioned_extension: Arc<Extension>) {
+    let mut reg = std_reg();
+    reg.register(versioned_extension);
+
+    let ast = roundtrip_with_reg(&versioned_source(symbol_suffix), &reg).unwrap();
+
+    assert!(ast.contains("model.versioned.MyType@0.2.3"));
+    assert!(ast.contains("model.versioned.my_op@0.2.3"));
 }
 
 /// Check that the fixtures in `hugr-model` are valid HUGR packages.

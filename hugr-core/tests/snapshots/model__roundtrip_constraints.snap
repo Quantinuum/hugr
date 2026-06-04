@@ -8,15 +8,15 @@ expression: ast
 
 (import core.fn)
 
-(import core.title)
+(import core.nat)
 
 (import core.nonlinear)
 
-(import core.nat)
+(import core.title)
 
 (import core.type)
 
-(import collections.array.array)
+(import collections.array.array@0.1.2)
 
 (declare-func
   private
