@@ -732,21 +732,22 @@ graph are necessarily evaluated. (For hierarchical nodes, this may entail
 evaluating some children, according to the node.) Evaluation may occur in
 some order, and for nodes that execute strictly and atomically (according to
 implementation) this will respect the Dataflow and Order edges. However *in
-general* Hugr allows:
-* Nodes to execute non-atomically, perhaps in parallel/overlapping other nodes
-* Nodes to execute partially or totally before all inputs are ready (if the
+general* Hugr allows that
+* Nodes may execute non-atomically, perhaps in parallel/overlapping other nodes
+* Nodes may execute partially or totally before all inputs are ready (if the
   op is able to "do" anything without all its inputs)
   * A specific exception here is that a node $n$ must not produce its `Order`
-   output until all other nodes connected to $n$'s `Order` input have produced
-   theirs.
+    output until all other nodes connected to $n$'s `Order` input have produced
+    theirs.
   * Similarly, a node with side-effects (e.g. panic or print) must not have
-   those side effects before all its `Order` inputs are ready.
+    those side effects before all its `Order` inputs are ready.
 
 This applies both to extension ops and core constructs such as DFG, CFG, or a
 Call to a function, but may be refined (introducing more precise guarantees
 such as atomicity or strictness) for specific ops and/or by specific
 implementations.
 
+For ops such as `Conditional`, `TailLoop` and `CFG`/`BasicBlock`, the order input to the container node, or to any `Output` node within, must be treated linearly: (only) after all Order-predecessors have (finished mutating state/produced their Order outputs), may the Order output (of exactly one `Input` node or the container itself) be ready - chosen according to the appropriate predicate. **Thus**, nodes reachable along Order edges from an `Input` may not be speculatively evaluated (perform any stateful update); but nodes which are not Order-reachable may be.
 
 ## Exception Handling
 
