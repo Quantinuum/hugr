@@ -7,6 +7,7 @@ use std::iter;
 use itertools::Itertools;
 use petgraph::algo::dominators::{self, Dominators};
 use petgraph::visit::{Topo, Walker};
+use semver::Version;
 use thiserror::Error;
 
 use crate::core::HugrNode;
@@ -200,6 +201,16 @@ impl<'a, H: HugrView> ValidationContext<'a, H> {
         // TODO Maybe we should delegate these checks to the OpTypes themselves.
         if let OpType::Const(c) = op_type {
             c.validate()?;
+        }
+        if let OpType::ExtensionOp(ext_op) = op_type {
+            // Ensure the extension reference has not been dropped and the signature is still valid.
+            ext_op.def().extension().upgrade().ok_or_else(|| {
+                ValidationError::ExtensionReferenceDropped {
+                    node,
+                    extension: ext_op.extension_id().to_string(),
+                    version: Some(ext_op.extension_version()),
+                }
+            })?;
         }
 
         Ok(())
@@ -764,6 +775,19 @@ pub enum ValidationError<N: HugrNode> {
     /// The HUGR entrypoint must be a region container.
     #[error("The HUGR entrypoint ({node}) must be a region container, but '{}' does not accept children.", optype.name())]
     EntrypointNotContainer { node: N, optype: Box<OpType> },
+    /// An extension reference has been dropped.
+    #[error(
+        "Extension '{extension}{ver}' reference in {node} has been dropped.",
+        ver = version.as_ref().map(|v| format!("@{v}")).unwrap_or_default()
+    )]
+    ExtensionReferenceDropped {
+        /// The node with the dropped reference.
+        node: N,
+        /// The name of the extension that was not resolved.
+        extension: String,
+        /// The version of the extension that was not resolved, if available.
+        version: Option<Version>,
+    },
 }
 
 /// Errors related to the inter-graph edge validations.
