@@ -401,67 +401,57 @@ mod test {
                 .map(|(n, _)| n)
                 .collect::<HashSet<_>>()
         };
-        // h_a should have Order edge(s) to the F64 load_const and the Rz,
-        // and the DFG's Order successors (h_a2, and optionally CX)
-        let input_ord_tgts = HashSet::from_iter(
-            [f.node(), r.node(), h_a2.node()]
+        let ext_preds = HashSet::from([h_a.node(), h_b.node()]);
+        let ext_order_preds = HashSet::from_iter(once(h_a.node()).chain(o1.then_some(h_b.node())));
+        let inp_succs = HashSet::from([f.node(), r.node()]);
+        let inp_order_succs = HashSet::from_iter(once(f.node()).chain(o2.then_some(r.node())));
+
+        let out_preds = [m.node(), if_n.node()];
+        let out_order_preds = HashSet::from_iter(once(if_n.node()).chain(o3.then_some(m.node())));
+        let ext_succs = HashSet::from([h_a2.node(), cx.node()]);
+        let ext_order_succs = HashSet::from_iter(once(h_a2.node()).chain(o4.then_some(cx.node())));
+
+        // Order predecessors of DFG get edges to both Input any-successor and DFG Order-successors
+        let ext_order_tgts = HashSet::from_iter(
+            inp_succs
                 .into_iter()
-                .chain(o4.then_some(cx.node())),
+                .chain(ext_order_succs.clone()),
         );
         assert_eq!(
             order_neighbours(h_a.node(), Direction::Outgoing),
-            input_ord_tgts
+            ext_order_tgts
         );
-        //if h_b had an Order edge to the DFG, then it should have Order edges to the same nodes as h_a,
-        // otherwise, only to the Order-successors of the Input node
         assert_eq!(
             order_neighbours(h_b.node(), Direction::Outgoing),
-            if o1 {
-                input_ord_tgts
-            } else {
-                HashSet::from_iter([f.node()].into_iter().chain(o2.then_some(r.node())))
-            }
+            if o1 { ext_order_tgts } else { inp_order_succs }
         );
-        // The F64 LoadConstant (with an Order edge from Input) has edges from all DFG predecessors
-        assert_eq!(
-            order_neighbours(f.node(), Direction::Incoming),
-            HashSet::from_iter([h_a.node(), h_b.node()])
-        );
-        // The RZ has an Order edge from h_a, and from h_b if EITHER h_b -> DFG or Input -> RZ were Order edges
+        assert_eq!(order_neighbours(f.node(), Direction::Incoming), ext_preds);
         assert_eq!(
             order_neighbours(r.node(), Direction::Incoming),
-            HashSet::from_iter(once(h_a.node()).chain((o1 || o2).then_some(h_b.node())))
+            if o2 {
+                ext_preds.clone()
+            } else {
+                ext_order_preds.clone()
+            }
         );
 
-        // The `if` had an Order edge to Output, so now has Order edges to both h_a2 and CX
         assert_eq!(
             order_neighbours(if_n.node(), Direction::Outgoing),
-            HashSet::from_iter([h_a2.node(), cx.node()])
+            ext_succs
         );
-        // `meas` has Order edge to h_a2 (DFG Order-successor), and to CX if EITHER meas->Output or DFG->CX were Order edges
         assert_eq!(
             order_neighbours(m.node(), Direction::Outgoing),
-            HashSet::from_iter(once(h_a2.node()).chain((o3 || o4).then_some(cx.node())))
+            if o3 { ext_succs } else { ext_order_succs }
         );
-
-        // h_a2 should have Order edges from `meas` and `if`, and the DFG's Order-precedessors (h_a, and optionally h_b),
-        let output_ord_srcs = HashSet::from_iter(
-            [h_a.node(), m.node(), if_n.node()]
-                .into_iter()
-                .chain(o1.then_some(h_b.node())),
-        );
+        // Order successors of DFG get edges from both Output any-predecessors and DFG Order-predecessors
+        let ext_order_srcs = HashSet::from_iter(out_preds.into_iter().chain(ext_order_preds));
         assert_eq!(
             order_neighbours(h_a2.node(), Direction::Incoming),
-            output_ord_srcs
+            ext_order_srcs
         );
-        // if CX had an Order edge from the DFG, then same, otherwise only from `if` and maybe `meas`
         assert_eq!(
             order_neighbours(cx.node(), Direction::Incoming),
-            if o4 {
-                output_ord_srcs
-            } else {
-                HashSet::from_iter(once(if_n.node()).chain(o3.then_some(m.node())))
-            }
+            if o4 { ext_order_srcs } else { out_order_preds }
         );
         Ok(())
     }
