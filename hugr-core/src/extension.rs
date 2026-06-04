@@ -250,32 +250,53 @@ impl ExtensionVersions {
     ///
     /// Panics if the extension id does not match the collection's id.
     pub fn register(&mut self, extension: Arc<Extension>) -> ExtensionRegisterResult {
+        self.register_internal(extension, true)
+    }
+
+    /// Register an extension version and report what happened.
+    ///
+    /// If we already have a compatible version, the extension with the higher
+    /// version is kept. If versions match exactly, the old extension is kept.
+    ///
+    /// Panics if the extension id does not match the collection's id.
+    pub fn register_if_new(&mut self, extension: Arc<Extension>) -> ExtensionRegisterResult {
+        self.register_internal(extension, false)
+    }
+
+    /// Register an extension version and report what happened.
+    fn register_internal(
+        &mut self,
+        extension: Arc<Extension>,
+        replace_exact_match: bool,
+    ) -> ExtensionRegisterResult {
         assert_eq!(
             extension.name(),
             &self.id,
             "extension id does not match ExtensionVersions id"
         );
 
-        let version = extension.version().clone();
-        let compatible_version = self.compatible_registered_version(&version);
+        let new_version = extension.version().clone();
+        let current_version = self.compatible_registered_version(&new_version);
 
-        let Some(compatible_version) = compatible_version else {
-            self.versions.insert(version, extension);
+        let Some(current_version) = current_version else {
+            self.versions.insert(new_version, extension);
             return ExtensionRegisterResult::Inserted;
         };
 
-        if compatible_version > version {
+        if (current_version > new_version)
+            || (current_version == new_version && !replace_exact_match)
+        {
             return ExtensionRegisterResult::KeptExisting {
-                version: compatible_version,
+                version: current_version,
             };
         }
 
-        self.versions.remove(&compatible_version);
-        let replaced = compatible_version < version;
-        self.versions.insert(version, extension);
+        self.versions.remove(&current_version);
+        let replaced = current_version < new_version;
+        self.versions.insert(new_version, extension);
         if replaced {
             ExtensionRegisterResult::Replaced {
-                version: compatible_version,
+                version: current_version,
             }
         } else {
             ExtensionRegisterResult::ReplacedExact
@@ -438,10 +459,33 @@ impl ExtensionRegistry {
     /// the existing entry.
     ///
     pub fn register(&mut self, extension: impl Into<Arc<Extension>>) -> ExtensionRegisterResult {
+        self.register_internal(extension.into(), true)
+    }
+
+    /// Registers a new extension to the registry, and report what happened.
+    ///
+    /// If we already have a compatible version, the extension with the higher
+    /// version is kept. If versions match exactly, the old extension is kept.
+    ///
+    pub fn register_if_new(
+        &mut self,
+        extension: impl Into<Arc<Extension>>,
+    ) -> ExtensionRegisterResult {
+        self.register_internal(extension.into(), false)
+    }
+
+    /// Registers a new extension to the registry, and report what happened.
+    fn register_internal(
+        &mut self,
+        extension: impl Into<Arc<Extension>>,
+        replace_exact_match: bool,
+    ) -> ExtensionRegisterResult {
         use btree_map::Entry::*;
         let extension = extension.into();
         let result = match self.exts.entry(extension.name().clone()) {
-            Occupied(mut prev) => prev.get_mut().register(extension),
+            Occupied(mut prev) => prev
+                .get_mut()
+                .register_internal(extension, replace_exact_match),
             Vacant(ve) => {
                 ve.insert(ExtensionVersions::new(extension));
                 ExtensionRegisterResult::Inserted
