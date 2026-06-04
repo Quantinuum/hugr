@@ -236,7 +236,7 @@ pub enum OutlineCfgError {
 
 #[cfg(test)]
 mod test {
-    use std::collections::{BTreeSet, HashSet};
+    use std::collections::HashSet;
 
     use crate::builder::{
         BlockBuilder, BuildError, CFGBuilder, Container, Dataflow, DataflowSubContainer,
@@ -481,10 +481,11 @@ mod test {
         cfg: Node,
         blocks: Vec<Node>,
     ) -> (Node, Node, Node) {
-        let mut other_blocks = h.children(cfg).collect::<BTreeSet<_>>();
+        let mut other_blocks = h.children(cfg).collect::<HashSet<_>>();
         assert!(blocks.iter().all(|b| other_blocks.remove(b)));
         let [new_block, new_cfg] = h.apply_patch(OutlineCfg::new(blocks.clone())).unwrap();
 
+        #[expect(clippy::iter_over_hash_type, reason = "order does not matter")]
         for n in other_blocks {
             assert_eq!(h.get_parent(n), Some(cfg));
         }

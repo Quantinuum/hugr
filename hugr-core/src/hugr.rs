@@ -443,17 +443,16 @@ impl Hugr {
     /// (since these must be the entry and exit blocks) and in each dataflow
     /// sibling graph (since these must be the input and output nodes).
     fn order_siblings_by_node_index(&mut self) {
-        let mut node_children = Vec::new();
-        for node in self.nodes() {
+        // Equivalent to `self.nodes()` that does not borrow the full structure, so we can mutate `self.hierarchy` while iterating.
+        let nodes = self.graph.nodes_iter().map_into();
+        for node in nodes {
             let mut children = self.children(node).collect_vec();
             if self.contains_dsg_or_csg(node) {
                 children[2..].sort();
             } else {
                 children.sort();
             }
-            node_children.push((node, children));
-        }
-        for (node, children) in node_children {
+
             self.hierarchy.detach_children(node.into_portgraph());
             for child in children {
                 self.hierarchy

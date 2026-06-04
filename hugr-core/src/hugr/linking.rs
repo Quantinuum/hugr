@@ -763,22 +763,10 @@ fn check_directives<SRC: HugrView, TN: HugrNode>(
     parent: Option<TN>,
     children: &NodeLinkingDirectives<SRC::Node, TN>,
 ) -> Result<Transfers<SRC::Node, TN>, NodeLinkingError<SRC::Node, TN>> {
-    /// Returns the minimum key in `children` for which `pred` returns true, or
-    /// `None` if there is no such key.
-    ///
-    /// Helper function to avoid nondeterminism in error reporting from iterating
-    /// over `children` (a `HashMap`).
-    fn min_directive_key<SN: HugrNode, TN>(
-        children: &NodeLinkingDirectives<SN, TN>,
-        mut pred: impl FnMut(SN) -> bool,
-    ) -> Option<SN> {
-        children.keys().copied().filter(|&n| pred(n)).min()
-    }
-
     if parent.is_some() {
         if other.entrypoint() == other.module_root() {
-            if let Some(c) = min_directive_key(children, |_| true) {
-                return Err(NodeLinkingError::ChildOfEntrypoint(c));
+            if let Some(c) = children.keys().next() {
+                return Err(NodeLinkingError::ChildOfEntrypoint(*c));
             }
         } else {
             let mut n = other.entrypoint();
@@ -803,15 +791,14 @@ fn check_directives<SRC: HugrView, TN: HugrNode>(
         replace: HashMap::default(),
         use_existing: HashMap::default(),
     };
-    if let Some(sn) = min_directive_key(children, |sn| {
-        other.get_parent(sn) != Some(other.module_root())
-    }) {
-        return Err(NodeLinkingError::NotChildOfRoot(sn));
-    }
-    for sn in other.children(other.module_root()) {
-        let Some(dirv) = children.get(&sn) else {
-            continue;
-        };
+    #[expect(
+        clippy::iter_over_hash_type,
+        reason = "Nondeterminism only affects the error reported."
+    )]
+    for (&sn, dirv) in children {
+        if other.get_parent(sn) != Some(other.module_root()) {
+            return Err(NodeLinkingError::NotChildOfRoot(sn));
+        }
         match dirv {
             NodeLinkingDirective::Add { replace } => {
                 for &r in replace {
