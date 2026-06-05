@@ -282,6 +282,20 @@ where
     module_context: EmitModuleContext<'c, 'a, H>,
 }
 
+/// Policy for whether to emit debug info.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub enum EmitDebugInfo {
+    /// Include debug info in the generated IR to the extent it is present in the HUGR.
+    ///
+    /// `ptr_bits` gives the number of bits in a pointer on target architecture - it is used only for generating debug info types.
+    Include {
+        /// The number of bits in a pointer on target architecture.
+        ptr_bits: u32,
+    },
+    /// Do not include any debug info in the generated IR, even if it is present in the HUGR.
+    Exclude,
+}
+
 impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
     delegate! {
         to self.module_context {
@@ -355,18 +369,12 @@ impl<'c, 'a, H: HugrView<Node = Node>> EmitHugr<'c, 'a, H> {
     /// and [`hugr_core::ops::FuncDecl`] nodes are not emitted directly, but instead by
     /// emission of ops with static edges from them. So [`FuncDefn`] are the only
     /// interesting children.
-    ///
-    /// If `emit_debug` is true, debug info will be included in the generated IR to the
-    /// extent it is present in the HUGR. If `emit_debug` is false, any debug info on
-    /// the HUGR will be ignored. `ptr_bits` gives the number of bits in a pointer on
-    /// target architecture - it is used only for generating debug info types.
     pub fn emit_module(
         mut self,
         node: FatNode<'_, hugr_core::ops::Module, H>,
-        emit_debug: bool,
-        ptr_bits: u32,
+        emit_debug: EmitDebugInfo,
     ) -> Result<Self> {
-        if emit_debug {
+        if let EmitDebugInfo::Include { ptr_bits } = emit_debug {
             self.module_context.try_di_init(node, ptr_bits)?;
         }
         for c in node.children() {
