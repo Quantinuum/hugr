@@ -2,6 +2,19 @@
 
 ## [0.28.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.27.1...hugr-v0.28.0) - 2026-06-05
 
+This release includes an overhaul of the `Type` definition, merging it with
+`Term`s. The `hugr-model` serialization now tracks granular information about
+which extensions versions requirements. This improves error reporting on missing
+extensions and opens the way for extension version migrations in the future.
+
+Support for bare `.json` HUGR files has been removed. JSON-encoded envelopes are
+still supported, but will be removed in the future.
+To convert old JSON files, add the following header and footer to the file:
+```rs
+PREPEND = r#"HUGRiHJv?@{"modules": ["#;
+APPEND = r#"],"extensions": []}"#;
+```
+
 ### Bug Fixes
 
 - Export dataflow blocks with CFG node link merged into input port when possible ([#3060](https://github.com/Quantinuum/hugr/pull/3060))
