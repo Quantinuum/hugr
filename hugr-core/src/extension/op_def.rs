@@ -409,7 +409,10 @@ impl OpDef {
     ) -> Result<(), SignatureError> {
         let temp: PolyFuncTypeRV; // to keep alive
         let (pf, args) = match &self.signature_func {
-            SignatureFunc::CustomValidator(ts) => (&ts.poly_func, args),
+            SignatureFunc::CustomValidator(custom) => {
+                custom.validate.validate(args, self)?;
+                (&custom.poly_func, args)
+            }
             SignatureFunc::PolyFuncType(ts) => (ts, args),
             SignatureFunc::CustomFunc(custom) => {
                 let (static_args, other_args) =
@@ -515,11 +518,14 @@ impl OpDef {
     pub(super) fn validate(&self) -> Result<(), SignatureError> {
         // TODO https://github.com/CQCL/hugr/issues/624 validate declared TypeParams
         // for both type scheme and custom binary
-        if let SignatureFunc::CustomValidator(ts) = &self.signature_func {
-            // The type scheme may contain row variables so be of variable length;
-            // these will have to be substituted to fixed-length concrete types when
-            // the OpDef is instantiated into an actual OpType.
-            ts.poly_func.validate()?;
+        match &self.signature_func {
+            SignatureFunc::PolyFuncType(pft) | SignatureFunc::MissingValidateFunc(pft) => {
+                pft.validate()?
+            }
+            SignatureFunc::CustomValidator(custom_validator) => {
+                custom_validator.poly_func.validate()?
+            }
+            SignatureFunc::CustomFunc(_) | SignatureFunc::MissingComputeFunc => (), // can't check anything
         }
         Ok(())
     }
@@ -637,15 +643,15 @@ pub(super) mod test {
 
     use super::SignatureFromArgs;
     use crate::builder::{DFGBuilder, Dataflow, DataflowHugr, endo_sig};
-    use crate::extension::SignatureError;
     use crate::extension::op_def::{CustomValidator, LowerFunc, OpDef, SignatureFunc};
     use crate::extension::prelude::usize_t;
-    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE};
+    use crate::extension::{ExtensionRegistry, ExtensionSet, PRELUDE, ValidateJustArgs};
+    use crate::extension::{ExtensionRegistryError, SignatureError};
     use crate::ops::OpName;
     use crate::package::Package;
     use crate::std_extensions::collections::list;
     use crate::types::type_param::{TermKindError, TypeParam};
-    use crate::types::{PolyFuncTypeRV, Signature, Term, Type, TypeArg, TypeBound};
+    use crate::types::{PolyFuncTypeRV, Signature, Term, Type, TypeArg, TypeBound, TypeRowRV};
     use crate::{Extension, const_extension_ids};
 
     const_extension_ids! {
@@ -910,6 +916,69 @@ pub(super) mod test {
             Ok(())
         })?;
         Ok(())
+    }
+
+    #[test] // failing before https://github.com/Quantinuum/hugr/pull/3081
+    fn invalid_extension() {
+        let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
+            ext.add_op(
+                "MyOp".into(),
+                "desc".into(),
+                PolyFuncTypeRV::new(
+                    [],
+                    Signature::new_endo([Type::new_tuple(
+                        // variable not declared
+                        TypeRowRV::new_var_use(0, TypeBound::Linear),
+                    )]),
+                ),
+                extension_ref,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+        let reg = ExtensionRegistry::new([PRELUDE.clone(), ext]);
+        assert_eq!(
+            reg.validate(),
+            Err(ExtensionRegistryError::InvalidSignature(
+                EXT_ID,
+                SignatureError::FreeTypeVar {
+                    idx: 0,
+                    num_decls: 0
+                }
+            ))
+        );
+    }
+
+    #[test]
+    fn validate_args() {
+        struct TestValidator;
+        impl ValidateJustArgs for TestValidator {
+            fn validate(&self, arg_values: &[TypeArg]) -> Result<(), SignatureError> {
+                if matches!(arg_values, [TypeArg::BoundedNat(n)] if *n % 2 == 1) {
+                    return Ok(());
+                }
+                Err(SignatureError::InvalidTypeArgs)
+            }
+        }
+        let ext = Extension::try_new_test_arc(EXT_ID, |ext, extension_ref| {
+            ext.add_op(
+                "TestOp".into(),
+                "Type arg must be odd but is otherwise ignored".into(),
+                CustomValidator::new(
+                    PolyFuncTypeRV::new([Term::max_nat_kind()], Signature::new_endo([usize_t()])),
+                    TestValidator,
+                ),
+                extension_ref,
+            )?;
+            Ok(())
+        })
+        .unwrap();
+        assert_eq!(
+            ext.get_op("TestOp")
+                .unwrap()
+                .validate_args(&[TypeArg::BoundedNat(2)], &[]),
+            Err(SignatureError::InvalidTypeArgs)
+        );
     }
 
     mod proptest {

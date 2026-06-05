@@ -298,14 +298,14 @@ mod test {
          *           |.   |?         NB. Order edge H_a to nested DFG
          *           | .  |?         NB. Optional(o1) Order edge from H_b to nested DFG
          *           |  /-|--------\
-         *           |  | |?.  Cst | NB. Order edge Input to LCst
+         *           |  | |? . Cst | NB. Order edge Input to LCst
          *           |  | |? . |   | NB. Optional(o2) Order edge from Input to RZ
          *           |  | |?  LCst |
-         *           |  | \? /  .  |
-         *           |  |  RZ   .  |
-         *           |  |  |    .  |  Order edge LCst to if
-         *           |  |  meas .  |
-         *           |  |  |? \ .  |
+         *           |  | \? /     |
+         *           |  |  RZ      |
+         *           |  |  |       |
+         *           |  |  meas    |
+         *           |  |  |? \    |
          *           |  |  |? if   | NB. Optional(o3) Order edge from meas to Output
          *           |  |  |? .    | NB. Order edge if to Output
          *           |  \--|-------/
@@ -336,7 +336,6 @@ mod test {
         if_n.case_builder(0)?.finish_with_outputs([])?;
         if_n.case_builder(1)?.finish_with_outputs([])?;
         let if_n = if_n.finish_sub_container()?;
-        inner.add_other_wire(f.node(), if_n.node());
         inner.add_other_wire(if_n.node(), inner.output().node());
         if o3 {
             inner.add_other_wire(m.node(), inner.output().node());
@@ -366,40 +365,54 @@ mod test {
                 .map(|(n, _)| n)
                 .collect::<HashSet<_>>()
         };
-        // h_a, and optionally h_b, should have Order edges to the F64 load_const,
-        // optionally the Rz, also the Order-successors of the DFG
-        let input_ord_srcs = HashSet::from_iter(once(h_a.node()).chain(o1.then_some(h_b.node())));
-        let input_ord_tgts = HashSet::from_iter(once(f.node()).chain(o2.then_some(r.node())));
+        let ext_order_preds = HashSet::from_iter(once(h_a.node()).chain(o1.then_some(h_b.node())));
+        let inp_order_succs = once(f.node()).chain(o2.then_some(r.node()));
 
-        // h_a2, and optionally the CX, should have Order edges from the if,
-        // optionally meas, and the Order-predecessors of the DFG
-        let output_ord_tgts = HashSet::from_iter(once(h_a2.node()).chain(o4.then_some(cx.node())));
-        let output_ord_srcs = HashSet::from_iter(once(if_n.node()).chain(o3.then_some(m.node())));
+        let out_order_preds = once(if_n.node()).chain(o3.then_some(m.node()));
+        let ext_order_succs = HashSet::from_iter(once(h_a2.node()).chain(o4.then_some(cx.node())));
 
-        for input_ord_src in &input_ord_srcs {
-            assert_eq!(
-                order_neighbours(*input_ord_src, Direction::Outgoing),
-                HashSet::from_iter(input_ord_tgts.union(&output_ord_tgts).copied())
-            );
-        }
-        for input_ord_tgt in &input_ord_tgts {
-            assert_eq!(
-                order_neighbours(*input_ord_tgt, Direction::Incoming),
-                input_ord_srcs
-            );
-        }
-        for output_ord_src in &output_ord_srcs {
-            assert_eq!(
-                order_neighbours(*output_ord_src, Direction::Outgoing),
-                output_ord_tgts
-            );
-        }
-        for output_ord_tgt in &output_ord_tgts {
-            assert_eq!(
-                order_neighbours(*output_ord_tgt, Direction::Incoming),
-                HashSet::from_iter(output_ord_srcs.union(&input_ord_srcs).copied())
-            );
-        }
+        // Order predecessors of DFG get edges to both Input any-successor and DFG Order-successors
+        let ext_order_tgts =
+            HashSet::from_iter(inp_order_succs.chain(ext_order_succs.iter().cloned()));
+        assert_eq!(
+            order_neighbours(h_a.node(), Direction::Outgoing),
+            ext_order_tgts
+        );
+        assert_eq!(
+            order_neighbours(h_b.node(), Direction::Outgoing),
+            if o1 { ext_order_tgts } else { HashSet::new() }
+        );
+        assert_eq!(
+            order_neighbours(f.node(), Direction::Incoming),
+            ext_order_preds
+        );
+        assert_eq!(
+            order_neighbours(r.node(), Direction::Incoming),
+            if o2 {
+                ext_order_preds.clone()
+            } else {
+                HashSet::new()
+            }
+        );
+
+        assert_eq!(
+            order_neighbours(if_n.node(), Direction::Outgoing),
+            ext_order_succs
+        );
+        assert_eq!(
+            order_neighbours(m.node(), Direction::Outgoing),
+            if o3 { ext_order_succs } else { HashSet::new() }
+        );
+        // Order successors of DFG get edges from both Output any-predecessors and DFG Order-predecessors
+        let ext_order_srcs = HashSet::from_iter(out_order_preds.chain(ext_order_preds));
+        assert_eq!(
+            order_neighbours(h_a2.node(), Direction::Incoming),
+            ext_order_srcs
+        );
+        assert_eq!(
+            order_neighbours(cx.node(), Direction::Incoming),
+            if o4 { ext_order_srcs } else { HashSet::new() }
+        );
         Ok(())
     }
 

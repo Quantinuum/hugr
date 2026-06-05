@@ -93,8 +93,14 @@ impl<R: BufRead> EnvelopeReader<R> {
         &self.description.header
     }
 
+    /// Add any extensions that were bundled in the package definition to the
+    /// local registry.
     fn register_packaged(&mut self, extensions: &ExtensionRegistry) {
-        self.registry.extend(extensions);
+        for versions in extensions {
+            for ext in versions.iter() {
+                self.registry.register_if_new(ext.clone());
+            }
+        }
     }
 
     /// Handle extension resolution errors by recording missing extensions in the description.
