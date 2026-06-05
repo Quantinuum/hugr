@@ -412,11 +412,8 @@ mod test {
         let ext_order_succs = HashSet::from_iter(once(h_a2.node()).chain(o4.then_some(cx.node())));
 
         // Order predecessors of DFG get edges to both Input any-successor and DFG Order-successors
-        let ext_order_tgts = HashSet::from_iter(
-            inp_succs
-                .into_iter()
-                .chain(ext_order_succs.clone()),
-        );
+        let ext_order_tgts =
+            HashSet::from_iter(inp_succs.into_iter().chain(ext_order_succs.clone()));
         assert_eq!(
             order_neighbours(h_a.node(), Direction::Outgoing),
             ext_order_tgts
