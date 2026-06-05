@@ -1,12 +1,12 @@
 //! Input/output arguments for the HUGR CLI.
 
 use clio::Input;
+use hugr::Extension;
 use hugr::envelope::description::PackageDesc;
 use hugr::envelope::read_envelope;
 use hugr::extension::ExtensionRegistry;
 use hugr::extension::resolution::WeakExtensionRegistry;
 use hugr::package::Package;
-use hugr::{Extension, Hugr};
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
 use walkdir::WalkDir;
@@ -79,40 +79,6 @@ impl HugrInputArgs {
                 Ok(read_envelope(buffer, &extensions)?)
             }
         }
-    }
-
-    /// Read a hugr JSON file from an optional reader.
-    ///
-    /// If `reader` is `None`, reads from the input specified in the args.
-    /// This is a legacy option for reading old HUGR JSON files.
-    #[deprecated(since = "0.27.0")]
-    pub(crate) fn get_hugr_with_reader<R: Read>(
-        &mut self,
-        reader: Option<R>,
-    ) -> Result<Hugr, CliError> {
-        let extensions = self.load_extensions()?;
-
-        /// Wraps the hugr JSON so that it defines a valid envelope.
-        const PREPEND: &str = r#"HUGRiHJv?@{"modules": ["#;
-        const APPEND: &str = r#"],"extensions": []}"#;
-
-        let mut envelope = PREPEND.to_string();
-
-        match reader {
-            Some(r) => {
-                let mut buffer = BufReader::new(r);
-                buffer.read_to_string(&mut envelope)?;
-            }
-            None => {
-                let mut buffer = BufReader::new(&mut self.input);
-                buffer.read_to_string(&mut envelope)?;
-            }
-        }
-
-        envelope.push_str(APPEND);
-
-        let hugr = Hugr::load_str(envelope, Some(&extensions))?;
-        Ok(hugr)
     }
 
     /// Return a register with the selected extensions.
