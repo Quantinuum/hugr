@@ -13,6 +13,7 @@ use inkwell::{
 use itertools::Itertools as _;
 use rstest::fixture;
 
+use crate::emit::test::TEST_EMIT_DEBUG;
 use crate::{
     custom::{CodegenExtsBuilder, CodegenExtsMap},
     emit::{
@@ -174,8 +175,12 @@ impl TestContext {
     pub fn exec_hugr<T>(&self, mut hugr: THugrView, entry_point: impl AsRef<str>) -> T {
         // We add random debug info to all test HUGRs for coverage.
         add_random_debug_info(&mut hugr);
-        let emission =
-            Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr(), true).unwrap();
+        let emission = Emission::emit_hugr(
+            hugr.fat_root().unwrap(),
+            self.get_emit_hugr(),
+            TEST_EMIT_DEBUG,
+        )
+        .unwrap();
         emission.verify().unwrap();
 
         emission.jit_exec::<T>(entry_point).unwrap()
@@ -234,8 +239,12 @@ impl TestContext {
     pub fn exec_hugr_panicking(&self, mut hugr: THugrView, entry_point: impl AsRef<str>) -> String {
         // We add random debug info to all test HUGRs for coverage.
         add_random_debug_info(&mut hugr);
-        let emission =
-            Emission::emit_hugr(hugr.fat_root().unwrap(), self.get_emit_hugr(), true).unwrap();
+        let emission = Emission::emit_hugr(
+            hugr.fat_root().unwrap(),
+            self.get_emit_hugr(),
+            TEST_EMIT_DEBUG,
+        )
+        .unwrap();
         emission.verify().unwrap();
 
         emission.exec_panicking(entry_point).unwrap()
