@@ -33,6 +33,7 @@ tracing = { version = "0.1.44", optional = true }
 tracing-subscriber = { version = "0.3.23", features = ["fmt"], optional = true }
 tabled = "0.21.0"
 schemars = { workspace = true, features = ["derive"] }
+walkdir = { workspace = true }
 
 
 [lints]
@@ -51,7 +52,6 @@ assert_fs = { workspace = true }
 predicates = { workspace = true }
 tempfile = { workspace = true }
 rstest = { workspace = true }
-walkdir = { workspace = true }
 
 [[bin]]
 name = "hugr"
