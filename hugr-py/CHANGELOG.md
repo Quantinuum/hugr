@@ -6,15 +6,15 @@ This release includes some improvements to the hugr serialization, adds a fast
 hugr linking utility, and allows aliases for metadata keys.
 
 The `hugr-model` serialization now tracks granular information about
-which extensions versions requirements. This improves error reporting on missing
+extensions' versions requirements. This improves error reporting on missing
 extensions and opens the way for extension version migrations in the future.
 
 Support for bare `.json` HUGR files has been removed. JSON-encoded envelopes are
 still supported, but will be removed in the future.
 To convert old JSON files, add the following header and footer to the file:
-```rs
-PREPEND = r#"HUGRiHJv?@{"modules": ["#;
-APPEND = r#"],"extensions": []}"#;
+```python
+PREPEND = b'"HUGRiHJv?@{"modules": ["'
+APPEND = b'"],"extensions": []}"'
 ```
 
 ### ⚠ BREAKING CHANGES
