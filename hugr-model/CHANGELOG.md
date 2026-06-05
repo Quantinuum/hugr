@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.28.0](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.27.1...hugr-model-v0.28.0) - 2026-06-05
+
+### New Features
+
+- [**breaking**] Add extension versions to hugr-model elements ([#3080](https://github.com/Quantinuum/hugr/pull/3080))
+
 ## [0.27.1](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.27.0...hugr-model-v0.27.1) - 2026-05-05
 
 ### Testing
