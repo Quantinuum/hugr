@@ -1,5 +1,51 @@
 # Changelog
 
+## [0.17.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.16.0...hugr-py-v0.17.0) (2026-06-05)
+
+This release includes some improvements to the hugr serialization, adds a fast
+hugr linking utility, and allows aliases for metadata keys.
+
+The `hugr-model` serialization now tracks granular information about
+extensions' versions requirements. This improves error reporting on missing
+extensions and opens the way for extension version migrations in the future.
+
+Support for bare `.json` HUGR files has been removed. JSON-encoded envelopes are
+still supported, but will be removed in the future.
+To convert old JSON files, add the following header and footer to the file:
+```python
+PREPEND = b'"HUGRiHJv?@{"modules": ["'
+APPEND = b'"],"extensions": []}"'
+```
+
+### ⚠ BREAKING CHANGES
+
+* Removed pure HUGR JSON store/decode APIs
+* The capnp import/export code has been updated to the format version `v1.1.0`.
+* **hugr-llvm:** `hugr-llvm::emit::EmitHugr::emit_hugr::emit_module` takes two new args: `emit_debug: bool` and `ptr_size: u32`. In addition, `hugr_core::views::render::NodeLabel` has a new variant `MetadataValues` which combines a numeric label and JSON metadata values.
+* Hugrs are no longer guaranteed to have an Order edge representing the ordering constraint from each nonlocal `Ext` edge; require HugrView impls to provide scheduling_graph; remove deprecated region_portgraph(), as_petgraph(), into_region_portgraph(),
+
+### Features
+
+* Add extension version to custom ops and types ([#3063](https://github.com/Quantinuum/hugr/issues/3063)) ([11e68b7](https://github.com/Quantinuum/hugr/commit/11e68b72fa1067156ab05ca1edf4c80272db175e))
+* Add extension versions to hugr-model elements ([#3080](https://github.com/Quantinuum/hugr/issues/3080)) ([39f0fb7](https://github.com/Quantinuum/hugr/commit/39f0fb7779ea105d894a733cc8f7440eaf5546d5))
+* do not require an Order edge for each nonlocal `Ext` edge; compute on demand in scheduling_graph() ([#2951](https://github.com/Quantinuum/hugr/issues/2951)) ([deadaa6](https://github.com/Quantinuum/hugr/commit/deadaa6c1f972b6e0208f55f36e8ed3ee48ccfba))
+* **hugr-llvm:** Add support for emitting debug locations ([#3026](https://github.com/Quantinuum/hugr/issues/3026)) ([28ab1a7](https://github.com/Quantinuum/hugr/commit/28ab1a7b7c6c469485b9400b8b4576be4b68384e))
+* Keep multiple incompatible extension versions in ExtensionRegistry ([#3064](https://github.com/Quantinuum/hugr/issues/3064)) ([dc03683](https://github.com/Quantinuum/hugr/commit/dc03683fd144781e3e697266d4579373ea74434a))
+* Metadata key aliases for non-breaking migrations ([#3057](https://github.com/Quantinuum/hugr/issues/3057)) ([e588703](https://github.com/Quantinuum/hugr/commit/e588703a281fa7f82c728f3704df7696e430b31e))
+* **py:** Linking packages serialised as bytes ([#3070](https://github.com/Quantinuum/hugr/issues/3070)) ([e2399c2](https://github.com/Quantinuum/hugr/commit/e2399c2cecf1fe3ee34c85b0740de5da91aa55b0))
+* Remove deprecated pure json HUGR APIs ([#3089](https://github.com/Quantinuum/hugr/issues/3089)) ([60dca49](https://github.com/Quantinuum/hugr/commit/60dca4904fdcfbb2420838f65d36f4ed4a20f0b0))
+
+
+### Bug Fixes
+
+* Export dataflow blocks with CFG node link merged into input port when possible ([#3060](https://github.com/Quantinuum/hugr/issues/3060)) ([6742c53](https://github.com/Quantinuum/hugr/commit/6742c53505b2e13c3234dd847a6201759e73b757)), closes [#3059](https://github.com/Quantinuum/hugr/issues/3059)
+
+
+### Documentation
+
+* Cleanup the python README ([#3099](https://github.com/Quantinuum/hugr/issues/3099)) ([3db96df](https://github.com/Quantinuum/hugr/commit/3db96df0991c70bf5f2e54ac677dab5e3366b687))
+* Simplify package description. ([#3040](https://github.com/Quantinuum/hugr/issues/3040)) ([2868f4a](https://github.com/Quantinuum/hugr/commit/2868f4a5aae74f969ea47caef6a13cec7e8c898e))
+
 ## [0.16.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.15.4...hugr-py-v0.16.0) (2026-04-01)
 
 This release changes the default text serialization format from JSON to `MODEL_WITH_EXTS` (the JSON format is now deprecated).
