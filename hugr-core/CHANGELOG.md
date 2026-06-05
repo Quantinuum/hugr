@@ -1,6 +1,38 @@
 # Changelog
 
 
+## [0.28.0](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.27.1...hugr-core-v0.28.0) - 2026-06-05
+
+### Bug Fixes
+
+- Export dataflow blocks with CFG node link merged into input port when possible ([#3060](https://github.com/Quantinuum/hugr/pull/3060))
+- Publish parametrisation check for types ([#3066](https://github.com/Quantinuum/hugr/pull/3066))
+- Preserve ordering in InlineDFG ([#3072](https://github.com/Quantinuum/hugr/pull/3072))
+- Properly validate extension definitions ([#3081](https://github.com/Quantinuum/hugr/pull/3081))
+- Re-link opdefs when doing extension resolution ([#3090](https://github.com/Quantinuum/hugr/pull/3090))
+- Don't override extensions unnecessarily on Extend ([#3095](https://github.com/Quantinuum/hugr/pull/3095))
+
+### New Features
+
+- SiblingSubgraphs with polymorphic signatures ([#3056](https://github.com/Quantinuum/hugr/pull/3056))
+- [**breaking**] do not require an Order edge for each nonlocal `Ext` edge; compute on demand in scheduling_graph() ([#2951](https://github.com/Quantinuum/hugr/pull/2951))
+- Metadata key aliases for non-breaking migrations ([#3057](https://github.com/Quantinuum/hugr/pull/3057))
+- *(hugr-llvm)* [**breaking**] Add support for emitting debug locations ([#3026](https://github.com/Quantinuum/hugr/pull/3026))
+- [**breaking**] Add extension version to custom ops and types ([#3063](https://github.com/Quantinuum/hugr/pull/3063))
+- [**breaking**] Keep multiple incompatible extension versions in ExtensionRegistry ([#3064](https://github.com/Quantinuum/hugr/pull/3064))
+- [**breaking**] Add extension versions to hugr-model elements ([#3080](https://github.com/Quantinuum/hugr/pull/3080))
+- Prefer local extension Arcs when loading a package ([#3094](https://github.com/Quantinuum/hugr/pull/3094))
+
+### Performance
+
+- [**breaking**] remove bound-caching from Type, do in SumType::General instead ([#3022](https://github.com/Quantinuum/hugr/pull/3022))
+
+### Refactor
+
+- *(hugrv2)* [**breaking**] combine TypeEnum with Term, no RV parametrization ([#2895](https://github.com/Quantinuum/hugr/pull/2895))
+- *(hugrv2)* [**breaking**] Rename Terms to clarify (runtime) Types from static parameter Kinds ([#3019](https://github.com/Quantinuum/hugr/pull/3019))
+- simplify InlineDFG, extend tests ([#3096](https://github.com/Quantinuum/hugr/pull/3096))
+
 ## [0.27.1](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.27.0...hugr-core-v0.27.1) - 2026-05-05
 
 ### Bug Fixes
