@@ -729,18 +729,20 @@ flowchart
 
 In a dataflow graph, the evaluation semantics are simple: all nodes in the
 graph are necessarily evaluated. (For hierarchical nodes, this may entail
-evaluating some children, according to the node.) Evaluation may occur in
-some order, and for nodes that execute strictly and atomically (according to
-implementation) this will respect the Dataflow and Order edges. However *in
-general* Hugr allows that
+evaluating some children, according to the node.) For nodes that execute
+strictly and atomically (according to implementation) this will happen in an
+order that respects the Dataflow and Order edges. However *in general* Hugr
+allows that
 * Nodes may execute non-atomically, perhaps in parallel/overlapping other nodes
 * Nodes may execute partially or totally before all inputs are ready (if the
-  op is able to "do" anything without all its inputs)
-  * A specific exception here is that a node $n$ must not produce its `Order`
-    output until all other nodes connected to $n$'s `Order` input have produced
-    theirs.
-  * Similarly, a node with side-effects (e.g. panic or print) must not have
-    those side effects before all its `Order` inputs are ready.
+  op is able to "do" anything without all its inputs). **However** note that
+  a node $n$ with an `Order` input must wait for all its `Order`-predecessors
+  to produce their `Order` output before:
+    * $n$ has any side-effects (e.g. panic or print)
+    * producing $n$'s `Order`
+  we can see this as requiring that a node can only "start" when all its
+  `Order`-predecessors are finished, but (according to implementation) this
+  does not restrict non-side-effectful computation/evaluation.
 
 This applies both to extension ops and core constructs such as DFG, CFG, or a
 Call to a function, but may be refined (introducing more precise guarantees
