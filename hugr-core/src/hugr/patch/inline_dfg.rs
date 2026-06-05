@@ -81,7 +81,7 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
         // DFG Inputs.
         for inp in h.node_inputs(n).collect::<Vec<_>>() {
             let dfg_preds = h.linked_outputs(n, inp).collect::<Vec<_>>();
-            assert!(inp == oth_in || dfg_preds.len() == 1); // Any number of order preds
+            debug_assert!(inp == oth_in || dfg_preds.len() == 1); // Any number of order preds
             h.disconnect(n, inp); // These disconnects allow permutations to work trivially.
             let outp = OutgoingPort::from(inp.index());
             let mut targets = h.linked_inputs(input, outp).collect::<Vec<_>>();
@@ -104,7 +104,7 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
         for outport in h.node_outputs(n).collect::<Vec<_>>() {
             let inpp = IncomingPort::from(outport.index());
             let sources = h.linked_outputs(output, inpp).collect::<Vec<_>>();
-            assert!(outport == oth_out || sources.len() == 1); // Any number of order sources
+            debug_assert!(outport == oth_out || sources.len() == 1); // Any number of order sources
             h.disconnect(output, inpp);
 
             let dfg_succs = h.linked_inputs(n, outport).collect::<Vec<_>>();
