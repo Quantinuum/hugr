@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.17.1](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.17.0...hugr-py-v0.17.1) (2026-06-10)
+
+
+### Bug Fixes
+
+* Don't read partial symbol definitions ([#3104](https://github.com/Quantinuum/hugr/issues/3104)) ([697fbce](https://github.com/Quantinuum/hugr/commit/697fbcea26543d4fd2c2ea1fea58b845e1eb7958))
+* Quote non-parsable Symbol names in S-expressions ([#3101](https://github.com/Quantinuum/hugr/issues/3101)) ([84f2448](https://github.com/Quantinuum/hugr/commit/84f244812624cce82e1321291e5ae18fa67b0577))
+
 ## [0.17.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.16.0...hugr-py-v0.17.0) (2026-06-05)
 
 This release includes some improvements to the hugr serialization, adds a fast
