@@ -1,5 +1,6 @@
 # Changelog
 
+
 ## [0.28.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.27.1...hugr-v0.28.0) - 2026-06-05
 
 This release includes an overhaul of the `Type` definition, merging it with
