@@ -42,9 +42,26 @@ mod pest_parser {
     pub struct HugrParser;
 }
 
+/// Return whether a symbol name matches the bare-symbol syntax.
+///
+/// The grammar rule can match a prefix of the input, so this helper checks that
+/// the parsed token consumes the full name.
+pub(super) fn is_bare_symbol_name(name: &str) -> bool {
+    HugrParser::parse(Rule::bare_symbol_name, name)
+        .ok()
+        .and_then(|mut pairs| pairs.next())
+        .is_some_and(|pair| pair.as_span().end() == name.len())
+}
+
 fn parse_symbol_name(pair: Pair<Rule>) -> ParseResult<SymbolName> {
     debug_assert_eq!(Rule::symbol_name, pair.as_rule());
-    Ok(SymbolName(pair.as_str().into()))
+    let pair = pair.into_inner().next().unwrap();
+
+    Ok(match pair.as_rule() {
+        Rule::bare_symbol_name => SymbolName(pair.as_str().into()),
+        Rule::literal_string => SymbolName(parse_string(pair)?),
+        _ => unreachable!("expected symbol name"),
+    })
 }
 
 fn parse_version(pair: Pair<Rule>) -> ParseResult<semver::Version> {

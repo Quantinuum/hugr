@@ -5,6 +5,7 @@ use pretty::{Arena, DocAllocator as _, RefDoc};
 
 use crate::v0::{Literal, RegionKind};
 
+use super::parse::is_bare_symbol_name;
 use super::{
     LinkName, Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, SymbolIdent,
     SymbolName, Term, VarName, Visibility,
@@ -85,22 +86,7 @@ impl<'a> Printer<'a> {
     }
 
     fn string(&mut self, string: &str) {
-        let mut output = String::with_capacity(string.len() + 2);
-        output.push('"');
-
-        for c in string.chars() {
-            match c {
-                '\\' => output.push_str("\\\\"),
-                '"' => output.push_str("\\\""),
-                '\n' => output.push_str("\\n"),
-                '\r' => output.push_str("\\r"),
-                '\t' => output.push_str("\\t"),
-                _ => output.push(c),
-            }
-        }
-
-        output.push('"');
-        self.text(output);
+        self.text(quote_string(string));
     }
 
     fn bytes(&mut self, bytes: &[u8]) {
@@ -113,13 +99,39 @@ impl<'a> Printer<'a> {
     }
 }
 
+/// Return the escaped representation used for string literals.
+fn quote_string(string: &str) -> String {
+    let mut output = String::with_capacity(string.len() + 2);
+    output.push('"');
+
+    for c in string.chars() {
+        match c {
+            '\\' => output.push_str("\\\\"),
+            '"' => output.push_str("\\\""),
+            '\n' => output.push_str("\\n"),
+            '\r' => output.push_str("\\r"),
+            '\t' => output.push_str("\\t"),
+            _ => output.push(c),
+        }
+    }
+
+    output.push('"');
+    output
+}
+
 fn print_term<'a>(printer: &mut Printer<'a>, term: &'a Term) {
     match term {
         Term::Wildcard => printer.text("_"),
         Term::Var(var) => print_var_name(printer, var),
         Term::Apply(symbol, terms) => {
             if terms.is_empty() {
-                print_symbol_ident(printer, symbol);
+                if symbol_ident_needs_parens_in_term(symbol) {
+                    printer.parens_enter();
+                    print_symbol_ident(printer, symbol);
+                    printer.parens_exit();
+                } else {
+                    print_symbol_ident(printer, symbol);
+                }
             } else {
                 printer.parens_enter();
                 print_symbol_ident(printer, symbol);
@@ -213,7 +225,7 @@ fn print_tuple_parts<'a>(printer: &mut Printer<'a>, parts: &'a [SeqPart]) {
 }
 
 fn print_symbol_name<'a>(printer: &mut Printer<'a>, name: &'a SymbolName) {
-    printer.text(name.0.as_str());
+    printer.text(format_symbol_name(name.as_ref()));
 }
 
 fn print_symbol_ident<'a>(printer: &mut Printer<'a>, symbol_ident: &'a SymbolIdent) {
@@ -468,7 +480,7 @@ impl Display for VarName {
 
 impl Display for SymbolName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", format_symbol_name(self.as_ref()))
     }
 }
 
@@ -476,4 +488,22 @@ impl Display for LinkName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "%{}", self.0)
     }
+}
+
+/// Format a symbol name as a parseable token.
+///
+/// The text syntax keeps common dotted identifiers bare for readability. Names
+/// produced by frontends may contain punctuation or whitespace, so those names
+/// use an escaped string-literal form to preserve roundtripping.
+fn format_symbol_name(name: &str) -> Cow<'_, str> {
+    if is_bare_symbol_name(name) {
+        Cow::Borrowed(name)
+    } else {
+        Cow::Owned(quote_string(name))
+    }
+}
+
+/// Return whether a symbol term must be parenthesized to avoid string literals.
+fn symbol_ident_needs_parens_in_term(symbol: &SymbolIdent) -> bool {
+    !is_bare_symbol_name(symbol.name.as_ref())
 }
