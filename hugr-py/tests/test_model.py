@@ -27,8 +27,8 @@ def test_symbol_escaped_name_text_roundtrip():
     text = str(symbol)
     parsed = model.Symbol.from_str(text)
 
-    assert f'r#"{name}"#' in text
     assert parsed == symbol
+    assert parsed.name == name
 
 
 def test_package_escaped_name_text_roundtrip():
@@ -44,6 +44,17 @@ def test_package_escaped_name_text_roundtrip():
 
     text = str(model.Package.from_str(source))
     parsed = model.Package.from_str(text)
+    operation = parsed.modules[0].root.children[1].operation
 
-    assert f'r#"{name}"#' in text
     assert str(parsed) == text
+    assert operation.symbol_name() == name
+
+
+def test_apply_escaped_name_text_roundtrip():
+    name = "tests.integration.test_linear.test_return_call.<locals>.op"
+    term = model.Apply(name)
+    text = str(term)
+    parsed = model.Term.from_str(text)
+
+    assert parsed == term
+    assert parsed.symbol == name

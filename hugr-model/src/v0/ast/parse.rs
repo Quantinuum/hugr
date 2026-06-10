@@ -54,10 +54,8 @@ pub(super) fn is_bare_symbol_name(name: &str) -> bool {
 }
 
 fn parse_symbol_name(pair: Pair<Rule>) -> ParseResult<SymbolName> {
-    debug_assert_eq!(Rule::symbol_name, pair.as_rule());
-    let pair = pair.into_inner().next().unwrap();
-
     Ok(match pair.as_rule() {
+        Rule::symbol_name => parse_symbol_name(pair.into_inner().next().unwrap())?,
         Rule::bare_symbol_name => SymbolName(pair.as_str().into()),
         Rule::raw_symbol_name => SymbolName(parse_raw_symbol_name(pair)),
         _ => unreachable!("expected symbol name"),
@@ -492,7 +490,16 @@ macro_rules! impl_from_str {
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 let mut pairs =
                     HugrParser::parse(Rule::$rule, s).map_err(|err| ParseError(Box::new(err)))?;
-                $parse(pairs.next().unwrap())
+                let pair = pairs.next().unwrap();
+                let span = pair.as_span();
+                let end = span.end();
+
+                if !s[end..].trim().is_empty() {
+                    let span = pest::Span::new(s, end, s.len()).unwrap_or(span);
+                    return Err(ParseError::custom("unexpected trailing input", span));
+                }
+
+                $parse(pair)
             }
         }
     };

@@ -3,7 +3,9 @@ use std::sync::Arc;
 
 use crate::v0::Visibility;
 
-use super::{Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, SymbolIdent, Term};
+use super::{
+    Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, SymbolIdent, SymbolName, Term,
+};
 use pyo3::{
     PyAny,
     exceptions::PyTypeError,
@@ -49,7 +51,13 @@ impl<'py> pyo3::FromPyObject<'_, 'py> for SymbolIdent {
 
     fn extract(ob: pyo3::Borrowed<'_, 'py, PyAny>) -> pyo3::PyResult<Self> {
         let name: String = ob.extract()?;
-        Self::from_str(&name).map_err(|err| PyTypeError::new_err(err.to_string()))
+        match Self::from_str(&name) {
+            Ok(symbol) => Ok(symbol),
+            _ => Ok(SymbolIdent {
+                name: SymbolName::new(name),
+                version: None,
+            }),
+        }
     }
 }
 
@@ -61,7 +69,11 @@ impl<'py> pyo3::IntoPyObject<'py> for &SymbolIdent {
     type Error = pyo3::PyErr;
 
     fn into_pyobject(self, py: pyo3::Python<'py>) -> Result<Self::Output, Self::Error> {
-        Ok(self.to_string().into_pyobject(py)?)
+        let symbol = match &self.version {
+            Some(version) => format!("{}@{}", self.name.as_ref(), version),
+            None => self.name.as_ref().to_string(),
+        };
+        Ok(symbol.into_pyobject(py)?)
     }
 }
 
