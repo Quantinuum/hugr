@@ -125,13 +125,7 @@ fn print_term<'a>(printer: &mut Printer<'a>, term: &'a Term) {
         Term::Var(var) => print_var_name(printer, var),
         Term::Apply(symbol, terms) => {
             if terms.is_empty() {
-                if symbol_ident_needs_parens_in_term(symbol) {
-                    printer.parens_enter();
-                    print_symbol_ident(printer, symbol);
-                    printer.parens_exit();
-                } else {
-                    print_symbol_ident(printer, symbol);
-                }
+                print_symbol_ident(printer, symbol);
             } else {
                 printer.parens_enter();
                 print_symbol_ident(printer, symbol);
@@ -494,16 +488,21 @@ impl Display for LinkName {
 ///
 /// The text syntax keeps common dotted identifiers bare for readability. Names
 /// produced by frontends may contain punctuation or whitespace, so those names
-/// use an escaped string-literal form to preserve roundtripping.
+/// use a Rust-style raw string form to preserve roundtripping.
 fn format_symbol_name(name: &str) -> Cow<'_, str> {
     if is_bare_symbol_name(name) {
         Cow::Borrowed(name)
     } else {
-        Cow::Owned(quote_string(name))
+        Cow::Owned(quote_raw_symbol_name(name))
     }
 }
 
-/// Return whether a symbol term must be parenthesized to avoid string literals.
-fn symbol_ident_needs_parens_in_term(symbol: &SymbolIdent) -> bool {
-    !is_bare_symbol_name(symbol.name.as_ref())
+/// Return the raw string representation used for escaped symbol names.
+fn quote_raw_symbol_name(name: &str) -> String {
+    let mut hashes = "#".to_string();
+    while name.contains(&format!("\"{hashes}")) {
+        hashes.push('#');
+    }
+
+    format!("r{hashes}\"{name}\"{hashes}")
 }

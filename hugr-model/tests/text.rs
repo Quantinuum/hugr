@@ -36,6 +36,7 @@ pub fn test_roundtrip(
 #[case::brackets("example.foo[T]")]
 #[case::comma_space("example.foo, bar")]
 #[case::reserved("mod")]
+#[case::raw_delimiter("example.foo\"#bar")]
 pub fn test_symbol_name_roundtrip(#[case] name: &str) {
     let symbol = ast::Symbol {
         visibility: Some(Visibility::Public),
@@ -57,17 +58,17 @@ pub fn test_symbol_name_roundtrip(#[case] name: &str) {
 #[case::comma_space("example.foo, bar")]
 pub fn test_package_symbol_name_roundtrip(#[case] name: &str) {
     let source = format!(
-        r#"(hugr 0)
+        r##"(hugr 0)
 
 (mod)
 
 (import core.fn)
 
-(declare-func public "{name}" (core.fn [] []))
+(declare-func public r#"{name}"# (core.fn [] []))
 
-(("{name}") [] []
+(r#"{name}"# [] []
   (signature (core.fn [] [])))
-"#
+"##
     );
 
     let roundtripped = roundtrip(&source);

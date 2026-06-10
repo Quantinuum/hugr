@@ -59,7 +59,7 @@ fn parse_symbol_name(pair: Pair<Rule>) -> ParseResult<SymbolName> {
 
     Ok(match pair.as_rule() {
         Rule::bare_symbol_name => SymbolName(pair.as_str().into()),
-        Rule::literal_string => SymbolName(parse_string(pair)?),
+        Rule::raw_symbol_name => SymbolName(parse_raw_symbol_name(pair)),
         _ => unreachable!("expected symbol name"),
     })
 }
@@ -409,6 +409,18 @@ fn parse_string(pair: Pair<Rule>) -> ParseResult<SmolStr> {
     }
 
     Ok(string.into())
+}
+
+fn parse_raw_symbol_name(pair: Pair<Rule>) -> SmolStr {
+    debug_assert_eq!(pair.as_rule(), Rule::raw_symbol_name);
+    let raw = pair.as_str();
+    let Some(quote_index) = raw.find('"') else {
+        unreachable!("raw symbol names always contain an opening quote")
+    };
+    let hashes = &raw[1..quote_index];
+    let content_start = quote_index + 1;
+    let content_end = raw.len() - hashes.len() - 1;
+    raw[content_start..content_end].into()
 }
 
 fn parse_bytes(pair: Pair<Rule>) -> ParseResult<Arc<[u8]>> {

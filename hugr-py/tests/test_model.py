@@ -27,7 +27,7 @@ def test_symbol_escaped_name_text_roundtrip():
     text = str(symbol)
     parsed = model.Symbol.from_str(text)
 
-    assert f'"{name}"' in text
+    assert f'r#"{name}"#' in text
     assert parsed == symbol
 
 
@@ -39,11 +39,11 @@ def test_package_escaped_name_text_roundtrip():
 
 (import core.fn)
 
-(declare-func public "{name}" (core.fn [] []))
+(declare-func public r#"{name}"# (core.fn [] []))
 """
 
     text = str(model.Package.from_str(source))
     parsed = model.Package.from_str(text)
 
-    assert f'"{name}"' in text
+    assert f'r#"{name}"#' in text
     assert str(parsed) == text
