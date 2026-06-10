@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.28.1](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.28.0...hugr-model-v0.28.1) - 2026-06-10
+
+### Bug Fixes
+
+- Quote non-parsable Symbol names in S-expressions ([#3101](https://github.com/Quantinuum/hugr/pull/3101))
+- Don't read partial symbol definitions ([#3104](https://github.com/Quantinuum/hugr/pull/3104))
+
 ## [0.28.0](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.27.1...hugr-model-v0.28.0) - 2026-06-05
 
 ### New Features
