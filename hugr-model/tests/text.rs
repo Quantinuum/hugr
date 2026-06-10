@@ -76,3 +76,31 @@ pub fn test_package_symbol_name_roundtrip(#[case] name: &str) {
 
     assert_eq!(parsed.to_string(), roundtripped);
 }
+
+#[rstest]
+fn test_raw_symbol_name_in_term() {
+    let term = ast::Term::from_str(r##"r#"example.foo<bar>"#"##).unwrap();
+
+    assert_eq!(
+        term,
+        ast::Term::Apply(
+            ast::SymbolIdent {
+                name: SymbolName::new("example.foo<bar>"),
+                version: None,
+            },
+            [].into(),
+        )
+    );
+}
+
+/// Parsing an invalid s-expression symbol definition should fail.
+///
+/// Non-supported characters like `<` and `>` are not allowed in bare symbol names,
+/// they require escaping with the raw symbol syntax.
+#[rstest]
+fn test_symbol_name_rejects_partial_parse() {
+    let name = "tests.integration.test_linear.test_return_call.<locals>.op";
+
+    assert!(ast::SymbolIdent::from_str(name).is_err());
+    assert!(ast::Term::from_str(name).is_err());
+}
