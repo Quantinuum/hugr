@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 import copy
-import json
 from collections.abc import Iterable, Iterator, Mapping
 from dataclasses import dataclass, field
 from queue import Queue
@@ -15,8 +14,6 @@ from typing import (
     cast,
     overload,
 )
-
-from typing_extensions import deprecated
 
 import hugr.model as model
 import hugr.ops as ops
@@ -1172,15 +1169,6 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         config = config or EnvelopeConfig.TEXT
         return _make_envelope_str(self.to_package(include_extensions), config)
 
-    @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
-    def to_json(self) -> str:
-        """Serialize the HUGR to a JSON string.
-
-        For most use cases, it is recommended to store a HUGR package instead.
-        See :meth:`hugr.package.Package.to_bytes`.
-        """
-        return self._to_serial().to_json()
-
     def to_model(self) -> model.Module:
         """Export this module into the hugr model format."""
         from hugr.model.export import ModelExport
@@ -1210,18 +1198,6 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             ext for ext in include_extensions.all_extensions if ext.name not in std
         ]
         return Package(modules=[self], extensions=extensions)
-
-    @classmethod
-    @deprecated("Use HUGR envelopes instead. See the `to_bytes` and `to_str` methods.")
-    def load_json(cls, json_str: str) -> Hugr:
-        """Deserialize a JSON string into a HUGR.
-
-        For most use cases, it is recommended to use package serialization instead.
-        See :meth:`hugr.package.Package.from_bytes`.
-        """
-        json_dict = json.loads(json_str)
-        serial = SerialHugr.load_json(json_dict)
-        return cls._from_serial(serial)
 
     def render_dot(
         self, config: RenderConfig | None = None, root: Node | None = None

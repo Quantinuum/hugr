@@ -1,7 +1,7 @@
 use inkwell::execution_engine::ExecutionEngine;
 use std::ffi::CStr;
 
-use crate::emit::EmitFuncContext;
+use crate::emit::{EmitDebugInfo, EmitFuncContext};
 use crate::extension::PreludeCodegen;
 use crate::types::HugrFuncType;
 use crate::utils::fat::FatNode;
@@ -22,7 +22,7 @@ mod panic_runtime;
 
 // currently all our targets have the same pointer size.
 // used for debug info.
-const TEST_PTR_SIZE: u32 = 64;
+pub const TEST_EMIT_DEBUG: EmitDebugInfo = EmitDebugInfo::Include { ptr_bits: 64 };
 
 #[allow(clippy::upper_case_acronyms)]
 pub type DFGW = DFGWrapper<Hugr, BuildHandle<FuncID<true>>>;
@@ -43,9 +43,9 @@ impl<'c> Emission<'c> {
     pub fn emit_hugr<'a: 'c, H: HugrView<Node = Node>>(
         hugr: FatNode<'c, hugr_core::ops::Module, H>,
         eh: EmitHugr<'c, 'a, H>,
-        emit_debug: bool,
+        emit_debug: EmitDebugInfo,
     ) -> Result<Self> where {
-        let (module, maybe_di_ctx) = eh.emit_module(hugr, emit_debug, TEST_PTR_SIZE)?.finish();
+        let (module, maybe_di_ctx) = eh.emit_module(hugr, emit_debug)?.finish();
         if let Some(di_ctx) = maybe_di_ctx {
             di_ctx.finish();
         }
@@ -328,8 +328,12 @@ macro_rules! check_emission {
         // We add random debug info to all test HUGRs for coverage.
         $crate::emit::debug_info::test::add_random_debug_info(&mut $hugr);
         let root = $crate::utils::fat::FatExt::fat_root(&$hugr).unwrap();
-        let emission =
-            $crate::emit::test::Emission::emit_hugr(root, $test_ctx.get_emit_hugr(), true).unwrap();
+        let emission = $crate::emit::test::Emission::emit_hugr(
+            root,
+            $test_ctx.get_emit_hugr(),
+            $crate::emit::test::TEST_EMIT_DEBUG,
+        )
+        .unwrap();
 
         let mut settings = $crate::emit::test::insta::Settings::clone_current();
         let new_suffix = settings

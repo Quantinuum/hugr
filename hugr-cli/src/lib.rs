@@ -90,11 +90,6 @@ pub enum CliError {
     #[error("Error validating HUGR.")]
     /// Errors produced by the `validate` subcommand.
     Validate(#[from] PackageValidationError),
-    /// Pretty error when the user passes a non-envelope file.
-    #[error(
-        "Input file is not a HUGR envelope. Invalid magic number.\n\nUse `--hugr-json` to read a raw HUGR JSON file instead."
-    )]
-    NotAnEnvelope,
     /// Invalid format string for conversion.
     #[error(
         "Invalid format: '{_0}'. Valid formats are: json, model, model-exts, s-expression, s-expression-exts"

@@ -635,7 +635,8 @@ pub mod test {
     mod tests {
         use super::*;
         use crate::custom::CodegenExtsBuilder;
-        use crate::emit::test::{DFGW, Emission, SimpleHugrConfig};
+        use crate::emit::EmitDebugInfo;
+        use crate::emit::test::{DFGW, Emission, SimpleHugrConfig, TEST_EMIT_DEBUG};
         use crate::test::{TestContext, llvm_ctx};
         use crate::utils::fat::FatExt;
         use hugr_core::HugrView;
@@ -718,7 +719,8 @@ pub mod test {
             llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
             let hugr = build_hugr_with_all_debug_info();
             let root = hugr.fat_root().unwrap();
-            let emission = Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).unwrap();
+            let emission =
+                Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), TEST_EMIT_DEBUG).unwrap();
             emission.verify().unwrap();
         }
 
@@ -729,7 +731,9 @@ pub mod test {
             llvm_ctx.add_extensions(CodegenExtsBuilder::add_default_int_extensions);
             let hugr = build_hugr_with_all_debug_info();
             let root = hugr.fat_root().unwrap();
-            let emission = Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), false).unwrap();
+            let emission =
+                Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), EmitDebugInfo::Exclude)
+                    .unwrap();
             emission.verify().unwrap();
         }
 
@@ -751,7 +755,7 @@ pub mod test {
                 },
             );
             let root = hugr.fat_root().unwrap();
-            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), TEST_EMIT_DEBUG).is_err());
         }
 
         /// Test that compilation fails when a wrong debug info record type is attached
@@ -775,7 +779,7 @@ pub mod test {
                 },
             );
             let root = hugr.fat_root().unwrap();
-            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), TEST_EMIT_DEBUG).is_err());
         }
 
         /// Test that compilation fails when a wrong debug info record type is attached
@@ -799,7 +803,7 @@ pub mod test {
                 },
             );
             let root = hugr.fat_root().unwrap();
-            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), TEST_EMIT_DEBUG).is_err());
         }
 
         /// Test that compilation fails when invalid JSON (not matching CompileUnitRecord's
@@ -815,7 +819,7 @@ pub mod test {
                 serde_json::json!({"not_a_valid_field": true}),
             );
             let root = hugr.fat_root().unwrap();
-            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), TEST_EMIT_DEBUG).is_err());
         }
 
         /// Test that compilation fails when a CompileUnitRecord has an out-of-range
@@ -835,7 +839,7 @@ pub mod test {
                 },
             );
             let root = hugr.fat_root().unwrap();
-            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), TEST_EMIT_DEBUG).is_err());
         }
 
         /// Test that compilation fails when invalid JSON (not matching SubprogramRecord's
@@ -855,7 +859,7 @@ pub mod test {
                 serde_json::json!({"not_a_valid_field": true}),
             );
             let root = hugr.fat_root().unwrap();
-            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), TEST_EMIT_DEBUG).is_err());
         }
 
         /// Test that compilation fails when a SubprogramRecord has an out-of-range file
@@ -879,7 +883,7 @@ pub mod test {
                 },
             );
             let root = hugr.fat_root().unwrap();
-            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), TEST_EMIT_DEBUG).is_err());
         }
 
         /// Test that `unmangle_hugr_func_name` correctly strips the prefix and suffix
@@ -933,7 +937,7 @@ pub mod test {
                 serde_json::json!({"not_a_valid_field": true}),
             );
             let root = hugr.fat_root().unwrap();
-            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), true).is_err());
+            assert!(Emission::emit_hugr(root, llvm_ctx.get_emit_hugr(), TEST_EMIT_DEBUG).is_err());
         }
     }
 }

@@ -1,14 +1,15 @@
 //! Input/output arguments for the HUGR CLI.
 
 use clio::Input;
+use hugr::Extension;
 use hugr::envelope::description::PackageDesc;
 use hugr::envelope::read_envelope;
 use hugr::extension::ExtensionRegistry;
 use hugr::extension::resolution::WeakExtensionRegistry;
 use hugr::package::Package;
-use hugr::{Extension, Hugr};
 use std::io::{BufReader, Read};
 use std::path::PathBuf;
+use walkdir::WalkDir;
 
 use crate::CliError;
 
@@ -34,6 +35,15 @@ pub struct HugrInputArgs {
         help = "Paths to additional serialised extensions needed to load the Hugr."
     )]
     pub extensions: Vec<PathBuf>,
+    /// Extension directories.
+    #[arg(
+        short = 'E',
+        long,
+        help_heading = "Input",
+        help = "Directories to recursively search for serialised extensions (*.json) needed to load the Hugr. \
+        Files not matching the extension schema are ignored."
+    )]
+    pub extension_dirs: Vec<PathBuf>,
 }
 
 impl HugrInputArgs {
@@ -71,44 +81,11 @@ impl HugrInputArgs {
         }
     }
 
-    /// Read a hugr JSON file from an optional reader.
-    ///
-    /// If `reader` is `None`, reads from the input specified in the args.
-    /// This is a legacy option for reading old HUGR JSON files.
-    #[deprecated(since = "0.27.0")]
-    pub(crate) fn get_hugr_with_reader<R: Read>(
-        &mut self,
-        reader: Option<R>,
-    ) -> Result<Hugr, CliError> {
-        let extensions = self.load_extensions()?;
-
-        /// Wraps the hugr JSON so that it defines a valid envelope.
-        const PREPEND: &str = r#"HUGRiHJv?@{"modules": ["#;
-        const APPEND: &str = r#"],"extensions": []}"#;
-
-        let mut envelope = PREPEND.to_string();
-
-        match reader {
-            Some(r) => {
-                let mut buffer = BufReader::new(r);
-                buffer.read_to_string(&mut envelope)?;
-            }
-            None => {
-                let mut buffer = BufReader::new(&mut self.input);
-                buffer.read_to_string(&mut envelope)?;
-            }
-        }
-
-        envelope.push_str(APPEND);
-
-        let hugr = Hugr::load_str(envelope, Some(&extensions))?;
-        Ok(hugr)
-    }
-
     /// Return a register with the selected extensions.
     ///
     /// This includes the standard extensions if [`HugrInputArgs::no_std`] is `false`,
-    /// and the extensions loaded from the paths in [`HugrInputArgs::extensions`].
+    /// and the extensions loaded from [`HugrInputArgs::extensions`] and
+    /// [`HugrInputArgs::extension_dirs`].
     pub fn load_extensions(&self) -> Result<ExtensionRegistry, CliError> {
         let mut reg = if self.no_std {
             hugr::extension::PRELUDE_REGISTRY.to_owned()
@@ -121,6 +98,19 @@ impl HugrInputArgs {
             let f = std::fs::File::open(ext)?;
             let ext: Extension = serde_json::from_reader(f)?;
             extensions.push(ext);
+        }
+
+        for dir in &self.extension_dirs {
+            for entry in WalkDir::new(dir)
+                .into_iter()
+                .filter_map(|e| e.ok())
+                .filter(|e| e.path().extension().is_some_and(|ext| ext == "json"))
+            {
+                let f = std::fs::File::open(entry.path())?;
+                if let Ok(ext) = serde_json::from_reader::<_, Extension>(f) {
+                    extensions.push(ext);
+                }
+            }
         }
 
         // After deserialization, we need to update all the internal

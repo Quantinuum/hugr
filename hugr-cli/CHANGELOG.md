@@ -1,6 +1,15 @@
 # Changelog
 
 
+## [0.28.0](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.27.1...hugr-cli-v0.28.0) - 2026-06-05
+
+### New Features
+
+- *(hugr-llvm)* [**breaking**] Add support for emitting debug locations ([#3026](https://github.com/Quantinuum/hugr/pull/3026))
+- [**breaking**] Keep multiple incompatible extension versions in ExtensionRegistry ([#3064](https://github.com/Quantinuum/hugr/pull/3064))
+- *(hugr-cli)* [**breaking**] add -E flag to load extensions from a directory ([#3082](https://github.com/Quantinuum/hugr/pull/3082))
+- [**breaking**] Remove deprecated pure json HUGR APIs ([#3089](https://github.com/Quantinuum/hugr/pull/3089))
+
 ## [0.27.0](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.26.1...hugr-cli-v0.27.0) - 2026-03-31
 
 ### Bug Fixes

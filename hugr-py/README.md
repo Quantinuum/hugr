@@ -26,22 +26,8 @@ The HUGR specification is [here](https://quantinuum.github.io/hugr/specification
 
 The package name is `hugr`. It can be installed from PyPI:
 ```bash
-pip install hugr
+uv pip install hugr
 ```
-
-The current releases are in alpha stage, and the API is subject to change.
-
-## Usage
-
-TODO
-
-## Recent Changes
-
-TODO
-
-## Development
-
-TODO
 
 ## License
 

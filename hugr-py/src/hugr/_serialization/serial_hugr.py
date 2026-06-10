@@ -37,18 +37,6 @@ class SerialHugr(ConfiguredBaseModel):
     )
     entrypoint: NodeIdx | None = None
 
-    def to_json(self) -> str:
-        """Return a JSON representation of the Hugr."""
-        from hugr import __version__ as hugr_version
-
-        self.encoder = f"hugr-py v{hugr_version}"
-        return self.model_dump_json()
-
-    @classmethod
-    def load_json(cls, json: dict[Any, Any]) -> "SerialHugr":
-        """Decode a JSON-encoded Hugr."""
-        return cls(**json)
-
     @classmethod
     def get_version(cls) -> str:
         """Return the version of the schema."""
