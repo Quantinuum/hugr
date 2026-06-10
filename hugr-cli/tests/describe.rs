@@ -263,6 +263,31 @@ fn test_public_symbols(package_with_exts_default_buffer: Vec<u8>, mut describe_c
 }
 
 #[rstest]
+fn test_describe_escaped_public_symbol(mut describe_cmd: Command) {
+    let package = br##"HUGRiHJv(@(hugr 0)
+
+(mod)
+
+(import core.fn)
+
+(declare-func
+  public
+  r#"tests.integration.test_basic.test_implicit_return.<locals>.ret"#
+  (core.fn [] []))
+"##;
+    describe_cmd.write_stdin(package.as_slice());
+
+    describe_cmd.arg("--public-symbols");
+    describe_cmd
+        .assert()
+        .success()
+        .stdout(contains("Public symbols:"))
+        .stdout(contains(
+            "tests.integration.test_basic.test_implicit_return.<locals>.ret",
+        ));
+}
+
+#[rstest]
 fn test_generator_claimed_extensions(
     package_with_exts_default_buffer: Vec<u8>,
     mut describe_cmd: Command,

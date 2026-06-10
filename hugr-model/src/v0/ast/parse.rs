@@ -42,9 +42,26 @@ mod pest_parser {
     pub struct HugrParser;
 }
 
+/// Return whether a symbol name matches the bare-symbol syntax.
+///
+/// The grammar rule can match a prefix of the input, so this helper checks that
+/// the parsed token consumes the full name.
+pub(super) fn is_bare_symbol_name(name: &str) -> bool {
+    HugrParser::parse(Rule::bare_symbol_name, name)
+        .ok()
+        .and_then(|mut pairs| pairs.next())
+        .is_some_and(|pair| pair.as_span().end() == name.len())
+}
+
 fn parse_symbol_name(pair: Pair<Rule>) -> ParseResult<SymbolName> {
     debug_assert_eq!(Rule::symbol_name, pair.as_rule());
-    Ok(SymbolName(pair.as_str().into()))
+    let pair = pair.into_inner().next().unwrap();
+
+    Ok(match pair.as_rule() {
+        Rule::bare_symbol_name => SymbolName(pair.as_str().into()),
+        Rule::raw_symbol_name => SymbolName(parse_raw_symbol_name(pair)),
+        _ => unreachable!("expected symbol name"),
+    })
 }
 
 fn parse_version(pair: Pair<Rule>) -> ParseResult<semver::Version> {
@@ -392,6 +409,18 @@ fn parse_string(pair: Pair<Rule>) -> ParseResult<SmolStr> {
     }
 
     Ok(string.into())
+}
+
+fn parse_raw_symbol_name(pair: Pair<Rule>) -> SmolStr {
+    debug_assert_eq!(pair.as_rule(), Rule::raw_symbol_name);
+    let raw = pair.as_str();
+    let Some(quote_index) = raw.find('"') else {
+        unreachable!("raw symbol names always contain an opening quote")
+    };
+    let hashes = &raw[1..quote_index];
+    let content_start = quote_index + 1;
+    let content_end = raw.len() - hashes.len() - 1;
+    raw[content_start..content_end].into()
 }
 
 fn parse_bytes(pair: Pair<Rule>) -> ParseResult<Arc<[u8]>> {
