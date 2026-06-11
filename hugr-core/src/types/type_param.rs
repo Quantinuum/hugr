@@ -857,7 +857,7 @@ pub enum TermKindError {
     #[error("Wrong number of terms in tuple: {0} vs expected {1} declared by parameter")]
     WrongNumberTuple(usize, usize),
     /// Invalid value
-    #[error("Invalid value of term argument")]
+    #[error("Invalid value of term argument: {0}")]
     InvalidValue(Box<TypeArg>),
 }
 
