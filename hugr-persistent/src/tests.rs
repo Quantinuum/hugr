@@ -276,6 +276,10 @@ pub(crate) fn test_state_space() -> TestStateSpace {
         // and nodes in the state space
         let inv_node_map = {
             let mut inv = BTreeMap::new();
+            #[expect(
+                clippy::iter_over_hash_type,
+                reason = "insertion order of non-colliding keys does not matter for BTreeMaps"
+            )]
             for (repl_node, hugr_node) in node_map {
                 inv.insert(hugr_node, repl_node);
             }
