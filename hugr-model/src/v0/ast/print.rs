@@ -5,6 +5,7 @@ use pretty::{Arena, DocAllocator as _, RefDoc};
 
 use crate::v0::{Literal, RegionKind};
 
+use super::parse::is_bare_symbol_name;
 use super::{
     LinkName, Module, Node, Operation, Package, Param, Region, SeqPart, Symbol, SymbolIdent,
     SymbolName, Term, VarName, Visibility,
@@ -85,22 +86,7 @@ impl<'a> Printer<'a> {
     }
 
     fn string(&mut self, string: &str) {
-        let mut output = String::with_capacity(string.len() + 2);
-        output.push('"');
-
-        for c in string.chars() {
-            match c {
-                '\\' => output.push_str("\\\\"),
-                '"' => output.push_str("\\\""),
-                '\n' => output.push_str("\\n"),
-                '\r' => output.push_str("\\r"),
-                '\t' => output.push_str("\\t"),
-                _ => output.push(c),
-            }
-        }
-
-        output.push('"');
-        self.text(output);
+        self.text(quote_string(string));
     }
 
     fn bytes(&mut self, bytes: &[u8]) {
@@ -111,6 +97,26 @@ impl<'a> Printer<'a> {
         output.push('"');
         self.text(output);
     }
+}
+
+/// Return the escaped representation used for string literals.
+fn quote_string(string: &str) -> String {
+    let mut output = String::with_capacity(string.len() + 2);
+    output.push('"');
+
+    for c in string.chars() {
+        match c {
+            '\\' => output.push_str("\\\\"),
+            '"' => output.push_str("\\\""),
+            '\n' => output.push_str("\\n"),
+            '\r' => output.push_str("\\r"),
+            '\t' => output.push_str("\\t"),
+            _ => output.push(c),
+        }
+    }
+
+    output.push('"');
+    output
 }
 
 fn print_term<'a>(printer: &mut Printer<'a>, term: &'a Term) {
@@ -213,7 +219,7 @@ fn print_tuple_parts<'a>(printer: &mut Printer<'a>, parts: &'a [SeqPart]) {
 }
 
 fn print_symbol_name<'a>(printer: &mut Printer<'a>, name: &'a SymbolName) {
-    printer.text(name.0.as_str());
+    printer.text(format_symbol_name(name.as_ref()));
 }
 
 fn print_symbol_ident<'a>(printer: &mut Printer<'a>, symbol_ident: &'a SymbolIdent) {
@@ -468,7 +474,7 @@ impl Display for VarName {
 
 impl Display for SymbolName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
+        write!(f, "{}", format_symbol_name(self.as_ref()))
     }
 }
 
@@ -476,4 +482,27 @@ impl Display for LinkName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "%{}", self.0)
     }
+}
+
+/// Format a symbol name as a parseable token.
+///
+/// The text syntax keeps common dotted identifiers bare for readability. Names
+/// produced by frontends may contain punctuation or whitespace, so those names
+/// use a Rust-style raw string form to preserve roundtripping.
+fn format_symbol_name(name: &str) -> Cow<'_, str> {
+    if is_bare_symbol_name(name) {
+        Cow::Borrowed(name)
+    } else {
+        Cow::Owned(quote_raw_symbol_name(name))
+    }
+}
+
+/// Return the raw string representation used for escaped symbol names.
+fn quote_raw_symbol_name(name: &str) -> String {
+    let mut hashes = "#".to_string();
+    while name.contains(&format!("\"{hashes}")) {
+        hashes.push('#');
+    }
+
+    format!("r{hashes}\"{name}\"{hashes}")
 }
