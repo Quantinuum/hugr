@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.28.2](https://github.com/Quantinuum/hugr/compare/hugr-v0.28.1...hugr-v0.28.2) - 2026-06-18
+
+### Bug Fixes
+
+- Allow TypeRow to be constructed from a ListConcat term ([#3110](https://github.com/Quantinuum/hugr/pull/3110))
+
 ## [0.28.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.27.1...hugr-v0.28.0) - 2026-06-05
 
 This release includes an overhaul of the `Type` definition, merging it with
