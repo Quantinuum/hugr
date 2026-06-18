@@ -1115,7 +1115,7 @@ dependencies = [
  "hugr-model",
  "indexmap 2.14.0",
  "insta",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "jsonschema",
  "ordered-float",
  "pastey",
@@ -1155,7 +1155,7 @@ dependencies = [
  "hugr-llvm",
  "inkwell",
  "insta",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "petgraph",
  "portgraph",
  "rand 0.10.1",
@@ -1174,7 +1174,7 @@ dependencies = [
  "capnp",
  "derive_more 2.1.1",
  "indexmap 2.14.0",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "ordered-float",
  "pest",
  "pest_derive",
@@ -1198,7 +1198,7 @@ dependencies = [
  "derive_more 2.1.1",
  "hugr-core",
  "insta",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "petgraph",
  "portgraph",
  "relrc",
@@ -1485,6 +1485,15 @@ name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
 dependencies = [
  "either",
 ]
