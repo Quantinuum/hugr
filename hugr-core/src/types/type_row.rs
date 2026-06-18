@@ -473,7 +473,14 @@ mod test {
     fn test_typerow_from_concatenated_type_row_rvs() {
         let tr1 = TypeRowRV::from(vec![Type::UNIT]);
         let tr2 = TypeRowRV::from(vec![bool_t()]);
-        let concatenated: TypeRow = tr1.clone().concat(tr2).try_into().unwrap();
+        let concatenated: TypeRow = tr1.concat(tr2).try_into().unwrap();
         assert_eq!(concatenated, TypeRow::from([Type::UNIT, bool_t()]));
+    }
+
+    #[test]
+    fn test_typerow_from_type_row_rvs_with_vars_fails() {
+        let tr1 = TypeRowRV::from(vec![Type::UNIT]);
+        let tr2 = TypeRowRV::new_var_use(1, TypeBound::Linear);
+        assert!(TypeRow::try_from(tr1.concat(tr2)).is_err());
     }
 }
