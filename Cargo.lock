@@ -265,9 +265,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "capnp"
-version = "0.25.5"
+version = "0.26.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "1cfd2485d4b36ac9c5aa6572d7d35daa63a5b34f517627d6c34d068e616e4a73"
+checksum = "71338171543626713e427635f7de390328d9e85828a816a0c88d959032b34a2f"
 dependencies = [
  "embedded-io",
 ]
@@ -280,9 +280,9 @@ checksum = "37b2a672a2cb129a2e41c10b1224bb368f9f37a2b16b612598138befd7b37eb5"
 
 [[package]]
 name = "cc"
-version = "1.2.63"
+version = "1.2.64"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "556e016178bb5662a08681bbe0f00f8e17631781a4dfc8c45e466e4b185ec27f"
+checksum = "dad887fd958be91b5098c0248def011f4523ab786cd411be668777e55063501f"
 dependencies = [
  "find-msvc-tools",
  "jobserver",
@@ -1062,7 +1062,7 @@ dependencies = [
 
 [[package]]
 name = "hugr"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "bumpalo",
  "criterion",
@@ -1075,7 +1075,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-cli"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "anyhow",
  "assert_cmd",
@@ -1100,7 +1100,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-core"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "anyhow",
  "base64",
@@ -1115,7 +1115,7 @@ dependencies = [
  "hugr-model",
  "indexmap 2.14.0",
  "insta",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "jsonschema",
  "ordered-float",
  "pastey",
@@ -1145,7 +1145,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-llvm"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "anyhow",
  "cc",
@@ -1155,7 +1155,7 @@ dependencies = [
  "hugr-llvm",
  "inkwell",
  "insta",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "petgraph",
  "portgraph",
  "rand 0.10.1",
@@ -1166,7 +1166,7 @@ dependencies = [
 
 [[package]]
 name = "hugr-model"
-version = "0.28.1"
+version = "0.28.2"
 dependencies = [
  "anyhow",
  "base64",
@@ -1174,7 +1174,7 @@ dependencies = [
  "capnp",
  "derive_more 2.1.1",
  "indexmap 2.14.0",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "ordered-float",
  "pest",
  "pest_derive",
@@ -1192,13 +1192,13 @@ dependencies = [
 
 [[package]]
 name = "hugr-persistent"
-version = "0.7.1"
+version = "0.7.2"
 dependencies = [
  "delegate",
  "derive_more 2.1.1",
  "hugr-core",
  "insta",
- "itertools 0.14.0",
+ "itertools 0.15.0",
  "petgraph",
  "portgraph",
  "relrc",
@@ -1434,9 +1434,9 @@ dependencies = [
 
 [[package]]
 name = "insta"
-version = "1.47.2"
+version = "1.48.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7b4a6248eb93a4401ed2f37dfe8ea592d3cf05b7cf4f8efa867b6895af7e094e"
+checksum = "86f0f8fee8c926415c58d6ae43a08523a26faccb2323f5e6b644fe7dd4ef6b82"
 dependencies = [
  "console",
  "once_cell",
@@ -1485,6 +1485,15 @@ name = "itertools"
 version = "0.14.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2b192c782037fadd9cfa75548310488aabdbf3d2da73885b31bd0abd03351285"
+dependencies = [
+ "either",
+]
+
+[[package]]
+name = "itertools"
+version = "0.15.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8b4baf93f58d4425749ca49a51c50ebab072c5df6994d08fed93541c331481dc"
 dependencies = [
  "either",
 ]
@@ -2078,9 +2087,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3"
-version = "0.28.3"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "91fd8e38a3b50ed1167fb981cd6fd60147e091784c427b8f7183a7ee32c31c12"
+checksum = "cd274650b21d4bfc26a0a47587962c1edb425f69287324355cd040c3ea66071c"
 dependencies = [
  "libc",
  "once_cell",
@@ -2092,18 +2101,18 @@ dependencies = [
 
 [[package]]
 name = "pyo3-build-config"
-version = "0.28.3"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e368e7ddfdeb98c9bca7f8383be1648fd84ab466bf2bc015e94008db6d35611e"
+checksum = "c5e2a7d2f0d013342f295c048ad19237add5154a55b1c5a254c0ec93d4109078"
 dependencies = [
  "target-lexicon",
 ]
 
 [[package]]
 name = "pyo3-ffi"
-version = "0.28.3"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7f29e10af80b1f7ccaf7f69eace800a03ecd13e883acfacc1e5d0988605f651e"
+checksum = "ca85c467da1bbc8d866eea5deff9cf29ea5f7785054a17da36e65bda9c05845b"
 dependencies = [
  "libc",
  "pyo3-build-config",
@@ -2111,9 +2120,9 @@ dependencies = [
 
 [[package]]
 name = "pyo3-macros"
-version = "0.28.3"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "df6e520eff47c45997d2fc7dd8214b25dd1310918bbb2642156ef66a67f29813"
+checksum = "9ac53762fd065daa3194dd09337a38bd793a188100fd1a9304c4ab312d901771"
 dependencies = [
  "proc-macro2",
  "pyo3-macros-backend",
@@ -2123,13 +2132,12 @@ dependencies = [
 
 [[package]]
 name = "pyo3-macros-backend"
-version = "0.28.3"
+version = "0.29.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c4cdc218d835738f81c2338f822078af45b4afdf8b2e33cbb5916f108b813acb"
+checksum = "4ca3a1557399783172dc5bf39cfca835157732532cba56b71d2292161e53b362"
 dependencies = [
  "heck",
  "proc-macro2",
- "pyo3-build-config",
  "quote",
  "syn",
 ]
@@ -2650,9 +2658,9 @@ dependencies = [
 
 [[package]]
 name = "smallvec"
-version = "1.15.1"
+version = "1.15.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "67b1b7a3b5fe4f1376887184045fcf45c69e92af734b7aaddc05fb777b6fbd03"
+checksum = "8ed6a63f02c8539c91a8685a86f4099661ba3da017932f6ebbea6de3f0fa7c90"
 
 [[package]]
 name = "smol_str"
@@ -2768,7 +2776,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "32497e9a4c7b38532efcdebeef879707aa9f794296a4f0244f6f69e9bc8574bd"
 dependencies = [
  "fastrand",
- "getrandom 0.4.1",
+ "getrandom 0.3.4",
  "once_cell",
  "rustix",
  "windows-sys 0.61.2",

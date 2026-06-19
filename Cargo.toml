@@ -42,7 +42,7 @@ too_long_first_doc_paragraph = "warn"
 anyhow = "1.0.101"
 insta = { version = "1.47.2" }
 bitvec = "1.0.1"
-capnp = "0.25.5"
+capnp = "0.26.0"
 cgmath = "0.18.0"
 cool_asserts = "2.0.4"
 delegate = "0.13.5"
@@ -50,7 +50,7 @@ derive_more = "2.1.1"
 downcast-rs = "2.0.2"
 enum_dispatch = "0.3.11"
 html-escape = "0.2.13"
-itertools = "0.14.0"
+itertools = "0.15.0"
 jsonschema = { version = "0.46.5", default-features = false }
 num-rational = "0.4.1"
 pastey = "0.2.3"
@@ -100,7 +100,7 @@ portgraph = { version = "0.16.1" }
 petgraph = { version = ">= 0.8.3, < 0.9", default-features = false }
 # There can only be one `pyo3` dependency in the whole workspace, so we use a
 # loose version constraint to prevent breaking changes in dependent crates where possible.
-pyo3 = ">= 0.27.2, < 0.29"
+pyo3 = ">= 0.27.2, < 0.30"
 strum = ">= 0.27.2, < 0.29"
 
 [profile.dev.package]

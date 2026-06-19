@@ -771,6 +771,7 @@ pub enum SignatureError {
     /// Extension declaration specifies a binary compute signature function, but none
     /// was loaded.
     #[error("Binary validate signature function not loaded.")]
+    #[deprecated(note = "Missing validation functions are ignored.", since = "0.28.2")]
     MissingValidateFunc,
 }
 

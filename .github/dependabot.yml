@@ -21,9 +21,6 @@ updates:
       minor:
         update-types: ["minor"]
       # Major updates still generate individual PRs
-    ignore:
-      - dependency-name: "smol_str:*"
-        versions: [">=0.3.4"] # Requires rustc 1.89
     labels:
       - "X-dependabot"
       - "A-rust"

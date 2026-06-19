@@ -12,7 +12,7 @@ use crate::{
     extension::SignatureError,
     types::{
         TypeBound,
-        type_param::{TermKindError, check_term_kind},
+        type_param::{SeqPart, TermKindError, check_term_kind},
     },
     utils::display_list,
 };
@@ -209,14 +209,14 @@ impl TryFrom<Term> for TypeRow {
     type Error = TermKindError;
 
     fn try_from(value: Term) -> Result<Self, Self::Error> {
-        match value {
-            Term::List(elems) => Ok(elems
-                .into_iter()
-                .map(Type::try_from)
-                .collect::<Result<Vec<_>, _>>()?
-                .into()),
-            v => Err(TermKindError::InvalidValue(Box::new(v))),
+        let mut tys = vec![];
+        for t in value.into_list_parts() {
+            match t {
+                SeqPart::Item(t) => tys.push(t.try_into()?),
+                SeqPart::Splice(t) => Err(TermKindError::InvalidValue(Box::new(t)))?,
+            }
         }
+        Ok(tys.into())
     }
 }
 
@@ -467,5 +467,20 @@ mod test {
         }
 
         assert_eq!(term.try_into(), Ok(type_row));
+    }
+
+    #[test]
+    fn test_typerow_from_concatenated_type_row_rvs() {
+        let tr1 = TypeRowRV::from(vec![Type::UNIT]);
+        let tr2 = TypeRowRV::from(vec![bool_t()]);
+        let concatenated: TypeRow = tr1.concat(tr2).try_into().unwrap();
+        assert_eq!(concatenated, TypeRow::from([Type::UNIT, bool_t()]));
+    }
+
+    #[test]
+    fn test_typerow_from_type_row_rvs_with_vars_fails() {
+        let tr1 = TypeRowRV::from(vec![Type::UNIT]);
+        let tr2 = TypeRowRV::new_var_use(1, TypeBound::Linear);
+        assert!(TypeRow::try_from(tr1.concat(tr2)).is_err());
     }
 }
