@@ -408,27 +408,31 @@ impl OpDef {
         var_decls: &[TypeParam],
     ) -> Result<(), SignatureError> {
         let temp: PolyFuncTypeRV; // to keep alive
-        let (pf, args) = match &self.signature_func {
+        let (poly_sign, args) = match &self.signature_func {
             SignatureFunc::CustomValidator(custom) => {
                 custom.validate.validate(args, self)?;
-                (&custom.poly_func, args)
+                (Some(&custom.poly_func), args)
             }
-            SignatureFunc::PolyFuncType(ts) => (ts, args),
+            SignatureFunc::PolyFuncType(ts) => (Some(ts), args),
             SignatureFunc::CustomFunc(custom) => {
                 let (static_args, other_args) =
                     args.split_at(min(custom.static_params().len(), args.len()));
                 static_args.iter().try_for_each(|ta| ta.validate(&[]))?;
                 check_term_kinds(static_args, custom.static_params())?;
                 temp = custom.compute_signature(static_args, self)?;
-                (&temp, other_args)
+                (Some(&temp), other_args)
             }
-            SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
             // Validation functions cannot cross the serialization boundary.
             // If they are missing, we ignore them and use the signature as-is.
-            SignatureFunc::MissingValidateFunc(ts) => (ts, args),
+            //
+            // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
+            SignatureFunc::MissingValidateFunc(ts) => (Some(ts), args),
+            SignatureFunc::MissingComputeFunc => (None, args),
         };
         args.iter().try_for_each(|ta| ta.validate(var_decls))?;
-        check_term_kinds(args, pf.params())?;
+        if let Some(pf) = poly_sign {
+            check_term_kinds(args, pf.params())?;
+        }
         Ok(())
     }
 
