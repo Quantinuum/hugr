@@ -422,7 +422,7 @@ impl OpDef {
                 temp = custom.compute_signature(static_args, self)?;
                 (Some(&temp), other_args)
             }
-            // Validation functions cannot cross the serialization boundary.
+            // Signature computation and validation functions cannot cross the serialization boundary.
             // If they are missing, we ignore them and use the signature as-is.
             //
             // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
