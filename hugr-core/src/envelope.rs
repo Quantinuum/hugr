@@ -101,7 +101,7 @@ pub enum ReadError {
     #[error(transparent)]
     EnvelopeHeader(#[from] Box<HeaderError>),
     /// Error reading the package payload.
-    #[error("Error reading package payload in envelope.")]
+    #[error("Error reading package payload in envelope: {source}")]
     Payload {
         /// The source error.
         source: Box<PayloadError>,
