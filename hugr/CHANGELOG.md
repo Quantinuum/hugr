@@ -1,6 +1,17 @@
 # Changelog
 
 
+## [0.28.3](https://github.com/Quantinuum/hugr/compare/hugr-v0.28.2...hugr-v0.28.3) - 2026-06-19
+
+### Bug Fixes
+
+- Display source error for errors during payload reads ([#3120](https://github.com/Quantinuum/hugr/pull/3120))
+
+### New Features
+
+- Don't error out when validating a signature with a missing validation function ([#3118](https://github.com/Quantinuum/hugr/pull/3118))
+- Allow instantiated ops with missing compute funcs when validating ([#3121](https://github.com/Quantinuum/hugr/pull/3121))
+
 ## [0.28.2](https://github.com/Quantinuum/hugr/compare/hugr-v0.28.1...hugr-v0.28.2) - 2026-06-18
 
 ### Bug Fixes
