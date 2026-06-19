@@ -423,9 +423,9 @@ impl OpDef {
                 (&temp, other_args)
             }
             SignatureFunc::MissingComputeFunc => return Err(SignatureError::MissingComputeFunc),
-            SignatureFunc::MissingValidateFunc(_) => {
-                return Err(SignatureError::MissingValidateFunc);
-            }
+            // Validation functions cannot cross the serialization boundary.
+            // If they are missing, we ignore them and use the signature as-is.
+            SignatureFunc::MissingValidateFunc(ts) => (ts, args),
         };
         args.iter().try_for_each(|ta| ta.validate(var_decls))?;
         check_term_kinds(args, pf.params())?;
