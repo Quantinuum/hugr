@@ -727,29 +727,33 @@ flowchart
 (evaluation-semantics)=
 ## Evaluation Semantics
 
-In a dataflow graph, the evaluation semantics are simple: all nodes in the
-graph are necessarily evaluated. (For hierarchical nodes, this may entail
-evaluating some children, according to the node.) For nodes that execute
-strictly (according to implementation) this will happen in an order that
-respects the Dataflow and Order edges; this will be a total order if the
-nodes execute atomically. However *in general* Hugr allows that
+Evaluating a dataflow sibling graph behaves as if all nodes in the graph are
+evaluated. (For hierarchical nodes, this may entail evaluating some children,
+according to the node.) For nodes that execute strictly[^1], this will happen in an
+order that respects the Dataflow and Order edges; said order will be a total
+order if the nodes execute atomically. Both strictness and atomicity may depend
+upon the specific toolchain or implementation; *in general* Hugr allows that
 * Nodes may execute non-atomically, perhaps in parallel/overlapping other nodes
 * Nodes may execute partially or totally before all inputs are ready (if the
   op is able to "do" anything without all its inputs). **However** note that
-  a node $n$ with an `Order` input must wait for all its `Order`-predecessors
+  a node with an `Order` input must wait for all its `Order`-predecessors
   to produce their `Order` output before:
-    * $n$ has any side-effects (e.g. panic or print)
-    * producing $n$'s `Order` output
+    * the node has any side-effects (e.g. panic or print)
+    * the node produces its own `Order` output
   this means that side-effects will occur in a partial/total order respecting
   the `Order` edges, but the `Order` edges do not restrict pure functional
-  computation (that does not depend on any global state or have any side effects).
+  computation (i.e. that does not depend on any global state or have any side
+  effects).
+
+[^1]: "strictly" as in requiring *all* of their inputs to have been finished before
+beginning evaluation of the node itself.
 
 This applies both to extension ops and core constructs such as DFG, CFG, or a
 Call to a function, but may be refined (introducing more precise guarantees
 such as atomicity or strictness) for specific ops and/or by specific
 implementations.
 
-For ops such as `Conditional`, `TailLoop` and `CFG`/`BasicBlock`, the order input to the container node, or to any `Output` node within, must be treated linearly: (only) after all Order-predecessors have (finished mutating state/produced their Order outputs), may the Order output (of exactly one `Input` node or the container itself) be ready - chosen according to the appropriate predicate. **Thus**, nodes reachable along Order edges from an `Input` may not be speculatively evaluated (perform any stateful update); but nodes which are not `Order`-reachable may be.
+For ops such as `Conditional`, `TailLoop` and `CFG`/`BasicBlock`, the order input to the container node, or to any `Output` node within, must be treated linearly: only after all Order-predecessors have finished mutating state and produced their Order outputs, may the Order output (of exactly one `Input` node or the container itself) be ready - chosen according to the appropriate predicate. Thus, nodes reachable along Order edges from an `Input` may not be speculatively evaluated (perform any stateful update); but nodes which are not `Order`-reachable may be.
 
 ## Exception Handling
 
