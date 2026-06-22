@@ -740,7 +740,8 @@ atomicity may depend upon the specific toolchain or implementation, and
 **However** an exception to the last point is that a node with an `Order` input must
 wait for all its `Order`-predecessors to produce their `Order` outputs before:
   * the node has any side-effects (e.g. panic or print)
-  * the node produces its own `Order` output
+  * the node produces its own `Order` output.
+
 This means that side-effects will occur in an order respecting the `Order`
 edges, but `Order` edges do not restrict pure functional computation (i.e. that
 does not depend on any global state or have any side effects).
