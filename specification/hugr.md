@@ -729,24 +729,23 @@ flowchart
 
 Evaluating a dataflow sibling graph behaves as if all nodes in the graph are
 evaluated. (For hierarchical nodes, this may entail evaluating some children,
-according to the node.) For nodes that execute strictly[^1], this will happen in an
-order that respects the Dataflow and Order edges; said order will be a total
-order if the nodes execute atomically. Both strictness and atomicity may depend
-upon the specific toolchain or implementation; *in general* Hugr allows that
+according to the node.) For nodes that execute strictly[^1], the order of
+execution will respect the Dataflow and Order edges. Strictness and also
+atomicity may depend upon the specific toolchain or implementation, and
+*in general* Hugr allows that
 * Nodes may execute non-atomically, perhaps in parallel/overlapping other nodes
 * Nodes may execute partially or totally before all inputs are ready (if the
-  op is able to "do" anything without all its inputs). **However** note that
-  a node with an `Order` input must wait for all its `Order`-predecessors
-  to produce their `Order` output before:
-    * the node has any side-effects (e.g. panic or print)
-    * the node produces its own `Order` output
-  this means that side-effects will occur in a partial/total order respecting
-  the `Order` edges, but the `Order` edges do not restrict pure functional
-  computation (i.e. that does not depend on any global state or have any side
-  effects).
+  op is able to "do" anything without all its inputs).
 
-[^1]: "strictly" as in requiring *all* of their inputs to have been finished before
-beginning evaluation of the node itself.
+**However** an exception to the last point is that a node with an `Order` input must
+wait for all its `Order`-predecessors to produce their `Order` outputs before:
+  * the node has any side-effects (e.g. panic or print)
+  * the node produces its own `Order` output
+This means that side-effects will occur in an order respecting the `Order`
+edges, but `Order` edges do not restrict pure functional computation (i.e. that
+does not depend on any global state or have any side effects).
+
+[^1]: "strictly" as in requiring *all* of a node's inputs to have been finished before beginning evaluation of the node itself.
 
 This applies both to extension ops and core constructs such as DFG, CFG, or a
 Call to a function, but may be refined (introducing more precise guarantees
