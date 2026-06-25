@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.29.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.28.3...hugr-v0.29.0) - 2026-06-25
+
+### New Features
+
+- [**breaking**] Insert fewer order edges when inlining and update spec for order edges ([#3058](https://github.com/Quantinuum/hugr/pull/3058))
+
 ## [0.28.3](https://github.com/Quantinuum/hugr/compare/hugr-v0.28.2...hugr-v0.28.3) - 2026-06-19
 
 ### Bug Fixes
