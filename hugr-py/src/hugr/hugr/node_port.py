@@ -2,10 +2,12 @@
 
 from __future__ import annotations
 
+import weakref
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import (
     TYPE_CHECKING,
+    Any,
     ClassVar,
     Generic,
     Protocol,
@@ -146,7 +148,7 @@ class ToNode(Wire, Protocol):
     @property
     def metadata(self) -> NodeMetadata:
         """Metadata associated with this node."""
-        return self.to_node()._metadata
+        return self.to_node().metadata
 
 
 @dataclass(eq=True, order=True)
@@ -160,6 +162,30 @@ class Node(ToNode):
         repr=False, compare=False, default_factory=NodeMetadata
     )
     _num_out_ports: int | None = field(default=None, compare=False, repr=False)
+    _hugr: weakref.ReferenceType[Any] | None = field(
+        default=None, compare=False, repr=False
+    )
+
+    def _bind_hugr(self, hugr: Any) -> None:
+        """Bind this node handle to the HUGR that owns its node data."""
+        self._hugr = weakref.ref(hugr)
+
+    @property
+    def metadata(self) -> NodeMetadata:
+        """Metadata associated with this node.
+
+        HUGR-owned node handles fetch metadata from their graph's canonical node
+        table. Standalone ``Node`` values keep using their local metadata, so
+        they remain useful as lightweight index tokens.
+        """
+        if self._hugr is not None:
+            hugr = self._hugr()
+            if hugr is not None:
+                try:
+                    return hugr[self].metadata
+                except KeyError:
+                    pass
+        return self._metadata
 
     def _index(
         self, index: PortOffset | slice | tuple[PortOffset, ...]

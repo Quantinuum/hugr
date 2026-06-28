@@ -212,7 +212,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
     def __iter__(self) -> Iterator[Node]:
         return (
-            Node(idx, data.metadata)
+            self._node_handle(idx, data.metadata)
             for idx, data in enumerate(self._nodes)
             if data is not None
         )
@@ -356,8 +356,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         if self._free_nodes:
             node = self._free_nodes.pop()
             self._nodes[node.idx] = node_data
+            node._bind_hugr(self)
         else:
-            node = Node(len(self._nodes), NodeMetadata())
+            node = self._node_handle(len(self._nodes), node_data.metadata)
             self._nodes.append(node_data)
         node._num_out_ports = num_outs
         node._metadata = node_data.metadata
@@ -365,6 +366,14 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             self[parent].children.append(node)
 
         self._update_node_outs(node, num_outs)
+        return node
+
+    def _node_handle(
+        self, idx: NodeIdx, metadata: NodeMetadata, num_outs: int | None = None
+    ) -> Node:
+        """Create a node handle bound to this HUGR's canonical node table."""
+        node = Node(idx, metadata, num_outs)
+        node._bind_hugr(self)
         return node
 
     def _update_node_outs(self, node: Node, num_outs: int | None) -> Node:
@@ -1040,7 +1049,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 continue
 
             node_meta = get_meta(idx)
-            parent: Node | None = Node(serial_node.root.parent)
+            parent: Node | None = hugr._node_handle(
+                serial_node.root.parent, get_meta(serial_node.root.parent)
+            )
 
             serial_node.root.parent = -1
             op = serial_node.root.deserialize()
@@ -1053,8 +1064,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 hugr.entrypoint = n
 
         for (src_node, src_offset), (dst_node, dst_offset) in serial.edges:
-            src = Node(src_node, _metadata=get_meta(src_node))
-            dst = Node(dst_node, _metadata=get_meta(dst_node))
+            src = hugr._node_handle(src_node, get_meta(src_node))
+            dst = hugr._node_handle(dst_node, get_meta(dst_node))
             if src_offset is None or dst_offset is None:
                 src_op = hugr[src].op
                 if isinstance(src_op, DataflowBlock | ExitBlock):
