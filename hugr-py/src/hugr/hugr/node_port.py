@@ -157,11 +157,17 @@ class Node(ToNode):
     with globally unique index.
     """
 
+    # The ID of the node.
     idx: NodeIdx
+    # If the node is not linked to a Hugr, the metadata information.
+    #
+    # This gets overriden by the Hugr's node info if `self._hugr` is alive.
     _metadata: NodeMetadata = field(
         repr=False, compare=False, default_factory=NodeMetadata
     )
+    # Number of output ports for this node, or None if the number is not fixed.
     _num_out_ports: int | None = field(default=None, compare=False, repr=False)
+    # The Hugr that owns this node, if any.
     _hugr: weakref.ReferenceType[Any] | None = field(
         default=None, compare=False, repr=False
     )
