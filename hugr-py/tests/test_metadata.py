@@ -78,16 +78,10 @@ def test_metadata_roundtrip() -> None:
     loaded = Hugr.from_bytes(data)
     node = loaded[loaded.module_root]
 
-    # The module root handle should expose the same metadata as the node table.
-    assert loaded.module_root.metadata is node.metadata
-    assert loaded.module_root.metadata.as_dict() == node.metadata.as_dict()
-
     # Typed readback
     assert node.metadata[HugrGenerator] == gen
-    assert loaded.module_root.metadata[HugrGenerator] == gen
     assert node.metadata.get(HugrGenerator) == gen
     assert node.metadata[HugrUsedExtensions] == exts
-    assert loaded.module_root.metadata[HugrUsedExtensions] == exts
     assert node.metadata.get(HugrUsedExtensions) == exts
     assert node.metadata[CustomMetadata] == custom_payload
     assert node.metadata[CustomMetadata.KEY] == custom_payload

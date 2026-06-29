@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from typing import (
+    TYPE_CHECKING,
     Protocol,
     cast,
 )
@@ -12,6 +13,9 @@ from hugr.hugr.node_port import (
     Node,
     ToNode,
 )
+
+if TYPE_CHECKING:
+    from hugr.metadata import NodeMetadata
 
 
 class ParentBuilder(ToNode, Protocol[OpVar]):
@@ -24,6 +28,11 @@ class ParentBuilder(ToNode, Protocol[OpVar]):
 
     def to_node(self) -> Node:
         return self.parent_node
+
+    @property
+    def metadata(self) -> NodeMetadata:
+        """Metadata associated with this builder's parent node."""
+        return self.hugr[self.parent_node].metadata
 
     @property
     def parent_op(self) -> OpVar:

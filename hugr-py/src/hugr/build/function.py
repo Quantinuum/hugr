@@ -11,7 +11,6 @@ from hugr.hugr import Hugr
 
 if TYPE_CHECKING:
     from hugr.hugr.node_port import Node
-    from hugr.metadata import NodeMetadata
     from hugr.tys import PolyFuncType, Type, TypeBound, TypeParam, TypeRow, Visibility
 
 __all__ = ["Function", "Module"]
@@ -98,8 +97,3 @@ class Module(DefinitionBuilder[ops.Module]):
     def add_alias_decl(self, name: str, bound: TypeBound) -> Node:
         """Add a type alias declaration."""
         return self.hugr.add_node(ops.AliasDecl(name, bound), self.hugr.module_root)
-
-    @property
-    def metadata(self) -> NodeMetadata:
-        """Metadata associated with this module."""
-        return self.hugr.entrypoint.metadata

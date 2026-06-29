@@ -211,11 +211,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return n
 
     def __iter__(self) -> Iterator[Node]:
-        return (
-            self._node_handle(idx, data.metadata)
-            for idx, data in enumerate(self._nodes)
-            if data is not None
-        )
+        return (Node(idx) for idx, data in enumerate(self._nodes) if data is not None)
 
     def __len__(self) -> int:
         return self.num_nodes()
@@ -356,24 +352,14 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         if self._free_nodes:
             node = self._free_nodes.pop()
             self._nodes[node.idx] = node_data
-            node._bind_hugr(self)
         else:
-            node = self._node_handle(len(self._nodes), node_data.metadata)
+            node = Node(len(self._nodes))
             self._nodes.append(node_data)
         node._num_out_ports = num_outs
-        node._metadata = node_data.metadata
         if parent:
             self[parent].children.append(node)
 
         self._update_node_outs(node, num_outs)
-        return node
-
-    def _node_handle(
-        self, idx: NodeIdx, metadata: NodeMetadata, num_outs: int | None = None
-    ) -> Node:
-        """Create a node handle bound to this HUGR's canonical node table."""
-        node = Node(idx, metadata, num_outs)
-        node._bind_hugr(self)
         return node
 
     def _update_node_outs(self, node: Node, num_outs: int | None) -> Node:
@@ -485,9 +471,6 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             self._links.delete_left(_SubPort(out))
 
         weight, self._nodes[node.idx] = self._nodes[node.idx], None
-
-        # Free up the metadata dictionary
-        node._metadata = NodeMetadata()
 
         self._free_nodes.append(node)
         return weight
@@ -977,7 +960,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             serial_idx = len(nodes)
 
             # non contiguous indices will be erased
-            nodes.append(data._to_serial(Node(serial_idx, NodeMetadata())))
+            nodes.append(data._to_serial(Node(serial_idx)))
             metadata.append(data.metadata.as_dict() if data.metadata else None)
             if self.entrypoint == node:
                 entrypoint = serial_idx
@@ -1049,9 +1032,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 continue
 
             node_meta = get_meta(idx)
-            parent: Node | None = hugr._node_handle(
-                serial_node.root.parent, get_meta(serial_node.root.parent)
-            )
+            parent: Node | None = Node(serial_node.root.parent)
 
             serial_node.root.parent = -1
             op = serial_node.root.deserialize()
@@ -1064,8 +1045,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
                 hugr.entrypoint = n
 
         for (src_node, src_offset), (dst_node, dst_offset) in serial.edges:
-            src = hugr._node_handle(src_node, get_meta(src_node))
-            dst = hugr._node_handle(dst_node, get_meta(dst_node))
+            src = Node(src_node)
+            dst = Node(dst_node)
             if src_offset is None or dst_offset is None:
                 src_op = hugr[src].op
                 if isinstance(src_op, DataflowBlock | ExitBlock):

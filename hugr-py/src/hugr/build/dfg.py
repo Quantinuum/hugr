@@ -46,6 +46,11 @@ class DefinitionBuilder(Generic[OpVar]):
 
     hugr: Hugr[OpVar]
 
+    @property
+    def metadata(self) -> NodeMetadata:
+        """Metadata associated with this builder's root node."""
+        return self.hugr[self.hugr.entrypoint].metadata
+
     def module_root_builder(self) -> Module:
         """Allows access to the `Module` at the root of the Hugr
         (outside the scope of this builder, perhaps outside the entrypoint).
