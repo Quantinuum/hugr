@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.18.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.17.1...hugr-py-v0.18.0) (2026-06-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* Removed `ToNode.metadata` method. Use `Hugr[node].metadata` instead.
+
+### Features
+
+* Remove metadata object from python Nodes ([#3128](https://github.com/Quantinuum/hugr/issues/3128)) ([e274098](https://github.com/Quantinuum/hugr/commit/e27409887716dc7c8d07e41c499af91c43175057))
+
 ## [0.17.1](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.17.0...hugr-py-v0.17.1) (2026-06-10)
 
 
