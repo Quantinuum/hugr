@@ -15,8 +15,6 @@ from typing import (
 
 from typing_extensions import Self
 
-from hugr.metadata import NodeMetadata
-
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -143,11 +141,6 @@ class ToNode(Wire, Protocol):
         else:
             return self.out(offset)
 
-    @property
-    def metadata(self) -> NodeMetadata:
-        """Metadata associated with this node."""
-        return self.to_node()._metadata
-
 
 @dataclass(eq=True, order=True)
 class Node(ToNode):
@@ -155,11 +148,12 @@ class Node(ToNode):
     with globally unique index.
     """
 
+    # The ID of the node.
     idx: NodeIdx
-    _metadata: NodeMetadata = field(
-        repr=False, compare=False, default_factory=NodeMetadata
+    # Number of output ports for this node, or None if the number is not fixed.
+    _num_out_ports: int | None = field(
+        default=None, compare=False, repr=False, kw_only=True
     )
-    _num_out_ports: int | None = field(default=None, compare=False, repr=False)
 
     def _index(
         self, index: PortOffset | slice | tuple[PortOffset, ...]
