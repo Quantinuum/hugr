@@ -1,6 +1,6 @@
 //! Rewrite for inserting a CFG-node into the hierarchy containing a subsection
 //! of an existing CFG
-use std::collections::HashSet;
+use std::collections::BTreeSet;
 
 use itertools::Itertools;
 use thiserror::Error;
@@ -19,14 +19,14 @@ use super::{PatchHugrMut, PatchVerification};
 /// Moves some of the blocks in a Control-flow region into a new CFG-node that
 /// is the only child of a new Basic Block in the original region.
 pub struct OutlineCfg {
-    blocks: HashSet<Node>,
+    blocks: BTreeSet<Node>,
 }
 
 impl OutlineCfg {
     /// Create a new `OutlineCfg` rewrite that will move the provided blocks.
     pub fn new(blocks: impl IntoIterator<Item = Node>) -> Self {
         Self {
-            blocks: HashSet::from_iter(blocks),
+            blocks: BTreeSet::from_iter(blocks),
         }
     }
 
@@ -485,6 +485,7 @@ mod test {
         assert!(blocks.iter().all(|b| other_blocks.remove(b)));
         let [new_block, new_cfg] = h.apply_patch(OutlineCfg::new(blocks.clone())).unwrap();
 
+        #[expect(clippy::iter_over_hash_type, reason = "order does not matter")]
         for n in other_blocks {
             assert_eq!(h.get_parent(n), Some(cfg));
         }
