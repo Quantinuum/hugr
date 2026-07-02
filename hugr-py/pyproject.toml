@@ -54,7 +54,7 @@ homepage = "https://github.com/quantinuum/hugr/tree/main/hugr-py"
 repository = "https://github.com/quantinuum/hugr/tree/main/hugr-py"
 
 [build-system]
-requires = ["maturin>=1.4,<2.0"]
+requires = ["maturin>=1.14.1,<2.0"]
 build-backend = "maturin"
 
 [tool.maturin]
