@@ -278,8 +278,8 @@ jobs:
         run: |
           git clone --depth 1 https://github.com/emscripten-core/emsdk.git
           cd emsdk
-          ./emsdk install 4.0.9
-          ./emsdk activate 4.0.9
+          ./emsdk install 5.0.3
+          ./emsdk activate 5.0.3
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
