@@ -130,8 +130,8 @@ mod test {
     use rstest::rstest;
 
     use crate::builder::{
-        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
-        SubContainer, endo_sig, inout_sig,
+        BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        FunctionBuilder, SubContainer, endo_sig, handle::Outputs, inout_sig,
     };
     use crate::extension::prelude::{Noop, qb_t};
     use crate::hugr::HugrMut;
@@ -140,7 +140,7 @@ mod test {
     use crate::std_extensions::arithmetic::float_types::{self, float64_type};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
-    use crate::types::Signature;
+    use crate::types::{Signature, TypeRow};
     use crate::utils::test_quantum_extension;
     use crate::{Direction, Hugr, HugrView, Port, Wire, type_row};
 
@@ -466,32 +466,41 @@ mod test {
         check_order_reachable(&h, qfree.node(), qalloc.node());
     }
 
-    #[rstest]
-    fn linear_chain_growth(#[values(0, 1, 2, 3, 4, 5, 6)] num_dfgs: usize) {
-        let mut fb = FunctionBuilder::new("main", endo_sig([qb_t()])).unwrap();
+    fn build_chain(
+        tys: impl Into<TypeRow>,
+        num_dfgs: usize,
+        dfg_fn: impl Fn(&mut FunctionBuilder<Hugr>, Outputs) -> BuildHandle<DfgID>,
+    ) -> (Hugr, Vec<DfgID>) {
+        let mut fb = FunctionBuilder::new("main", endo_sig(tys)).unwrap();
         let mut dfgs = Vec::new();
-        let [mut q] = fb.input_wires_arr();
+        let mut last_outputs = fb.input_wires();
         let mut ord = fb.input().node();
         for _ in 0..num_dfgs {
-            let mut inner = fb.dfg_builder(endo_sig([qb_t()]), [q]).unwrap();
-            let dfg = {
-                let [q] = inner.input_wires_arr();
-                let op = inner.add_dataflow_op(Noop::new(qb_t()), [q]).unwrap();
-                inner.add_other_wire(inner.input().node(), op.node());
-                inner.add_other_wire(op.node(), inner.output().node());
-                inner.finish_with_outputs(op.outputs()).unwrap()
-            };
-            dfgs.push(dfg);
-            [q] = dfg.outputs_arr();
-            fb.add_other_wire(ord, dfg.node());
+            let dfg = dfg_fn(&mut fb, last_outputs);
+            last_outputs = dfg.outputs();
+            dfgs.push(*dfg.handle());
+            fb.add_other_wire(ord.node(), dfg.node());
             ord = dfg.node();
         }
-        fb.add_other_wire(ord, fb.output().node());
-        let mut h = fb.finish_hugr_with_outputs([q]).unwrap();
+        fb.add_other_wire(ord.node(), fb.output().node());
+        (fb.finish_hugr_with_outputs(last_outputs).unwrap(), dfgs)
+    }
+
+    #[rstest]
+    fn linear_chain_growth(#[values(0, 1, 2, 3, 4, 5, 6)] num_dfgs: usize) {
+        fn noop_dfg(h: &mut FunctionBuilder<Hugr>, inputs: Outputs) -> BuildHandle<DfgID> {
+            let mut inner = h.dfg_builder(endo_sig([qb_t()]), inputs).unwrap();
+            let [q] = inner.input_wires_arr();
+            let op = inner.add_dataflow_op(Noop::new(qb_t()), [q]).unwrap();
+            inner.add_other_wire(inner.input().node(), op.node());
+            inner.add_other_wire(op.node(), inner.output().node());
+            inner.finish_with_outputs(op.outputs()).unwrap()
+        }
+        let (mut h, dfgs) = build_chain([qb_t()], num_dfgs, noop_dfg);
         assert_eq!(count_order_edges(&h), 1 + 3 * num_dfgs);
 
         for dfg in dfgs {
-            h.apply_patch(InlineDFG(*dfg.handle())).unwrap();
+            h.apply_patch(InlineDFG(dfg)).unwrap();
         }
         h.validate().unwrap();
         assert_eq!(count_order_edges(&h), (num_dfgs + 1) * (num_dfgs + 2) / 2);
