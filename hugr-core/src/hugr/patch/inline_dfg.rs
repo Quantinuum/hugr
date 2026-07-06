@@ -3,12 +3,14 @@
 //! and deleting the DFG along with its Input + Output
 
 use itertools::Itertools;
+use std::collections::HashSet;
 
-use super::{PatchHugrMut, PatchVerification};
 use crate::core::HugrNode;
 use crate::hugr::HugrMut;
 use crate::ops::handle::{DfgID, NodeHandle};
 use crate::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
+
+use super::{PatchHugrMut, PatchVerification};
 
 /// Structure identifying an `InlineDFG` rewrite from the spec
 pub struct InlineDFG<N = Node>(pub DfgID<N>);
@@ -74,6 +76,7 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
 
         let parent = h.get_parent(n).unwrap();
         let [input, output] = h.get_io(n).unwrap();
+        let internal_order_path = is_order_reachable(h, input, output);
         for ch in h.children(n).skip(2).collect::<Vec<_>>() {
             h.set_parent(ch, parent);
         }
@@ -86,12 +89,10 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
             let outp = OutgoingPort::from(inp.index());
             let mut targets = h.linked_inputs(input, outp).collect::<Vec<_>>();
             h.disconnect(input, outp);
-            if inp == oth_in {
+            if inp == oth_in && !internal_order_path {
                 // In order to ensure that any nodes A, B with Order edges A->DFG->B are still ordered
-                // after inlining, connect all such pairs A and B directly. This is not strictly necessary
-                // in all cases (specifically if there are Order paths from the DFG's Input to Output),
-                // but the redundant edges shouldn't cause any issues and can potentially be removed by
-                // a later pass, if we care.
+                // after inlining, if there is no order path "through" the DFG contents, then instead
+                // connect pairs A and B directly.
                 targets.extend(h.linked_inputs(n, oth_out));
             }
 
@@ -120,6 +121,24 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
         h.remove_node(n);
         Ok([n, input, output])
     }
+}
+
+/// Determines whether there is a path along [Order] edges only from `src` to `tgt`.
+///
+/// [Order]: crate::types::EdgeKind::StateOrder
+fn is_order_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) -> bool {
+    let mut visited = HashSet::new();
+    let mut to_visit = vec![src];
+    while let Some(n) = to_visit.pop() {
+        if visited.insert(n) {
+            if n == tgt {
+                return true;
+            }
+            let order_outport = h.get_optype(n).other_output_port().unwrap();
+            to_visit.extend(h.linked_inputs(n, order_outport).map(|(n, _)| n));
+        }
+    }
+    false
 }
 
 #[cfg(test)]
@@ -503,7 +522,7 @@ mod test {
             h.apply_patch(InlineDFG(dfg)).unwrap();
         }
         h.validate().unwrap();
-        assert_eq!(count_order_edges(&h), (num_dfgs + 1) * (num_dfgs + 2) / 2);
+        assert_eq!(count_order_edges(&h), num_dfgs + 1); // Was (num_dfgs + 1) * (num_dfgs + 2) / 2 i.e. triangular/quadratic
     }
 
     fn count_order_edges<H: HugrView>(h: &H) -> usize {
@@ -540,6 +559,6 @@ mod test {
             h.apply_patch(InlineDFG(dfg)).unwrap();
         }
         h.validate().unwrap();
-        assert_eq!(count_order_edges(&h), 2 * num_dfgs * (num_dfgs + 1) + 1);
+        assert_eq!(count_order_edges(&h), 1.max(4 * num_dfgs)); // was 2 * num_dfgs * (num_dfgs + 1) + 1);
     }
 }
