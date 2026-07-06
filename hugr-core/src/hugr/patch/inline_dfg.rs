@@ -3,12 +3,14 @@
 //! and deleting the DFG along with its Input + Output
 
 use itertools::Itertools;
+use std::collections::HashSet;
 
-use super::{PatchHugrMut, PatchVerification};
 use crate::core::HugrNode;
 use crate::hugr::HugrMut;
 use crate::ops::handle::{DfgID, NodeHandle};
 use crate::{HugrView, IncomingPort, Node, OutgoingPort, PortIndex};
+
+use super::{PatchHugrMut, PatchVerification};
 
 /// Structure identifying an `InlineDFG` rewrite from the spec
 pub struct InlineDFG<N = Node>(pub DfgID<N>);
@@ -74,6 +76,7 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
 
         let parent = h.get_parent(n).unwrap();
         let [input, output] = h.get_io(n).unwrap();
+        let internal_order_path = is_order_reachable(h, input, output);
         for ch in h.children(n).skip(2).collect::<Vec<_>>() {
             h.set_parent(ch, parent);
         }
@@ -86,12 +89,10 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
             let outp = OutgoingPort::from(inp.index());
             let mut targets = h.linked_inputs(input, outp).collect::<Vec<_>>();
             h.disconnect(input, outp);
-            if inp == oth_in {
+            if inp == oth_in && !internal_order_path {
                 // In order to ensure that any nodes A, B with Order edges A->DFG->B are still ordered
-                // after inlining, connect all such pairs A and B directly. This is not strictly necessary
-                // in all cases (specifically if there are Order paths from the DFG's Input to Output),
-                // but the redundant edges shouldn't cause any issues and can potentially be removed by
-                // a later pass, if we care.
+                // after inlining, if there is no order path "through" the DFG contents, then instead
+                // connect pairs A and B directly.
                 targets.extend(h.linked_inputs(n, oth_out));
             }
 
@@ -122,6 +123,24 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
     }
 }
 
+/// Determines whether there is a path along [Order] edges only from `src` to `tgt`.
+///
+/// [Order]: crate::types::EdgeKind::StateOrder
+fn is_order_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) -> bool {
+    let mut visited = HashSet::new();
+    let mut to_visit = vec![src];
+    while let Some(n) = to_visit.pop() {
+        if visited.insert(n) {
+            if n == tgt {
+                return true;
+            }
+            let order_outport = h.get_optype(n).other_output_port().unwrap();
+            to_visit.extend(h.linked_inputs(n, order_outport).map(|(n, _)| n));
+        }
+    }
+    false
+}
+
 #[cfg(test)]
 mod test {
     use std::collections::HashSet;
@@ -130,17 +149,17 @@ mod test {
     use rstest::rstest;
 
     use crate::builder::{
-        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer,
-        endo_sig, inout_sig,
+        BuildHandle, Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer,
+        FunctionBuilder, SubContainer, endo_sig, handle::Outputs, inout_sig,
     };
-    use crate::extension::prelude::qb_t;
+    use crate::extension::prelude::{Noop, qb_t};
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
     use crate::ops::{OpType, Value};
     use crate::std_extensions::arithmetic::float_types::{self, float64_type};
     use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::std_extensions::arithmetic::int_types::{self, ConstInt};
-    use crate::types::Signature;
+    use crate::types::{Signature, TypeRow};
     use crate::utils::test_quantum_extension;
     use crate::{Direction, Hugr, HugrView, Port, Wire, type_row};
 
@@ -464,5 +483,86 @@ mod test {
         h.validate().unwrap();
         // This was failing prior to https://github.com/Quantinuum/hugr/pull/3072
         check_order_reachable(&h, qfree.node(), qalloc.node());
+    }
+
+    fn build_chain(
+        tys: impl Into<TypeRow>,
+        num_dfgs: usize,
+        dfg_fn: impl Fn(&mut FunctionBuilder<Hugr>, Outputs) -> BuildHandle<DfgID>,
+    ) -> (Hugr, Vec<DfgID>) {
+        let mut fb = FunctionBuilder::new("main", endo_sig(tys)).unwrap();
+        let mut dfgs = Vec::new();
+        let mut last_outputs = fb.input_wires();
+        let mut ord = fb.input().node();
+        for _ in 0..num_dfgs {
+            let dfg = dfg_fn(&mut fb, last_outputs);
+            last_outputs = dfg.outputs();
+            dfgs.push(*dfg.handle());
+            fb.add_other_wire(ord.node(), dfg.node());
+            ord = dfg.node();
+        }
+        fb.add_other_wire(ord.node(), fb.output().node());
+        (fb.finish_hugr_with_outputs(last_outputs).unwrap(), dfgs)
+    }
+
+    #[rstest]
+    fn linear_chain_growth(#[values(0, 1, 2, 3, 4, 5, 6)] num_dfgs: usize) {
+        fn noop_dfg(h: &mut FunctionBuilder<Hugr>, inputs: Outputs) -> BuildHandle<DfgID> {
+            let mut inner = h.dfg_builder(endo_sig([qb_t()]), inputs).unwrap();
+            let [q] = inner.input_wires_arr();
+            let op = inner.add_dataflow_op(Noop::new(qb_t()), [q]).unwrap();
+            inner.add_other_wire(inner.input().node(), op.node());
+            inner.add_other_wire(op.node(), inner.output().node());
+            inner.finish_with_outputs(op.outputs()).unwrap()
+        }
+        let (mut h, dfgs) = build_chain([qb_t()], num_dfgs, noop_dfg);
+        assert_eq!(count_order_edges(&h), 1 + 3 * num_dfgs);
+
+        for dfg in dfgs {
+            h.apply_patch(InlineDFG(dfg)).unwrap();
+        }
+        h.validate().unwrap();
+        // Prior to https://github.com/Quantinuum/hugr/pull/3136,
+        // this produced (num_dfgs + 1) * (num_dfgs + 2) / 2 edges, i.e. triangular/quadratic:
+        assert_eq!(count_order_edges(&h), num_dfgs + 1);
+    }
+
+    fn count_order_edges<H: HugrView>(h: &H) -> usize {
+        h.nodes()
+            .flat_map(|n| {
+                h.get_optype(n)
+                    .other_output_port()
+                    .into_iter()
+                    .flat_map(move |p| h.linked_inputs(n, p))
+            })
+            .count()
+    }
+
+    #[rstest]
+    fn double_chain_growth(#[values(0, 1, 2, 3, 4, 5, 6)] num_dfgs: usize) {
+        fn double_noop_dfg(h: &mut FunctionBuilder<Hugr>, inputs: Outputs) -> BuildHandle<DfgID> {
+            let mut inner = h.dfg_builder(endo_sig([qb_t(), qb_t()]), inputs).unwrap();
+            let [q1, q2] = inner.input_wires_arr();
+            let op1 = inner.add_dataflow_op(Noop::new(qb_t()), [q1]).unwrap();
+            let op2 = inner.add_dataflow_op(Noop::new(qb_t()), [q2]).unwrap();
+            inner
+                .set_outputs(op1.outputs().chain(op2.outputs()))
+                .unwrap();
+            for op in [op1, op2] {
+                inner.add_other_wire(inner.input().node(), op.node());
+                inner.add_other_wire(op.node(), inner.output().node());
+            }
+            inner.finish_sub_container().unwrap()
+        }
+        let (mut h, dfgs) = build_chain([qb_t(), qb_t()], num_dfgs, double_noop_dfg);
+        assert_eq!(count_order_edges(&h), 1 + 5 * num_dfgs);
+
+        for dfg in dfgs {
+            h.apply_patch(InlineDFG(dfg)).unwrap();
+        }
+        h.validate().unwrap();
+        // Prior to https://github.com/Quantinuum/hugr/pull/3136,
+        // this produced 2 * num_dfgs * (num_dfgs + 1) + 1 edges, i.e. quadratic:
+        assert_eq!(count_order_edges(&h), 1.max(4 * num_dfgs));
     }
 }
