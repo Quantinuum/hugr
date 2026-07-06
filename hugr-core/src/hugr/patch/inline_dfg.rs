@@ -522,7 +522,9 @@ mod test {
             h.apply_patch(InlineDFG(dfg)).unwrap();
         }
         h.validate().unwrap();
-        assert_eq!(count_order_edges(&h), num_dfgs + 1); // Was (num_dfgs + 1) * (num_dfgs + 2) / 2 i.e. triangular/quadratic
+        // Prior to https://github.com/Quantinuum/hugr/pull/3136,
+        // this produced (num_dfgs + 1) * (num_dfgs + 2) / 2 edges, i.e. triangular/quadratic:
+        assert_eq!(count_order_edges(&h), num_dfgs + 1);
     }
 
     fn count_order_edges<H: HugrView>(h: &H) -> usize {
@@ -559,6 +561,8 @@ mod test {
             h.apply_patch(InlineDFG(dfg)).unwrap();
         }
         h.validate().unwrap();
-        assert_eq!(count_order_edges(&h), 1.max(4 * num_dfgs)); // was 2 * num_dfgs * (num_dfgs + 1) + 1);
+        // Prior to https://github.com/Quantinuum/hugr/pull/3136,
+        // this produced 2 * num_dfgs * (num_dfgs + 1) + 1 edges, i.e. quadratic:
+        assert_eq!(count_order_edges(&h), 1.max(4 * num_dfgs));
     }
 }
