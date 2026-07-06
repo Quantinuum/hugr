@@ -539,7 +539,7 @@ mod test {
     }
 
     #[rstest]
-    fn double_chain_growth(#[values(0,1,2,3,4,5,6)] num_dfgs: usize) {
+    fn double_chain_growth(#[values(0, 1, 2, 3, 4, 5, 6)] num_dfgs: usize) {
         fn double_noop_dfg(h: &mut FunctionBuilder<Hugr>, inputs: Outputs) -> BuildHandle<DfgID> {
             let mut inner = h.dfg_builder(endo_sig([qb_t(), qb_t()]), inputs).unwrap();
             let [q1, q2] = inner.input_wires_arr();
