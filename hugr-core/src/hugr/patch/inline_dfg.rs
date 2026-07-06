@@ -516,4 +516,30 @@ mod test {
             })
             .count()
     }
+
+    #[rstest]
+    fn double_chain_growth(#[values(0,1,2,3,4,5,6)] num_dfgs: usize) {
+        fn double_noop_dfg(h: &mut FunctionBuilder<Hugr>, inputs: Outputs) -> BuildHandle<DfgID> {
+            let mut inner = h.dfg_builder(endo_sig([qb_t(), qb_t()]), inputs).unwrap();
+            let [q1, q2] = inner.input_wires_arr();
+            let op1 = inner.add_dataflow_op(Noop::new(qb_t()), [q1]).unwrap();
+            let op2 = inner.add_dataflow_op(Noop::new(qb_t()), [q2]).unwrap();
+            inner
+                .set_outputs(op1.outputs().chain(op2.outputs()))
+                .unwrap();
+            for op in [op1, op2] {
+                inner.add_other_wire(inner.input().node(), op.node());
+                inner.add_other_wire(op.node(), inner.output().node());
+            }
+            inner.finish_sub_container().unwrap()
+        }
+        let (mut h, dfgs) = build_chain([qb_t(), qb_t()], num_dfgs, double_noop_dfg);
+        assert_eq!(count_order_edges(&h), 1 + 5 * num_dfgs);
+
+        for dfg in dfgs {
+            h.apply_patch(InlineDFG(dfg)).unwrap();
+        }
+        h.validate().unwrap();
+        assert_eq!(count_order_edges(&h), 2 * num_dfgs * (num_dfgs + 1) + 1);
+    }
 }
