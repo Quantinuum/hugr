@@ -130,10 +130,10 @@ mod test {
     use rstest::rstest;
 
     use crate::builder::{
-        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, SubContainer,
-        endo_sig, inout_sig,
+        Container, DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, FunctionBuilder,
+        SubContainer, endo_sig, inout_sig,
     };
-    use crate::extension::prelude::qb_t;
+    use crate::extension::prelude::{Noop, qb_t};
     use crate::hugr::HugrMut;
     use crate::ops::handle::{DfgID, NodeHandle};
     use crate::ops::{OpType, Value};
@@ -464,5 +464,47 @@ mod test {
         h.validate().unwrap();
         // This was failing prior to https://github.com/Quantinuum/hugr/pull/3072
         check_order_reachable(&h, qfree.node(), qalloc.node());
+    }
+
+    #[rstest]
+    fn linear_chain_growth(#[values(0, 1, 2, 3, 4, 5, 6)] num_dfgs: usize) {
+        let mut fb = FunctionBuilder::new("main", endo_sig([qb_t()])).unwrap();
+        let mut dfgs = Vec::new();
+        let [mut q] = fb.input_wires_arr();
+        let mut ord = fb.input().node();
+        for _ in 0..num_dfgs {
+            let mut inner = fb.dfg_builder(endo_sig([qb_t()]), [q]).unwrap();
+            let dfg = {
+                let [q] = inner.input_wires_arr();
+                let op = inner.add_dataflow_op(Noop::new(qb_t()), [q]).unwrap();
+                inner.add_other_wire(inner.input().node(), op.node());
+                inner.add_other_wire(op.node(), inner.output().node());
+                inner.finish_with_outputs(op.outputs()).unwrap()
+            };
+            dfgs.push(dfg);
+            [q] = dfg.outputs_arr();
+            fb.add_other_wire(ord, dfg.node());
+            ord = dfg.node();
+        }
+        fb.add_other_wire(ord, fb.output().node());
+        let mut h = fb.finish_hugr_with_outputs([q]).unwrap();
+        assert_eq!(count_order_edges(&h), 1 + 3 * num_dfgs);
+
+        for dfg in dfgs {
+            h.apply_patch(InlineDFG(*dfg.handle())).unwrap();
+        }
+        h.validate().unwrap();
+        assert_eq!(count_order_edges(&h), (num_dfgs + 1) * (num_dfgs + 2) / 2);
+    }
+
+    fn count_order_edges<H: HugrView>(h: &H) -> usize {
+        h.nodes()
+            .flat_map(|n| {
+                h.get_optype(n)
+                    .other_output_port()
+                    .into_iter()
+                    .flat_map(move |p| h.linked_inputs(n, p))
+            })
+            .count()
     }
 }
