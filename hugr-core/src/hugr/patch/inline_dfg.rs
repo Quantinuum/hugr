@@ -127,6 +127,7 @@ impl<N: HugrNode> PatchHugrMut for InlineDFG<N> {
 ///
 /// [Order]: crate::types::EdgeKind::StateOrder
 fn is_order_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) -> bool {
+    let parent = h.get_parent(src);
     let mut visited = HashSet::new();
     let mut to_visit = vec![src];
     while let Some(n) = to_visit.pop() {
@@ -135,7 +136,12 @@ fn is_order_reachable<H: HugrView>(h: &H, src: H::Node, tgt: H::Node) -> bool {
                 return true;
             }
             let order_outport = h.get_optype(n).other_output_port().unwrap();
-            to_visit.extend(h.linked_inputs(n, order_outport).map(|(n, _)| n));
+            to_visit.extend(
+                h.linked_inputs(n, order_outport)
+                    .map(|(n, _)| n)
+                    // Ignore non-local edges
+                    .filter(|n| h.get_parent(*n) == parent),
+            );
         }
     }
     false
