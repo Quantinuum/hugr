@@ -1352,13 +1352,18 @@ impl Links {
 #[inline(always)]
 fn has_order_edges(hugr: &Hugr, node: Node) -> bool {
     let optype = hugr.get_optype(node);
-    Direction::BOTH
-        .iter()
-        .filter(|dir| optype.other_port_kind(**dir) == Some(EdgeKind::StateOrder))
-        .filter_map(|dir| optype.other_port(*dir))
-        .flat_map(|port| hugr.linked_ports(node, port))
-        .next()
-        .is_some()
+    for dir in Direction::BOTH {
+        if optype.other_port_kind(dir) != Some(EdgeKind::StateOrder) {
+            continue;
+        }
+        let Some(port) = optype.other_port(dir) else {
+            continue;
+        };
+        if hugr.linked_ports(node, port).next().is_some() {
+            return true;
+        }
+    }
+    false
 }
 
 #[cfg(test)]
