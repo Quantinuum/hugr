@@ -1349,6 +1349,7 @@ impl Links {
 }
 
 /// Returns `true` if a node has any incident order edges.
+#[inline(always)]
 fn has_order_edges(hugr: &Hugr, node: Node) -> bool {
     let optype = hugr.get_optype(node);
     Direction::BOTH
