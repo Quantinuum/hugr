@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.29.1](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.0...hugr-v0.29.1) - 2026-07-07
+
+### New Features
+
+- Fewer order edges when inlining DFGs ([#3136](https://github.com/Quantinuum/hugr/pull/3136))
+
 ## [0.29.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.28.3...hugr-v0.29.0) - 2026-06-29
 
 ### New Features
