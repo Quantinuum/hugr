@@ -1146,6 +1146,7 @@ dependencies = [
  "delegate",
  "derive_more 2.1.1",
  "hugr-core",
+ "indexmap 2.14.0",
  "insta",
  "itertools 0.15.0",
  "petgraph",

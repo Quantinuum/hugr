@@ -1,6 +1,6 @@
 //! Implementation of the `Replace` operation.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, HashSet, VecDeque};
 
 use itertools::Itertools;
 use thiserror::Error;
@@ -71,12 +71,16 @@ pub struct Replacement<HostNode = Node> {
     pub replacement: Hugr,
     /// Describes how parts of the Hugr that would otherwise be removed should
     /// instead be preserved but with new parents amongst the newly-inserted
-    /// nodes.  This is a Map from container nodes in [`Self::replacement`]
+    /// nodes.
+    ///
+    /// This is a Map from container nodes in [`Self::replacement`]
     /// that have no children, to container nodes that are descended from
     /// [`Self::removal`]. The keys are the new parents for the children of
     /// the values.  Note no value may be ancestor or descendant of another.
     /// This is "B" in the spec; "R" is the set of descendants of
     /// [`Self::removal`]  that are not descendants of values here.
+    ///
+    /// The nodes in the values must be distinct descendants of the removed nodes.
     pub adoptions: HashMap<Node, HostNode>,
     /// Edges from nodes in the existing Hugr that are not removed
     /// ([`NewEdgeSpec::src`] in Gamma\R) to inserted nodes
@@ -146,7 +150,7 @@ impl<HostNode: HugrNode, N: Clone> NewEdgeSpec<N, HostNode> {
     fn check_existing_edge(
         &self,
         h: &impl HugrView<Node = HostNode>,
-        legal_src_ancestors: &HashSet<HostNode>,
+        legal_src_ancestors: &BTreeSet<HostNode>,
         err_edge: impl Fn(Self) -> WhichEdgeSpec<HostNode>,
     ) -> Result<(), ReplaceError<HostNode>> {
         if let NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } = self.kind
@@ -202,7 +206,7 @@ impl<HostNode: HugrNode> Replacement<HostNode> {
     fn get_removed_nodes(
         &self,
         h: &impl HugrView<Node = HostNode>,
-    ) -> Result<HashSet<HostNode>, ReplaceError<HostNode>> {
+    ) -> Result<BTreeSet<HostNode>, ReplaceError<HostNode>> {
         // Check the keys of the transfer map too, the values we'll use imminently
         self.adoptions.keys().try_for_each(|&n| {
             (self.replacement.contains_node(n)
@@ -222,7 +226,7 @@ impl<HostNode: HugrNode> Replacement<HostNode> {
             ));
         }
 
-        let mut removed = HashSet::new();
+        let mut removed = BTreeSet::new();
         let mut queue = VecDeque::from_iter(self.removal.iter().copied());
         while let Some(n) = queue.pop_front() {
             let new = removed.insert(n);
@@ -400,9 +404,18 @@ impl<HostNode: HugrNode> PatchHugrMut for Replacement<HostNode> {
         h.remove_node(inserted_entrypoint);
 
         // 6. Transfer to keys of `transfers` children of the corresponding values.
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "adoptions move disjoint child sets, so order cannot affect the result. Repeated values return an error."
+        )]
         for (new_parent, &old_parent) in &self.adoptions {
             let new_parent = node_map.get(new_parent).unwrap();
-            debug_assert!(h.children(old_parent).next().is_some());
+
+            if h.children(old_parent).next().is_none() {
+                // `old_parent` appeared more than once on the right-hand side of `adoptions`.
+                return Err(ReplaceError::RepeatedAdoptee { node: old_parent });
+            }
+
             while let Some(ch) = h.first_child(old_parent) {
                 h.set_parent(ch, *new_parent);
             }
@@ -422,7 +435,7 @@ fn transfer_edges<'a, SrcNode, TgtNode, HostNode>(
     trans_src: impl Fn(SrcNode) -> Option<HostNode>,
     trans_tgt: impl Fn(TgtNode) -> Option<HostNode>,
     err_spec: impl Fn(NewEdgeSpec<SrcNode, TgtNode>) -> WhichEdgeSpec<HostNode>,
-    legal_src_ancestors: Option<&HashSet<HostNode>>,
+    legal_src_ancestors: Option<&BTreeSet<HostNode>>,
 ) -> Result<(), ReplaceError<HostNode>>
 where
     SrcNode: 'a + HugrNode,
@@ -509,6 +522,12 @@ pub enum ReplaceError<HostNode = Node> {
     /// The [`NewEdgeKind`] was not applicable for the source/target node(s)
     #[error("The edge kind was not applicable to the {0:?} node: {1:?}")]
     BadEdgeKind(Direction, WhichEdgeSpec<HostNode>),
+    /// Some value in [`Replacement::adoptions`] was repeated for multiple parents. The nodes are indicated on a best-effort basis.
+    #[error("Node {node:?} adopted by multiple new parents")]
+    RepeatedAdoptee {
+        /// The node that was repeated
+        node: HostNode,
+    },
 }
 
 /// The three kinds of [`NewEdgeSpec`] that may appear in a [`ReplaceError`]
