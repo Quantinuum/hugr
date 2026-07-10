@@ -1560,84 +1560,111 @@ impl<'a> Context<'a> {
         bound: TypeBound,
     ) -> Result<Term, ImportErrorInner> {
         (|| {
-            if let Some([]) = self.match_symbol(term_id, model::CORE_STR_TYPE)? {
-                return Ok(Term::StringKind);
-            }
+            let term_data = self.get_term(term_id)?;
+            if let table::Term::Apply(symbol, args) = term_data {
+                let symbol_name = self.get_symbol_name(*symbol)?;
 
-            if let Some([]) = self.match_symbol(term_id, model::CORE_NAT_TYPE)? {
-                return Ok(Term::max_nat_kind());
-            }
+                if let Some([]) =
+                    self.match_applied_symbol(symbol_name, args, model::CORE_STR_TYPE)?
+                {
+                    return Ok(Term::StringKind);
+                }
 
-            if let Some([]) = self.match_symbol(term_id, model::CORE_BYTES_TYPE)? {
-                return Ok(Term::BytesKind);
-            }
+                if let Some([]) =
+                    self.match_applied_symbol(symbol_name, args, model::CORE_NAT_TYPE)?
+                {
+                    return Ok(Term::max_nat_kind());
+                }
 
-            if let Some([]) = self.match_symbol(term_id, model::CORE_FLOAT_TYPE)? {
-                return Ok(Term::FloatKind);
-            }
+                if let Some([]) =
+                    self.match_applied_symbol(symbol_name, args, model::CORE_BYTES_TYPE)?
+                {
+                    return Ok(Term::BytesKind);
+                }
 
-            if let Some([]) = self.match_symbol(term_id, model::CORE_TYPE)? {
-                return Ok(TypeParam::TypeKind(bound));
-            }
+                if let Some([]) =
+                    self.match_applied_symbol(symbol_name, args, model::CORE_FLOAT_TYPE)?
+                {
+                    return Ok(Term::FloatKind);
+                }
 
-            if let Some([]) = self.match_symbol(term_id, model::CORE_CONSTRAINT)? {
-                return Err(error_unsupported!("`{}`", model::CORE_CONSTRAINT));
-            }
+                if let Some([]) = self.match_applied_symbol(symbol_name, args, model::CORE_TYPE)? {
+                    return Ok(TypeParam::TypeKind(bound));
+                }
 
-            if let Some([]) = self.match_symbol(term_id, model::CORE_STATIC)? {
-                return Ok(Term::StaticKind);
-            }
+                if let Some([]) =
+                    self.match_applied_symbol(symbol_name, args, model::CORE_CONSTRAINT)?
+                {
+                    return Err(error_unsupported!("`{}`", model::CORE_CONSTRAINT));
+                }
 
-            if let Some([ty]) = self.match_symbol(term_id, model::CORE_CONST)? {
-                let ty = self
-                    .import_type(ty)
-                    .map_err(|err| error_context!(err, "type of a constant"))?;
-                return Ok(TypeParam::new_const(ty));
-            }
+                if let Some([]) =
+                    self.match_applied_symbol(symbol_name, args, model::CORE_STATIC)?
+                {
+                    return Ok(Term::StaticKind);
+                }
 
-            if let Some([item_type]) = self.match_symbol(term_id, model::CORE_LIST_TYPE)? {
-                // At present `hugr-model` has no way to express that the item
-                // type of a list must be copyable. Therefore we import it as `Any`.
-                let item_type = self
-                    .import_term(item_type)
-                    .map_err(|err| error_context!(err, "item type of list type"))?;
-                return Ok(TypeParam::new_list_kind(item_type));
-            }
+                if let Some([ty]) =
+                    self.match_applied_symbol(symbol_name, args, model::CORE_CONST)?
+                {
+                    let ty = self
+                        .import_type(ty)
+                        .map_err(|err| error_context!(err, "type of a constant"))?;
+                    return Ok(TypeParam::new_const(ty));
+                }
 
-            if let Some([item_types]) = self.match_symbol(term_id, model::CORE_TUPLE_TYPE)? {
-                // At present `hugr-model` has no way to express that the item
-                // types of a tuple must be copyable. Therefore we import it as `Any`.
-                let item_types = self
-                    .import_term(item_types)
-                    .map_err(|err| error_context!(err, "item types of tuple type"))?;
-                return Ok(TypeParam::new_tuple_kind(item_types));
-            }
+                if let Some([item_type]) =
+                    self.match_applied_symbol(symbol_name, args, model::CORE_LIST_TYPE)?
+                {
+                    // At present `hugr-model` has no way to express that the item
+                    // type of a list must be copyable. Therefore we import it as `Any`.
+                    let item_type = self
+                        .import_term(item_type)
+                        .map_err(|err| error_context!(err, "item type of list type"))?;
+                    return Ok(TypeParam::new_list_kind(item_type));
+                }
 
-            if let Some([_, _]) = self.match_symbol(term_id, model::CORE_FN)? {
-                let func_type = self.import_func_type(term_id, |this, term_id| {
-                    Ok(TypeRowRV::try_from(this.import_term(term_id)?)?)
-                })?;
-                return Ok(Type::new_function(func_type).into());
-            }
+                if let Some([item_types]) =
+                    self.match_applied_symbol(symbol_name, args, model::CORE_TUPLE_TYPE)?
+                {
+                    // At present `hugr-model` has no way to express that the item
+                    // types of a tuple must be copyable. Therefore we import it as `Any`.
+                    let item_types = self
+                        .import_term(item_types)
+                        .map_err(|err| error_context!(err, "item types of tuple type"))?;
+                    return Ok(TypeParam::new_tuple_kind(item_types));
+                }
 
-            if let Some([variants]) = self.match_symbol(term_id, model::CORE_ADT)? {
-                let variants = (|| {
-                    self.import_closed_list(variants)?
-                        .iter()
-                        .map(|variant| {
-                            self.import_term(*variant).and_then(|tm| {
-                                TypeRowRV::try_from(tm)
-                                    .map_err(|e| ImportErrorInner::Signature(e.into()))
+                if let Some([_, _]) =
+                    self.match_applied_symbol(symbol_name, args, model::CORE_FN)?
+                {
+                    let func_type = self.import_func_type(term_id, |this, term_id| {
+                        Ok(TypeRowRV::try_from(this.import_term(term_id)?)?)
+                    })?;
+                    return Ok(Type::new_function(func_type).into());
+                }
+
+                if let Some([variants]) =
+                    self.match_applied_symbol(symbol_name, args, model::CORE_ADT)?
+                {
+                    let variants = (|| {
+                        self.import_closed_list(variants)?
+                            .iter()
+                            .map(|variant| {
+                                self.import_term(*variant).and_then(|tm| {
+                                    TypeRowRV::try_from(tm)
+                                        .map_err(|e| ImportErrorInner::Signature(e.into()))
+                                })
                             })
-                        })
-                        .collect::<Result<Vec<_>, _>>()
-                })()
-                .map_err(|err| error_context!(err, "adt variants"))?;
+                            .collect::<Result<Vec<_>, _>>()
+                    })()
+                    .map_err(|err| error_context!(err, "adt variants"))?;
 
-                return Ok(Type::new_sum(variants).into());
-            }
+                    return Ok(Type::new_sum(variants).into());
+                }
+            };
 
-            match self.get_term(term_id)? {
+            match term_data {
                 table::Term::Wildcard => Err(error_uninferred!("wildcard")),
 
                 table::Term::Var(var) => {
@@ -2118,22 +2145,30 @@ impl<'a> Context<'a> {
             return Ok(None);
         };
 
-        if name != self.get_symbol_name(*symbol)? {
+        let symbol_name = self.get_symbol_name(*symbol)?;
+        self.match_applied_symbol(symbol_name, args, name)
+    }
+
+    /// Matches a `table::Term::Apply` symbol application by name and arity.
+    ///
+    /// Missing arguments are represented by wildcard term IDs at the start of the
+    /// returned array, matching the model's implicit-argument convention.
+    fn match_applied_symbol<const N: usize>(
+        &self,
+        symbol_name: &str,
+        args: &[table::TermId],
+        name: &str,
+    ) -> Result<Option<[table::TermId; N]>, ImportErrorInner> {
+        if symbol_name != name || args.len() > N {
             return Ok(None);
         }
 
-        if args.len() > N {
-            return Ok(None);
-        }
-
-        let result = std::array::from_fn(|i| {
+        Ok(Some(std::array::from_fn(|i| {
             (i + args.len())
                 .checked_sub(N)
                 .map(|i| args[i])
                 .unwrap_or_default()
-        });
-
-        Ok(Some(result))
+        })))
     }
 
     /// Expects a term to be an application of a symbol with the given name and

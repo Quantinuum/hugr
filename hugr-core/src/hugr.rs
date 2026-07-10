@@ -11,6 +11,7 @@ pub mod validate;
 pub mod views;
 
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::io;
@@ -34,7 +35,7 @@ use crate::extension::resolution::{
     ExtensionResolutionError, WeakExtensionRegistry, resolve_op_extensions,
     resolve_op_types_extensions,
 };
-use crate::extension::{EMPTY_REG, ExtensionRegistry, ExtensionSet};
+use crate::extension::{EMPTY_REG, ExtensionId, ExtensionRegistry, ExtensionSet, Version};
 use crate::metadata::RawMetadataValue;
 use crate::ops::{self, Module, NamedOp, OpName, OpTag, OpTrait};
 pub use crate::ops::{DEFAULT_OPTYPE, OpType};
@@ -291,6 +292,7 @@ impl Hugr {
         extensions: &ExtensionRegistry,
     ) -> Result<(), ExtensionResolutionError> {
         let mut used_extensions = ExtensionRegistry::default();
+        let mut seen_extensions = BTreeSet::<(ExtensionId, Version)>::new();
 
         // Here we need to iterate the optypes in the hugr mutably, to avoid
         // having to clone and accumulate all replacements before finally
@@ -313,14 +315,22 @@ impl Hugr {
             let op = &mut self.op_types[pg_node];
 
             if let Some(extension) = resolve_op_extensions(node, op, extensions)? {
-                used_extensions.register(extension.clone());
+                let extension_key = (extension.name().clone(), extension.version().clone());
+                if seen_extensions.insert(extension_key) {
+                    used_extensions.register(extension.clone());
+                }
             }
-            used_extensions.extend(
+            for extension in
                 resolve_op_types_extensions(Some(node), op, &weak_extensions)?.map(|weak| {
                     weak.upgrade()
                         .expect("Extension comes from a valid registry")
-                }),
-            );
+                })
+            {
+                let extension_key = (extension.name().clone(), extension.version().clone());
+                if seen_extensions.insert(extension_key) {
+                    used_extensions.register(extension);
+                }
+            }
         }
 
         used_extensions.extend_with_dependencies()?;
