@@ -478,30 +478,49 @@ class ExtensionVersions:
         """Get all versions of the extension."""
         return frozenset(self._exts.keys())
 
+    def _coalesce_single(self, resolve_on: Version) -> None:
+        compatible_versions = [
+            version
+            for version in self._exts
+            if _same_compatibility_group(version, resolve_on)
+        ]
+        if len(compatible_versions) > 0:
+            latest_compatible = max(compatible_versions)
+            for version in compatible_versions:
+                if version != latest_compatible:
+                    del self._exts[version]
+
+    def coalesce(self) -> None:
+        """Ensures the latest version is up to date and any semver compatible versions
+        are coalesced, with only the latest of that group retained.
+
+        This is done automatically by `add`, but not by `add_lazy`.
+        """
+        self._latest_version = max(self._exts)
+
+        for version in list(self._exts.keys()):
+            # body mutates the dictionary, so check whether the version is still present
+            if version in self._exts:
+                self._coalesce_single(version)
+
     def add(self, extension: Extension) -> None:
         """Add an extension to the set, coalescing compatible older versions."""
         if extension.name != self._id:
             msg = f"Extension {extension.name} has a different name than {self._id}"
             raise ValueError(msg)
 
-        compatible_versions = [
-            version
-            for version in self._exts
-            if _same_compatibility_group(version, extension.version)
-        ]
-        if compatible_versions:
-            latest_compatible = max(compatible_versions)
-            if latest_compatible > extension.version:
-                return
-            for version in compatible_versions:
-                del self._exts[version]
+        self.add_lazy(extension)
+        self._latest_version = max(self._exts)
+        self._coalesce_single(extension.version)
 
+    def add_lazy(self, extension: Extension) -> None:
+        """Add an extension to the set, NOT coalescing compatible older versions.
+        Use `coalesce` to subsequently coalesce all compatible versions.
+        """
+        if extension.name != self._id:
+            msg = f"Extension {extension.name} has a different name than {self._id}"
+            raise ValueError(msg)
         self._exts[extension.version] = extension
-
-        if extension.version > self._latest_version:
-            self._latest_version = extension.version
-        else:
-            self._latest_version = max(self._exts)
 
     def get_compatible(self, version: Version) -> Extension:
         """Get the highest registered extension compatible with ``version``."""
@@ -656,7 +675,7 @@ class UsedExtensionResolver:
     certain extensions are present and unresolved operations are added efficiently.
     """
 
-    _used_extensions: ExtensionRegistry = field(default_factory=ExtensionRegistry)
+    _used_extensions: dict[ExtensionId, ExtensionVersions] = field(default_factory=dict)
     _unresolved_extensions: set[ExtensionId] = field(default_factory=set)
     _unresolved_ops: dict[tuple[tys.ExtensionId, str], ops.Custom] = field(
         default_factory=dict
@@ -666,7 +685,10 @@ class UsedExtensionResolver:
     )
 
     def register(self, extension: Extension) -> None:
-        self._used_extensions.register(extension)
+        if extension.name not in self._used_extensions:
+            self._used_extensions[extension.name] = ExtensionVersions(extension)
+        else:
+            self._used_extensions[extension.name].add_lazy(extension)
 
     def ensure_unresolved(self, ext_id: ExtensionId) -> None:
         self._unresolved_extensions.add(ext_id)
@@ -689,14 +711,17 @@ class UsedExtensionResolver:
         Args:
             result: The result of resolving extensions to add.
         """
-        self._used_extensions.extend(result.used_extensions)
+        for ext in result.used_extensions.all_extensions:
+            self.register(ext)
         self._unresolved_extensions.update(result.unresolved_extensions)
         self._unresolved_ops.update(result.unresolved_ops)
         self._unresolved_types.update(result.unresolved_types)
 
     def result(self) -> ExtensionResolutionResult:
+        for versions in self._used_extensions.values():
+            versions.coalesce()
         return ExtensionResolutionResult(
-            self._used_extensions,
+            ExtensionRegistry(self._used_extensions),
             self._unresolved_extensions,
             self._unresolved_ops,
             self._unresolved_types,
