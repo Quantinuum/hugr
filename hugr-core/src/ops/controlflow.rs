@@ -2,12 +2,12 @@
 
 use std::borrow::Cow;
 
-use crate::Direction;
 use crate::types::{EdgeKind, Signature, Type, TypeRow, TypeRowLike};
+use crate::{Direction, Port, PortIndex};
 
 use super::OpTag;
 use super::dataflow::{DataflowOpTrait, DataflowParent};
-use super::{OpTrait, StaticTag, impl_op_name};
+use super::{OpTrait, StaticTag, ValuePortOp, impl_op_name};
 
 /// Tail-controlled loop.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -43,6 +43,31 @@ impl DataflowOpTrait for TailLoop {
             just_outputs: self.just_outputs.substitute(subst),
             rest: self.rest.substitute(subst),
         }
+    }
+}
+
+impl ValuePortOp for TailLoop {
+    fn value_port_kind(&self, port: Port) -> Option<EdgeKind> {
+        let (head, tail) = match port.direction() {
+            Direction::Incoming => (&self.just_inputs, &self.rest),
+            Direction::Outgoing => (&self.just_outputs, &self.rest),
+        };
+        head.get(port.index())
+            .or_else(|| {
+                port.index()
+                    .checked_sub(head.len())
+                    .and_then(|index| tail.get(index))
+            })
+            .cloned()
+            .map(EdgeKind::Value)
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        let directional = match dir {
+            Direction::Incoming => &self.just_inputs,
+            Direction::Outgoing => &self.just_outputs,
+        };
+        directional.len() + self.rest.len()
     }
 }
 
@@ -123,6 +148,24 @@ impl DataflowOpTrait for Conditional {
     }
 }
 
+impl ValuePortOp for Conditional {
+    fn value_port_kind(&self, port: Port) -> Option<EdgeKind> {
+        let ty = match port.direction() {
+            Direction::Incoming if port.index() == 0 => Type::new_sum(self.sum_rows.clone()),
+            Direction::Incoming => self.other_inputs.get(port.index() - 1)?.clone(),
+            Direction::Outgoing => self.outputs.get(port.index())?.clone(),
+        };
+        Some(EdgeKind::Value(ty))
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.other_inputs.len() + 1,
+            Direction::Outgoing => self.outputs.len(),
+        }
+    }
+}
+
 impl Conditional {
     /// Build the input `TypeRow` of the nth child graph of a Conditional node.
     pub(crate) fn case_input_row(&self, case: usize) -> Option<TypeRow> {
@@ -155,6 +198,12 @@ impl DataflowOpTrait for CFG {
         Self {
             signature: self.signature.substitute(subst),
         }
+    }
+}
+
+impl ValuePortOp for CFG {
+    fn value_port_signature(&self) -> Option<&Signature> {
+        Some(&self.signature)
     }
 }
 
