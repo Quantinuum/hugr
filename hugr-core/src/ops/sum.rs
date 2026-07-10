@@ -3,8 +3,9 @@
 use std::borrow::Cow;
 
 use super::dataflow::DataflowOpTrait;
-use super::{OpTag, impl_op_name};
+use super::{OpTag, ValuePortOp, impl_op_name};
 use crate::types::{EdgeKind, Signature, Type, TypeRow, TypeRowLike};
+use crate::{Direction, Port, PortIndex};
 
 /// An operation that creates a tagged sum value from one of its variants.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -61,6 +62,24 @@ impl DataflowOpTrait for Tag {
         Self {
             variants: self.variants.iter().map(|r| r.substitute(subst)).collect(),
             tag: self.tag,
+        }
+    }
+}
+
+impl ValuePortOp for Tag {
+    fn value_port_kind(&self, port: Port) -> Option<EdgeKind> {
+        let ty = match port.direction() {
+            Direction::Incoming => self.variants.get(self.tag)?.get(port.index())?.clone(),
+            Direction::Outgoing if port.index() == 0 => Type::new_sum(self.variants.clone()),
+            Direction::Outgoing => return None,
+        };
+        Some(EdgeKind::Value(ty))
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.variants.get(self.tag).expect("Not a valid tag").len(),
+            Direction::Outgoing => 1,
         }
     }
 }

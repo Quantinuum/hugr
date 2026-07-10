@@ -2,14 +2,14 @@
 
 use std::borrow::Cow;
 
-use super::{OpTag, OpTrait, impl_op_name};
+use super::{OpTag, OpTrait, ValuePortOp, impl_op_name};
 
 use crate::extension::SignatureError;
 use crate::ops::StaticTag;
 use crate::types::{
     EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow, TypeRowLike,
 };
-use crate::{IncomingPort, type_row};
+use crate::{Direction, IncomingPort, Port, PortIndex, type_row};
 
 #[cfg(test)]
 use {crate::types::proptest_utils::any_serde_type_arg_vec, proptest_derive::Arbitrary};
@@ -124,6 +124,23 @@ impl DataflowOpTrait for Input {
         }
     }
 }
+
+impl ValuePortOp for Input {
+    fn value_port_kind(&self, port: Port) -> Option<EdgeKind> {
+        match port.direction() {
+            Direction::Incoming => None,
+            Direction::Outgoing => self.types.get(port.index()).cloned().map(EdgeKind::Value),
+        }
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => 0,
+            Direction::Outgoing => self.types.len(),
+        }
+    }
+}
+
 impl DataflowOpTrait for Output {
     const TAG: OpTag = OpTag::Output;
 
@@ -145,6 +162,22 @@ impl DataflowOpTrait for Output {
     fn substitute(&self, subst: &Substitution) -> Self {
         Self {
             types: self.types.substitute(subst),
+        }
+    }
+}
+
+impl ValuePortOp for Output {
+    fn value_port_kind(&self, port: Port) -> Option<EdgeKind> {
+        match port.direction() {
+            Direction::Incoming => self.types.get(port.index()).cloned().map(EdgeKind::Value),
+            Direction::Outgoing => None,
+        }
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.types.len(),
+            Direction::Outgoing => 0,
         }
     }
 }
@@ -231,6 +264,12 @@ impl DataflowOpTrait for Call {
             instantiation,
             func_sig: self.func_sig.clone(),
         }
+    }
+}
+
+impl ValuePortOp for Call {
+    fn value_port_signature(&self) -> Option<&Signature> {
+        Some(&self.instantiation)
     }
 }
 impl Call {
@@ -327,6 +366,24 @@ impl DataflowOpTrait for CallIndirect {
     }
 }
 
+impl ValuePortOp for CallIndirect {
+    fn value_port_kind(&self, port: Port) -> Option<EdgeKind> {
+        let ty = match port.direction() {
+            Direction::Incoming if port.index() == 0 => Type::new_function(self.signature.clone()),
+            Direction::Incoming => self.signature.input().get(port.index() - 1)?.clone(),
+            Direction::Outgoing => self.signature.output().get(port.index())?.clone(),
+        };
+        Some(EdgeKind::Value(ty))
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.signature.input_count() + 1,
+            Direction::Outgoing => self.signature.output_count(),
+        }
+    }
+}
+
 /// Load a static constant in to the local dataflow graph.
 #[derive(Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
@@ -354,6 +411,17 @@ impl DataflowOpTrait for LoadConstant {
     fn substitute(&self, _subst: &Substitution) -> Self {
         // Constants cannot refer to TypeArgs, so neither can loading them
         self.clone()
+    }
+}
+
+impl ValuePortOp for LoadConstant {
+    fn value_port_kind(&self, port: Port) -> Option<EdgeKind> {
+        (port.direction() == Direction::Outgoing && port.index() == 0)
+            .then(|| EdgeKind::Value(self.datatype.clone()))
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        usize::from(dir == Direction::Outgoing)
     }
 }
 
@@ -436,6 +504,18 @@ impl DataflowOpTrait for LoadFunction {
         }
     }
 }
+
+impl ValuePortOp for LoadFunction {
+    fn value_port_kind(&self, port: Port) -> Option<EdgeKind> {
+        (port.direction() == Direction::Outgoing && port.index() == 0)
+            .then(|| EdgeKind::Value(Type::new_function(self.instantiation.clone())))
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        usize::from(dir == Direction::Outgoing)
+    }
+}
+
 impl LoadFunction {
     /// Try to make a new LoadFunction op. Returns an error if the `type_args`` do not fit
     /// the [TypeParam]s declared by the function.
@@ -525,5 +605,11 @@ impl DataflowOpTrait for DFG {
         Self {
             signature: self.signature.substitute(subst),
         }
+    }
+}
+
+impl ValuePortOp for DFG {
+    fn value_port_signature(&self) -> Option<&Signature> {
+        Some(&self.signature)
     }
 }

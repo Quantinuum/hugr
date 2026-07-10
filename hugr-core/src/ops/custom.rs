@@ -19,7 +19,7 @@ use crate::{IncomingPort, ops};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
-use super::{NamedOp, OpName, OpNameRef};
+use super::{NamedOp, OpName, OpNameRef, ValuePortOp};
 
 /// An operation defined by an [`OpDef`] from a loaded [Extension].
 ///
@@ -247,6 +247,12 @@ impl DataflowOpTrait for ExtensionOp {
     }
 }
 
+impl ValuePortOp for ExtensionOp {
+    fn value_port_signature(&self) -> Option<&Signature> {
+        Some(&self.signature)
+    }
+}
+
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`].
 ///
 /// [`ExtensionOp`]s are serialised as `OpaqueOp`s.
@@ -393,6 +399,12 @@ impl DataflowOpTrait for OpaqueOp {
             signature: self.signature.substitute(subst),
             ..self.clone()
         }
+    }
+}
+
+impl ValuePortOp for OpaqueOp {
+    fn value_port_signature(&self) -> Option<&Signature> {
+        Some(&self.signature)
     }
 }
 
