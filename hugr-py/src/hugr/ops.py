@@ -19,7 +19,6 @@ from typing_extensions import Self
 import hugr._serialization.ops as sops
 import hugr._serialization.tys as stys
 from hugr import tys, val
-from hugr.ext import UsedExtensionResolver
 from hugr.hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
 from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 
@@ -30,7 +29,7 @@ if TYPE_CHECKING:
 
     from hugr import ext
     from hugr._serialization.ops import BaseOp
-    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
+    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult, UsedExtensionResolver
     from hugr.tys import Visibility
 
 
@@ -119,6 +118,8 @@ class Op(Protocol):
         Returns:
             The result containing used and unresolved extensions.
         """
+        from hugr.ext import UsedExtensionResolver
+
         resolver = UsedExtensionResolver()
         _ = self._resolve_used_extensions(resolver, resolve_from)
         result = resolver.result()
@@ -497,6 +498,8 @@ class Custom(DataflowOp):
 
         If extension or operation is not found, returns itself.
         """
+        from hugr.ext import UsedExtensionResolver
+
         op = self._resolve_used_extensions(UsedExtensionResolver(), registry)
         assert isinstance(op, ExtOp | Custom)
         return op
