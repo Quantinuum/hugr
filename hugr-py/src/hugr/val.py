@@ -16,7 +16,7 @@ from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 if TYPE_CHECKING:
     from collections.abc import Iterable
 
-    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
+    from hugr.ext import ExtensionRegistry, UsedExtensionResolver
     from hugr.hugr import Hugr
 
 
@@ -43,13 +43,14 @@ class Value(Protocol):
     def to_model(self) -> model.Term: ...
 
     def _resolve_used_extensions_inplace(
-        self, registry: ExtensionRegistry | None = None
-    ) -> ExtensionResolutionResult:
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> None:
         """Resolve the extensions required to define this value.
 
         The value is modified in-place.
 
         Args:
+            resolver: The resolved to report used extensions to.
             registry: A registry to resolve unresolved extensions from.
                 If None, opaque operations and types will not be resolved.
 
@@ -57,9 +58,6 @@ class Value(Protocol):
             The resolution result containing used and unresolved extensions.
         """
         ...
-        from hugr.ext import ExtensionResolutionResult
-
-        return ExtensionResolutionResult()
 
 
 @dataclass
@@ -175,17 +173,16 @@ class Sum(Value):
         )
 
     def _resolve_used_extensions_inplace(
-        self, registry: ExtensionRegistry | None = None
-    ) -> ExtensionResolutionResult:
-        resolved_typ, result = self.typ._resolve_used_extensions(registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> None:
+        resolved_typ = self.typ._resolve_used_extensions(resolver, registry)
         assert isinstance(
             resolved_typ, tys.Sum
         ), "HUGR internal error, expected resolved type to be sum."
         self.typ = resolved_typ
 
         for val in self.vals:
-            result.extend(val._resolve_used_extensions_inplace(registry))
-        return result
+            val._resolve_used_extensions_inplace(resolver, registry)
 
 
 @dataclass(eq=False, repr=False)
@@ -363,9 +360,10 @@ class Function(Value):
         return model.Func(module.root)
 
     def _resolve_used_extensions_inplace(
-        self, registry: ExtensionRegistry | None = None
-    ) -> ExtensionResolutionResult:
-        return self.body.used_extensions(registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> None:
+        result = self.body.used_extensions(registry)
+        resolver.extend_with_result(result)
 
 
 @dataclass
@@ -394,10 +392,9 @@ class Extension(Value):
         return model.Apply("compat.const_json", [type, model.Literal(json)])
 
     def _resolve_used_extensions_inplace(
-        self, registry: ExtensionRegistry | None = None
-    ) -> ExtensionResolutionResult:
-        self.typ, result = self.typ._resolve_used_extensions(registry)
-        return result
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> None:
+        self.typ = self.typ._resolve_used_extensions(resolver, registry)
 
     def __str__(self) -> str:
         return f"{self.name}({self.val})"

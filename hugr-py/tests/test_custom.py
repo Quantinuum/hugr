@@ -4,6 +4,7 @@ import pytest
 
 from hugr import ext, model, ops, tys
 from hugr.build.dfg import Dfg
+from hugr.ext import UsedExtensionResolver
 from hugr.hugr import Hugr, Node
 from hugr.ops import AsExtOp, Custom, ExtOp
 from hugr.package import Package
@@ -150,17 +151,19 @@ def test_custom_type(ext_t: tys.ExtType, registry: ext.ExtensionRegistry):
     opaque = ext_t._to_serial().deserialize()
     assert isinstance(opaque, tys.Opaque)
     assert opaque.extension_version == ext_t.type_def.get_extension().version
-    resolved, _ = opaque._resolve_used_extensions(registry)
+    resolved = opaque._resolve_used_extensions(UsedExtensionResolver(), registry)
     assert resolved == ext_t
 
-    resolved, _ = opaque._resolve_used_extensions(ext.ExtensionRegistry())
+    resolved = opaque._resolve_used_extensions(
+        UsedExtensionResolver(), ext.ExtensionRegistry()
+    )
     assert resolved == opaque
 
     f_t = tys.FunctionType.endo([ext_t])
     f_t_opaque = f_t._to_serial().deserialize()
     assert isinstance(f_t_opaque.input[0], tys.Opaque)
 
-    resolved, _ = f_t_opaque._resolve_used_extensions(registry)
+    resolved = f_t_opaque._resolve_used_extensions(UsedExtensionResolver(), registry)
     assert resolved == f_t
 
 

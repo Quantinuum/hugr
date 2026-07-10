@@ -31,11 +31,11 @@ class FloatVal(val.ExtensionValue):
         return f"{self.v}"
 
     def _resolve_used_extensions_inplace(
-        self, registry: ext.ExtensionRegistry | None = None
-    ) -> ext.ExtensionResolutionResult:
-        result = ext.ExtensionResolutionResult()
-        result.used_extensions.register(FLOAT_TYPES_EXTENSION)
-        return result
+        self,
+        resolver: ext.UsedExtensionResolver,
+        registry: ext.ExtensionRegistry | None = None,
+    ) -> None:
+        resolver.register(FLOAT_TYPES_EXTENSION)
 
     def to_model(self) -> model.Term:
         return model.Apply("arithmetic.float.const_f64", [model.Literal(self.v)])

@@ -21,6 +21,9 @@ __all__ = [
     "OpDef",
     "Extension",
     "Version",
+    "ExtensionRegistry",
+    "ExtensionResolutionResult",
+    "UsedExtensionResolver",
 ]
 
 if TYPE_CHECKING:
@@ -264,9 +267,6 @@ class OpDef(ExtensionObject):
         return ops.ExtOp(self, concrete_signature, list(args or []))
 
 
-T = TypeVar("T", bound=ops.RegisteredOp)
-
-
 @dataclass
 class Extension:
     """HUGR extension declaration."""
@@ -343,17 +343,19 @@ class Extension:
         if registry is not None and self.name not in registry:
             registry.register(self)
 
+        resolver = UsedExtensionResolver()
         result = ExtensionResolutionResult()
         for op_def in self.operations.values():
             poly_func = op_def.signature.poly_func
             if poly_func is None:
                 continue
-            _, sig_result = poly_func._resolve_used_extensions(registry)
-            result.extend(sig_result)
+            poly_func._resolve_used_extensions(resolver, registry)
 
             for lower_func in op_def.lower_funcs:
                 lower_result = lower_func.hugr.used_extensions(registry)
                 result.extend(lower_result)
+
+        result.extend(resolver.result())
 
         return result
 
@@ -424,6 +426,8 @@ class Extension:
         if not isinstance(signature, OpDefSig):
             binary = signature is None
             signature = OpDefSig(signature, binary)
+
+        T = TypeVar("T", bound=ops.RegisteredOp)
 
         def _inner(cls: type[T]) -> type[T]:
             new_description = cls.__doc__ if description is None and cls.__doc__ else ""
@@ -644,6 +648,59 @@ class ExtensionRegistry:
 
     def __contains__(self, name: ExtensionId) -> bool:
         return name in self.versioned_extensions
+
+
+@dataclass
+class UsedExtensionResolver:
+    """A stateful helper class for resolving used extensions, enabling to ensure that
+    certain extensions are present and unresolved operations are added efficiently.
+    """
+
+    _used_extensions: ExtensionRegistry = field(default_factory=ExtensionRegistry)
+    _unresolved_extensions: set[ExtensionId] = field(default_factory=set)
+    _unresolved_ops: dict[tuple[tys.ExtensionId, str], ops.Custom] = field(
+        default_factory=dict
+    )
+    _unresolved_types: dict[tuple[tys.ExtensionId, str], tys.Opaque] = field(
+        default_factory=dict
+    )
+
+    def register(self, extension: Extension) -> None:
+        self._used_extensions.register(extension)
+
+    def ensure_unresolved(self, ext_id: ExtensionId) -> None:
+        self._unresolved_extensions.add(ext_id)
+
+    def ensure_unresolved_op(
+        self, ext_id: ExtensionId, type_id: str, op: ops.Custom
+    ) -> None:
+        if (ext_id, type_id) not in self._unresolved_ops:
+            self._unresolved_ops[(ext_id, type_id)] = op
+
+    def ensure_unresolved_type(
+        self, ext_id: ExtensionId, type_id: str, opaque_type: tys.Opaque
+    ) -> None:
+        if (ext_id, type_id) not in self._unresolved_types:
+            self._unresolved_types[(ext_id, type_id)] = opaque_type
+
+    def extend_with_result(self, result: ExtensionResolutionResult) -> None:
+        """Add the values from another result to this resolver.
+
+        Args:
+            result: The result of resolving extensions to add.
+        """
+        self._used_extensions.extend(result.used_extensions)
+        self._unresolved_extensions.update(result.unresolved_extensions)
+        self._unresolved_ops.update(result.unresolved_ops)
+        self._unresolved_types.update(result.unresolved_types)
+
+    def result(self) -> ExtensionResolutionResult:
+        return ExtensionResolutionResult(
+            self._used_extensions,
+            self._unresolved_extensions,
+            self._unresolved_ops,
+            self._unresolved_types,
+        )
 
 
 @dataclass

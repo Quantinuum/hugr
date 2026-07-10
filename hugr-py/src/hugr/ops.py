@@ -19,6 +19,7 @@ from typing_extensions import Self
 import hugr._serialization.ops as sops
 import hugr._serialization.tys as stys
 from hugr import tys, val
+from hugr.ext import UsedExtensionResolver
 from hugr.hugr.node_port import Direction, InPort, Node, OutPort, PortOffset, Wire
 from hugr.utils import comma_sep_repr, comma_sep_str, ser_it
 
@@ -84,14 +85,15 @@ class Op(Protocol):
         return str(self)
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
         """Resolve the extensions required to define this operation.
 
         Does not include transitive dependencies required by the returned
         extension definitions, to avoid infinite recursion.
 
         Args:
+            resolver: The resolver to report used extensions to.
             registry: A registry to resolve unresolved extensions from.
 
         Returns:
@@ -99,9 +101,7 @@ class Op(Protocol):
             - A result type with both resolved and unresolved extensions
               referenced by the operation.
         """
-        from hugr.ext import ExtensionResolutionResult
-
-        return (self, ExtensionResolutionResult())
+        return self
 
     def used_extensions(
         self, resolve_from: ExtensionRegistry | None = None
@@ -119,7 +119,9 @@ class Op(Protocol):
         Returns:
             The result containing used and unresolved extensions.
         """
-        _, result = self._resolve_used_extensions(resolve_from)
+        resolver = UsedExtensionResolver()
+        _ = self._resolve_used_extensions(resolver, resolve_from)
+        result = resolver.result()
         result._extend_with_transitive_ops(resolve_from)
         return result
 
@@ -302,10 +304,10 @@ class Input(DataflowOp):
         return "Input"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        result = tys._resolve_typerow_exts_inplace(self.types, registry)
-        return (self, result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        tys._resolve_typerow_exts_inplace(self.types, resolver, registry)
+        return self
 
 
 @dataclass()
@@ -346,15 +348,12 @@ class Output(DataflowOp, _PartialOp):
         return "Output"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
-
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
         if self._types is None:
-            return (self, ExtensionResolutionResult())
-
-        result = tys._resolve_typerow_exts_inplace(self._types, registry)
-        return (self, result)
+            return self
+        tys._resolve_typerow_exts_inplace(self._types, resolver, registry)
+        return self
 
 
 @runtime_checkable
@@ -453,10 +452,10 @@ class AsExtOp(DataflowOp, Protocol):
         return f"{name}<{comma_sep_str(self.type_args())}>"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        _, result = self.ext_op._resolve_used_extensions(registry)
-        return (self, result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        _ = self.ext_op._resolve_used_extensions(resolver, registry)
+        return self
 
 
 @dataclass(frozen=True, eq=False)
@@ -498,14 +497,14 @@ class Custom(DataflowOp):
 
         If extension or operation is not found, returns itself.
         """
-        op, _ = self._resolve_used_extensions(registry)
+        op = self._resolve_used_extensions(UsedExtensionResolver(), registry)
         assert isinstance(op, ExtOp | Custom)
         return op
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        from hugr.ext import Extension, ExtensionRegistry, ExtensionResolutionResult
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        from hugr.ext import Extension, ExtensionRegistry
 
         if registry is not None:
             try:
@@ -519,21 +518,14 @@ class Custom(DataflowOp):
                 pass
             else:
                 op = ExtOp(op_def, self.signature, self.args)
-                return op._resolve_used_extensions(registry)
+                return op._resolve_used_extensions(resolver, registry)
 
         # Could not resolve to an ExtOp - return self with unresolved extension
-        result = ExtensionResolutionResult()
-
-        signature, sig_result = self.signature._resolve_used_extensions(registry)
+        signature = self.signature._resolve_used_extensions(resolver, registry)
         assert isinstance(signature, tys.FunctionType)
-        result.extend(sig_result)
-
-        new_args: list[tys.TypeArg] = []
-        for arg in self.args:
-            resolved_arg, arg_result = arg._resolve_used_extensions(registry)
-            new_args.append(resolved_arg)
-            result.extend(arg_result)
-
+        new_args = [
+            arg._resolve_used_extensions(resolver, registry) for arg in self.args
+        ]
         new_op = Custom(
             self.op_name,
             signature,
@@ -542,11 +534,10 @@ class Custom(DataflowOp):
             self.extension_version,
         )
 
-        result.unresolved_extensions.add(self.extension)
-        if (self.extension, self.op_name) not in result.unresolved_ops:
-            result.unresolved_ops[(self.extension, self.op_name)] = new_op
+        resolver.ensure_unresolved(self.extension)
+        resolver.ensure_unresolved_op(self.extension, self.op_name, new_op)
 
-        return (new_op, result)
+        return new_op
 
     def name(self) -> str:
         return f"Custom({self.op_name})"
@@ -610,35 +601,28 @@ class ExtOp(AsExtOp):
         return poly_func.body
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
-
-        result = ExtensionResolutionResult()
-        result.used_extensions.register(self._op_def.get_extension())
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        resolver.register(self._op_def.get_extension())
 
         # Signature
         new_signature: tys.FunctionType | None = self.signature
         if self.signature is not None:
-            resolved_sig, sig_result = self.signature._resolve_used_extensions(registry)
+            resolved_sig = self.signature._resolve_used_extensions(resolver, registry)
             assert isinstance(
                 resolved_sig, tys.FunctionType
             ), "HUGR internal error, expected resolved signature to be function type."
             new_signature = resolved_sig
-            result.extend(sig_result)
         else:
             # Get extensions from the default signature in the OpDef
-            _, sig_result = self.outer_signature()._resolve_used_extensions(registry)
-            result.extend(sig_result)
+            _ = self.outer_signature()._resolve_used_extensions(resolver, registry)
 
         # Args
-        new_args: list[tys.TypeArg] = []
-        for arg in self.args:
-            resolved_arg, arg_result = arg._resolve_used_extensions(registry)
-            new_args.append(resolved_arg)
-            result.extend(arg_result)
+        new_args = [
+            arg._resolve_used_extensions(resolver, registry) for arg in self.args
+        ]
 
-        return (ExtOp(self._op_def, new_signature, new_args), result)
+        return ExtOp(self._op_def, new_signature, new_args)
 
 
 class RegisteredOp(AsExtOp):
@@ -701,17 +685,15 @@ class MakeTuple(AsExtOp, _PartialOp):
         return "MakeTuple"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
         from hugr import std
-        from hugr.ext import ExtensionResolutionResult
 
-        result = ExtensionResolutionResult()
-        result.used_extensions.register(std.PRELUDE)
+        resolver.register(std.PRELUDE)
         if self._types is not None:
-            result.extend(tys._resolve_typerow_exts_inplace(self._types, registry))
+            tys._resolve_typerow_exts_inplace(self._types, resolver, registry)
 
-        return (self, result)
+        return self
 
 
 @dataclass()
@@ -769,17 +751,15 @@ class UnpackTuple(AsExtOp, _PartialOp):
         return "UnpackTuple"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
         from hugr import std
-        from hugr.ext import ExtensionResolutionResult
 
-        result = ExtensionResolutionResult()
-        result.used_extensions.register(std.PRELUDE)
+        resolver.register(std.PRELUDE)
         if self._types is not None:
-            result.extend(tys._resolve_typerow_exts_inplace(self._types, registry))
+            tys._resolve_typerow_exts_inplace(self._types, resolver, registry)
 
-        return (self, result)
+        return self
 
 
 @dataclass(frozen=True)
@@ -810,11 +790,11 @@ class Tag(DataflowOp):
         )
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        sum_ty, result = self.sum_ty._resolve_used_extensions(registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        sum_ty = self.sum_ty._resolve_used_extensions(resolver, registry)
         assert isinstance(sum_ty, tys.Sum)
-        return (Tag(self.tag, sum_ty), result)
+        return Tag(self.tag, sum_ty)
 
     def __repr__(self) -> str:
         if len(self.sum_ty.variant_rows) == 2:
@@ -970,12 +950,12 @@ class DFG(DfParentOp, DataflowOp):
         return "DFG"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        result = tys._resolve_typerow_exts_inplace(self.inputs, registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        tys._resolve_typerow_exts_inplace(self.inputs, resolver, registry)
         if self._outputs is not None:
-            result.extend(tys._resolve_typerow_exts_inplace(self._outputs, registry))
-        return (self, result)
+            tys._resolve_typerow_exts_inplace(self._outputs, resolver, registry)
+        return self
 
 
 @dataclass()
@@ -1024,12 +1004,12 @@ class CFG(DataflowOp):
         return self.inputs
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        result = tys._resolve_typerow_exts_inplace(self.inputs, registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        tys._resolve_typerow_exts_inplace(self.inputs, resolver, registry)
         if self._outputs is not None:
-            result.extend(tys._resolve_typerow_exts_inplace(self._outputs, registry))
-        return (self, result)
+            tys._resolve_typerow_exts_inplace(self._outputs, resolver, registry)
+        return self
 
 
 @dataclass
@@ -1100,20 +1080,19 @@ class DataflowBlock(DfParentOp):
         return "DataflowBlock"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        result = tys._resolve_typerow_exts_inplace(self.inputs, registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        tys._resolve_typerow_exts_inplace(self.inputs, resolver, registry)
         if self._sum is not None:
-            resolved_sum, sum_result = self._sum._resolve_used_extensions(registry)
+            resolved_sum = self._sum._resolve_used_extensions(resolver, registry)
             assert isinstance(
                 resolved_sum, tys.Sum
             ), "HUGR internal error, expected resolved type to be sum."
             self._sum = resolved_sum
-            result.extend(sum_result)
         if self._other_outputs is not None:
             other_out = self._other_outputs
-            result.extend(tys._resolve_typerow_exts_inplace(other_out, registry))
-        return (self, result)
+            tys._resolve_typerow_exts_inplace(other_out, resolver, registry)
+        return self
 
 
 @dataclass
@@ -1145,16 +1124,11 @@ class ExitBlock(Op):
         return "ExitBlock"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
-
-        result = ExtensionResolutionResult()
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
         if self._cfg_outputs is not None:
-            result.extend(
-                tys._resolve_typerow_exts_inplace(self._cfg_outputs, registry)
-            )
-        return (self, result)
+            tys._resolve_typerow_exts_inplace(self._cfg_outputs, resolver, registry)
+        return self
 
 
 @dataclass
@@ -1183,10 +1157,10 @@ class Const(Op):
         return f"Const({self.val})"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        result = self.val._resolve_used_extensions_inplace(registry)
-        return (self, result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        self.val._resolve_used_extensions_inplace(resolver, registry)
+        return self
 
 
 @dataclass
@@ -1231,16 +1205,11 @@ class LoadConst(DataflowOp):
         return "LoadConst"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
-
-        result = ExtensionResolutionResult()
-        typ: tys.Type | None = None
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
         if self._typ is not None:
-            typ, result = self._typ._resolve_used_extensions(registry)
-            self._typ = typ
-        return (self, result)
+            self._typ = self._typ._resolve_used_extensions(resolver, registry)
+        return self
 
 
 @dataclass()
@@ -1302,18 +1271,18 @@ class Conditional(DataflowOp):
         return [self.sum_ty, *self.other_inputs]
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        resolved_sum, result = self.sum_ty._resolve_used_extensions(registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        resolved_sum = self.sum_ty._resolve_used_extensions(resolver, registry)
         assert isinstance(
             resolved_sum, tys.Sum
         ), "HUGR internal error, expected resolved type to be sum."
         self.sum_ty = resolved_sum
 
-        result.extend(tys._resolve_typerow_exts_inplace(self.other_inputs, registry))
+        tys._resolve_typerow_exts_inplace(self.other_inputs, resolver, registry)
         if self._outputs is not None:
-            result.extend(tys._resolve_typerow_exts_inplace(self._outputs, registry))
-        return (self, result)
+            tys._resolve_typerow_exts_inplace(self._outputs, resolver, registry)
+        return self
 
 
 @dataclass
@@ -1355,12 +1324,12 @@ class Case(DfParentOp):
         return "Case"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        result = tys._resolve_typerow_exts_inplace(self.inputs, registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        tys._resolve_typerow_exts_inplace(self.inputs, resolver, registry)
         if self._outputs is not None:
-            result.extend(tys._resolve_typerow_exts_inplace(self._outputs, registry))
-        return (self, result)
+            tys._resolve_typerow_exts_inplace(self._outputs, resolver, registry)
+        return self
 
 
 @dataclass
@@ -1419,17 +1388,13 @@ class TailLoop(DfParentOp, DataflowOp):
         return "TailLoop"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
-
-        result = ExtensionResolutionResult()
-        result.extend(tys._resolve_typerow_exts_inplace(self.just_inputs, registry))
-        result.extend(tys._resolve_typerow_exts_inplace(self.rest, registry))
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        tys._resolve_typerow_exts_inplace(self.just_inputs, resolver, registry)
+        tys._resolve_typerow_exts_inplace(self.rest, resolver, registry)
         if self._just_outputs is not None:
-            out_result = tys._resolve_typerow_exts_inplace(self._just_outputs, registry)
-            result.extend(out_result)
-        return (self, result)
+            tys._resolve_typerow_exts_inplace(self._just_outputs, resolver, registry)
+        return self
 
 
 @dataclass
@@ -1497,15 +1462,14 @@ class FuncDefn(DfParentOp):
         return f"FuncDefn({self.f_name})"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        result = tys._resolve_typerow_exts_inplace(self.inputs, registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        tys._resolve_typerow_exts_inplace(self.inputs, resolver, registry)
         for i, param in enumerate(self.params):
-            self.params[i], param_result = param._resolve_used_extensions(registry)
-            result.extend(param_result)
+            self.params[i] = param._resolve_used_extensions(resolver, registry)
         if self._outputs is not None:
-            result.extend(tys._resolve_typerow_exts_inplace(self._outputs, registry))
-        return (self, result)
+            tys._resolve_typerow_exts_inplace(self._outputs, resolver, registry)
+        return self
 
 
 @dataclass
@@ -1539,14 +1503,14 @@ class FuncDecl(Op):
         return f"FuncDecl({self.f_name})"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        resolved_sig, result = self.signature._resolve_used_extensions(registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        resolved_sig = self.signature._resolve_used_extensions(resolver, registry)
         assert isinstance(
             resolved_sig, tys.PolyFuncType
         ), "HUGR internal error, expected resolved signature to be poly function type."
         self.signature = resolved_sig
-        return (self, result)
+        return self
 
 
 @dataclass
@@ -1604,28 +1568,23 @@ class _CallOrLoad:
             self.type_args = list(type_args)
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Self, ExtensionResolutionResult]:
-        resolved_sig, result = self.signature._resolve_used_extensions(registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Self:
+        resolved_sig = self.signature._resolve_used_extensions(resolver, registry)
         assert isinstance(
             resolved_sig, tys.PolyFuncType
         ), "HUGR internal error, expected resolved signature to be poly function type."
         self.signature = resolved_sig  # type: ignore[attr-defined]
 
-        resolved_inst, inst_result = self.instantiation._resolve_used_extensions(
-            registry
-        )
+        resolved_inst = self.instantiation._resolve_used_extensions(resolver, registry)
         assert isinstance(
             resolved_inst, tys.FunctionType
         ), "HUGR internal error, expected resolved instantiation to be function type."
         self.instantiation = resolved_inst
-        result.extend(inst_result)
 
         for i, arg in enumerate(self.type_args):
-            resolved_arg, arg_result = arg._resolve_used_extensions(registry)
-            self.type_args[i] = resolved_arg
-            result.extend(arg_result)
-        return (self, result)
+            self.type_args[i] = arg._resolve_used_extensions(resolver, registry)
+        return self
 
 
 class Call(_CallOrLoad, DataflowOp):
@@ -1724,18 +1683,16 @@ class CallIndirect(DataflowOp, _PartialOp):
         return "CallIndirect"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
-
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
         if self._signature is None:
-            return (self, ExtensionResolutionResult())
-        resolved_sig, result = self._signature._resolve_used_extensions(registry)
+            return self
+        resolved_sig = self._signature._resolve_used_extensions(resolver, registry)
         assert isinstance(
             resolved_sig, tys.FunctionType
         ), "HUGR internal error, expected resolved signature to be function type."
         self._signature = resolved_sig
-        return (self, result)
+        return self
 
 
 class LoadFunc(_CallOrLoad, DataflowOp):
@@ -1870,7 +1827,7 @@ class AliasDefn(Op):
         return f"AliasDefn({self.alias})"
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Op, ExtensionResolutionResult]:
-        self.definition, result = self.definition._resolve_used_extensions(registry)
-        return (self, result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Op:
+        self.definition = self.definition._resolve_used_extensions(resolver, registry)
+        return self
