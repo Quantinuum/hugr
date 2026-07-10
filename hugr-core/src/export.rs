@@ -7,9 +7,7 @@ use crate::{
     Direction, Hugr, HugrView, IncomingPort, Node, NodeIndex as _, Port,
     extension::{ExtensionId, OpDef, SignatureFunc},
     hugr::IdentList,
-    ops::{
-        DataflowBlock, DataflowOpTrait, OpName, OpTrait, OpType, Value, constant::CustomSerialized,
-    },
+    ops::{DataflowBlock, OpName, OpType, Value, constant::CustomSerialized},
     std_extensions::{
         arithmetic::{float_types::ConstF64, int_types::ConstInt},
         collections::array::ArrayValue,
@@ -424,10 +422,8 @@ impl<'a> Context<'a> {
                 let args = args.into_bump_slice();
                 let func = self.make_term(table::Term::Apply(symbol, args));
 
-                // TODO PERFORMANCE: Avoid exporting the signature here again.
-                let signature = call.signature();
-                let inputs = self.export_type_row(&signature.input);
-                let outputs = self.export_type_row(&signature.output);
+                let inputs = self.export_type_row(call.instantiation.input());
+                let outputs = self.export_type_row(call.instantiation.output());
                 let operation = self.make_term_apply(model::CORE_CALL, &[inputs, outputs, func]);
                 table::Operation::Custom(operation)
             }
@@ -526,25 +522,7 @@ impl<'a> Context<'a> {
             }
         };
 
-        let (signature, num_inputs, num_outputs) = match optype {
-            OpType::DataflowBlock(block) => {
-                let signature = self.export_block_signature(block);
-                (Some(signature), 1, block.sum_rows.len())
-            }
-
-            // PERFORMANCE: As it stands, `OpType::dataflow_signature` copies and/or allocates.
-            // That might not seem like a big deal, but it's a significant portion of the time spent
-            // when exporting. However it is not trivial to change this at the moment.
-            _ => match &optype.dataflow_signature() {
-                Some(signature) => {
-                    let num_inputs = signature.input_types().len();
-                    let num_outputs = signature.output_types().len();
-                    let signature = self.export_func_type(signature, Self::export_type_row);
-                    (Some(signature), num_inputs, num_outputs)
-                }
-                None => (None, 0, 0),
-            },
-        };
+        let (signature, num_inputs, num_outputs) = self.export_node_signature(optype);
 
         let inputs = self.make_ports(node, Direction::Incoming, num_inputs);
         let outputs = self.make_ports(node, Direction::Outgoing, num_outputs);
@@ -657,6 +635,165 @@ impl<'a> Context<'a> {
         };
 
         self.make_term_apply(model::CORE_CTRL, &[inputs, outputs])
+    }
+
+    fn export_node_signature(&mut self, optype: &OpType) -> (Option<table::TermId>, usize, usize) {
+        if let OpType::DataflowBlock(block) = optype {
+            return (
+                Some(self.export_block_signature(block)),
+                1,
+                block.sum_rows.len(),
+            );
+        }
+
+        let Some((inputs, outputs, num_inputs, num_outputs)) =
+            self.export_dataflow_signature_parts(optype)
+        else {
+            return (None, 0, 0);
+        };
+        (
+            Some(self.make_term_apply(model::CORE_FN, &[inputs, outputs])),
+            num_inputs,
+            num_outputs,
+        )
+    }
+
+    fn export_dataflow_signature_parts(
+        &mut self,
+        optype: &OpType,
+    ) -> Option<(table::TermId, table::TermId, usize, usize)> {
+        match optype {
+            OpType::Input(op) => {
+                let outputs = self.export_type_row(&op.types);
+                Some((self.export_empty_type_row(), outputs, 0, op.types.len()))
+            }
+            OpType::Output(op) => {
+                let inputs = self.export_type_row(&op.types);
+                Some((inputs, self.export_empty_type_row(), op.types.len(), 0))
+            }
+            OpType::Call(op) => Some(self.export_signature_rows(&op.instantiation)),
+            OpType::CallIndirect(op) => {
+                let function_type = Type::new_function(op.signature.clone());
+                let inputs = self.export_type_row_with_head(
+                    &function_type,
+                    op.signature.input().len(),
+                    op.signature.input().iter(),
+                );
+                let outputs = self.export_type_row(op.signature.output());
+                Some((
+                    inputs,
+                    outputs,
+                    op.signature.input_count() + 1,
+                    op.signature.output_count(),
+                ))
+            }
+            OpType::LoadConstant(op) => {
+                let outputs = self.export_type_row_single(&op.datatype);
+                Some((self.export_empty_type_row(), outputs, 0, 1))
+            }
+            OpType::LoadFunction(op) => {
+                let function_type = Type::new_function(op.instantiation.clone());
+                let outputs = self.export_type_row_single(&function_type);
+                Some((self.export_empty_type_row(), outputs, 0, 1))
+            }
+            OpType::DFG(op) => Some(self.export_signature_rows(&op.signature)),
+            OpType::ExtensionOp(op) => Some(self.export_signature_rows(op.signature_ref())),
+            OpType::OpaqueOp(op) => Some(self.export_signature_rows(op.signature_ref())),
+            OpType::Tag(op) => {
+                let variant = op.variants.get(op.tag).expect("Not a valid tag");
+                let inputs = self.export_type_row(variant);
+                let sum_type = Type::new_sum(op.variants.clone());
+                let outputs = self.export_type_row_single(&sum_type);
+                Some((inputs, outputs, variant.len(), 1))
+            }
+            OpType::TailLoop(op) => {
+                let inputs = self.export_type_row_iter(
+                    op.just_inputs.len() + op.rest.len(),
+                    op.just_inputs.iter().chain(op.rest.iter()),
+                );
+                let outputs = self.export_type_row_iter(
+                    op.just_outputs.len() + op.rest.len(),
+                    op.just_outputs.iter().chain(op.rest.iter()),
+                );
+                Some((
+                    inputs,
+                    outputs,
+                    op.just_inputs.len() + op.rest.len(),
+                    op.just_outputs.len() + op.rest.len(),
+                ))
+            }
+            OpType::CFG(op) => Some(self.export_signature_rows(&op.signature)),
+            OpType::Conditional(op) => {
+                let sum_type = Type::new_sum(op.sum_rows.clone());
+                let inputs = self.export_type_row_with_head(
+                    &sum_type,
+                    op.other_inputs.len(),
+                    op.other_inputs.iter(),
+                );
+                let outputs = self.export_type_row(&op.outputs);
+                Some((inputs, outputs, op.other_inputs.len() + 1, op.outputs.len()))
+            }
+            OpType::Module(_)
+            | OpType::FuncDefn(_)
+            | OpType::FuncDecl(_)
+            | OpType::AliasDecl(_)
+            | OpType::AliasDefn(_)
+            | OpType::Const(_)
+            | OpType::DataflowBlock(_)
+            | OpType::ExitBlock(_)
+            | OpType::Case(_) => None,
+        }
+    }
+
+    fn export_signature_rows(
+        &mut self,
+        signature: &crate::types::Signature,
+    ) -> (table::TermId, table::TermId, usize, usize) {
+        let inputs = self.export_type_row(signature.input());
+        let outputs = self.export_type_row(signature.output());
+        (
+            inputs,
+            outputs,
+            signature.input_count(),
+            signature.output_count(),
+        )
+    }
+
+    fn export_empty_type_row(&mut self) -> table::TermId {
+        self.make_term(table::Term::List(&[]))
+    }
+
+    fn export_type_row_single(&mut self, typ: &Type) -> table::TermId {
+        let typ = self.export_type(typ);
+        self.make_term(table::Term::List(
+            self.bump.alloc_slice_copy(&[table::SeqPart::Item(typ)]),
+        ))
+    }
+
+    fn export_type_row_with_head<'b>(
+        &mut self,
+        head: &Type,
+        tail_len: usize,
+        tail: impl IntoIterator<Item = &'b Type>,
+    ) -> table::TermId {
+        let mut parts = BumpVec::with_capacity_in(tail_len + 1, self.bump);
+        parts.push(table::SeqPart::Item(self.export_type(head)));
+        for typ in tail {
+            parts.push(table::SeqPart::Item(self.export_type(typ)));
+        }
+        self.make_term(table::Term::List(parts.into_bump_slice()))
+    }
+
+    fn export_type_row_iter<'b>(
+        &mut self,
+        len: usize,
+        types: impl IntoIterator<Item = &'b Type>,
+    ) -> table::TermId {
+        let mut parts = BumpVec::with_capacity_in(len, self.bump);
+        for typ in types {
+            parts.push(table::SeqPart::Item(self.export_type(typ)));
+        }
+        self.make_term(table::Term::List(parts.into_bump_slice()))
     }
 
     /// Creates a data flow region from the given node's children.

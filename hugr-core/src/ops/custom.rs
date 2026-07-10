@@ -142,6 +142,11 @@ impl ExtensionOp {
         &mut self.signature
     }
 
+    /// Returns a reference to the cached signature of the operation.
+    pub(crate) fn signature_ref(&self) -> &Signature {
+        &self.signature
+    }
+
     /// Returns a mutable reference to the type arguments of the operation.
     pub(crate) fn args_mut(&mut self) -> &mut [TypeArg] {
         self.args.as_mut_slice()
@@ -325,6 +330,11 @@ impl OpaqueOp {
     /// Returns a mutable reference to the signature of the operation.
     pub fn signature_mut(&mut self) -> &mut Signature {
         &mut self.signature
+    }
+
+    /// Returns a reference to the signature of the operation.
+    pub(crate) fn signature_ref(&self) -> &Signature {
+        &self.signature
     }
 }
 
