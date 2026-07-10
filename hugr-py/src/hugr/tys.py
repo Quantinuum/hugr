@@ -182,6 +182,7 @@ def _resolve_typerow_exts_inplace(
             If None, opaque types will not be resolved.
 
     Example:
+        >>> from hugr.ext import UsedExtensionResolver
         >>> _resolver = UsedExtensionResolver()
         >>> _resolve_typerow_exts_inplace([Qubit, USize()], _resolver)
         >>> _resolver.result().ids()

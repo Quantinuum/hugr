@@ -231,7 +231,7 @@ def test_registry_version_resolution():
         extension="versioned_ext",
         extension_version=ext.Version(0, 2, 3),
     )
-    resolved_ty, _ = opaque._resolve_used_extensions(reg)
+    resolved_ty = opaque._resolve_used_extensions(UsedExtensionResolver(), reg)
     assert isinstance(resolved_ty, tys.ExtType)
     assert resolved_ty.type_def.get_extension() is ext_0_2_5
 

@@ -29,7 +29,11 @@ if TYPE_CHECKING:
 
     from hugr import ext
     from hugr._serialization.ops import BaseOp
-    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult, UsedExtensionResolver
+    from hugr.ext import (
+        ExtensionRegistry,
+        ExtensionResolutionResult,
+        UsedExtensionResolver,
+    )
     from hugr.tys import Visibility
 
 
