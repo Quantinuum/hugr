@@ -1,8 +1,10 @@
 # /// script
 # requires-python = ">=3.13"
 # dependencies = [
-#     "guppylang==1.0.0a5",
-#     "guppylang-internals==1.0.0a5",
+#     "guppylang==1.0.0rc1",
+#     "guppylang-internals==1.0.0rc1",
+#   "selene-sim==0.3.0a1",
+#   "selene-core==0.3.0a1",
 # ]
 # ///
 """A small T-state factory using magic-state distillation."""
@@ -74,5 +76,5 @@ def main() -> None:
         option_t.unwrap_nothing()
 
 
-program = main.compile_function()
+program = main.with_minimal_opt().compile_function()
 Path(argv[0]).with_suffix(".hugr").write_bytes(program.to_bytes())
