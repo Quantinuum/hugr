@@ -43,10 +43,10 @@ impl ConstFold for LogicOp {
             }
             Self::Eq => {
                 let inps = read_inputs(consts)?;
-                let res = inps.iter().copied().reduce(|a, b| a == b)?;
-                // If we have only some inputs, we can still fold to false, but not to true
-                (!res || inps.len() as u64 == 2)
-                    .then_some(vec![(0.into(), ops::Value::from_bool(res))])
+                let [lhs, rhs] = inps.as_slice() else {
+                    return None;
+                };
+                Some(vec![(0.into(), ops::Value::from_bool(lhs == rhs))])
             }
             Self::Not => {
                 let inps = read_inputs(consts)?;
@@ -243,7 +243,10 @@ pub(crate) mod test {
     #[case(LogicOp::And, [Some(false), None], Some(false))]
     #[case(LogicOp::Or, [None, Some(false)], None)]
     #[case(LogicOp::Or, [None, Some(true)], Some(true))]
+    #[case(LogicOp::Eq, [None, Some(false)], None)]
     #[case(LogicOp::Eq, [None, Some(true)], None)]
+    #[case(LogicOp::Eq, [Some(false), None], None)]
+    #[case(LogicOp::Eq, [Some(true), None], None)]
     #[case(LogicOp::Not, [None], None)]
     #[case(LogicOp::Xor, [None, Some(true)], None)]
     fn partial_const_fold(
