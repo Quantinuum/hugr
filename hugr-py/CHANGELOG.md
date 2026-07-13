@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.18.1](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.0...hugr-py-v0.18.1) (2026-07-13)
+
+
+### Features
+
+* Overrride `__repr__` for `RegionKind` ([#3144](https://github.com/Quantinuum/hugr/issues/3144)) ([2c268a3](https://github.com/Quantinuum/hugr/commit/2c268a3fa6869865d0dc332fbf0665d89be86303))
+
+
+### Performance Improvements
+
+* Register used extensions through a special resolver and lazy coalesce versions ([#3152](https://github.com/Quantinuum/hugr/issues/3152)) ([adc55c0](https://github.com/Quantinuum/hugr/commit/adc55c0c8298cf53f6225980861240dfa9e8364a))
+
 ## [0.18.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.17.1...hugr-py-v0.18.0) (2026-06-29)
 
 
