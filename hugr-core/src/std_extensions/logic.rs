@@ -43,10 +43,10 @@ impl ConstFold for LogicOp {
             }
             Self::Eq => {
                 let inps = read_inputs(consts)?;
-                let res = inps.iter().copied().reduce(|a, b| a == b)?;
-                // If we have only some inputs, we can still fold to false, but not to true
-                (!res || inps.len() as u64 == 2)
-                    .then_some(vec![(0.into(), ops::Value::from_bool(res))])
+                let [lhs, rhs] = inps.as_slice() else {
+                    return None;
+                };
+                Some(vec![(0.into(), ops::Value::from_bool(lhs == rhs))])
             }
             Self::Not => {
                 let inps = read_inputs(consts)?;
@@ -241,11 +241,21 @@ pub(crate) mod test {
     #[rstest]
     #[case(LogicOp::And, [Some(true), None], None)]
     #[case(LogicOp::And, [Some(false), None], Some(false))]
+    #[case(LogicOp::And, [None, Some(true)], None)]
+    #[case(LogicOp::And, [None, Some(false)], Some(false))]
+    #[case(LogicOp::Or, [Some(false), None], None)]
+    #[case(LogicOp::Or, [Some(true), None], Some(true))]
     #[case(LogicOp::Or, [None, Some(false)], None)]
     #[case(LogicOp::Or, [None, Some(true)], Some(true))]
+    #[case(LogicOp::Eq, [None, Some(false)], None)]
     #[case(LogicOp::Eq, [None, Some(true)], None)]
+    #[case(LogicOp::Eq, [Some(false), None], None)]
+    #[case(LogicOp::Eq, [Some(true), None], None)]
     #[case(LogicOp::Not, [None], None)]
     #[case(LogicOp::Xor, [None, Some(true)], None)]
+    #[case(LogicOp::Xor, [None, Some(false)], None)]
+    #[case(LogicOp::Xor, [Some(true), None], None)]
+    #[case(LogicOp::Xor, [Some(false), None], None)]
     fn partial_const_fold(
         #[case] op: LogicOp,
         #[case] ins: impl IntoIterator<Item = Option<bool>>,
