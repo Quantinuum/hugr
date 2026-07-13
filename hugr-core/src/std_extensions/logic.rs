@@ -241,6 +241,10 @@ pub(crate) mod test {
     #[rstest]
     #[case(LogicOp::And, [Some(true), None], None)]
     #[case(LogicOp::And, [Some(false), None], Some(false))]
+    #[case(LogicOp::And, [None, Some(true)], None)]
+    #[case(LogicOp::And, [None, Some(false)], Some(false))]
+    #[case(LogicOp::Or, [Some(false), None], None)]
+    #[case(LogicOp::Or, [Some(true), None], Some(true))]
     #[case(LogicOp::Or, [None, Some(false)], None)]
     #[case(LogicOp::Or, [None, Some(true)], Some(true))]
     #[case(LogicOp::Eq, [None, Some(false)], None)]
@@ -249,6 +253,9 @@ pub(crate) mod test {
     #[case(LogicOp::Eq, [Some(true), None], None)]
     #[case(LogicOp::Not, [None], None)]
     #[case(LogicOp::Xor, [None, Some(true)], None)]
+    #[case(LogicOp::Xor, [None, Some(false)], None)]
+    #[case(LogicOp::Xor, [Some(true), None], None)]
+    #[case(LogicOp::Xor, [Some(false), None], None)]
     fn partial_const_fold(
         #[case] op: LogicOp,
         #[case] ins: impl IntoIterator<Item = Option<bool>>,
