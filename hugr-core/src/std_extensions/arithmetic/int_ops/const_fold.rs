@@ -1032,13 +1032,13 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     if n0.log_width() != logwidth0 || n1.log_width() != logwidth0 {
                         None
                     } else {
+                        let width = 1u64 << logwidth0;
                         Some(vec![(
                             0.into(),
                             Value::extension(
                                 ConstInt::new_u(
                                     logwidth0,
-                                    (n0.value_u() << n1.value_u())
-                                        & bitmask_from_logwidth(logwidth0),
+                                    shift_left(n0.value_u(), n1.value_u(), width),
                                 )
                                 .unwrap(),
                             ),
@@ -1059,10 +1059,15 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     if n0.log_width() != logwidth0 || n1.log_width() != logwidth0 {
                         None
                     } else {
+                        let width = 1u64 << logwidth0;
                         Some(vec![(
                             0.into(),
                             Value::extension(
-                                ConstInt::new_u(logwidth0, n0.value_u() >> n1.value_u()).unwrap(),
+                                ConstInt::new_u(
+                                    logwidth0,
+                                    shift_right(n0.value_u(), n1.value_u(), width),
+                                )
+                                .unwrap(),
                             ),
                         )])
                     }
@@ -1083,15 +1088,11 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     } else {
                         let n = n0.value_u();
                         let w = 1 << logwidth0;
-                        let k = n1.value_u() % w; // equivalent rotation amount
                         Some(vec![(
                             0.into(),
                             Value::extension(
-                                ConstInt::new_u(
-                                    logwidth0,
-                                    ((n << k) & bitmask_from_width(w)) | (n >> (w - k)),
-                                )
-                                .unwrap(),
+                                ConstInt::new_u(logwidth0, rotate_left(n, n1.value_u(), w))
+                                    .unwrap(),
                             ),
                         )])
                     }
@@ -1112,15 +1113,11 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
                     } else {
                         let n = n0.value_u();
                         let w = 1 << logwidth0;
-                        let k = n1.value_u() % w; // equivalent rotation amount
                         Some(vec![(
                             0.into(),
                             Value::extension(
-                                ConstInt::new_u(
-                                    logwidth0,
-                                    ((n << (w - k)) & bitmask_from_width(w)) | (n >> k),
-                                )
-                                .unwrap(),
+                                ConstInt::new_u(logwidth0, rotate_right(n, n1.value_u(), w))
+                                    .unwrap(),
                             ),
                         )])
                     }
@@ -1170,4 +1167,54 @@ pub(super) fn set_fold(op: &IntOpDef, def: &mut OpDef) {
             ),
         },
     });
+}
+
+/// Shift `value` left within a `width`-bit integer, filling from the right with
+/// zeroes.
+///
+/// `width` must be between one and 64 bits. Shifting by the width or more
+/// discards every bit, rather than relying on the host integer shift
+/// behaviour.
+fn shift_left(value: u64, amount: u64, width: u64) -> u64 {
+    if amount >= width {
+        0
+    } else {
+        (value << amount) & bitmask_from_width(width)
+    }
+}
+
+/// Shift `value` right within a `width`-bit integer, filling from the left
+/// with zeroes.
+///
+/// `width` must be between one and 64 bits. Shifting by the width or more
+/// discards every bit, rather than relying on the host integer shift
+/// behaviour.
+fn shift_right(value: u64, amount: u64, width: u64) -> u64 {
+    if amount >= width { 0 } else { value >> amount }
+}
+
+/// Rotate `value` left within a `width`-bit integer.
+///
+/// `width` must be between one and 64 bits.
+fn rotate_left(value: u64, amount: u64, width: u64) -> u64 {
+    let amount = amount % width;
+    if amount == 0 {
+        // Do not panic when rotating a 64-bit value by 64 bits.
+        value
+    } else {
+        ((value << amount) & bitmask_from_width(width)) | (value >> (width - amount))
+    }
+}
+
+/// Rotate `value` right within a `width`-bit integer.
+///
+/// `width` must be between one and 64 bits.
+fn rotate_right(value: u64, amount: u64, width: u64) -> u64 {
+    let amount = amount % width;
+    if amount == 0 {
+        // Do not panic when rotating a 64-bit value by 64 bits.
+        value
+    } else {
+        ((value << (width - amount)) & bitmask_from_width(width)) | (value >> amount)
+    }
 }
