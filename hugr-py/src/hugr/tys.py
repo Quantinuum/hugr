@@ -24,8 +24,7 @@ if TYPE_CHECKING:
     from semver import Version
 
     from hugr import ext
-    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
-
+    from hugr.ext import ExtensionRegistry, UsedExtensionResolver
 
 ExtensionId = stys.ExtensionId
 ExtensionSet = stys.ExtensionSet
@@ -49,20 +48,19 @@ class TypeParam(Protocol):
         raise NotImplementedError(self)
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[TypeParam, ExtensionResolutionResult]:
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> TypeParam:
         """Resolve the extensions required to define this type parameter.
 
         Args:
+            resolver: The resolver to track used and unresolved extensions.
             registry: A registry to resolve unresolved extensions from.
                 If None, opaque types will not be resolved.
 
         Returns:
-            A tuple of the resolved type parameter and the resolution result.
+            The resolved type parameter.
         """
-        from hugr.ext import ExtensionResolutionResult
-
-        return (self, ExtensionResolutionResult())
+        return self
 
 
 @runtime_checkable
@@ -79,28 +77,28 @@ class TypeArg(Protocol):
     @deprecated("Call `used_extensions` on the hugr instead.")
     def resolve(self, registry: ext.ExtensionRegistry) -> TypeArg:
         """Resolve types in the argument using the given registry."""
-        resolved, _ = self._resolve_used_extensions(registry)
-        return resolved
+        from hugr.ext import UsedExtensionResolver
+
+        return self._resolve_used_extensions(UsedExtensionResolver(), registry)
 
     def to_model(self) -> model.Term | model.Splice:
         """Convert the type argument to a model Term."""
         raise NotImplementedError(self)
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[TypeArg, ExtensionResolutionResult]:
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> TypeArg:
         """Resolve the extensions required to define this type argument.
 
         Args:
+            resolver: The resolver to track used and unresolved extensions.
             registry: A registry to resolve unresolved extensions from.
                 If None, opaque types will not be resolved.
 
         Returns:
-            A tuple of the resolved type argument and the resolution result.
+            The resolved type argument.
         """
-        from hugr.ext import ExtensionResolutionResult
-
-        return (self, ExtensionResolutionResult())
+        return self
 
 
 @runtime_checkable
@@ -137,31 +135,31 @@ class Type(Protocol):
     @deprecated("Call `used_extensions` on the hugr instead.")
     def resolve(self, registry: ext.ExtensionRegistry) -> Type:
         """Resolve types in the type using the given registry."""
-        resolved, _ = self._resolve_used_extensions(registry)
-        return resolved
+        from hugr.ext import UsedExtensionResolver
+
+        return self._resolve_used_extensions(UsedExtensionResolver(), registry)
 
     def to_model(self) -> model.Term | model.Splice:
         """Convert the type to a model Term."""
         raise NotImplementedError(self)
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Type, ExtensionResolutionResult]:
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Type:
         """Resolve the extensions required to define this type.
 
         Does not include transitive dependencies required by the returned
         extension definitions, to avoid infinite recursion.
 
         Args:
+            resolver: The resolver to track used and unresolved extensions.
             registry: A registry to resolve unresolved extensions from.
                 If None, opaque types will not be resolved.
 
         Returns:
-            A tuple of the resolved type and the resolution result.
+            The resolved type.
         """
-        from hugr.ext import ExtensionResolutionResult
-
-        return (self, ExtensionResolutionResult())
+        return self
 
 
 #: Row of types.
@@ -169,29 +167,29 @@ TypeRow = list[Type]
 
 
 def _resolve_typerow_exts_inplace(
-    row: TypeRow, registry: ExtensionRegistry | None = None
-) -> ExtensionResolutionResult:
+    row: TypeRow,
+    resolver: UsedExtensionResolver,
+    registry: ExtensionRegistry | None = None,
+) -> None:
     """Resolve the extensions required to define a row of types.
 
     Modifies the row in-place to resolve opaque types.
 
     Args:
         row: The row of types.
+        resolver: The resolver to track used and unresolved extensions.
         registry: A registry to resolve unresolved extensions from.
             If None, opaque types will not be resolved.
 
     Example:
-        >>> _resolve_typerow_exts_inplace([Qubit, USize()]).ids()
+        >>> from hugr.ext import UsedExtensionResolver
+        >>> _resolver = UsedExtensionResolver()
+        >>> _resolve_typerow_exts_inplace([Qubit, USize()], _resolver)
+        >>> _resolver.result().ids()
         {'prelude'}
     """
-    from hugr.ext import ExtensionResolutionResult
-
-    result = ExtensionResolutionResult()
     for i, ty in enumerate(row):
-        resolved_ty, ty_result = ty._resolve_used_extensions(registry)
-        row[i] = resolved_ty
-        result.extend(ty_result)
-    return result
+        row[i] = ty._resolve_used_extensions(resolver, registry)
 
 
 # --------------------------------------------
@@ -294,10 +292,9 @@ class ListParam(TypeParam):
         return model.Apply("core.list", [item_type])
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[TypeParam, ExtensionResolutionResult]:
-        resolved_param, result = self.param._resolve_used_extensions(registry)
-        return (ListParam(resolved_param), result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> TypeParam:
+        return ListParam(self.param._resolve_used_extensions(resolver, registry))
 
 
 @dataclass(frozen=True)
@@ -317,17 +314,14 @@ class TupleParam(TypeParam):
         return model.Apply("core.tuple", [item_types])
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[TypeParam, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
-
-        result = ExtensionResolutionResult()
-        new_params = []
-        for param in self.params:
-            resolved_param, param_result = param._resolve_used_extensions(registry)
-            new_params.append(resolved_param)
-            result.extend(param_result)
-        return (TupleParam(new_params), result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> TypeParam:
+        return TupleParam(
+            [
+                param._resolve_used_extensions(resolver, registry)
+                for param in self.params
+            ]
+        )
 
 
 @dataclass(frozen=True)
@@ -347,10 +341,9 @@ class ConstParam(TypeParam):
         return model.Apply("core.const", [ty])
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[TypeParam, ExtensionResolutionResult]:
-        resolved_ty, result = self.ty._resolve_used_extensions(registry)
-        return (ConstParam(resolved_ty), result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> TypeParam:
+        return ConstParam(self.ty._resolve_used_extensions(resolver, registry))
 
 
 # ------------------------------------------
@@ -374,10 +367,10 @@ class TypeTypeArg(TypeArg):
         return self.ty.to_model()
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[TypeArg, ExtensionResolutionResult]:
-        resolved_ty, result = self.ty._resolve_used_extensions(registry)
-        return (TypeTypeArg(resolved_ty), result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> TypeArg:
+        resolved_ty = self.ty._resolve_used_extensions(resolver, registry)
+        return TypeTypeArg(resolved_ty)
 
 
 @dataclass(frozen=True)
@@ -461,17 +454,11 @@ class ListArg(TypeArg):
         return model.List([elem.to_model() for elem in self.elems])
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[TypeArg, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
-
-        result = ExtensionResolutionResult()
-        new_elems = []
-        for elem in self.elems:
-            resolved_elem, elem_result = elem._resolve_used_extensions(registry)
-            new_elems.append(resolved_elem)
-            result.extend(elem_result)
-        return (ListArg(new_elems), result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> TypeArg:
+        return ListArg(
+            [elem._resolve_used_extensions(resolver, registry) for elem in self.elems]
+        )
 
 
 @dataclass(frozen=True)
@@ -502,17 +489,11 @@ class ListConcatArg(TypeArg):
                 return self
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[TypeArg, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
-
-        result = ExtensionResolutionResult()
-        new_lists = []
-        for elem in self.lists:
-            resolved_elem, elem_result = elem._resolve_used_extensions(registry)
-            new_lists.append(resolved_elem)
-            result.extend(elem_result)
-        return (ListConcatArg(new_lists), result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> TypeArg:
+        return ListConcatArg(
+            [elem._resolve_used_extensions(resolver, registry) for elem in self.lists]
+        )
 
 
 @dataclass(frozen=True)
@@ -531,17 +512,11 @@ class TupleArg(TypeArg):
         return model.Tuple([elem.to_model() for elem in self.elems])
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[TypeArg, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
-
-        result = ExtensionResolutionResult()
-        new_elems = []
-        for elem in self.elems:
-            resolved_elem, elem_result = elem._resolve_used_extensions(registry)
-            new_elems.append(resolved_elem)
-            result.extend(elem_result)
-        return (TupleArg(new_elems), result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> TypeArg:
+        return TupleArg(
+            [elem._resolve_used_extensions(resolver, registry) for elem in self.elems]
+        )
 
 
 @dataclass(frozen=True)
@@ -572,17 +547,11 @@ class TupleConcatArg(TypeArg):
                 return self
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[TypeArg, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
-
-        result = ExtensionResolutionResult()
-        new_tuples = []
-        for tup in self.tuples:
-            resolved_tup, tup_result = tup._resolve_used_extensions(registry)
-            new_tuples.append(resolved_tup)
-            result.extend(tup_result)
-        return (TupleConcatArg(new_tuples), result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> TypeArg:
+        return TupleConcatArg(
+            [tup._resolve_used_extensions(resolver, registry) for tup in self.tuples]
+        )
 
 
 @dataclass(frozen=True)
@@ -602,10 +571,10 @@ class VariableArg(TypeArg):
         return model.Var(f"_{self.idx}")
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[TypeArg, ExtensionResolutionResult]:
-        resolved_param, result = self.param._resolve_used_extensions(registry)
-        return (VariableArg(self.idx, resolved_param), result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> TypeArg:
+        resolved_param = self.param._resolve_used_extensions(resolver, registry)
+        return VariableArg(self.idx, resolved_param)
 
 
 # ----------------------------------------------
@@ -678,14 +647,11 @@ class Sum(Type):
         return model.Apply("core.adt", [variants])
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Type, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
-
-        result = ExtensionResolutionResult()
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Type:
         for row in self.variant_rows:
-            result.extend(_resolve_typerow_exts_inplace(row, registry))
-        return (self, result)
+            _resolve_typerow_exts_inplace(row, resolver, registry)
+        return self
 
 
 @dataclass(eq=False, repr=False)
@@ -801,14 +767,13 @@ class USize(Type):
         return model.Apply("prelude.usize")
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Type, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Type:
         from hugr.std.prelude import PRELUDE_EXTENSION
 
-        result = ExtensionResolutionResult()
-        result.used_extensions.register(PRELUDE_EXTENSION)
-        return (self, result)
+        resolver.register(PRELUDE_EXTENSION)
+
+        return self
 
 
 @dataclass(frozen=True)
@@ -890,12 +855,11 @@ class FunctionType(Type):
         return model.Apply("core.fn", [inputs, outputs])
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Type, ExtensionResolutionResult]:
-        in_result = _resolve_typerow_exts_inplace(self.input, registry)
-        out_result = _resolve_typerow_exts_inplace(self.output, registry)
-        in_result.extend(out_result)
-        return (self, in_result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Type:
+        _resolve_typerow_exts_inplace(self.input, resolver, registry)
+        _resolve_typerow_exts_inplace(self.output, resolver, registry)
+        return self
 
 
 @dataclass(frozen=True)
@@ -935,16 +899,15 @@ class PolyFuncType(Type):
         raise TypeError(error)
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Type, ExtensionResolutionResult]:
-        resolved_body, result = self.body._resolve_used_extensions(registry)
-        new_params = []
-        for param in self.params:
-            resolved_param, param_result = param._resolve_used_extensions(registry)
-            new_params.append(resolved_param)
-            result.extend(param_result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Type:
+        resolved_body = self.body._resolve_used_extensions(resolver, registry)
         assert type(resolved_body) is FunctionType
-        return (PolyFuncType(new_params, resolved_body), result)
+        new_params = [
+            param._resolve_used_extensions(resolver, registry) for param in self.params
+        ]
+
+        return PolyFuncType(new_params, resolved_body)
 
 
 @dataclass
@@ -995,19 +958,13 @@ class ExtType(Type):
         return self._to_opaque().to_model()
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Type, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
-
-        result = ExtensionResolutionResult()
-        result.used_extensions.register(self.type_def.get_extension())
-
-        new_args = []
-        for arg in self.args:
-            resolved_arg, arg_result = arg._resolve_used_extensions(registry)
-            new_args.append(resolved_arg)
-            result.extend(arg_result)
-        return (ExtType(self.type_def, new_args), result)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Type:
+        resolver.register(self.type_def.get_extension())
+        new_args = [
+            arg._resolve_used_extensions(resolver, registry) for arg in self.args
+        ]
+        return ExtType(self.type_def, new_args)
 
 
 @dataclass
@@ -1048,9 +1005,9 @@ class Opaque(Type):
         return model.Apply(name, args)
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Type, ExtensionResolutionResult]:
-        from hugr.ext import Extension, ExtensionRegistry, ExtensionResolutionResult
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Type:
+        from hugr.ext import Extension, ExtensionRegistry
 
         if registry is not None:
             try:
@@ -1061,17 +1018,14 @@ class Opaque(Type):
                 pass
             else:
                 # Successfully got the type_def - resolve to ExtType
-                return ExtType(type_def, self.args)._resolve_used_extensions(registry)
+                return ExtType(type_def, self.args)._resolve_used_extensions(
+                    resolver, registry
+                )
 
-        # Could not resolve to an ExtType - return self with unresolved extension
-        result = ExtensionResolutionResult()
-
-        new_args = []
-        for arg in self.args:
-            resolved_arg, arg_result = arg._resolve_used_extensions(registry)
-            new_args.append(resolved_arg)
-            result.extend(arg_result)
-
+        # Could not resolve to an ExtType - add to unresolved types
+        new_args = [
+            arg._resolve_used_extensions(resolver, registry) for arg in self.args
+        ]
         new_type = Opaque(
             self.id,
             self.bound,
@@ -1080,11 +1034,10 @@ class Opaque(Type):
             self.extension_version,
         )
 
-        result.unresolved_extensions.add(self.extension)
-        if (self.extension, self.id) not in result.unresolved_types:
-            result.unresolved_types[(self.extension, self.id)] = new_type
+        resolver.ensure_unresolved(self.extension)
+        resolver.ensure_unresolved_type(self.extension, self.id, new_type)
 
-        return (new_type, result)
+        return new_type
 
 
 @dataclass
@@ -1102,14 +1055,12 @@ class _QubitDef(Type):
         return model.Apply("prelude.qubit", [])
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Type, ExtensionResolutionResult]:
-        from hugr.ext import ExtensionResolutionResult
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Type:
         from hugr.std.prelude import PRELUDE_EXTENSION
 
-        result = ExtensionResolutionResult()
-        result.used_extensions.register(PRELUDE_EXTENSION)
-        return (self, result)
+        resolver.register(PRELUDE_EXTENSION)
+        return self
 
 
 #: Qubit type.

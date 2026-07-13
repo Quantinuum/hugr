@@ -44,7 +44,6 @@ from hugr.ops import (
 )
 from hugr.tys import Kind, OrderKind, Type, ValueKind
 from hugr.utils import BiMap
-from hugr.val import Value
 
 from .node_port import (
     Direction,
@@ -1258,21 +1257,19 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> Dfg(tys.Qubit).hugr.used_extensions().ids()
             {'prelude'}
         """
-        from hugr.ext import ExtensionResolutionResult
+        from hugr.ext import UsedExtensionResolver
         from hugr.std import _std_extensions
 
         if resolve_from is not None:
             resolve_from.extend(_std_extensions())
 
-        result = ExtensionResolutionResult()
+        resolver = UsedExtensionResolver()
 
         for node in self:
             op = self[node].op
-            # _resolve_used_extensions returns the resolved op and the extensions
-            resolved_op, op_result = op._resolve_used_extensions(resolve_from)
-            self[node].op = resolved_op
-            result.extend(op_result)
+            self[node].op = op._resolve_used_extensions(resolver, resolve_from)
 
+        result = resolver.result()
         result._extend_with_transitive_ops(resolve_from)
 
         return result

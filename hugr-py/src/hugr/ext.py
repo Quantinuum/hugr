@@ -21,6 +21,9 @@ __all__ = [
     "OpDef",
     "Extension",
     "Version",
+    "ExtensionRegistry",
+    "ExtensionResolutionResult",
+    "UsedExtensionResolver",
 ]
 
 if TYPE_CHECKING:
@@ -264,9 +267,6 @@ class OpDef(ExtensionObject):
         return ops.ExtOp(self, concrete_signature, list(args or []))
 
 
-T = TypeVar("T", bound=ops.RegisteredOp)
-
-
 @dataclass
 class Extension:
     """HUGR extension declaration."""
@@ -343,17 +343,19 @@ class Extension:
         if registry is not None and self.name not in registry:
             registry.register(self)
 
+        resolver = UsedExtensionResolver()
         result = ExtensionResolutionResult()
         for op_def in self.operations.values():
             poly_func = op_def.signature.poly_func
             if poly_func is None:
                 continue
-            _, sig_result = poly_func._resolve_used_extensions(registry)
-            result.extend(sig_result)
+            poly_func._resolve_used_extensions(resolver, registry)
 
             for lower_func in op_def.lower_funcs:
                 lower_result = lower_func.hugr.used_extensions(registry)
                 result.extend(lower_result)
+
+        result.extend(resolver.result())
 
         return result
 
@@ -425,6 +427,8 @@ class Extension:
             binary = signature is None
             signature = OpDefSig(signature, binary)
 
+        T = TypeVar("T", bound=ops.RegisteredOp)
+
         def _inner(cls: type[T]) -> type[T]:
             new_description = cls.__doc__ if description is None and cls.__doc__ else ""
             new_name = cls.__name__ if name is None else name
@@ -474,30 +478,49 @@ class ExtensionVersions:
         """Get all versions of the extension."""
         return frozenset(self._exts.keys())
 
+    def _coalesce_single(self, resolve_on: Version) -> None:
+        compatible_versions = [
+            version
+            for version in self._exts
+            if _same_compatibility_group(version, resolve_on)
+        ]
+        if len(compatible_versions) > 0:
+            latest_compatible = max(compatible_versions)
+            for version in compatible_versions:
+                if version != latest_compatible:
+                    del self._exts[version]
+
+    def coalesce(self) -> None:
+        """Ensures the latest version is up to date and any semver compatible versions
+        are coalesced, with only the latest of that group retained.
+
+        This is done automatically by `add`, but not by `add_lazy`.
+        """
+        self._latest_version = max(self._exts)
+
+        for version in list(self._exts.keys()):
+            # body mutates the dictionary, so check whether the version is still present
+            if version in self._exts:
+                self._coalesce_single(version)
+
     def add(self, extension: Extension) -> None:
         """Add an extension to the set, coalescing compatible older versions."""
         if extension.name != self._id:
             msg = f"Extension {extension.name} has a different name than {self._id}"
             raise ValueError(msg)
 
-        compatible_versions = [
-            version
-            for version in self._exts
-            if _same_compatibility_group(version, extension.version)
-        ]
-        if compatible_versions:
-            latest_compatible = max(compatible_versions)
-            if latest_compatible > extension.version:
-                return
-            for version in compatible_versions:
-                del self._exts[version]
+        self.add_lazy(extension)
+        self._latest_version = max(self._exts)
+        self._coalesce_single(extension.version)
 
+    def add_lazy(self, extension: Extension) -> None:
+        """Add an extension to the set, NOT coalescing compatible older versions.
+        Use `coalesce` to subsequently coalesce all compatible versions.
+        """
+        if extension.name != self._id:
+            msg = f"Extension {extension.name} has a different name than {self._id}"
+            raise ValueError(msg)
         self._exts[extension.version] = extension
-
-        if extension.version > self._latest_version:
-            self._latest_version = extension.version
-        else:
-            self._latest_version = max(self._exts)
 
     def get_compatible(self, version: Version) -> Extension:
         """Get the highest registered extension compatible with ``version``."""
@@ -644,6 +667,65 @@ class ExtensionRegistry:
 
     def __contains__(self, name: ExtensionId) -> bool:
         return name in self.versioned_extensions
+
+
+@dataclass
+class UsedExtensionResolver:
+    """A stateful helper class for resolving used extensions, enabling to ensure that
+    certain extensions are present and unresolved operations are added efficiently.
+    """
+
+    _used_extensions: dict[ExtensionId, ExtensionVersions] = field(default_factory=dict)
+    _unresolved_extensions: set[ExtensionId] = field(default_factory=set)
+    _unresolved_ops: dict[tuple[tys.ExtensionId, str], ops.Custom] = field(
+        default_factory=dict
+    )
+    _unresolved_types: dict[tuple[tys.ExtensionId, str], tys.Opaque] = field(
+        default_factory=dict
+    )
+
+    def register(self, extension: Extension) -> None:
+        if extension.name not in self._used_extensions:
+            self._used_extensions[extension.name] = ExtensionVersions(extension)
+        else:
+            self._used_extensions[extension.name].add_lazy(extension)
+
+    def ensure_unresolved(self, ext_id: ExtensionId) -> None:
+        self._unresolved_extensions.add(ext_id)
+
+    def ensure_unresolved_op(
+        self, ext_id: ExtensionId, type_id: str, op: ops.Custom
+    ) -> None:
+        if (ext_id, type_id) not in self._unresolved_ops:
+            self._unresolved_ops[(ext_id, type_id)] = op
+
+    def ensure_unresolved_type(
+        self, ext_id: ExtensionId, type_id: str, opaque_type: tys.Opaque
+    ) -> None:
+        if (ext_id, type_id) not in self._unresolved_types:
+            self._unresolved_types[(ext_id, type_id)] = opaque_type
+
+    def extend_with_result(self, result: ExtensionResolutionResult) -> None:
+        """Add the values from another result to this resolver.
+
+        Args:
+            result: The result of resolving extensions to add.
+        """
+        for ext in result.used_extensions.all_extensions:
+            self.register(ext)
+        self._unresolved_extensions.update(result.unresolved_extensions)
+        self._unresolved_ops.update(result.unresolved_ops)
+        self._unresolved_types.update(result.unresolved_types)
+
+    def result(self) -> ExtensionResolutionResult:
+        for versions in self._used_extensions.values():
+            versions.coalesce()
+        return ExtensionResolutionResult(
+            ExtensionRegistry(self._used_extensions),
+            self._unresolved_extensions,
+            self._unresolved_ops,
+            self._unresolved_types,
+        )
 
 
 @dataclass

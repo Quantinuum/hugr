@@ -11,7 +11,7 @@ from hugr.std._util import _load_extension
 from hugr.utils import comma_sep_str
 
 if TYPE_CHECKING:
-    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
+    from hugr.ext import ExtensionRegistry, UsedExtensionResolver
 
 EXTENSION = _load_extension("collections.borrow_arr")
 
@@ -62,9 +62,9 @@ class BorrowArray(tys.ExtType):
         return tys.TypeBound.Linear
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[BorrowArray, ExtensionResolutionResult]:
-        ext_type, result = super()._resolve_used_extensions(registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> BorrowArray:
+        ext_type = super()._resolve_used_extensions(resolver, registry)
 
         assert isinstance(
             ext_type, tys.ExtType
@@ -75,7 +75,7 @@ class BorrowArray(tys.ExtType):
 
         borrow_array = BorrowArray(tys.Unit, 0)
         borrow_array.args = ext_type.args
-        return borrow_array, result
+        return borrow_array
 
 
 # Note that only borrow array values with no elements borrowed should be emitted.
@@ -113,13 +113,12 @@ class BorrowArrayVal(val.ExtensionValue):
         )
 
     def _resolve_used_extensions_inplace(
-        self, registry: ExtensionRegistry | None = None
-    ) -> ExtensionResolutionResult:
-        resolved_ty, result = self.ty._resolve_used_extensions(registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> None:
+        resolved_ty = self.ty._resolve_used_extensions(resolver, registry)
         assert isinstance(
             resolved_ty, BorrowArray
         ), "HUGR internal error, expected resolved type to be borrow array."
         self.ty = resolved_ty
         for value in self.v:
-            result.extend(value._resolve_used_extensions_inplace(registry))
-        return result
+            value._resolve_used_extensions_inplace(resolver, registry)

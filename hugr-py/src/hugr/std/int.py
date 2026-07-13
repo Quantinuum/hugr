@@ -13,6 +13,7 @@ from hugr.ops import AsExtOp, DataflowOp, ExtOp, RegisteredOp
 from hugr.std._util import _load_extension
 
 if TYPE_CHECKING:
+    from hugr.ext import UsedExtensionResolver
     from hugr.ops import Command, ComWire
 
 CONVERSIONS_EXTENSION = _load_extension("arithmetic.conversions")
@@ -95,11 +96,11 @@ class IntVal(val.ExtensionValue):
         return f"{self.v}"
 
     def _resolve_used_extensions_inplace(
-        self, registry: ext.ExtensionRegistry | None = None
-    ) -> ext.ExtensionResolutionResult:
-        result = ext.ExtensionResolutionResult()
-        result.used_extensions.register(INT_TYPES_EXTENSION)
-        return result
+        self,
+        resolver: UsedExtensionResolver,
+        registry: ext.ExtensionRegistry | None = None,
+    ) -> None:
+        resolver.register(INT_TYPES_EXTENSION)
 
     def to_model(self) -> model.Term:
         unsigned = _to_unsigned(self.v, 1 << self.width)
