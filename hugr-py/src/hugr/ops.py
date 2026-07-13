@@ -101,8 +101,6 @@ class Op(Protocol):
 
         Returns:
             - The resolved operation
-            - A result type with both resolved and unresolved extensions
-              referenced by the operation.
         """
         return self
 

@@ -53,9 +53,6 @@ class Value(Protocol):
             resolver: The resolved to report used extensions to.
             registry: A registry to resolve unresolved extensions from.
                 If None, opaque operations and types will not be resolved.
-
-        Returns:
-            The resolution result containing used and unresolved extensions.
         """
         ...
 
