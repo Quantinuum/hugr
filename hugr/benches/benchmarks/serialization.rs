@@ -24,23 +24,22 @@ fn serializers() -> [Serializer; 4] {
     [
         Serializer {
             name: "capnp/without_extensions",
-            config: EnvelopeConfig::new(EnvelopeFormat::Model).disable_compression(),
+            config: EnvelopeConfig::new(EnvelopeFormat::Model),
             include_extensions: false,
         },
         Serializer {
             name: "capnp/with_extensions",
-            config: EnvelopeConfig::new(EnvelopeFormat::ModelWithExtensions).disable_compression(),
+            config: EnvelopeConfig::new(EnvelopeFormat::ModelWithExtensions),
             include_extensions: true,
         },
         Serializer {
             name: "sexpr/without_extensions",
-            config: EnvelopeConfig::new(EnvelopeFormat::SExpression).disable_compression(),
+            config: EnvelopeConfig::new(EnvelopeFormat::SExpression),
             include_extensions: false,
         },
         Serializer {
             name: "sexpr/with_extensions",
-            config: EnvelopeConfig::new(EnvelopeFormat::SExpressionWithExtensions)
-                .disable_compression(),
+            config: EnvelopeConfig::new(EnvelopeFormat::SExpressionWithExtensions),
             include_extensions: true,
         },
     ]
@@ -48,11 +47,14 @@ fn serializers() -> [Serializer; 4] {
 
 /// Encodes a HUGR with the supplied envelope configuration.
 fn encode(hugr: &Hugr, serializer: &Serializer) -> Vec<u8> {
+    // Always disable compression, since we are not benchmarking zstd here.
+    let config = serializer.config.disable_compression();
+
     let mut bytes = Vec::new();
     if serializer.include_extensions {
-        hugr.store_with_exts(&mut bytes, serializer.config, hugr.extensions())
+        hugr.store_with_exts(&mut bytes, config, hugr.extensions())
     } else {
-        hugr.store(&mut bytes, serializer.config)
+        hugr.store(&mut bytes, config)
     }
     .expect("benchmark HUGRs should always be serializable");
     bytes
