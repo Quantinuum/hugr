@@ -599,6 +599,11 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                 .unwrap_basic();
             Ok(vec![r])
         }),
+        // NOTE: LLVM's shl/lshr define a shift by a count greater or equal to the operand width as poison.
+        // The operation definition does not restrict the shift count, so the lowering here is inconsistent.
+        //
+        // TODO: Improve this lowering.
+        // <https://github.com/Quantinuum/hugr/issues/3155>
         IntOpDef::ishl => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
             Ok(vec![
                 ctx.builder()
@@ -606,6 +611,11 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                     .as_basic_value_enum(),
             ])
         }),
+        // NOTE: LLVM's shl/lshr define a shift by a count greater or equal to the operand width as poison.
+        // The operation definition does not restrict the shift count, so the lowering here is inconsistent.
+        //
+        // TODO: Improve this lowering.
+        // <https://github.com/Quantinuum/hugr/issues/3155>
         IntOpDef::ishr => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
             Ok(vec![
                 ctx.builder()
