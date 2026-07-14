@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.29.2](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.29.1...hugr-llvm-v0.29.2) - 2026-07-14
+
+### Bug Fixes
+
+- ConstFold panic on rotating/shifting by large values ([#3156](https://github.com/Quantinuum/hugr/pull/3156))
+
 ## [0.28.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.27.1...hugr-llvm-v0.28.0) - 2026-06-05
 
 ### New Features
