@@ -1,6 +1,17 @@
 # Changelog
 
 
+## [0.29.2](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.1...hugr-v0.29.2) - 2026-07-14
+
+### Bug Fixes
+
+- Fix partial const folding of logic.eq ([#3154](https://github.com/Quantinuum/hugr/pull/3154))
+- ConstFold panic on rotating/shifting by large values ([#3156](https://github.com/Quantinuum/hugr/pull/3156))
+
+### Performance
+
+- Reduce extension resolution work in envelope decoding ([#3148](https://github.com/Quantinuum/hugr/pull/3148))
+
 ## [0.29.1](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.0...hugr-v0.29.1) - 2026-07-07
 
 ### New Features
