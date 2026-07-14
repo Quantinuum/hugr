@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.27.2](https://github.com/quantinuum/hugr/compare/hugr-v0.27.1...hugr-v0.27.2) - 2026-07-14
+
+### Bug Fixes
+
+- Display source error for errors during payload reads ([#3120](https://github.com/quantinuum/hugr/pull/3120))
+- ConstFold panic on rotating/shifting by large values ([#3156](https://github.com/quantinuum/hugr/pull/3156))
+- Fix partial const folding of logic.eq ([#3154](https://github.com/quantinuum/hugr/pull/3154))
+
 ## [0.27.1](https://github.com/Quantinuum/hugr/compare/hugr-v0.27.0...hugr-v0.27.1) - 2026-05-05
 
 ### Bug Fixes
