@@ -413,3 +413,17 @@ class ExtensionValue(Value, Protocol):
     def to_model(self) -> model.Term:
         # Fallback
         return self.to_value().to_model()
+
+    def _resolve_used_extensions_inplace(
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> None:
+        """Resolve the extensions required to define this value.
+
+        This should be implemented by classes that conform to the ExtensionValue
+        protocol, ensuring any extension referenced internally are resolved
+        using the registry, and calling `UsedExtensionResolver.register` for any
+        extensions used by the value.
+        """
+        # TODO: This should probably be an abstract class, but we provide a
+        # default implementation here to avoid breaking the API.
+        return
