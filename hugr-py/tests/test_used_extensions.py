@@ -127,6 +127,36 @@ def test_op_signature_contains_same_extension() -> None:
     assert my_ext.name in exts.ids()
 
 
+def test_extension_from_json_resolves_types() -> None:
+    """Resolve opaque types throughout a deserialized extension definition."""
+    extension = ext.Extension("test.from_json", ext.Version(0, 1, 0))
+    extension.add_type_def(
+        ext.TypeDef(
+            name="Container",
+            description="A type parameterized by a constant.",
+            params=[tys.ConstParam(TEST_TYPE_OPAQUE)],
+            bound=ext.ExplicitBound(tys.TypeBound.Copyable),
+        )
+    )
+    extension.add_op_def(
+        ext.OpDef(
+            name="Make",
+            description="Return the referenced type.",
+            signature=ext.OpDefSig(tys.FunctionType([], [TEST_TYPE_OPAQUE])),
+        )
+    )
+    registry = ext.ExtensionRegistry.from_extensions([TEST_EXT])
+
+    loaded = ext.Extension.from_json(extension.to_json(), registry)
+
+    signature = loaded.get_op("Make").signature.poly_func
+    assert signature is not None
+    assert isinstance(signature.body.output[0], tys.ExtType)
+    [param] = loaded.get_type("Container").params
+    assert isinstance(param, tys.ConstParam)
+    assert isinstance(param.ty, tys.ExtType)
+
+
 @pytest.mark.parametrize(
     ("typ", "extensions"),
     [

@@ -299,16 +299,24 @@ class Extension:
         return self._to_serial().model_dump_json()
 
     @classmethod
-    def from_json(cls, json_str: str) -> Extension:
+    def from_json(
+        cls, json_str: str, registry: ExtensionRegistry | None = None
+    ) -> Extension:
         """Deserialize a JSON string to a Extension object.
 
         Args:
             json_str: The JSON string representing a Extension.
+            registry: If present, performs extension resolution on the
+                extension types referenced in the type and operation definitions
+                of the deserialized Extension.
 
         Returns:
             The deserialized Extension object.
         """
-        return ext_s.Extension.model_validate_json(json_str).deserialize()
+        ext = ext_s.Extension.model_validate_json(json_str).deserialize()
+        if registry is not None:
+            ext._resolve_used_extensions(registry)
+        return ext
 
     def add_op_def(self, op_def: OpDef) -> OpDef:
         """Add an operation definition to the extension.
@@ -339,17 +347,25 @@ class Extension:
     def _resolve_used_extensions(
         self, registry: ExtensionRegistry | None = None
     ) -> ExtensionResolutionResult:
-        """Collect extension dependencies from this extension's op signatures."""
+        """Resolve and collect dependencies throughout this extension definition."""
         if registry is not None and self.name not in registry:
             registry.register(self)
 
         resolver = UsedExtensionResolver()
         result = ExtensionResolutionResult()
+        for type_def in self.types.values():
+            type_def.params = [
+                param._resolve_used_extensions(resolver, registry)
+                for param in type_def.params
+            ]
+
         for op_def in self.operations.values():
             poly_func = op_def.signature.poly_func
             if poly_func is None:
                 continue
-            poly_func._resolve_used_extensions(resolver, registry)
+            resolved_poly_func = poly_func._resolve_used_extensions(resolver, registry)
+            assert isinstance(resolved_poly_func, tys.PolyFuncType)
+            op_def.signature.poly_func = resolved_poly_func
 
             for lower_func in op_def.lower_funcs:
                 lower_result = lower_func.hugr.used_extensions(registry)
