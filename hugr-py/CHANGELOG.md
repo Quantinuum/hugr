@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.18.2](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.1...hugr-py-v0.18.2) (2026-07-15)
+
+
+### Features
+
+* Standalone extension resolution on extension load ([#3160](https://github.com/Quantinuum/hugr/issues/3160)) ([6f96ce8](https://github.com/Quantinuum/hugr/commit/6f96ce8c270032f17db95333f21e3d3c589f9835))
+
+
+### Bug Fixes
+
+* Avoid breaking change to ExtensionValue present in hugr 0.18.1 ([#3163](https://github.com/Quantinuum/hugr/issues/3163)) ([eeff49d](https://github.com/Quantinuum/hugr/commit/eeff49d7201c4ffc4cf7e6f2c5ca15fc5ed36654))
+
 ## [0.18.1](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.0...hugr-py-v0.18.1) (2026-07-13)
 
 
