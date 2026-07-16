@@ -112,7 +112,7 @@ use std::cmp::Ordering;
 
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ExtensionId, ExtensionRegistry};
-use crate::types::{EdgeKind, Signature, Substitution};
+use crate::types::{EdgeKind, Signature, Substitution, Type};
 use crate::{Direction, Node, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
 use handle::NodeHandle;
@@ -132,7 +132,7 @@ use smol_str::SmolStr;
 pub use sum::Tag;
 pub use tag::OpTag;
 
-#[enum_dispatch(OpTrait, NamedOp, ValidateOp, OpParent, ValuePortOp)]
+#[enum_dispatch(OpTrait, NamedOp, ValidateOp, OpParent)]
 #[derive(Clone, Debug, PartialEq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(proptest_derive::Arbitrary))]
 /// The concrete operation types for a node in the HUGR.
@@ -322,7 +322,7 @@ impl OpType {
 
         // Dataflow ports
         if port.index() < port_count {
-            return ValuePortOp::value_port_kind(self, port);
+            return OpTrait::value_port_type(self, port).map(EdgeKind::Value);
         }
 
         // Constant port
@@ -429,7 +429,7 @@ impl OpType {
     #[inline]
     #[must_use]
     pub fn value_port_count(&self, dir: portgraph::Direction) -> usize {
-        ValuePortOp::value_port_count(self, dir)
+        OpTrait::value_port_count(self, dir)
     }
 
     /// The number of Value input ports.
@@ -537,51 +537,6 @@ pub(crate) trait NamedOp {
     fn name(&self) -> OpName;
 }
 
-/// Internal borrow-first queries for the value ports of an operation.
-///
-/// Variants with a cached signature only need to expose it. Variants whose
-/// signatures are synthesized implement the queries directly, avoiding an
-/// allocation of the complete signature.
-#[enum_dispatch]
-pub(crate) trait ValuePortOp {
-    /// Returns a cached signature when the operation stores one directly.
-    fn value_port_signature(&self) -> Option<&Signature> {
-        None
-    }
-
-    /// Returns the kind of one value port, constructing only its requested type.
-    fn value_port_kind(&self, port: Port) -> Option<EdgeKind> {
-        self.value_port_signature()?
-            .port_type(port)
-            .cloned()
-            .map(EdgeKind::Value)
-    }
-
-    /// Returns the number of value ports in one direction.
-    fn value_port_count(&self, dir: Direction) -> usize {
-        self.value_port_signature()
-            .map_or(0, |signature| signature.port_count(dir))
-    }
-}
-
-macro_rules! impl_no_value_ports {
-    ($($op:ty),* $(,)?) => {
-        $(impl ValuePortOp for $op {})*
-    };
-}
-
-impl_no_value_ports!(
-    Module,
-    FuncDefn,
-    FuncDecl,
-    AliasDecl,
-    AliasDefn,
-    Const,
-    DataflowBlock,
-    ExitBlock,
-    Case,
-);
-
 /// Trait statically querying the tag of an operation.
 ///
 /// This is implemented by all `OpType` variants, and always contains the dynamic
@@ -618,6 +573,23 @@ pub trait OpTrait: Sized + Clone {
     /// Only dataflow operations have a signature, otherwise returns None.
     fn dataflow_signature(&self) -> Option<Cow<'_, Signature>> {
         None
+    }
+
+    /// Returns the type of a value port.
+    ///
+    /// Implementations may override this to avoid constructing a complete
+    /// [`Signature`] when only one port type is needed.
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        self.dataflow_signature()?.port_type(port).cloned()
+    }
+
+    /// Returns the number of value ports in one direction.
+    ///
+    /// Implementations may override this to avoid constructing a complete
+    /// [`Signature`] when only its size is needed.
+    fn value_port_count(&self, dir: Direction) -> usize {
+        self.dataflow_signature()
+            .map_or(0, |signature| signature.port_count(dir))
     }
 
     /// The edge kind for the non-dataflow inputs of the operation,

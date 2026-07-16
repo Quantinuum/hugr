@@ -7,7 +7,7 @@ use crate::{Direction, Port, PortIndex};
 
 use super::OpTag;
 use super::dataflow::{DataflowOpTrait, DataflowParent};
-use super::{OpTrait, StaticTag, ValuePortOp, impl_op_name};
+use super::{OpTrait, StaticTag, impl_op_name};
 
 /// Tail-controlled loop.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -37,17 +37,7 @@ impl DataflowOpTrait for TailLoop {
         Cow::Owned(Signature::new(inputs, outputs))
     }
 
-    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
-        Self {
-            just_inputs: self.just_inputs.substitute(subst),
-            just_outputs: self.just_outputs.substitute(subst),
-            rest: self.rest.substitute(subst),
-        }
-    }
-}
-
-impl ValuePortOp for TailLoop {
-    fn value_port_kind(&self, port: Port) -> Option<EdgeKind> {
+    fn value_port_type(&self, port: Port) -> Option<Type> {
         let (head, tail) = match port.direction() {
             Direction::Incoming => (&self.just_inputs, &self.rest),
             Direction::Outgoing => (&self.just_outputs, &self.rest),
@@ -59,7 +49,6 @@ impl ValuePortOp for TailLoop {
                     .and_then(|index| tail.get(index))
             })
             .cloned()
-            .map(EdgeKind::Value)
     }
 
     fn value_port_count(&self, dir: Direction) -> usize {
@@ -68,6 +57,14 @@ impl ValuePortOp for TailLoop {
             Direction::Outgoing => &self.just_outputs,
         };
         directional.len() + self.rest.len()
+    }
+
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            just_inputs: self.just_inputs.substitute(subst),
+            just_outputs: self.just_outputs.substitute(subst),
+            rest: self.rest.substitute(subst),
+        }
     }
 }
 
@@ -139,29 +136,26 @@ impl DataflowOpTrait for Conditional {
         Cow::Owned(Signature::new(inputs, self.outputs.clone()))
     }
 
-    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
-        Self {
-            sum_rows: self.sum_rows.iter().map(|r| r.substitute(subst)).collect(),
-            other_inputs: self.other_inputs.substitute(subst),
-            outputs: self.outputs.substitute(subst),
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        match port.direction() {
+            Direction::Incoming if port.index() == 0 => Some(Type::new_sum(self.sum_rows.clone())),
+            Direction::Incoming => self.other_inputs.get(port.index() - 1).cloned(),
+            Direction::Outgoing => self.outputs.get(port.index()).cloned(),
         }
-    }
-}
-
-impl ValuePortOp for Conditional {
-    fn value_port_kind(&self, port: Port) -> Option<EdgeKind> {
-        let ty = match port.direction() {
-            Direction::Incoming if port.index() == 0 => Type::new_sum(self.sum_rows.clone()),
-            Direction::Incoming => self.other_inputs.get(port.index() - 1)?.clone(),
-            Direction::Outgoing => self.outputs.get(port.index())?.clone(),
-        };
-        Some(EdgeKind::Value(ty))
     }
 
     fn value_port_count(&self, dir: Direction) -> usize {
         match dir {
             Direction::Incoming => self.other_inputs.len() + 1,
             Direction::Outgoing => self.outputs.len(),
+        }
+    }
+
+    fn substitute(&self, subst: &crate::types::Substitution) -> Self {
+        Self {
+            sum_rows: self.sum_rows.iter().map(|r| r.substitute(subst)).collect(),
+            other_inputs: self.other_inputs.substitute(subst),
+            outputs: self.outputs.substitute(subst),
         }
     }
 }
@@ -198,12 +192,6 @@ impl DataflowOpTrait for CFG {
         Self {
             signature: self.signature.substitute(subst),
         }
-    }
-}
-
-impl ValuePortOp for CFG {
-    fn value_port_signature(&self) -> Option<&Signature> {
-        Some(&self.signature)
     }
 }
 
