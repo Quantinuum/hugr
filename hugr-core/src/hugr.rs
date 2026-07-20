@@ -883,6 +883,8 @@ pub(crate) mod test {
     }
 
     /// A multiport copy node must not hide later nodes from extension resolution.
+    ///
+    /// See <https://github.com/Quantinuum/hugr/pull/3170>
     #[rstest]
     fn resolve_after_multiport_copy() {
         let extension_id = ExtensionId::new_unchecked("test.multiport");
