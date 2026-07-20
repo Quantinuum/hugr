@@ -294,24 +294,9 @@ impl Hugr {
         let mut used_extensions = ExtensionRegistry::default();
         let mut seen_extensions = BTreeSet::<(ExtensionId, Version)>::new();
 
-        // Here we need to iterate the optypes in the hugr mutably, to avoid
-        // having to clone and accumulate all replacements before finally
-        // applying them.
-        //
-        // This is not something we want to expose it the API, so we manually
-        // iterate instead of writing it as a method.
-        //
-        // Since we don't have a non-borrowing iterator over all the possible
-        // NodeIds, we have to simulate it by iterating over all possible
-        // indices and checking if the node exists.
         let weak_extensions: WeakExtensionRegistry = extensions.into();
-        for n in 0..self.graph.node_capacity() {
-            let pg_node = portgraph::NodeIndex::new(n);
+        for pg_node in self.graph.nodes_iter() {
             let node: Node = pg_node.into();
-            if !self.contains_node(node) {
-                continue;
-            }
-
             let op = &mut self.op_types[pg_node];
 
             if let Some(extension) = resolve_op_extensions(node, op, extensions)? {
@@ -686,7 +671,7 @@ pub(crate) mod test {
     use crate::ops::OpaqueOp;
     use crate::ops::handle::NodeHandle;
     use crate::types::Signature;
-    use crate::{Visibility, test_file};
+    use crate::{Visibility, test_file, type_row};
     use cool_asserts::assert_matches;
     use itertools::Either;
     use portgraph::LinkView;
@@ -895,5 +880,51 @@ pub(crate) mod test {
         assert_matches!(exts.get("test.ext"), Some(ext) => {
             assert!(ext.get_op("MyOp").is_some());
         });
+    }
+
+    /// A multiport copy node must not hide later nodes from extension resolution.
+    #[rstest]
+    fn resolve_after_multiport_copy() {
+        let extension_id = ExtensionId::new_unchecked("test.multiport");
+        let extension = Extension::new_test_arc(extension_id.clone(), |ext, extension_ref| {
+            ext.add_op(
+                "op".into(),
+                String::new(),
+                Signature::new(vec![], vec![]),
+                extension_ref,
+            )
+            .unwrap();
+        });
+        let version = extension.version().clone();
+        let registry = ExtensionRegistry::new([extension]);
+
+        // An invalid hugr with two outputs. We're not validating, so this is fine.
+        let mut hugr = Hugr::new();
+        let root = hugr.module_root();
+        let source = hugr.add_node_with_parent(root, ops::Input { types: type_row![] });
+        let target_a = hugr.add_node_with_parent(root, ops::Output { types: type_row![] });
+        let target_b = hugr.add_node_with_parent(root, ops::Output { types: type_row![] });
+        // Connecting multiple edges from the input node's output port will
+        // create a multiport copy node in the underlying portgraph.
+        hugr.add_other_edge(source, target_a);
+        hugr.add_other_edge(source, target_b);
+
+        // An extension op added after the multiport copy node.
+        let trailing = hugr.add_node_with_parent(
+            root,
+            OpaqueOp::new(
+                extension_id,
+                version,
+                "op",
+                [],
+                Signature::new(vec![], vec![]),
+            ),
+        );
+        hugr.graph.shrink_to_fit();
+
+        // This should resolve the op.
+        hugr.resolve_extension_defs(&registry).unwrap();
+
+        assert!(hugr.get_optype(trailing).as_extension_op().is_some());
     }
 }
