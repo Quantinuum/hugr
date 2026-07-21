@@ -16,7 +16,9 @@ pub(super) fn set_fold(op: &FloatOps, def: &mut OpDef) {
             def.set_constant_folder(BinaryFold::from_op(op));
         }
         feq | fne | flt | fgt | fle | fge => def.set_constant_folder(CmpFold::from_op(*op)),
-        fneg | fabs | ffloor | fceil | fround => def.set_constant_folder(UnaryFold::from_op(op)),
+        fneg | fabs | ffloor | fceil | fround | froundeven => {
+            def.set_constant_folder(UnaryFold::from_op(op))
+        }
         ftostring => def.set_constant_folder(ToStringFold::from_op(op)),
     }
 }
@@ -110,6 +112,7 @@ impl UnaryFold {
             ffloor => f64::floor,
             fceil => f64::ceil,
             fround => f64::round,
+            froundeven => f64::round_ties_even,
             _ => panic!("not unary op."),
         }))
     }
