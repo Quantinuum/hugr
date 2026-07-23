@@ -112,7 +112,7 @@ use std::cmp::Ordering;
 
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ExtensionId, ExtensionRegistry};
-use crate::types::{EdgeKind, Signature, Substitution};
+use crate::types::{EdgeKind, Signature, Substitution, Type};
 use crate::{Direction, Node, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
 use handle::NodeHandle;
@@ -316,14 +316,13 @@ impl OpType {
     /// See [`OpType::dataflow_signature`], [`OpType::static_port_kind`], and
     /// [`OpType::other_port_kind`].
     pub fn port_kind(&self, port: impl Into<Port>) -> Option<EdgeKind> {
-        let signature = self.dataflow_signature().unwrap_or_default();
         let port: Port = port.into();
         let dir = port.direction();
-        let port_count = signature.port_count(dir);
+        let port_count = self.value_port_count(dir);
 
         // Dataflow ports
         if port.index() < port_count {
-            return signature.port_type(port).cloned().map(EdgeKind::Value);
+            return OpTrait::value_port_type(self, port).map(EdgeKind::Value);
         }
 
         // Constant port
@@ -430,8 +429,7 @@ impl OpType {
     #[inline]
     #[must_use]
     pub fn value_port_count(&self, dir: portgraph::Direction) -> usize {
-        self.dataflow_signature()
-            .map_or(0, |sig| sig.port_count(dir))
+        OpTrait::value_port_count(self, dir)
     }
 
     /// The number of Value input ports.
@@ -577,6 +575,23 @@ pub trait OpTrait: Sized + Clone {
         None
     }
 
+    /// Returns the type of a value port.
+    ///
+    /// Implementations may override this to avoid constructing a complete
+    /// [`Signature`] when only one port type is needed.
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        self.dataflow_signature()?.port_type(port).cloned()
+    }
+
+    /// Returns the number of value ports in one direction.
+    ///
+    /// Implementations may override this to avoid constructing a complete
+    /// [`Signature`] when only its size is needed.
+    fn value_port_count(&self, dir: Direction) -> usize {
+        self.dataflow_signature()
+            .map_or(0, |signature| signature.port_count(dir))
+    }
+
     /// The edge kind for the non-dataflow inputs of the operation,
     /// not described by the signature.
     ///
@@ -694,3 +709,99 @@ macro_rules! impl_validate_op {
 }
 
 use impl_validate_op;
+
+#[cfg(test)]
+mod test {
+    use super::*;
+    use crate::types::{PolyFuncType, Type};
+    use rstest::rstest;
+
+    fn signature() -> Signature {
+        Signature::new([Type::UNIT, Type::new_unit_sum(2)], [Type::new_unit_sum(3)])
+    }
+
+    fn input() -> OpType {
+        Input {
+            types: signature().input,
+        }
+        .into()
+    }
+
+    fn output() -> OpType {
+        Output {
+            types: signature().output,
+        }
+        .into()
+    }
+
+    fn call_indirect() -> OpType {
+        CallIndirect {
+            signature: signature(),
+        }
+        .into()
+    }
+
+    fn load_constant() -> OpType {
+        LoadConstant {
+            datatype: Type::new_unit_sum(2),
+        }
+        .into()
+    }
+
+    fn load_function() -> OpType {
+        let instantiation = signature();
+        LoadFunction {
+            func_sig: PolyFuncType::new(Vec::new(), instantiation.clone()),
+            type_args: Vec::new(),
+            instantiation,
+        }
+        .into()
+    }
+
+    fn tag() -> OpType {
+        Tag::new(1, vec![vec![Type::UNIT].into(), signature().input]).into()
+    }
+
+    fn tail_loop() -> OpType {
+        TailLoop {
+            just_inputs: vec![Type::UNIT].into(),
+            just_outputs: vec![Type::new_unit_sum(2)].into(),
+            rest: vec![Type::new_unit_sum(3)].into(),
+        }
+        .into()
+    }
+
+    fn conditional() -> OpType {
+        Conditional {
+            sum_rows: vec![vec![Type::UNIT].into(), vec![Type::new_unit_sum(2)].into()],
+            other_inputs: signature().input,
+            outputs: signature().output,
+        }
+        .into()
+    }
+
+    /// Borrow-first queries must remain equivalent to the public signature API.
+    #[rstest]
+    #[case::input(input())]
+    #[case::output(output())]
+    #[case::call_indirect(call_indirect())]
+    #[case::load_constant(load_constant())]
+    #[case::load_function(load_function())]
+    #[case::tag(tag())]
+    #[case::tail_loop(tail_loop())]
+    #[case::conditional(conditional())]
+    fn value_ports_match_signature(#[case] op: OpType) {
+        let signature = op.dataflow_signature().expect("dataflow operation");
+
+        for dir in [Direction::Incoming, Direction::Outgoing] {
+            assert_eq!(op.value_port_count(dir), signature.port_count(dir));
+            for index in 0..signature.port_count(dir) {
+                let port = Port::new(dir, index);
+                assert_eq!(
+                    op.port_kind(port),
+                    signature.port_type(port).cloned().map(EdgeKind::Value)
+                );
+            }
+        }
+    }
+}

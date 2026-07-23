@@ -2,8 +2,8 @@
 
 use std::borrow::Cow;
 
-use crate::Direction;
 use crate::types::{EdgeKind, Signature, Type, TypeRow, TypeRowLike};
+use crate::{Direction, Port, PortIndex};
 
 use super::OpTag;
 use super::dataflow::{DataflowOpTrait, DataflowParent};
@@ -35,6 +35,28 @@ impl DataflowOpTrait for TailLoop {
         let [inputs, outputs] =
             [&self.just_inputs, &self.just_outputs].map(|row| row.extend(self.rest.iter()));
         Cow::Owned(Signature::new(inputs, outputs))
+    }
+
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        let (head, tail) = match port.direction() {
+            Direction::Incoming => (&self.just_inputs, &self.rest),
+            Direction::Outgoing => (&self.just_outputs, &self.rest),
+        };
+        head.get(port.index())
+            .or_else(|| {
+                port.index()
+                    .checked_sub(head.len())
+                    .and_then(|index| tail.get(index))
+            })
+            .cloned()
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        let directional = match dir {
+            Direction::Incoming => &self.just_inputs,
+            Direction::Outgoing => &self.just_outputs,
+        };
+        directional.len() + self.rest.len()
     }
 
     fn substitute(&self, subst: &crate::types::Substitution) -> Self {
@@ -112,6 +134,21 @@ impl DataflowOpTrait for Conditional {
             .to_mut()
             .insert(0, Type::new_sum(self.sum_rows.clone()));
         Cow::Owned(Signature::new(inputs, self.outputs.clone()))
+    }
+
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        match port.direction() {
+            Direction::Incoming if port.index() == 0 => Some(Type::new_sum(self.sum_rows.clone())),
+            Direction::Incoming => self.other_inputs.get(port.index() - 1).cloned(),
+            Direction::Outgoing => self.outputs.get(port.index()).cloned(),
+        }
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.other_inputs.len() + 1,
+            Direction::Outgoing => self.outputs.len(),
+        }
     }
 
     fn substitute(&self, subst: &crate::types::Substitution) -> Self {
