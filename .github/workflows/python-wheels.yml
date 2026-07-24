@@ -254,7 +254,6 @@ jobs:
     strategy:
       matrix:
         emsdk_version:
-          - "5.0.3"
           - "4.0.9"
     steps:
       - uses: actions/checkout@v7
