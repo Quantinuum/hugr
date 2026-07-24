@@ -251,6 +251,10 @@ jobs:
     needs: check-tag
     if: ${{ needs.check-tag.outputs.run == 'true' }}
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        emsdk_version:
+          - "4.0.9"
     steps:
       - uses: actions/checkout@v7
       - uses: actions/setup-python@v7
@@ -273,13 +277,14 @@ jobs:
         # Ideally this should match both the version used by rustc and the pyodide ABI.
         # See <https://doc.rust-lang.org/beta/rustc/platform-support/wasm32-unknown-emscripten.html>
         # and <https://github.com/pyodide/pyodide/blob/main/docs/development/abi.md>
-        # Pyodide `0.28` and `0.29` use 4.0.9
-        # We fix a rustc version compatible with it.
+        # Pyodide `0.2X` requires emscripten 4
+        # Pyodide `314.X` requires emscripten 5
+        # We fix a rustc version compatible with both.
         run: |
           git clone --depth 1 https://github.com/emscripten-core/emsdk.git
           cd emsdk
-          ./emsdk install 5.0.3
-          ./emsdk activate 5.0.3
+          ./emsdk install ${{ matrix.emsdk_version }}
+          ./emsdk activate ${{ matrix.emsdk_version }}
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
         with:
@@ -309,7 +314,7 @@ jobs:
       - name: Upload wheels
         uses: actions/upload-artifact@v7
         with:
-          name: wheels-wasm-${{ matrix.platform.target }}
+          name: wheels-wasm-${{ matrix.platform.target }}-${{ matrix.emsdk_version }}
           path: dist
 
   release:
