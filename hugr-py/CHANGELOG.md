@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.3](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.2...hugr-py-v0.18.3) (2026-07-27)
+
+
+### Bug Fixes
+
+* Narrow the type definition for hugr.qsystem.result.DataValue ([#3181](https://github.com/Quantinuum/hugr/issues/3181)) ([d39e670](https://github.com/Quantinuum/hugr/commit/d39e670afe24d9bc5366d50ae4cdd961ccd68b5f))
+
 ## [0.18.2](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.1...hugr-py-v0.18.2) (2026-07-15)
 
 
