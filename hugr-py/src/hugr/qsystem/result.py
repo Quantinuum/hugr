@@ -42,7 +42,7 @@ if TYPE_CHECKING:
 #: Primitive data types that can be returned by a result
 DataPrimitive = int | float | bool
 #: Data value that can be returned by a result: a primitive or a list of primitives
-DataValue = DataPrimitive | list[DataPrimitive]
+DataValue = DataPrimitive | list[int] | list[float] | list[bool]
 TaggedResult = tuple[str, DataValue]
 # Pattern to match register index in tag, e.g. "reg[0]"
 REG_INDEX_PATTERN = re.compile(r"^([a-z][\w_]*)\[(\d+)\]$")
