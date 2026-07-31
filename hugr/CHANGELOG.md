@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.29.3](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.2...hugr-v0.29.3) - 2026-07-20
+
+### Bug Fixes
+
+- Fix rust-side extension resolution missing ops in the hugr ([#3170](https://github.com/Quantinuum/hugr/pull/3170))
+
 ## [0.29.2](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.1...hugr-v0.29.2) - 2026-07-14
 
 ### Bug Fixes
