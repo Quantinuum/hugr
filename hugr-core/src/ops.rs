@@ -583,6 +583,20 @@ pub trait OpTrait: Sized + Clone {
         self.dataflow_signature()?.port_type(port).cloned()
     }
 
+    /// Returns the type of an input value port.
+    ///
+    /// Shorthand for `value_port_type(port.into())`.
+    fn value_input_type(&self, port: IncomingPort) -> Option<Type> {
+        self.value_port_type(port.into())
+    }
+
+    /// Returns the type of an output value port.
+    ///
+    /// Shorthand for `value_port_type(port.into())`.
+    fn value_output_type(&self, port: OutgoingPort) -> Option<Type> {
+        self.value_port_type(port.into())
+    }
+
     /// Returns the number of value ports in one direction.
     ///
     /// Implementations may override this to avoid constructing a complete
