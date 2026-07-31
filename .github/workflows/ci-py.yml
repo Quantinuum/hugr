@@ -47,7 +47,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -120,7 +120,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
@@ -153,7 +153,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
       - name: Run sccache-cache
-        uses: mozilla-actions/sccache-action@v0.0.10
+        uses: mozilla-actions/sccache-action@v0.0.11
 
       - name: Set up uv
         uses: astral-sh/setup-uv@v7
