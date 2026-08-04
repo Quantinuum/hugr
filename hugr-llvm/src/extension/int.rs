@@ -599,29 +599,11 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
                 .unwrap_basic();
             Ok(vec![r])
         }),
-        // NOTE: LLVM's shl/lshr define a shift by a count greater or equal to the operand width as poison.
-        // The operation definition does not restrict the shift count, so the lowering here is inconsistent.
-        //
-        // TODO: Improve this lowering.
-        // <https://github.com/Quantinuum/hugr/issues/3155>
-        IntOpDef::ishl => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![
-                ctx.builder()
-                    .build_left_shift(lhs.into_int_value(), rhs.into_int_value(), "")?
-                    .as_basic_value_enum(),
-            ])
+        IntOpDef::ishl => emit_custom_binary_op(context, args, |ctx, inputs, _| {
+            emit_shift_op(ctx, inputs, ShiftBuilder::Left)
         }),
-        // NOTE: LLVM's shl/lshr define a shift by a count greater or equal to the operand width as poison.
-        // The operation definition does not restrict the shift count, so the lowering here is inconsistent.
-        //
-        // TODO: Improve this lowering.
-        // <https://github.com/Quantinuum/hugr/issues/3155>
-        IntOpDef::ishr => emit_custom_binary_op(context, args, |ctx, (lhs, rhs), _| {
-            Ok(vec![
-                ctx.builder()
-                    .build_right_shift(lhs.into_int_value(), rhs.into_int_value(), false, "")?
-                    .as_basic_value_enum(),
-            ])
+        IntOpDef::ishr => emit_custom_binary_op(context, args, |ctx, inputs, _| {
+            emit_shift_op(ctx, inputs, ShiftBuilder::Right)
         }),
         IntOpDef::ieq => emit_icmp(context, args, inkwell::IntPredicate::EQ),
         IntOpDef::ine => emit_icmp(context, args, inkwell::IntPredicate::NE),
@@ -761,6 +743,43 @@ fn emit_int_op<'c, H: HugrView<Node = Node>>(
         }),
         _ => Err(anyhow!("IntOpEmitter: unimplemented op: {}", op.op_id())),
     }
+}
+
+enum ShiftBuilder {
+    Left,
+    Right,
+}
+/// Produce the LLVM code for a shift operation, either left or right.
+///
+/// An oversized LLVM shift produces poison, to be consistent with the hugr semantics, we first check that the shift count is
+/// less than the bit width of the value being shifted, and if not, we return 0 (instead of the llvm poisoned value).
+fn emit_shift_op<'c, H>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    (lhs, rhs): (BasicValueEnum<'c>, BasicValueEnum<'c>),
+    shift: ShiftBuilder,
+) -> Result<Vec<BasicValueEnum<'c>>>
+where
+    H: HugrView<Node = Node>,
+{
+    let lhs = lhs.into_int_value();
+    let rhs = rhs.into_int_value();
+    let int_ty = lhs.get_type();
+    let bit_width = int_ty.const_int(u64::from(int_ty.get_bit_width()), false);
+    let shift_is_valid =
+        ctx.builder()
+            .build_int_compare(IntPredicate::ULT, rhs, bit_width, "shift_is_valid")?;
+    let shifted = match shift {
+        ShiftBuilder::Left => ctx.builder().build_left_shift(lhs, rhs, "shifted")?,
+        ShiftBuilder::Right => ctx
+            .builder()
+            .build_right_shift(lhs, rhs, false, "shifted")?,
+    };
+    Ok(vec![ctx.builder().build_select(
+        shift_is_valid,
+        shifted,
+        int_ty.const_zero(),
+        "shift_result",
+    )?])
 }
 
 // Helper to get the log width arg to an int op when it's the only argument
