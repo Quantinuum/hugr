@@ -1429,6 +1429,40 @@ mod test {
     }
 
     #[rstest]
+    #[case::ishl_i8_below_width("ishl", 3, 0xff, 7, 0x80)]
+    #[case::ishl_i8_at_width("ishl", 3, 0xff, 8, 0)]
+    #[case::ishl_i8_above_width("ishl", 3, 0xff, 9, 0)]
+    #[case::ishl_i8_max_amount("ishl", 3, 0xff, 0xff, 0)]
+    #[case::ishr_i8_below_width("ishr", 3, 0xff, 7, 1)]
+    #[case::ishr_i8_at_width("ishr", 3, 0xff, 8, 0)]
+    #[case::ishr_i8_above_width("ishr", 3, 0xff, 9, 0)]
+    #[case::ishr_i8_max_amount("ishr", 3, 0xff, 0xff, 0)]
+    #[case::ishl_i64_below_width("ishl", 6, u64::MAX, 63, 1_u64 << 63)]
+    #[case::ishl_i64_at_width("ishl", 6, u64::MAX, 64, 0)]
+    #[case::ishl_i64_max_amount("ishl", 6, u64::MAX, u64::MAX, 0)]
+    #[case::ishr_i64_below_width("ishr", 6, u64::MAX, 63, 1)]
+    #[case::ishr_i64_at_width("ishr", 6, u64::MAX, 64, 0)]
+    #[case::ishr_i64_max_amount("ishr", 6, u64::MAX, u64::MAX, 0)]
+    fn test_exec_shift(
+        int_exec_ctx: TestContext,
+        #[case] op: &str,
+        #[case] log_width: u8,
+        #[case] lhs: u64,
+        #[case] rhs: u64,
+        #[case] expected: u64,
+    ) {
+        let ty = INT_TYPES[log_width as usize].clone();
+        let inputs = [
+            ConstInt::new_u(log_width, lhs).unwrap(),
+            ConstInt::new_u(log_width, rhs).unwrap(),
+        ];
+        let ext_op = make_int_op(op, log_width);
+
+        let hugr = test_int_op_with_results::<2>(ext_op, log_width, Some(inputs), ty);
+        int_exec_ctx.check_int_hugr(hugr, "main", log_width, expected, false);
+    }
+
+    #[rstest]
     #[case::imax("imax_s", 1, 2, 2)]
     #[case::imax("imax_s", 2, 1, 2)]
     #[case::imax("imax_s", 2, 2, 2)]
