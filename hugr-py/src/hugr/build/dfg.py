@@ -128,7 +128,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             parent_op: The parent operation of the new dataflow graph.
             hugr: The host HUGR instance to build the dataflow graph in.
             parent: Parent of new dataflow graph's root node: defaults to the
-            host HUGR entrypoint.
+                  host HUGR entrypoint.
 
         Example:
             >>> hugr = Hugr()
@@ -382,7 +382,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
 
         Args:
             cond_wire: The wire holding the value (of Sum type) to branch the
-            conditional on.
+                conditional on.
             args: Remaining input wires to the conditional.
 
         Returns:
@@ -462,7 +462,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
         Args:
             just_inputs: input wires for types that are only inputs to the loop body.
             rest: input wires for types that are inputs and outputs of the loop
-            body.
+                body.
 
         Returns:
             Builder for new nested TailLoop.
@@ -609,7 +609,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             args: The input wires to the function call.
             instantiation: The concrete function type to call (needed if polymorphic).
             type_args: The type arguments for the function (needed if
-            polymorphic).
+                polymorphic).
 
         Returns:
             The node holding the :class:`Call <hugr.ops.Call>` operation.
@@ -693,7 +693,7 @@ class Dfg(DfBase[ops.DFG]):
 
     Args:
         input_types: The input types of the the dataflow graph. Output types are
-        calculated by propagating types through the graph.
+            calculated by propagating types through the graph.
 
     Example:
         >>> dfg = Dfg(tys.Bool)
