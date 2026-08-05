@@ -65,7 +65,7 @@ class Cfg(ParentBuilder[ops.CFG], AbstractContextManager):
 
     Args:
         input_types: The input types for the CFG. Outputs are computed
-        by propagating types through the control flow graph to the exit block.
+            by propagating types through the control flow graph to the exit block.
 
     Examples:
         >>> cfg = Cfg(tys.Bool, tys.Unit)
@@ -197,7 +197,8 @@ class Cfg(ParentBuilder[ops.CFG], AbstractContextManager):
 
         Args:
             pred: The wire from the predecessor block to the new block. The
-            port of the wire determines the branching index of the new block.
+                port of the wire determines the branching index of the new
+                block.
 
 
         Returns:

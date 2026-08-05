@@ -98,7 +98,7 @@ class Conditional(ParentBuilder[ops.Conditional], AbstractContextManager):
     Args:
         sum_ty: The sum type to branch on.
         other_inputs: The inputs for the conditional that aren't included in the
-        sum variants. These are passed to all cases.
+            sum variants. These are passed to all cases.
 
     Examples:
         >>> cond = Conditional(tys.Bool, [tys.Qubit])
@@ -200,8 +200,8 @@ class Conditional(ParentBuilder[ops.Conditional], AbstractContextManager):
 
         Args:
             case_id: The index of the case to build. Input types for the case
-            are the corresponding variant of the sum type concatenated with the
-            other inputs to the conditional.
+                are the corresponding variant of the sum type concatenated with
+                the other inputs to the conditional.
 
         Returns:
             The new case builder.
