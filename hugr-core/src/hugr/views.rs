@@ -486,9 +486,9 @@ pub trait HugrView: HugrInternals {
     /// Iterator over all outgoing ports that have Value type, along
     /// with corresponding types.
     fn value_types(&self, node: Self::Node, dir: Direction) -> impl Iterator<Item = (Port, Type)> {
-        let sig = self.signature(node).unwrap_or_default();
-        self.node_ports(node, dir)
-            .filter_map(move |port| sig.port_type(port).map(|typ| (port, typ.clone())))
+        let op = self.get_optype(node);
+        op.value_ports(dir)
+            .map(|port| (port, op.value_port_type(port).unwrap()))
     }
 
     /// Iterator over all incoming ports that have Value type, along
