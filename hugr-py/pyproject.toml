@@ -37,7 +37,7 @@ dependencies = [
 
 
 [project.scripts]
-hugr = "hugr._hugr:run_cli"
+hugr = "hugr._hugr.model:run_cli"
 
 [project.optional-dependencies]
 docs = [
