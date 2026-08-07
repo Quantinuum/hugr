@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.29.4](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.29.3...hugr-llvm-v0.29.4) - 2026-08-07
+
+### Bug Fixes
+
+- avoid poisoned values when using ishl/ishr whith large shift amounts ([#3192](https://github.com/Quantinuum/hugr/pull/3192))
+
 ## [0.29.2](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.29.1...hugr-llvm-v0.29.2) - 2026-07-14
 
 ### Bug Fixes
