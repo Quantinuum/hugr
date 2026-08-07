@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from semver import Version
 
 from hugr import val
 from hugr.std.collections.array import Array, ArrayVal
@@ -24,6 +25,7 @@ from hugr.tys import (
     FunctionType,
     ListArg,
     ListParam,
+    Opaque,
     Option,
     PolyFuncType,
     Qubit,
@@ -155,9 +157,37 @@ def test_args_str(arg: TypeArg, string: str):
     ],
 )
 def test_tys_str(ty: Type, string: str):
+    assert ty.render(False) == string
     assert str(ty) == string
     if isinstance(ty, ExtType):
         assert str(ty._to_opaque()) == string
+
+
+def test_render_extension_version() -> None:
+    assert INT_T.render(False) == str(INT_T)
+    assert INT_T.render(True) == f"{INT_T}@{INT_T.get_extension_version()}"
+
+
+def test_render_nested_extension_versions() -> None:
+    inner = Opaque(
+        "Inner",
+        TypeBound.Copyable,
+        extension="inner",
+        extension_version=Version(1, 2, 3),
+    )
+    outer = Opaque(
+        "Outer",
+        TypeBound.Copyable,
+        args=[TypeTypeArg(inner)],
+        extension="outer",
+        extension_version=Version(2, 3, 4),
+    )
+    nested = Tuple(outer, inner)
+
+    assert nested.render(False) == "Tuple(Outer<Type(Inner)>, Inner)"
+    assert nested.render(True) == (
+        "Tuple(Outer<Type(Inner@1.2.3)>@2.3.4, Inner@1.2.3)"
+    )
 
 
 def test_list():
