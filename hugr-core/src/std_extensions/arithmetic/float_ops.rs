@@ -44,6 +44,7 @@ pub enum FloatOps {
     ffloor,
     fceil,
     fround,
+    froundeven,
     ftostring,
 }
 
@@ -74,7 +75,9 @@ impl MakeOpDef for FloatOps {
             fmax | fmin | fadd | fsub | fmul | fdiv | fpow => {
                 Signature::new(vec![float64_type(); 2], vec![float64_type()])
             }
-            fneg | fabs | ffloor | fceil | fround => Signature::new_endo([float64_type()]),
+            fneg | fabs | ffloor | fceil | fround | froundeven => {
+                Signature::new_endo([float64_type()])
+            }
             ftostring => Signature::new(vec![float64_type()], [string_type()]),
         }
         .into()
@@ -101,6 +104,7 @@ impl MakeOpDef for FloatOps {
             ffloor => "floor",
             fceil => "ceiling",
             fround => "round",
+            froundeven => "round to nearest even integer",
             ftostring => "string representation",
         }
         .to_string()
