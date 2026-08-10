@@ -100,9 +100,9 @@ class RenderConfig:
     #: Max length for metadata display. None means no truncation.
     max_metadata_length: int | None = 20
     #: If true, display the op extension version in node labels.
-    display_node_extension_version: bool = True
+    display_node_extension_version: bool = False
     #: If true, display the types extension version on edges.
-    display_edge_extension_version: bool = True
+    display_edge_extension_version: bool = False
 
 
 class DotRenderer:

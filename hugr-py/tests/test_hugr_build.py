@@ -540,7 +540,12 @@ def test_render_type_arg_extension_version() -> None:
     dfg = Dfg(nested_type)
     dfg.set_outputs(*dfg.inputs())
 
-    dot = dfg.hugr.render_dot(RenderConfig(max_edge_label_length=None))
+    dot = dfg.hugr.render_dot(
+        RenderConfig(
+            display_edge_extension_version=True,
+            max_edge_label_length=None,
+        )
+    )
 
     assert html.escape(nested_type.render(True)) in dot.source
 
@@ -606,3 +611,16 @@ def test_render_node_type_arg_extension_version() -> None:
         "example.int_ops.ieq&lt;Type(int&lt;5&gt;@0.1.0)&gt;@0.1.1"
         in qualified_dot.source
     )
+
+    unversioned_config = RenderConfig(
+        max_node_label_length=None,
+        max_edge_label_length=None,
+    )
+    assert not unversioned_config.display_node_extension_version
+    assert not unversioned_config.display_edge_extension_version
+
+    unversioned_dot = dfg.hugr.render_dot(unversioned_config)
+    assert "ieq&lt;Type(int&lt;5&gt;)&gt;" in unversioned_dot.source
+    assert unversioned_dot.source.count('xlabel="int&lt;5&gt;"') >= 2
+    assert "@0.1.0" not in unversioned_dot.source
+    assert "@0.1.1" not in unversioned_dot.source
