@@ -325,9 +325,12 @@ class TupleParam(TypeParam):
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
     ) -> TypeParam:
-        return TupleParam([
-            param._resolve_used_extensions(resolver, registry) for param in self.params
-        ])
+        return TupleParam(
+            [
+                param._resolve_used_extensions(resolver, registry)
+                for param in self.params
+            ]
+        )
 
 
 @dataclass(frozen=True)
@@ -462,9 +465,7 @@ class ListArg(TypeArg):
 
     def render(self, include_extension_version: bool) -> str:
         """Render the nested list arguments."""
-        elems = ", ".join(
-            elem.render(include_extension_version) for elem in self.elems
-        )
+        elems = ", ".join(elem.render(include_extension_version) for elem in self.elems)
         return f"[{elems}]"
 
     def to_model(self) -> model.Term:
@@ -473,9 +474,9 @@ class ListArg(TypeArg):
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
     ) -> TypeArg:
-        return ListArg([
-            elem._resolve_used_extensions(resolver, registry) for elem in self.elems
-        ])
+        return ListArg(
+            [elem._resolve_used_extensions(resolver, registry) for elem in self.elems]
+        )
 
 
 @dataclass(frozen=True)
@@ -499,9 +500,9 @@ class ListConcatArg(TypeArg):
         return f"[{lists}]"
 
     def to_model(self) -> model.Term:
-        return model.List([
-            model.Splice(cast(model.Term, elem.to_model())) for elem in self.lists
-        ])
+        return model.List(
+            [model.Splice(cast(model.Term, elem.to_model())) for elem in self.lists]
+        )
 
     def flatten(self) -> TypeArg:
         match self.lists:
@@ -515,9 +516,9 @@ class ListConcatArg(TypeArg):
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
     ) -> TypeArg:
-        return ListConcatArg([
-            elem._resolve_used_extensions(resolver, registry) for elem in self.lists
-        ])
+        return ListConcatArg(
+            [elem._resolve_used_extensions(resolver, registry) for elem in self.lists]
+        )
 
 
 @dataclass(frozen=True)
@@ -534,9 +535,7 @@ class TupleArg(TypeArg):
 
     def render(self, include_extension_version: bool) -> str:
         """Render the nested tuple arguments."""
-        elems = ", ".join(
-            elem.render(include_extension_version) for elem in self.elems
-        )
+        elems = ", ".join(elem.render(include_extension_version) for elem in self.elems)
         return f"({elems})"
 
     def to_model(self) -> model.Term:
@@ -545,9 +544,9 @@ class TupleArg(TypeArg):
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
     ) -> TypeArg:
-        return TupleArg([
-            elem._resolve_used_extensions(resolver, registry) for elem in self.elems
-        ])
+        return TupleArg(
+            [elem._resolve_used_extensions(resolver, registry) for elem in self.elems]
+        )
 
 
 @dataclass(frozen=True)
@@ -571,9 +570,9 @@ class TupleConcatArg(TypeArg):
         return f"({tuples})"
 
     def to_model(self) -> model.Term:
-        return model.Tuple([
-            model.Splice(cast(model.Term, elem.to_model())) for elem in self.tuples
-        ])
+        return model.Tuple(
+            [model.Splice(cast(model.Term, elem.to_model())) for elem in self.tuples]
+        )
 
     def flatten(self) -> TypeArg:
         match self.tuples:
@@ -587,9 +586,9 @@ class TupleConcatArg(TypeArg):
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
     ) -> TypeArg:
-        return TupleConcatArg([
-            tup._resolve_used_extensions(resolver, registry) for tup in self.tuples
-        ])
+        return TupleConcatArg(
+            [tup._resolve_used_extensions(resolver, registry) for tup in self.tuples]
+        )
 
 
 @dataclass(frozen=True)
@@ -731,9 +730,9 @@ class Sum(Type):
         return TypeBound.join(*(t.type_bound() for r in self.variant_rows for t in r))
 
     def to_model(self) -> model.Term:
-        variants = model.List([
-            model.List([typ.to_model() for typ in row]) for row in self.variant_rows
-        ])
+        variants = model.List(
+            [model.List([typ.to_model() for typ in row]) for row in self.variant_rows]
+        )
         return model.Apply("core.adt", [variants])
 
     def _resolve_used_extensions(

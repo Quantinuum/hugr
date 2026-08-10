@@ -272,7 +272,5 @@ def name_w_args_render(
     args = list(args)
     if not args:
         return name
-    rendered_args = (
-        arg.render(include_extension_version) for arg in args
-    )
+    rendered_args = (arg.render(include_extension_version) for arg in args)
     return f"{name}<{comma_sep_str(rendered_args)}>"

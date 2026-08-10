@@ -185,9 +185,7 @@ def test_render_nested_extension_versions() -> None:
     nested = Tuple(outer, inner)
 
     assert nested.render(False) == "Tuple(Outer<Type(Inner)>, Inner)"
-    assert nested.render(True) == (
-        "Tuple(Outer<Type(Inner@1.2.3)>@2.3.4, Inner@1.2.3)"
-    )
+    assert nested.render(True) == ("Tuple(Outer<Type(Inner@1.2.3)>@2.3.4, Inner@1.2.3)")
 
 
 def test_list():

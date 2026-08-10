@@ -398,6 +398,8 @@ class DotRenderer:
         match kind:
             case ValueKind(ty):
                 if self.config.display_link_label:
+                    # TODO: Figure out why some nested types result in all type fields
+                    # being printed instead of just the `__str__` representation.
                     label = html.escape(
                         ty.render(self.config.display_edge_extension_version)
                     )
