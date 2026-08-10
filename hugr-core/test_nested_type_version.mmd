@@ -1,0 +1,22 @@
+---
+config:
+    layout: elk
+---
+graph LR
+    subgraph 0 ["(0) Module"]
+        direction LR
+        subgraph 1 ["(1) FuncDefn: #quot;main#quot;"]
+            direction LR
+            2["(2) Input"]
+            3["(3) Output"]
+            subgraph 4 ["(4) [**DFG**]"]
+                direction LR
+                style 4 stroke:#832561,stroke-width:3px
+                5["(5) Input"]
+                6["(6) Output"]
+                5--"0:0<br>array(3, int(5))"-->6
+            end
+            2--"0:0<br>array(3, int(5))"-->4
+            4--"0:0<br>array(3, int(5))"-->3
+        end
+    end

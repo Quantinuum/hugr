@@ -13,6 +13,8 @@ use crate::ops::{NamedOp, OpType};
 use crate::types::EdgeKind;
 use crate::{Hugr, HugrView, Node};
 
+// Here you need to set options for the mermaid formatter, such as print versions of extensions
+// consider also adding a flag to print type args of nodes
 /// Configuration for rendering a HUGR graph.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MermaidFormatter<'h, H: HugrInternals + ?Sized = Hugr> {
@@ -358,7 +360,17 @@ pub(in crate::hugr) fn edge_style<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{NodeIndex, builder::test::simple_dfg_hugr};
+    use crate::{
+        NodeIndex,
+        builder::{Container, DFGBuilder, Dataflow, DataflowHugr, test::simple_dfg_hugr},
+        extension::{ExtensionId, Version, prelude::bool_t},
+        ops::custom::OpaqueOp,
+        std_extensions::{
+            arithmetic::{int_ops::IntOpDef, int_types::int_type},
+            collections::array::{Array, ArrayKind},
+        },
+        types::Signature,
+    };
 
     use super::*;
 
@@ -373,6 +385,63 @@ mod tests {
         let config = h
             .mermaid_format()
             .with_node_labels(NodeLabel::Custom(node_labels));
-        insta::assert_snapshot!(h.mermaid_string_with_formatter(config));
+        insta::assert_snapshot!(h.mermaid_string_with_formatter(config.clone()));
+        std::fs::write(
+            "test_custom_node_labels.mmd",
+            h.mermaid_string_with_formatter(config),
+        )
+        .unwrap();
+    }
+
+    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
+    #[test]
+    fn write_extension_version_examples() {
+        let int_type = int_type(5);
+
+        let mut custom_op_hugr = DFGBuilder::new(Signature::new(
+            [int_type.clone(), int_type.clone()],
+            [bool_t()],
+        ))
+        .unwrap();
+        let [lhs, rhs] = custom_op_hugr.input_wires_arr();
+        let result = custom_op_hugr
+            .add_dataflow_op(IntOpDef::ieq.with_log_width(5), [lhs, rhs])
+            .unwrap()
+            .out_wire(0);
+        let test_op = OpaqueOp::new(
+            ExtensionId::new_unchecked("TEST_EXT.name"),
+            Version::parse("1.0.0-parsdefrve").unwrap(),
+            "TestOp",
+            [],
+            Signature::new_endo([bool_t()]),
+        );
+        let result = custom_op_hugr
+            .add_dataflow_op(test_op, [result])
+            .unwrap()
+            .out_wire(0);
+        custom_op_hugr.set_outputs([result]).unwrap();
+        let custom_op_hugr = custom_op_hugr.hugr().clone();
+
+        let array_type = Array::ty(3, int_type.clone());
+        let array_hugr = DFGBuilder::new(Signature::new_endo([array_type])).unwrap();
+        let [array] = array_hugr.input_wires_arr();
+        let array_hugr = array_hugr.finish_hugr_with_outputs([array]).unwrap();
+
+        let mut int_op_hugr =
+            DFGBuilder::new(Signature::new([int_type.clone(), int_type], [bool_t()])).unwrap();
+        let [lhs, rhs] = int_op_hugr.input_wires_arr();
+        let result = int_op_hugr
+            .add_dataflow_op(IntOpDef::ieq.with_log_width(5), [lhs, rhs])
+            .unwrap()
+            .out_wire(0);
+        let int_op_hugr = int_op_hugr.finish_hugr_with_outputs([result]).unwrap();
+
+        for (name, hugr) in [
+            ("test_custom_op_version.mmd", custom_op_hugr),
+            ("test_nested_type_version.mmd", array_hugr),
+            ("test_type_arg_version.mmd", int_op_hugr),
+        ] {
+            std::fs::write(name, hugr.mermaid_string()).unwrap();
+        }
     }
 }
