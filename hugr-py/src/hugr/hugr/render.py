@@ -18,7 +18,7 @@ from hugr.tys import (
     OrderKind,
     ValueKind,
 )
-from hugr.utils import name_w_args_str
+from hugr.utils import name_w_args_render
 
 from .node_port import InPort, Node, OutPort
 
@@ -301,14 +301,26 @@ class DotRenderer:
             else ""
         )
 
-        # NICOLA: TODO: change here, we want to render the version also of the types args
         match hugr[node].op:
-            case AsExtOp() as op if not self.config.qualify_op_name:
-                op_name = name_w_args_str(op.op_def().name, op.type_args())
+            case AsExtOp() as op:
+                name = (
+                    op.op_def().qualified_name()
+                    if self.config.qualify_op_name
+                    else op.op_def().name
+                )
+                op_name = name_w_args_render(
+                    name,
+                    op.type_args(),
+                    self.config.display_node_extension_version,
+                )
             case Case() as op if sibling_order is not None:
                 op_name = f"{op.name()}[{sibling_order}]"
             case Custom() as op:
-                op_name = name_w_args_str(op.name(), op.args)
+                op_name = name_w_args_render(
+                    op.name(),
+                    op.args,
+                    self.config.display_node_extension_version,
+                )
             case op:
                 op_name = op.name()
 

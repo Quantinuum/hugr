@@ -14,8 +14,8 @@ from hugr.utils import (
     comma_sep_repr,
     comma_sep_str,
     comma_sep_str_paren,
+    name_w_args_render,
     name_w_args_str,
-    name_with_args_render,
     ser_it,
 )
 
@@ -67,6 +67,10 @@ class TypeParam(Protocol):
 @runtime_checkable
 class TypeArg(Protocol):
     """A HUGR type argument, which can be bound to a :class:TypeParam."""
+
+    def render(self, include_extension_version: bool) -> str:
+        """Render the argument, optionally including nested extension versions."""
+        return str(self)
 
     def _to_serial(self) -> stys.BaseTypeArg:
         """Convert to serializable model."""
@@ -365,6 +369,10 @@ class TypeTypeArg(TypeArg):
     def __str__(self) -> str:
         return f"Type({self.ty!s})"
 
+    def render(self, include_extension_version: bool) -> str:
+        """Render the nested type argument."""
+        return f"Type({self.ty.render(include_extension_version)})"
+
     def to_model(self) -> model.Term | model.Splice:
         return self.ty.to_model()
 
@@ -452,6 +460,13 @@ class ListArg(TypeArg):
     def __str__(self) -> str:
         return f"[{comma_sep_str(self.elems)}]"
 
+    def render(self, include_extension_version: bool) -> str:
+        """Render the nested list arguments."""
+        elems = ", ".join(
+            elem.render(include_extension_version) for elem in self.elems
+        )
+        return f"[{elems}]"
+
     def to_model(self) -> model.Term:
         return model.List([elem.to_model() for elem in self.elems])
 
@@ -474,6 +489,13 @@ class ListConcatArg(TypeArg):
 
     def __str__(self) -> str:
         lists = comma_sep_str(f"... {list}" for list in self.lists)
+        return f"[{lists}]"
+
+    def render(self, include_extension_version: bool) -> str:
+        """Render the nested concatenated list arguments."""
+        lists = ", ".join(
+            f"... {item.render(include_extension_version)}" for item in self.lists
+        )
         return f"[{lists}]"
 
     def to_model(self) -> model.Term:
@@ -510,6 +532,13 @@ class TupleArg(TypeArg):
     def __str__(self) -> str:
         return f"({comma_sep_str(self.elems)})"
 
+    def render(self, include_extension_version: bool) -> str:
+        """Render the nested tuple arguments."""
+        elems = ", ".join(
+            elem.render(include_extension_version) for elem in self.elems
+        )
+        return f"({elems})"
+
     def to_model(self) -> model.Term:
         return model.Tuple([elem.to_model() for elem in self.elems])
 
@@ -532,6 +561,13 @@ class TupleConcatArg(TypeArg):
 
     def __str__(self) -> str:
         tuples = comma_sep_str(f"... {tuple}" for tuple in self.tuples)
+        return f"({tuples})"
+
+    def render(self, include_extension_version: bool) -> str:
+        """Render the nested concatenated tuple arguments."""
+        tuples = ", ".join(
+            f"... {item.render(include_extension_version)}" for item in self.tuples
+        )
         return f"({tuples})"
 
     def to_model(self) -> model.Term:
@@ -594,37 +630,6 @@ def _render_type_param(param: TypeParam, include_extension_version: bool) -> str
             return f"({params})"
         case _:
             return str(param)
-
-
-def _render_type_arg(arg: TypeArg, include_extension_version: bool) -> str:
-    """Render a type argument containing nested types."""
-    match arg:
-        case TypeTypeArg():
-            return f"Type({arg.ty.render(include_extension_version)})"
-        case ListArg():
-            elems = ", ".join(
-                _render_type_arg(elem, include_extension_version) for elem in arg.elems
-            )
-            return f"[{elems}]"
-        case ListConcatArg():
-            lists = ", ".join(
-                f"... {_render_type_arg(item, include_extension_version)}"
-                for item in arg.lists
-            )
-            return f"[{lists}]"
-        case TupleArg():
-            elems = ", ".join(
-                _render_type_arg(elem, include_extension_version) for elem in arg.elems
-            )
-            return f"({elems})"
-        case TupleConcatArg():
-            tuples = ", ".join(
-                f"... {_render_type_arg(item, include_extension_version)}"
-                for item in arg.tuples
-            )
-            return f"({tuples})"
-        case _:
-            return str(arg)
 
 
 def _render_type_row(row: TypeRow, include_extension_version: bool) -> str:
@@ -1062,9 +1067,10 @@ class ExtType(Type):
 
     def render(self, include_extension_version: bool) -> str:
         """Render this extension type."""
-        rendered = name_with_args_render(
+        rendered = name_w_args_render(
             self.type_def.name,
-            (_render_type_arg(arg, include_extension_version) for arg in self.args),
+            self.args,
+            include_extension_version,
         )
         if include_extension_version:
             rendered += "@" + str(self.get_extension_version())
@@ -1121,9 +1127,10 @@ class Opaque(Type):
 
     def render(self, include_extension_version: bool) -> str:
         """Render this opaque type."""
-        rendered = name_with_args_render(
+        rendered = name_w_args_render(
             self.id,
-            (_render_type_arg(arg, include_extension_version) for arg in self.args),
+            self.args,
+            include_extension_version,
         )
         if include_extension_version and self.extension_version is not None:
             rendered += "@" + str(self.extension_version)
