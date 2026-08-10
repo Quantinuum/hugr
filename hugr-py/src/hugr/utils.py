@@ -259,7 +259,6 @@ def name_w_args_str(name: str, args: Sequence["TypeArg"]) -> str:
     """Helper to format a type name with type arguments."""
     if len(args) == 0:
         return name
-    # We may want to use represent() instead of str()
     return f"{name}<{comma_sep_str(args)}>"
 
 
