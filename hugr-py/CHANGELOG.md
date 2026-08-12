@@ -1,5 +1,13 @@
 # Changelog
 
+## [0.18.4](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.3...hugr-py-v0.18.4) (2026-08-12)
+
+
+### Bug Fixes
+
+* Docstring formatting ([#3190](https://github.com/Quantinuum/hugr/issues/3190)) ([b1f37c3](https://github.com/Quantinuum/hugr/commit/b1f37c35b9d87c5251d593a321e38f4d849bd158))
+* Fix pointer to hugr cli function ([#3194](https://github.com/Quantinuum/hugr/issues/3194)) ([2f47988](https://github.com/Quantinuum/hugr/commit/2f47988e1d562ceefdd0c24d6fc5f7d3bb45d0f9))
+
 ## [0.18.3](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.2...hugr-py-v0.18.3) (2026-07-27)
 
 
