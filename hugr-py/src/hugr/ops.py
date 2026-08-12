@@ -629,6 +629,13 @@ class ExtOp(AsExtOp):
 
         return ExtOp(self._op_def, new_signature, new_args)
 
+    def get_extension_version(self) -> stys.Version | None:
+        """Get the extension version. Return None if the object is not associated with
+        an extension.
+        """
+        ext = self._op_def._extension
+        return ext.version if ext else None
+
 
 class RegisteredOp(AsExtOp):
     """Base class for operations that are registered with an extension using

@@ -15,6 +15,7 @@ from hugr.utils import (
     comma_sep_str,
     comma_sep_str_paren,
     name_w_args,
+    name_w_args_render,
     ser_it,
 )
 
@@ -66,6 +67,12 @@ class TypeParam(Protocol):
 @runtime_checkable
 class TypeArg(Protocol):
     """A HUGR type argument, which can be bound to a :class:TypeParam."""
+
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render the argument with the requested nested type options."""
+        return str(self)
 
     def _to_serial(self) -> stys.BaseTypeArg:
         """Convert to serializable model."""
@@ -122,6 +129,12 @@ class Type(Protocol):
 
     def _to_serial_root(self) -> stys.Type:
         return stys.Type(root=self._to_serial())  # type: ignore[arg-type]
+
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render the type with optional versions and qualified extension names."""
+        ...  # pragma: no cover
 
     def type_arg(self) -> TypeTypeArg:
         """The :class:`TypeTypeArg` for this type.
@@ -363,6 +376,16 @@ class TypeTypeArg(TypeArg):
     def __str__(self) -> str:
         return f"Type({self.ty!s})"
 
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render the nested type argument."""
+        rendered = self.ty.render(
+            extension_version=extension_version,
+            qualified_name=qualified_name,
+        )
+        return f"Type({rendered})"
+
     def to_model(self) -> model.Term | model.Splice:
         return self.ty.to_model()
 
@@ -450,6 +473,19 @@ class ListArg(TypeArg):
     def __str__(self) -> str:
         return f"[{comma_sep_str(self.elems)}]"
 
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render the nested list arguments."""
+        elems = ", ".join(
+            elem.render(
+                extension_version=extension_version,
+                qualified_name=qualified_name,
+            )
+            for elem in self.elems
+        )
+        return f"[{elems}]"
+
     def to_model(self) -> model.Term:
         return model.List([elem.to_model() for elem in self.elems])
 
@@ -472,6 +508,20 @@ class ListConcatArg(TypeArg):
 
     def __str__(self) -> str:
         lists = comma_sep_str(f"... {list}" for list in self.lists)
+        return f"[{lists}]"
+
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render the nested concatenated list arguments."""
+        lists = ", ".join(
+            "... "
+            + item.render(
+                extension_version=extension_version,
+                qualified_name=qualified_name,
+            )
+            for item in self.lists
+        )
         return f"[{lists}]"
 
     def to_model(self) -> model.Term:
@@ -508,6 +558,19 @@ class TupleArg(TypeArg):
     def __str__(self) -> str:
         return f"({comma_sep_str(self.elems)})"
 
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render the nested tuple arguments."""
+        elems = ", ".join(
+            elem.render(
+                extension_version=extension_version,
+                qualified_name=qualified_name,
+            )
+            for elem in self.elems
+        )
+        return f"({elems})"
+
     def to_model(self) -> model.Term:
         return model.Tuple([elem.to_model() for elem in self.elems])
 
@@ -530,6 +593,20 @@ class TupleConcatArg(TypeArg):
 
     def __str__(self) -> str:
         tuples = comma_sep_str(f"... {tuple}" for tuple in self.tuples)
+        return f"({tuples})"
+
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render the nested concatenated tuple arguments."""
+        tuples = ", ".join(
+            "... "
+            + item.render(
+                extension_version=extension_version,
+                qualified_name=qualified_name,
+            )
+            for item in self.tuples
+        )
         return f"({tuples})"
 
     def to_model(self) -> model.Term:
@@ -577,6 +654,51 @@ class VariableArg(TypeArg):
         return VariableArg(self.idx, resolved_param)
 
 
+def _render_type_param(
+    param: TypeParam, *, extension_version: bool, qualified_name: bool
+) -> str:
+    """Render a type parameter containing nested types."""
+    match param:
+        case ConstParam():
+            rendered = param.ty.render(
+                extension_version=extension_version,
+                qualified_name=qualified_name,
+            )
+            return f"Const({rendered})"
+        case ListParam():
+            rendered = _render_type_param(
+                param.param,
+                extension_version=extension_version,
+                qualified_name=qualified_name,
+            )
+            return f"[{rendered}]"
+        case TupleParam():
+            params = ", ".join(
+                _render_type_param(
+                    item,
+                    extension_version=extension_version,
+                    qualified_name=qualified_name,
+                )
+                for item in param.params
+            )
+            return f"({params})"
+        case _:
+            return str(param)
+
+
+def _render_type_row(
+    row: TypeRow, *, extension_version: bool, qualified_name: bool
+) -> str:
+    """Render a comma-separated row of nested types."""
+    return ", ".join(
+        ty.render(
+            extension_version=extension_version,
+            qualified_name=qualified_name,
+        )
+        for ty in row
+    )
+
+
 # ----------------------------------------------
 # --------------- Type -------------------------
 # ----------------------------------------------
@@ -599,6 +721,60 @@ class Sum(Type):
             len(self.variant_rows) == 1
         ), "Sum type must have exactly one row to be converted to a Tuple"
         return Tuple(*self.variant_rows[0])
+
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render this sum type."""
+        if self == Bool:
+            return "Bool"
+        if self == Unit:
+            return "Unit"
+        if all(len(row) == 0 for row in self.variant_rows):
+            return f"UnitSum({len(self.variant_rows)})"
+        if len(self.variant_rows) == 1:
+            row = _render_type_row(
+                self.variant_rows[0],
+                extension_version=extension_version,
+                qualified_name=qualified_name,
+            )
+            return f"Tuple({row})"
+        if len(self.variant_rows) == 2 and not self.variant_rows[0]:
+            row = _render_type_row(
+                self.variant_rows[1],
+                extension_version=extension_version,
+                qualified_name=qualified_name,
+            )
+            return f"Option({row})"
+        if len(self.variant_rows) == 2:
+            left, right = self.variant_rows
+            rendered_left = comma_sep_str_paren(
+                ty.render(
+                    extension_version=extension_version,
+                    qualified_name=qualified_name,
+                )
+                for ty in left
+            )
+            rendered_right = comma_sep_str_paren(
+                ty.render(
+                    extension_version=extension_version,
+                    qualified_name=qualified_name,
+                )
+                for ty in right
+            )
+            return f"Either({rendered_left}, {rendered_right})"
+
+        rendered_rows = ", ".join(
+            "["
+            + _render_type_row(
+                row,
+                extension_version=extension_version,
+                qualified_name=qualified_name,
+            )
+            + "]"
+            for row in self.variant_rows
+        )
+        return f"Sum([{rendered_rows}])"
 
     def __repr__(self) -> str:
         if self == Bool:
@@ -723,6 +899,12 @@ class Variable(Type):
     def type_bound(self) -> TypeBound:
         return self.bound
 
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render this type variable."""
+        return repr(self)
+
     def __repr__(self) -> str:
         return f"${self.idx}"
 
@@ -743,6 +925,12 @@ class RowVariable(Type):
     def type_bound(self) -> TypeBound:
         return self.bound
 
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render this row variable."""
+        return repr(self)
+
     def __repr__(self) -> str:
         return f"${self.idx}"
 
@@ -759,6 +947,12 @@ class USize(Type):
 
     def type_bound(self) -> TypeBound:
         return TypeBound.Copyable
+
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render this unsigned-size type."""
+        return repr(self)
 
     def __repr__(self) -> str:
         return "USize"
@@ -788,6 +982,12 @@ class Alias(Type):
 
     def type_bound(self) -> TypeBound:
         return self.bound
+
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render this type alias."""
+        return repr(self)
 
     def __repr__(self) -> str:
         return self.name
@@ -849,6 +1049,22 @@ class FunctionType(Type):
     def __str__(self) -> str:
         return f"{comma_sep_str(self.input)} -> {comma_sep_str(self.output)}"
 
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render this function type."""
+        inputs = _render_type_row(
+            self.input,
+            extension_version=extension_version,
+            qualified_name=qualified_name,
+        )
+        outputs = _render_type_row(
+            self.output,
+            extension_version=extension_version,
+            qualified_name=qualified_name,
+        )
+        return f"{inputs} -> {outputs}"
+
     def to_model(self) -> model.Term:
         inputs = model.List([input.to_model() for input in self.input])
         outputs = model.List([output.to_model() for output in self.output])
@@ -879,6 +1095,24 @@ class PolyFuncType(Type):
             params=[p._to_serial_root() for p in self.params],
             body=self.body._to_serial(),
         )
+
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render this polymorphic function type."""
+        params = ", ".join(
+            _render_type_param(
+                param,
+                extension_version=extension_version,
+                qualified_name=qualified_name,
+            )
+            for param in self.params
+        )
+        body = self.body.render(
+            extension_version=extension_version,
+            qualified_name=qualified_name,
+        )
+        return f"∀ {params}. {body}"
 
     def __str__(self) -> str:
         return f"∀ {comma_sep_str(self.params)}. {self.body!s}"
@@ -945,6 +1179,21 @@ class ExtType(Type):
             bound=self.type_bound(),
         )
 
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render this extension type."""
+        name = self.type_def.qualified_name() if qualified_name else self.type_def.name
+        rendered = name_w_args_render(
+            name,
+            self.args,
+            extension_version=extension_version,
+            qualified_name=qualified_name,
+        )
+        if extension_version:
+            rendered += "@" + str(self.get_extension_version())
+        return rendered
+
     def __str__(self) -> str:
         return name_w_args(self.type_def.name, self.args)
 
@@ -965,6 +1214,11 @@ class ExtType(Type):
             arg._resolve_used_extensions(resolver, registry) for arg in self.args
         ]
         return ExtType(self.type_def, new_args)
+
+    def get_extension_version(self) -> Version:
+        """Get the version of the extension associated with this type."""
+        assert self.type_def._extension is not None, "Extension must be initialised."
+        return self.type_def._extension.version
 
 
 @dataclass
@@ -988,6 +1242,25 @@ class Opaque(Type):
 
     def type_bound(self) -> TypeBound:
         return self.bound
+
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render this opaque type."""
+        name = (
+            f"{self.extension}.{self.id}"
+            if qualified_name and self.extension
+            else self.id
+        )
+        rendered = name_w_args_render(
+            name,
+            self.args,
+            extension_version=extension_version,
+            qualified_name=qualified_name,
+        )
+        if extension_version and self.extension_version is not None:
+            rendered += "@" + str(self.extension_version)
+        return rendered
 
     def __str__(self) -> str:
         return name_w_args(self.id, self.args)
@@ -1047,6 +1320,12 @@ class _QubitDef(Type):
 
     def _to_serial(self) -> stys.Qubit:
         return stys.Qubit()
+
+    def render(
+        self, *, extension_version: bool = False, qualified_name: bool = False
+    ) -> str:
+        """Render the qubit type."""
+        return repr(self)
 
     def __repr__(self) -> str:
         return "Qubit"

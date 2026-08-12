@@ -260,3 +260,24 @@ def name_w_args(name: str, args: Sequence["TypeArg"]) -> str:
     if len(args) == 0:
         return name
     return f"{name}<{comma_sep_str(args)}>"
+
+
+def name_w_args_render(
+    name: str,
+    args: Iterable["TypeArg"],
+    *,
+    extension_version: bool = False,
+    qualified_name: bool = False,
+) -> str:
+    """Format a type name with recursively rendered type arguments."""
+    args = list(args)
+    if not args:
+        return name
+    rendered_args = (
+        arg.render(
+            extension_version=extension_version,
+            qualified_name=qualified_name,
+        )
+        for arg in args
+    )
+    return f"{name}<{comma_sep_str(rendered_args)}>"
