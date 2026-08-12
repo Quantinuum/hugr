@@ -1,4 +1,4 @@
 # serializer version: 1
 # name: test_insufficient_args_err
-  'Not enough args: Op ineg takes 1 args, but was given 0'
+  'Not enough args: Op arithmetic.int.ineg takes 1 args, but was given 0'
 # ---

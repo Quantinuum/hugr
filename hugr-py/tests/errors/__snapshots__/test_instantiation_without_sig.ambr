@@ -2,7 +2,7 @@
 # name: test_instantiation_without_sig
   '''
   Signature not provided:
-    Concrete signature required for polymorphic Op `ineg`.
+    Concrete signature required for polymorphic Op `arithmetic.int.ineg`.
     See documentation for `OpDef.instantiate`:
     https://quantinuum.github.io/hugr/generated/hugr.ext.OpDef.html#hugr.ext.OpDef.instantiate
   '''

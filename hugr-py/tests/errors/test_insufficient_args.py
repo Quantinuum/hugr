@@ -14,5 +14,5 @@ def test_insufficient_args_err(snapshot):
         node = dfg.add_op(op, *dfg.inputs())
         dfg.set_outputs(node)
         pytest.fail("Didn't raise an error")
-    except TypeError as e:
+    except ValueError as e:
         error_snap(str(e), snapshot)
