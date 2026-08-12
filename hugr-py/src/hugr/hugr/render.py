@@ -85,7 +85,7 @@ class RenderConfig:
 
     #: The palette to use for rendering. See :obj:`PALETTE` for the included options.
     palette: Palette = field(default_factory=lambda: PALETTE["default"])
-    #: If true prepend extension name to operation name.
+    #: If true prepend extension names to operation and type names.
     qualify_op_name: bool = False
     #: If true display node metadata.
     display_metadata: bool = True
@@ -311,7 +311,8 @@ class DotRenderer:
                 op_name = name_w_args_render(
                     name,
                     op.type_args(),
-                    self.config.display_node_extension_version,
+                    extension_version=self.config.display_node_extension_version,
+                    qualified_name=self.config.qualify_op_name,
                 )
             case Case() as op if sibling_order is not None:
                 op_name = f"{op.name()}[{sibling_order}]"
@@ -319,7 +320,8 @@ class DotRenderer:
                 op_name = name_w_args_render(
                     op.name(),
                     op.args,
-                    self.config.display_node_extension_version,
+                    extension_version=self.config.display_node_extension_version,
+                    qualified_name=self.config.qualify_op_name,
                 )
             case op:
                 op_name = op.name()
@@ -399,7 +401,10 @@ class DotRenderer:
             case ValueKind(ty):
                 if self.config.display_link_label:
                     label = html.escape(
-                        ty.render(self.config.display_edge_extension_version)
+                        ty.render(
+                            extension_version=self.config.display_edge_extension_version,
+                            qualified_name=self.config.qualify_op_name,
+                        )
                     )
                 color = self.config.palette.edge
             case OrderKind():

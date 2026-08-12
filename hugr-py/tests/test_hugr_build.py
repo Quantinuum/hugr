@@ -547,7 +547,26 @@ def test_render_type_arg_extension_version() -> None:
         )
     )
 
-    assert html.escape(nested_type.render(True)) in dot.source
+    assert html.escape(nested_type.render(extension_version=True)) in dot.source
+
+
+def test_render_qualified_type_names() -> None:
+    nested_type = Array(INT_T, 3)
+    dfg = Dfg(nested_type)
+    dfg.set_outputs(*dfg.inputs())
+
+    unqualified_dot = dfg.hugr.render_dot(RenderConfig(max_edge_label_length=None))
+    qualified_dot = dfg.hugr.render_dot(
+        RenderConfig(
+            qualify_op_name=True,
+            max_edge_label_length=None,
+        )
+    )
+
+    unqualified_type = html.escape(nested_type.render())
+    qualified_type = html.escape(nested_type.render(qualified_name=True))
+    assert f'xlabel="{unqualified_type}"' in unqualified_dot.source
+    assert f'xlabel="{qualified_type}"' in qualified_dot.source
 
 
 def test_render_node_type_arg_extension_version() -> None:
@@ -608,7 +627,8 @@ def test_render_node_type_arg_extension_version() -> None:
         )
     )
     assert (
-        "example.int_ops.ieq&lt;Type(int&lt;5&gt;@0.1.0)&gt;@0.1.1"
+        "example.int_ops.ieq&lt;"
+        "Type(arithmetic.int.types.int&lt;5&gt;@0.1.0)&gt;@0.1.1"
         in qualified_dot.source
     )
 

@@ -255,7 +255,7 @@ def comma_sep_repr_paren(items: Iterable[T]) -> str:
         return f"({comma_sep_repr(items)})"
 
 
-def name_w_args_str(name: str, args: Sequence["TypeArg"]) -> str:
+def name_w_args(name: str, args: Sequence["TypeArg"]) -> str:
     """Helper to format a type name with type arguments."""
     if len(args) == 0:
         return name
@@ -266,11 +266,18 @@ def name_w_args_render(
     name: str,
     args: Iterable["TypeArg"],
     *,
-    include_extension_version: bool = False,
+    extension_version: bool = False,
+    qualified_name: bool = False,
 ) -> str:
     """Format a type name with recursively rendered type arguments."""
     args = list(args)
     if not args:
         return name
-    rendered_args = (arg.render(include_extension_version) for arg in args)
+    rendered_args = (
+        arg.render(
+            extension_version=extension_version,
+            qualified_name=qualified_name,
+        )
+        for arg in args
+    )
     return f"{name}<{comma_sep_str(rendered_args)}>"
