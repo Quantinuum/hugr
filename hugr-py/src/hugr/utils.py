@@ -265,7 +265,8 @@ def name_w_args_str(name: str, args: Sequence["TypeArg"]) -> str:
 def name_w_args_render(
     name: str,
     args: Iterable["TypeArg"],
-    include_extension_version: bool,
+    *,
+    include_extension_version: bool = False,
 ) -> str:
     """Format a type name with recursively rendered type arguments."""
     args = list(args)

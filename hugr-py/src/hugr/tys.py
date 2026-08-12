@@ -128,7 +128,7 @@ class Type(Protocol):
     def _to_serial_root(self) -> stys.Type:
         return stys.Type(root=self._to_serial())  # type: ignore[arg-type]
 
-    def render(self, include_extension_version: bool) -> str:
+    def render(self, *, extension_version: bool = False) -> str:
         """Render the type, optionally including extension versions."""
         ...  # pragma: no cover
 
