@@ -554,6 +554,9 @@ pub trait OpTrait: Sized + Clone {
     /// A human-readable description of the operation.
     fn description(&self) -> &str;
 
+    /// Returns an exhaustive string representation of the operation.
+    fn render_str(&self) -> &str;
+
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag;
 

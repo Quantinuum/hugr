@@ -9,7 +9,7 @@ use portgraph::{LinkView, MultiPortGraph, NodeIndex, PortIndex, PortView};
 
 use crate::core::HugrNode;
 use crate::hugr::internal::HugrInternals;
-use crate::ops::{NamedOp, OpType};
+use crate::ops::{NamedOp, OpTrait, OpType};
 use crate::types::EdgeKind;
 use crate::{Hugr, HugrView, Node};
 
@@ -192,16 +192,29 @@ pub enum NodeLabel<N: HugrNode = Node> {
     Custom(HashMap<N, String>),
 }
 
+/// Configuration for rendering an operation as a string.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct OpStringConfig {
+    /// Include the version of the extension defining the operation.
+    pub print_extension_version: bool,
+    /// Include the operation's type arguments.
+    pub print_type_args: bool,
+    /// Qualify operation names with their extension identifier.
+    pub qualify_names: bool,
+}
+
 /// Formatter method to compute a node style.
 pub(in crate::hugr) fn node_style<'a>(
     h: &'a Hugr,
     formatter: MermaidFormatter<'a>,
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + 'a> {
     fn node_name(h: &Hugr, n: NodeIndex) -> String {
+        // Nicola: todo: Move the logic in OpTrait -> use a struct for setting parameters -> flag for ext version, types args, qualifying names
+        // the stuff inside optype implement optrait
         match h.get_optype(n.into()) {
             OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.func_name()),
             OpType::FuncDefn(f) => format!("FuncDefn: \"{}\"", f.func_name()),
-            op => op.name().to_string(),
+            op => op.description().to_string(),
         }
     }
 
