@@ -19,7 +19,7 @@ use crate::{IncomingPort, ops};
 
 use super::dataflow::DataflowOpTrait;
 use super::tag::OpTag;
-use super::{NamedOp, OpName, OpNameRef};
+use super::{NamedOp, OpName, OpNameRef, RenderStringConfig};
 
 /// An operation defined by an [`OpDef`] from a loaded [Extension].
 ///
@@ -228,6 +228,14 @@ impl DataflowOpTrait for ExtensionOp {
         self.def().description()
     }
 
+    fn render_str(&self, config: RenderStringConfig) -> OpName {
+        if config.qualify_name {
+            self.qualified_id()
+        } else {
+            self.unqualified_id().into()
+        }
+    }
+
     fn signature(&self) -> Cow<'_, Signature> {
         Cow::Borrowed(&self.signature)
     }
@@ -383,6 +391,14 @@ impl DataflowOpTrait for OpaqueOp {
         "Opaque operation"
     }
 
+    fn render_str(&self, config: RenderStringConfig) -> OpName {
+        if config.qualify_name {
+            self.qualified_id()
+        } else {
+            self.unqualified_id().clone()
+        }
+    }
+
     fn signature(&self) -> Cow<'_, Signature> {
         Cow::Borrowed(&self.signature)
     }
@@ -447,7 +463,7 @@ pub enum OpaqueOpError<N: HugrNode> {
 #[cfg(test)]
 mod test {
 
-    use ops::OpType;
+    use ops::{OpTrait, OpType};
 
     use crate::extension::ExtensionRegistry;
     use crate::extension::resolution::resolve_op_extensions;
@@ -483,6 +499,20 @@ mod test {
             sig.clone(),
         );
         assert_eq!(op.name(), "OpaqueOp:res.op");
+        assert_eq!(
+            OpTrait::render_str(&op, RenderStringConfig::default()),
+            "op"
+        );
+        assert_eq!(
+            OpTrait::render_str(
+                &op,
+                RenderStringConfig {
+                    qualify_name: true,
+                    ..Default::default()
+                }
+            ),
+            "res.op"
+        );
         assert_eq!(op.args(), &[usize_t().into()]);
         assert_eq!(op.signature().as_ref(), &sig);
 
@@ -536,6 +566,20 @@ mod test {
             },
         );
         let ext_op = ext.instantiate_extension_op("op", []).unwrap();
+        assert_eq!(
+            OpTrait::render_str(&ext_op, RenderStringConfig::default()),
+            "op"
+        );
+        assert_eq!(
+            OpTrait::render_str(
+                &ext_op,
+                RenderStringConfig {
+                    qualify_name: true,
+                    ..Default::default()
+                }
+            ),
+            "ext.op"
+        );
         assert_eq!(ext_op.make_opaque().extension_version(), Some(&version));
     }
 

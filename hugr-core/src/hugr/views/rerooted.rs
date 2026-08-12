@@ -3,6 +3,7 @@
 
 use crate::hugr::internal::{HugrInternals, HugrMutInternals};
 use crate::hugr::{HugrMut, hugrmut::InsertForestResult};
+use crate::ops::RenderStringConfig;
 
 use super::{HugrView, SchedulingGraph, panic_invalid_node};
 
@@ -62,9 +63,10 @@ impl<H: HugrView> HugrView for Rerooted<H> {
     fn mermaid_string_with_formatter(
         &self,
         formatter: crate::hugr::views::render::MermaidFormatter<Self>,
+        render_label_config: RenderStringConfig,
     ) -> String {
         self.hugr
-            .mermaid_string_with_formatter(formatter.with_hugr(&self.hugr))
+            .mermaid_string_with_formatter(formatter.with_hugr(&self.hugr), render_label_config)
     }
 
     delegate::delegate! {

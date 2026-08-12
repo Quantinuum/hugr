@@ -154,9 +154,9 @@ pub enum OpType {
     LoadFunction,
     DFG,
     #[serde(skip_deserializing, rename = "Extension")]
-    ExtensionOp,
+    ExtensionOp, // extension
     #[serde(rename = "Extension")]
-    OpaqueOp,
+    OpaqueOp, // extension
     Tag,
     DataflowBlock,
     ExitBlock,
@@ -548,6 +548,17 @@ pub trait StaticTag {
     const TAG: OpTag;
 }
 
+/// Configuration for rendering an operation as a string.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RenderStringConfig {
+    /// Include the version of the extension defining the operation.
+    pub print_extension_version: bool,
+    /// Include the operation's type arguments.
+    pub print_type_args: bool,
+    /// Qualify operation name with their extension identifier.
+    pub qualify_name: bool,
+}
+
 #[enum_dispatch]
 /// Trait implemented by all `OpType` variants.
 pub trait OpTrait: Sized + Clone {
@@ -555,7 +566,7 @@ pub trait OpTrait: Sized + Clone {
     fn description(&self) -> &str;
 
     /// Returns an exhaustive string representation of the operation.
-    fn render_str(&self) -> &str;
+    fn render_str(&self, config: RenderStringConfig) -> OpName;
 
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag;

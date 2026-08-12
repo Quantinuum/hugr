@@ -9,7 +9,7 @@ use portgraph::{LinkView, MultiPortGraph, NodeIndex, PortIndex, PortView};
 
 use crate::core::HugrNode;
 use crate::hugr::internal::HugrInternals;
-use crate::ops::{NamedOp, OpTrait, OpType};
+use crate::ops::{OpTrait, OpType, RenderStringConfig};
 use crate::types::EdgeKind;
 use crate::{Hugr, HugrView, Node};
 
@@ -91,7 +91,8 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
     where
         H: HugrView,
     {
-        self.hugr.mermaid_string_with_formatter(self)
+        self.hugr
+            .mermaid_string_with_formatter(self, RenderStringConfig::default())
     }
 
     pub(crate) fn with_hugr<NewH: HugrInternals<Node = H::Node>>(
@@ -192,37 +193,36 @@ pub enum NodeLabel<N: HugrNode = Node> {
     Custom(HashMap<N, String>),
 }
 
-/// Configuration for rendering an operation as a string.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct OpStringConfig {
-    /// Include the version of the extension defining the operation.
-    pub print_extension_version: bool,
-    /// Include the operation's type arguments.
-    pub print_type_args: bool,
-    /// Qualify operation names with their extension identifier.
-    pub qualify_names: bool,
-}
-
 /// Formatter method to compute a node style.
 pub(in crate::hugr) fn node_style<'a>(
     h: &'a Hugr,
     formatter: MermaidFormatter<'a>,
+    render_label_config: RenderStringConfig,
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + 'a> {
-    fn node_name(h: &Hugr, n: NodeIndex) -> String {
+    fn node_name(h: &Hugr, n: NodeIndex, inner_label_config: RenderStringConfig) -> String {
         // Nicola: todo: Move the logic in OpTrait -> use a struct for setting parameters -> flag for ext version, types args, qualifying names
         // the stuff inside optype implement optrait
         match h.get_optype(n.into()) {
             OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.func_name()),
             OpType::FuncDefn(f) => format!("FuncDefn: \"{}\"", f.func_name()),
-            op => op.description().to_string(),
+            op => op.render_str(inner_label_config).to_string(),
         }
     }
 
-    fn numeric_label(h: &Hugr, n: NodeIndex, is_entry: bool) -> String {
+    fn numeric_label(
+        h: &Hugr,
+        n: NodeIndex,
+        is_entry: bool,
+        inner_label_config: RenderStringConfig,
+    ) -> String {
         if is_entry {
-            format!("({}) [**{}**]", n.index(), node_name(h, n))
+            format!(
+                "({}) [**{}**]",
+                n.index(),
+                node_name(h, n, inner_label_config)
+            )
         } else {
-            format!("({}) {}", n.index(), node_name(h, n))
+            format!("({}) {}", n.index(), node_name(h, n, inner_label_config))
         }
     }
 
@@ -234,17 +234,21 @@ pub(in crate::hugr) fn node_style<'a>(
     match formatter.node_labels {
         NodeLabel::Numeric => Box::new(move |n| {
             if Some(n) == entrypoint {
-                NodeStyle::boxed(numeric_label(h, n, true)).with_attrs(entrypoint_style.clone())
+                NodeStyle::boxed(numeric_label(h, n, true, render_label_config))
+                    .with_attrs(entrypoint_style.clone())
             } else {
-                NodeStyle::boxed(numeric_label(h, n, false))
+                NodeStyle::boxed(numeric_label(h, n, false, render_label_config))
             }
         }),
         NodeLabel::None => Box::new(move |n| {
             if Some(n) == entrypoint {
-                NodeStyle::boxed(format!("[**{name}**]", name = node_name(h, n)))
-                    .with_attrs(entrypoint_style.clone())
+                NodeStyle::boxed(format!(
+                    "[**{name}**]",
+                    name = node_name(h, n, render_label_config)
+                ))
+                .with_attrs(entrypoint_style.clone())
             } else {
-                NodeStyle::boxed(node_name(h, n))
+                NodeStyle::boxed(node_name(h, n, render_label_config))
             }
         }),
         NodeLabel::MetadataValues { print_keys } => Box::new(move |n| {
@@ -267,10 +271,16 @@ pub(in crate::hugr) fn node_style<'a>(
                 .join("; ");
 
             if Some(n) == entrypoint {
-                NodeStyle::boxed(format!("{}; {kv_str}", numeric_label(h, n, true)))
-                    .with_attrs(entrypoint_style.clone())
+                NodeStyle::boxed(format!(
+                    "{}; {kv_str}",
+                    numeric_label(h, n, true, render_label_config)
+                ))
+                .with_attrs(entrypoint_style.clone())
             } else {
-                NodeStyle::boxed(format!("{}; {kv_str}", numeric_label(h, n, false)))
+                NodeStyle::boxed(format!(
+                    "{}; {kv_str}",
+                    numeric_label(h, n, false, render_label_config)
+                ))
             }
         }),
         NodeLabel::Custom(labels) => Box::new(move |n| {
@@ -278,14 +288,14 @@ pub(in crate::hugr) fn node_style<'a>(
                 NodeStyle::boxed(format!(
                     "({label}) [**{name}**]",
                     label = labels.get(&n.into()).unwrap_or(&n.index().to_string()),
-                    name = node_name(h, n)
+                    name = node_name(h, n, render_label_config)
                 ))
                 .with_attrs(entrypoint_style.clone())
             } else {
                 NodeStyle::boxed(format!(
                     "({label}) {name}",
                     label = labels.get(&n.into()).unwrap_or(&n.index().to_string()),
-                    name = node_name(h, n)
+                    name = node_name(h, n, render_label_config)
                 ))
             }
         }),
@@ -398,10 +408,12 @@ mod tests {
         let config = h
             .mermaid_format()
             .with_node_labels(NodeLabel::Custom(node_labels));
-        insta::assert_snapshot!(h.mermaid_string_with_formatter(config.clone()));
+        insta::assert_snapshot!(
+            h.mermaid_string_with_formatter(config.clone(), RenderStringConfig::default())
+        );
         std::fs::write(
             "test_custom_node_labels.mmd",
-            h.mermaid_string_with_formatter(config),
+            h.mermaid_string_with_formatter(config, RenderStringConfig::default()),
         )
         .unwrap();
     }
@@ -454,7 +466,11 @@ mod tests {
             ("test_nested_type_version.mmd", array_hugr),
             ("test_type_arg_version.mmd", int_op_hugr),
         ] {
-            std::fs::write(name, hugr.mermaid_string()).unwrap();
+            std::fs::write(
+                name,
+                hugr.mermaid_string_with_config(RenderStringConfig::default()),
+            )
+            .unwrap();
         }
     }
 }
