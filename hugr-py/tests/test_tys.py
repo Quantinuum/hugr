@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import pytest
+from semver import Version
 
 from hugr import val
 from hugr.std.collections.array import Array, ArrayVal
@@ -24,6 +25,7 @@ from hugr.tys import (
     FunctionType,
     ListArg,
     ListParam,
+    Opaque,
     Option,
     PolyFuncType,
     Qubit,
@@ -155,9 +157,63 @@ def test_args_str(arg: TypeArg, string: str):
     ],
 )
 def test_tys_str(ty: Type, string: str):
+    assert ty.render() == string
     assert str(ty) == string
     if isinstance(ty, ExtType):
         assert str(ty._to_opaque()) == string
+
+
+def test_render_extension_version() -> None:
+    assert INT_T.render() == str(INT_T)
+    assert (
+        INT_T.render(extension_version=True)
+        == f"{INT_T}@{INT_T.get_extension_version()}"
+    )
+
+
+def test_render_qualified_extension_name() -> None:
+    assert INT_T.render(qualified_name=True) == "arithmetic.int.types.int<5>"
+    assert (
+        INT_T.render(
+            extension_version=True,
+            qualified_name=True,
+        )
+        == f"arithmetic.int.types.int<5>@{INT_T.get_extension_version()}"
+    )
+
+
+def test_render_nested_extension_versions() -> None:
+    inner = Opaque(
+        "Inner",
+        TypeBound.Copyable,
+        extension="inner",
+        extension_version=Version(1, 2, 3),
+    )
+    outer = Opaque(
+        "Outer",
+        TypeBound.Copyable,
+        args=[TypeTypeArg(inner)],
+        extension="outer",
+        extension_version=Version(2, 3, 4),
+    )
+    nested = Tuple(outer, inner)
+
+    assert nested.render() == "Tuple(Outer<Type(Inner)>, Inner)"
+    assert nested.render(extension_version=True) == (
+        "Tuple(Outer<Type(Inner@1.2.3)>@2.3.4, Inner@1.2.3)"
+    )
+    assert nested.render(qualified_name=True) == (
+        "Tuple(outer.Outer<Type(inner.Inner)>, inner.Inner)"
+    )
+    assert nested.render(extension_version=True, qualified_name=True) == (
+        "Tuple(outer.Outer<Type(inner.Inner@1.2.3)>@2.3.4, " "inner.Inner@1.2.3)"
+    )
+
+
+def test_render_qualified_opaque_without_extension() -> None:
+    opaque = Opaque("Standalone", TypeBound.Copyable)
+
+    assert opaque.render(qualified_name=True) == "Standalone"
 
 
 def test_list():
