@@ -243,7 +243,7 @@ _SI = _SubPort[InPort]
 @dataclass(frozen=True)
 class _NodeLinks:
     _inner: BiMap[_SO, _SI] = field(init=False, default_factory=BiMap)
-    _max_subs: dict[_SO | _SI, int] = field(init=False, default_factory=dict)
+    _max_subs: dict[OutPort | InPort, int] = field(init=False, default_factory=dict)
 
     def _unused_sub_offset(self, port: P) -> _SubPort[P]:
         max_sub = self._max_subs.get(port, -1)
