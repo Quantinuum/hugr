@@ -13,8 +13,6 @@ use crate::ops::{OpTrait, OpType, RenderStringConfig};
 use crate::types::EdgeKind;
 use crate::{Hugr, HugrView, Node};
 
-// Here you need to set options for the mermaid formatter, such as print versions of extensions
-// consider also adding a flag to print type args of nodes
 /// Configuration for rendering a HUGR graph.
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct MermaidFormatter<'h, H: HugrInternals + ?Sized = Hugr> {
@@ -28,6 +26,8 @@ pub struct MermaidFormatter<'h, H: HugrInternals + ?Sized = Hugr> {
     type_labels_in_edges: bool,
     /// A node to highlight as the graph entrypoint.
     entrypoint: Option<H::Node>,
+    /// How operation names are rendered in node labels.
+    render_string_config: RenderStringConfig,
 }
 
 impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
@@ -39,6 +39,10 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
             port_offsets_in_edges: true,
             type_labels_in_edges: true,
             entrypoint: None,
+            render_string_config: RenderStringConfig {
+                qualify_name: true,
+                ..Default::default()
+            },
         }
     }
 
@@ -62,6 +66,11 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
         self.type_labels_in_edges
     }
 
+    /// The configuration used to render operation names in node labels.
+    pub fn render_string_config(&self) -> RenderStringConfig {
+        self.render_string_config
+    }
+
     /// Set the node labels style.
     pub fn with_node_labels(mut self, node_labels: NodeLabel<H::Node>) -> Self {
         self.node_labels = node_labels;
@@ -80,6 +89,12 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
         self
     }
 
+    /// Set how operation names are rendered in node labels.
+    pub fn with_render_string_config(mut self, config: RenderStringConfig) -> Self {
+        self.render_string_config = config;
+        self
+    }
+
     /// Set the entrypoint node to highlight.
     pub fn with_entrypoint(mut self, entrypoint: impl Into<Option<H::Node>>) -> Self {
         self.entrypoint = entrypoint.into();
@@ -91,8 +106,7 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
     where
         H: HugrView,
     {
-        self.hugr
-            .mermaid_string_with_formatter(self, RenderStringConfig::default())
+        self.hugr.mermaid_string_with_formatter(self)
     }
 
     pub(crate) fn with_hugr<NewH: HugrInternals<Node = H::Node>>(
@@ -105,6 +119,7 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
             port_offsets_in_edges,
             type_labels_in_edges,
             entrypoint,
+            render_string_config,
         } = self;
         MermaidFormatter {
             hugr,
@@ -112,6 +127,7 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
             port_offsets_in_edges,
             type_labels_in_edges,
             entrypoint,
+            render_string_config,
         }
     }
 }
@@ -135,6 +151,7 @@ macro_rules! impl_mermaid_formatter_from {
                     port_offsets_in_edges,
                     type_labels_in_edges,
                     entrypoint,
+                    render_string_config,
                 } = value;
                 MermaidFormatter {
                     hugr,
@@ -142,6 +159,7 @@ macro_rules! impl_mermaid_formatter_from {
                     port_offsets_in_edges,
                     type_labels_in_edges,
                     entrypoint,
+                    render_string_config,
                 }
             }
         }
@@ -164,6 +182,7 @@ impl<'h, H: HugrView + ToOwned> From<MermaidFormatter<'h, std::borrow::Cow<'_, H
             port_offsets_in_edges,
             type_labels_in_edges,
             entrypoint,
+            render_string_config,
         } = value;
         MermaidFormatter {
             hugr,
@@ -171,6 +190,7 @@ impl<'h, H: HugrView + ToOwned> From<MermaidFormatter<'h, std::borrow::Cow<'_, H
             port_offsets_in_edges,
             type_labels_in_edges,
             entrypoint,
+            render_string_config,
         }
     }
 }
@@ -197,7 +217,6 @@ pub enum NodeLabel<N: HugrNode = Node> {
 pub(in crate::hugr) fn node_style<'a>(
     h: &'a Hugr,
     formatter: MermaidFormatter<'a>,
-    render_label_config: RenderStringConfig,
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + 'a> {
     fn node_name(h: &Hugr, n: NodeIndex, inner_label_config: RenderStringConfig) -> String {
         // Nicola: todo: Move the logic in OpTrait -> use a struct for setting parameters -> flag for ext version, types args, qualifying names
@@ -230,6 +249,7 @@ pub(in crate::hugr) fn node_style<'a>(
     entrypoint_style.stroke = Some("#832561".to_string());
     entrypoint_style.stroke_width = Some("3px".to_string());
     let entrypoint = formatter.entrypoint.map(Node::into_portgraph);
+    let render_label_config = formatter.render_string_config();
 
     match formatter.node_labels {
         NodeLabel::Numeric => Box::new(move |n| {
@@ -408,14 +428,35 @@ mod tests {
         let config = h
             .mermaid_format()
             .with_node_labels(NodeLabel::Custom(node_labels));
-        insta::assert_snapshot!(
-            h.mermaid_string_with_formatter(config.clone(), RenderStringConfig::default())
-        );
+        insta::assert_snapshot!(h.mermaid_string_with_formatter(config.clone()));
         std::fs::write(
             "test_custom_node_labels.mmd",
-            h.mermaid_string_with_formatter(config, RenderStringConfig::default()),
+            h.mermaid_string_with_formatter(config),
         )
         .unwrap();
+    }
+
+    #[test]
+    fn render_string_config_is_applied_to_node_labels() {
+        let int_type = int_type(5);
+        let mut builder =
+            DFGBuilder::new(Signature::new([int_type.clone(), int_type], [bool_t()])).unwrap();
+        let [lhs, rhs] = builder.input_wires_arr();
+        let output = builder
+            .add_dataflow_op(IntOpDef::ieq.with_log_width(5), [lhs, rhs])
+            .unwrap()
+            .out_wire(0);
+        let h = builder.finish_hugr_with_outputs([output]).unwrap();
+
+        let qualified = h.mermaid_format().finish();
+        let unqualified = h
+            .mermaid_format()
+            .with_render_string_config(RenderStringConfig::default())
+            .finish();
+
+        assert!(qualified.contains("arithmetic.int.ieq"));
+        assert!(!unqualified.contains("arithmetic.int.ieq"));
+        assert!(unqualified.contains("ieq"));
     }
 
     #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri

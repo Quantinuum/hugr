@@ -8,7 +8,7 @@ use hugr_core::{
         internal::HugrInternals,
         views::{ExtractionResult, render},
     },
-    ops::{OpType, RenderStringConfig},
+    ops::OpType,
 };
 
 use crate::Commit;
@@ -189,11 +189,7 @@ impl HugrView for ParentsView<'_> {
         unimplemented!()
     }
 
-    fn mermaid_string_with_formatter(
-        &self,
-        _: render::MermaidFormatter<Self>,
-        _: RenderStringConfig,
-    ) -> String {
+    fn mermaid_string_with_formatter(&self, _: render::MermaidFormatter<Self>) -> String {
         unimplemented!()
     }
 

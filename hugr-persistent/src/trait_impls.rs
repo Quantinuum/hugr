@@ -16,7 +16,7 @@ use hugr_core::{
             render::{MermaidFormatter, NodeLabel},
         },
     },
-    ops::{OpTag, OpTrait, OpType, RenderStringConfig},
+    ops::{OpTag, OpTrait, OpType},
 };
 
 use crate::{CommitId, persistent_hugr::NodeStatus};
@@ -257,11 +257,7 @@ impl HugrView for PersistentHugr {
             .flat_map(move |port| self.linked_ports(node, port).map(|(opp_node, _)| opp_node))
     }
 
-    fn mermaid_string_with_formatter(
-        &self,
-        formatter: MermaidFormatter<Self>,
-        _render_label_config: RenderStringConfig,
-    ) -> String {
+    fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String {
         // Extract a concrete HUGR for displaying
         let (hugr, node_map) = self.apply_all();
 
@@ -296,7 +292,8 @@ impl HugrView for PersistentHugr {
             .with_entrypoint(entrypoint)
             .with_node_labels(node_labels)
             .with_port_offsets(formatter.port_offsets())
-            .with_type_labels(formatter.type_labels());
+            .with_type_labels(formatter.type_labels())
+            .with_render_string_config(formatter.render_string_config());
 
         config.finish()
     }

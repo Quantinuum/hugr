@@ -428,7 +428,7 @@ pub trait HugrView: HugrInternals {
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
     fn mermaid_string(&self) -> String {
-        self.mermaid_string_with_formatter(self.mermaid_format(), RenderStringConfig::default())
+        self.mermaid_string_with_formatter(self.mermaid_format())
     }
     /// Return the mermaid representation of the underlying hierarchical graph
     /// using the provided rendering configuration.
@@ -436,7 +436,7 @@ pub trait HugrView: HugrInternals {
     /// This method allows customizing the appearance of node labels and other
     /// elements in the mermaid diagram.
     fn mermaid_string_with_config(&self, config: RenderStringConfig) -> String {
-        self.mermaid_string_with_formatter(self.mermaid_format(), config)
+        self.mermaid_string_with_formatter(self.mermaid_format().with_render_string_config(config))
     }
 
     /// Return the mermaid representation of the underlying hierarchical graph
@@ -447,12 +447,7 @@ pub trait HugrView: HugrInternals {
     ///
     /// For a more detailed representation, use the [`HugrView::dot_string`]
     /// format instead.
-    // NICOLA: TODO: include RenderStringConfig in the formatter, so that we don't have to pass it separately
-    fn mermaid_string_with_formatter(
-        &self,
-        formatter: MermaidFormatter<Self>,
-        render_label_config: RenderStringConfig,
-    ) -> String;
+    fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String;
 
     /// Construct a mermaid representation of the underlying hierarchical graph.
     ///
@@ -764,19 +759,11 @@ impl HugrView for Hugr {
         self.graph.all_neighbours(node.into_portgraph()).map_into()
     }
 
-    fn mermaid_string_with_formatter(
-        &self,
-        formatter: MermaidFormatter<Self>,
-        render_label_config: RenderStringConfig,
-    ) -> String {
+    fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String {
         self.graph
             .mermaid_format()
             .with_hierarchy(&self.hierarchy)
-            .with_node_style(render::node_style(
-                self,
-                formatter.clone(),
-                render_label_config,
-            ))
+            .with_node_style(render::node_style(self, formatter.clone()))
             .with_edge_style(render::edge_style(self, formatter))
             .finish()
     }
@@ -789,11 +776,7 @@ impl HugrView for Hugr {
         self.graph
             .dot_format()
             .with_hierarchy(&self.hierarchy)
-            .with_node_style(render::node_style(
-                self,
-                formatter.clone(),
-                RenderStringConfig::default(),
-            ))
+            .with_node_style(render::node_style(self, formatter.clone()))
             .with_port_style(render::port_style(self))
             .with_edge_style(render::edge_style(self, formatter))
             .finish()
