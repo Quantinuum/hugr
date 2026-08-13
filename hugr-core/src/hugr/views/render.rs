@@ -39,10 +39,7 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
             port_offsets_in_edges: true,
             type_labels_in_edges: true,
             entrypoint: None,
-            render_string_config: RenderStringConfig {
-                qualify_name: true,
-                ..Default::default()
-            },
+            render_string_config: RenderStringConfig::default(),
         }
     }
 
@@ -448,7 +445,13 @@ mod tests {
             .out_wire(0);
         let h = builder.finish_hugr_with_outputs([output]).unwrap();
 
-        let qualified = h.mermaid_format().finish();
+        let qualified = h
+            .mermaid_format()
+            .with_render_string_config(RenderStringConfig {
+                qualify_name: true,
+                ..Default::default()
+            })
+            .finish();
         let unqualified = h
             .mermaid_format()
             .with_render_string_config(RenderStringConfig::default())
