@@ -83,8 +83,8 @@ impl OpTrait for Const {
         "Constant value"
     }
 
-    fn render_str(&self, _config: RenderStringConfig) -> OpName {
-        self.name()
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn tag(&self) -> OpTag {

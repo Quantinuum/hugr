@@ -13,7 +13,7 @@ use crate::Visibility;
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type, TypeBound};
 
 use super::dataflow::DataflowParent;
-use super::{NamedOp, OpName, OpTag, OpTrait, RenderStringConfig, StaticTag, impl_op_name};
+use super::{NamedOp, OpTag, OpTrait, RenderStringConfig, StaticTag, impl_op_name};
 
 /// The root of a module, parent of all other `OpType`s.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -42,8 +42,8 @@ impl OpTrait for Module {
         "The root of a module, parent of all other `OpType`s"
     }
 
-    fn render_str(&self, _config: RenderStringConfig) -> OpName {
-        self.name()
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn tag(&self) -> super::OpTag {
@@ -135,8 +135,8 @@ impl OpTrait for FuncDefn {
         "A function definition"
     }
 
-    fn render_str(&self, _config: RenderStringConfig) -> OpName {
-        self.name()
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        format!("FuncDefn: \"{}\"", self.func_name())
     }
 
     fn tag(&self) -> OpTag {
@@ -227,8 +227,8 @@ impl OpTrait for FuncDecl {
         "External function declaration, linked at runtime"
     }
 
-    fn render_str(&self, _config: RenderStringConfig) -> OpName {
-        self.name()
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        format!("FuncDecl: \"{}\"", self.func_name())
     }
 
     fn tag(&self) -> OpTag {
@@ -261,8 +261,8 @@ impl OpTrait for AliasDefn {
         "A type alias definition"
     }
 
-    fn render_str(&self, _config: RenderStringConfig) -> OpName {
-        NamedOp::name(self)
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        NamedOp::name(self).to_string()
     }
 
     fn tag(&self) -> OpTag {
@@ -309,8 +309,8 @@ impl OpTrait for AliasDecl {
         "A type alias declaration"
     }
 
-    fn render_str(&self, _config: RenderStringConfig) -> OpName {
-        NamedOp::name(self)
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        NamedOp::name(self).to_string()
     }
 
     fn tag(&self) -> OpTag {

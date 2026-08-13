@@ -228,11 +228,23 @@ impl DataflowOpTrait for ExtensionOp {
         self.def().description()
     }
 
-    fn render_str(&self, config: RenderStringConfig) -> OpName {
-        if config.qualify_name {
-            self.qualified_id()
+    fn render_str(&self, config: RenderStringConfig) -> String {
+        let mut name = if config.qualify_name {
+            self.qualified_id().to_string()
         } else {
-            self.unqualified_id().into()
+            self.unqualified_id().to_string()
+        };
+        if config.print_type_args && !self.args().is_empty() {
+            name = format!(
+                "{}<{}>",
+                name,
+                self.args().iter().map(TypeArg::render_str).join(", ")
+            );
+        }
+        if config.extension_version {
+            format!("{}@{}", name, self.extension_version())
+        } else {
+            name
         }
     }
 
@@ -391,12 +403,25 @@ impl DataflowOpTrait for OpaqueOp {
         "Opaque operation"
     }
 
-    fn render_str(&self, config: RenderStringConfig) -> OpName {
-        if config.qualify_name {
-            self.qualified_id()
+    fn render_str(&self, config: RenderStringConfig) -> String {
+        let mut name = if config.qualify_name {
+            self.qualified_id().to_string()
         } else {
-            self.unqualified_id().clone()
+            self.unqualified_id().to_string()
+        };
+        if config.print_type_args && !self.args().is_empty() {
+            name = format!(
+                "{}<{}>",
+                name,
+                self.args().iter().map(TypeArg::render_str).join(", ")
+            );
         }
+        if config.extension_version {
+            if let Some(version) = self.extension_version() {
+                return format!("{}@{}", name, version);
+            }
+        }
+        name
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
@@ -467,8 +492,10 @@ mod test {
 
     use crate::extension::ExtensionRegistry;
     use crate::extension::resolution::resolve_op_extensions;
+    use crate::extension::simple_op::MakeRegisteredOp;
     use crate::std_extensions::STD_REG;
     use crate::std_extensions::arithmetic::conversions::{self};
+    use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::types::Type;
     use crate::{
         Extension,
@@ -581,6 +608,76 @@ mod test {
             "ext.op"
         );
         assert_eq!(ext_op.make_opaque().extension_version(), Some(&version));
+    }
+
+    #[test]
+    fn render_extension_version() {
+        let ext = Extension::new_arc(
+            "ext".try_into().unwrap(),
+            Version::new(1, 2, 3),
+            |ext, extension_ref| {
+                ext.add_op(
+                    "op".into(),
+                    String::new(),
+                    SignatureFunc::PolyFuncType(
+                        FuncValueType::from(Signature::new_endo([bool_t()])).into(),
+                    ),
+                    extension_ref,
+                )
+                .unwrap();
+            },
+        );
+        let ext_op = ext.instantiate_extension_op("op", []).unwrap();
+        let config = RenderStringConfig {
+            extension_version: true,
+            ..Default::default()
+        };
+
+        assert_eq!(OpTrait::render_str(&ext_op, config), "op@1.2.3");
+        assert_eq!(
+            OpTrait::render_str(
+                &ext_op,
+                RenderStringConfig {
+                    qualify_name: true,
+                    ..config
+                }
+            ),
+            "ext.op@1.2.3"
+        );
+
+        let mut opaque = ext_op.make_opaque();
+        assert_eq!(OpTrait::render_str(&opaque, config), "op@1.2.3");
+        opaque.set_extension_version(None);
+        assert_eq!(OpTrait::render_str(&opaque, config), "op");
+    }
+
+    #[test]
+    fn render_type_args() {
+        let ext_op = IntOpDef::ieq.with_log_width(5).to_extension_op().unwrap();
+        let config = RenderStringConfig {
+            extension_version: true,
+            print_type_args: true,
+            qualify_name: true,
+        };
+
+        assert_eq!(
+            OpTrait::render_str(&ext_op, config),
+            "arithmetic.int.ieq<5>@0.1.1"
+        );
+        assert_eq!(
+            OpTrait::render_str(&ext_op.make_opaque(), config),
+            "arithmetic.int.ieq<5>@0.1.1"
+        );
+        assert_eq!(
+            OpTrait::render_str(
+                &ext_op,
+                RenderStringConfig {
+                    print_type_args: false,
+                    ..config
+                }
+            ),
+            "arithmetic.int.ieq@0.1.1"
+        );
     }
 
     #[test]

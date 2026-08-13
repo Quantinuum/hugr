@@ -177,6 +177,36 @@ impl Term {
     /// An empty list of Terms.
     pub const EMPTY_LIST: Self = Self::List(vec![]);
 
+    /// Returns a string representation of this term.
+    ///
+    /// Composite terms recursively render each of their nested terms.
+    #[must_use]
+    pub fn render_str(&self) -> String {
+        match self {
+            Self::ListKind(term) => format!("List[{}]", term.render_str()),
+            Self::TupleKind(term) => format!("Tuple[{}]", term.render_str()),
+            Self::List(terms) => format!("[{}]", terms.iter().map(Self::render_str).join(", ")),
+            Self::ListConcat(terms) => format!(
+                "[{}]",
+                terms
+                    .iter()
+                    .map(|term| format!("... {}", term.render_str()))
+                    .join(",")
+            ),
+            Self::Tuple(terms) => {
+                format!("({})", terms.iter().map(Self::render_str).join(","))
+            }
+            Self::TupleConcat(terms) => format!(
+                "({})",
+                terms
+                    .iter()
+                    .map(|term| format!("... {}", term.render_str()))
+                    .join(",")
+            ),
+            _ => self.to_string(),
+        }
+    }
+
     /// Creates a [`Term::BoundedNatKind`] with the maximum bound (`u64::MAX` + 1).
     #[must_use]
     pub const fn max_nat_kind() -> Self {
@@ -946,6 +976,19 @@ mod test {
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::types::type_param::SeqPart;
     use crate::types::{Term, Type, TypeBound, TypeRow, type_param::TermKindError};
+
+    #[test]
+    fn render_nested_term() {
+        let term = Term::Tuple(vec![
+            Term::List(vec![
+                Term::BoundedNat(1),
+                Term::Tuple(vec![Term::String("inner".into()), Term::BoundedNat(2)]),
+            ]),
+            Term::new_list_kind(Term::Tuple(vec![Term::BoundedNat(3), Term::BoundedNat(4)])),
+        ]);
+
+        assert_eq!(term.render_str(), r#"([1, ("inner",2)],List[(3,4)])"#);
+    }
 
     #[test]
     fn new_list_from_parts_items() {

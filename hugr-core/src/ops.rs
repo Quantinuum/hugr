@@ -552,7 +552,7 @@ pub trait StaticTag {
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct RenderStringConfig {
     /// Include the version of the extension defining the operation.
-    pub print_extension_version: bool,
+    pub extension_version: bool,
     /// Include the operation's type arguments.
     pub print_type_args: bool,
     /// Qualify operation name with their extension identifier.
@@ -566,7 +566,7 @@ pub trait OpTrait: Sized + Clone {
     fn description(&self) -> &str;
 
     /// Returns an exhaustive string representation of the operation.
-    fn render_str(&self, config: RenderStringConfig) -> OpName;
+    fn render_str(&self, config: RenderStringConfig) -> String;
 
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag;

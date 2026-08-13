@@ -7,7 +7,7 @@ use crate::types::{EdgeKind, Signature, Type, TypeRow, TypeRowLike};
 
 use super::OpTag;
 use super::dataflow::{DataflowOpTrait, DataflowParent};
-use super::{NamedOp, OpName, OpTrait, RenderStringConfig, StaticTag, impl_op_name};
+use super::{NamedOp, OpTrait, RenderStringConfig, StaticTag, impl_op_name};
 
 /// Tail-controlled loop.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -30,8 +30,8 @@ impl DataflowOpTrait for TailLoop {
         "A tail-controlled loop"
     }
 
-    fn render_str(&self, _config: RenderStringConfig) -> OpName {
-        self.name()
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
@@ -109,8 +109,8 @@ impl DataflowOpTrait for Conditional {
         "HUGR conditional operation"
     }
 
-    fn render_str(&self, _config: RenderStringConfig) -> OpName {
-        self.name()
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
@@ -155,8 +155,8 @@ impl DataflowOpTrait for CFG {
         "A dataflow node defined by a child CFG"
     }
 
-    fn render_str(&self, _config: RenderStringConfig) -> OpName {
-        self.name()
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
@@ -219,8 +219,8 @@ impl OpTrait for DataflowBlock {
         "A CFG basic block node"
     }
 
-    fn render_str(&self, _config: RenderStringConfig) -> OpName {
-        self.name()
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     /// Tag identifying the operation.
@@ -257,8 +257,8 @@ impl OpTrait for ExitBlock {
         "A CFG exit block node"
     }
 
-    fn render_str(&self, _config: RenderStringConfig) -> OpName {
-        self.name()
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     /// Tag identifying the operation.
@@ -343,8 +343,8 @@ impl OpTrait for Case {
         "A case node inside a conditional"
     }
 
-    fn render_str(&self, _config: RenderStringConfig) -> OpName {
-        self.name()
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn tag(&self) -> OpTag {

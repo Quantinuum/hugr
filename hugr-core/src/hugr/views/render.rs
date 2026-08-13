@@ -9,7 +9,7 @@ use portgraph::{LinkView, MultiPortGraph, NodeIndex, PortIndex, PortView};
 
 use crate::core::HugrNode;
 use crate::hugr::internal::HugrInternals;
-use crate::ops::{OpTrait, OpType, RenderStringConfig};
+use crate::ops::{OpTrait, RenderStringConfig};
 use crate::types::EdgeKind;
 use crate::{Hugr, HugrView, Node};
 
@@ -221,11 +221,7 @@ pub(in crate::hugr) fn node_style<'a>(
     fn node_name(h: &Hugr, n: NodeIndex, inner_label_config: RenderStringConfig) -> String {
         // Nicola: todo: Move the logic in OpTrait -> use a struct for setting parameters -> flag for ext version, types args, qualifying names
         // the stuff inside optype implement optrait
-        match h.get_optype(n.into()) {
-            OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.func_name()),
-            OpType::FuncDefn(f) => format!("FuncDefn: \"{}\"", f.func_name()),
-            op => op.render_str(inner_label_config).to_string(),
-        }
+        h.get_optype(n.into()).render_str(inner_label_config)
     }
 
     fn numeric_label(
@@ -509,7 +505,11 @@ mod tests {
         ] {
             std::fs::write(
                 name,
-                hugr.mermaid_string_with_config(RenderStringConfig::default()),
+                hugr.mermaid_string_with_config(RenderStringConfig {
+                    qualify_name: false,
+                    extension_version: true,
+                    print_type_args: true,
+                }),
             )
             .unwrap();
         }
