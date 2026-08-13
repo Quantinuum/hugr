@@ -43,7 +43,6 @@ from hugr.ops import (
     is_dataflow_op,
 )
 from hugr.tys import Kind, OrderKind, Type, ValueKind
-from hugr.utils import BiMap
 
 from .node_port import (
     Direction,
@@ -54,6 +53,7 @@ from .node_port import (
     PortOffset,
     ToNode,
     _SubPort,
+    _NodeLinks,
 )
 
 if TYPE_CHECKING:
@@ -126,13 +126,13 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
     # List of nodes, with None for deleted nodes.
     _nodes: list[NodeData | None]
     # Bidirectional map of links between ports.
-    _links: BiMap[_SO, _SI]
+    _links: _NodeLinks
     # List of free node indices, populated when nodes are deleted.
     _free_nodes: list[Node]
 
     def __init__(self, entrypoint_op: OpVarCov | None = None) -> None:
         self._free_nodes = []
-        self._links = BiMap()
+        self._links = _NodeLinks()
         self._nodes = []
         self.entrypoint = Node(0)
         self.module_root = Node(0)
@@ -474,18 +474,6 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         self._free_nodes.append(node)
         return weight
 
-    def _unused_sub_offset(self, port: P) -> _SubPort[P]:
-        d: dict[_SO, _SI] | dict[_SI, _SO]
-        match port:
-            case OutPort(_):
-                d = self._links.fwd
-            case InPort(_):
-                d = self._links.bck
-        sub_port = _SubPort(port)
-        while sub_port in d:
-            sub_port = sub_port.next_sub_offset()
-        return sub_port
-
     def has_link(self, src: OutPort, dst: InPort) -> bool:
         """Check if there is a link between two ports.
 
@@ -518,12 +506,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             >>> list(df.hugr.linked_ports(df.input_node[0]))
             [InPort(Node(6), 0)]
         """
-        src_sub = self._unused_sub_offset(src)
-        dst_sub = self._unused_sub_offset(dst)
-        # if self._links.get_left(dst_sub) is not None:
-        #     dst = replace(dst, _sub_offset=dst._sub_offset + 1)
-        self._links.insert_left(src_sub, dst_sub)
-
+        self._links.establish_link(src, dst)
         self[src.node]._num_outs = max(self[src.node]._num_outs, src.offset + 1)
         self[dst.node]._num_inps = max(self[dst.node]._num_inps, dst.offset + 1)
 

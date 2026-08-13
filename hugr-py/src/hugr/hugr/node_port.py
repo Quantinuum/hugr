@@ -15,6 +15,8 @@ from typing import (
 
 from typing_extensions import Self
 
+from hugr.utils import BiMap
+
 if TYPE_CHECKING:
     from collections.abc import Iterator
 
@@ -234,3 +236,40 @@ class _SubPort(Generic[P]):
 
     def next_sub_offset(self) -> Self:
         return replace(self, sub_offset=self.sub_offset + 1)
+
+_SO = _SubPort[OutPort]
+_SI = _SubPort[InPort]
+
+@dataclass(frozen=True)
+class _NodeLinks:
+    _inner: BiMap[_SO, _SI] = field(init=False, default_factory=BiMap)
+    _max_subs: dict[_SO | _SI, int] = field(init=False, default_factory=dict)
+
+    def _unused_sub_offset(self, port: P) -> _SubPort[P]:
+        max_sub = self._max_subs.get(port, -1)
+        self._max_subs[port] = max_sub + 1
+
+        return _SubPort(port, sub_offset=max_sub + 1)
+
+    def establish_link(self, src: OutPort, dst: InPort):
+        src_sub = self._unused_sub_offset(src)
+        dst_sub = self._unused_sub_offset(dst)
+
+        self._inner.insert_left(src_sub, dst_sub)
+
+    def delete_left(self, key: _SO):
+        self._inner.delete_left(key)
+
+    def delete_right(self, key: _SI):
+        self._inner.delete_right(key)
+
+    def items(self):
+        return self._inner.items()
+
+    @property
+    def fwd(self):
+        return self._inner.fwd
+
+    @property
+    def bck(self):
+        return self._inner.bck
