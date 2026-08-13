@@ -238,7 +238,10 @@ impl DataflowOpTrait for ExtensionOp {
             name = format!(
                 "{}<{}>",
                 name,
-                self.args().iter().map(TypeArg::render_str).join(", ")
+                self.args()
+                    .iter()
+                    .map(|arg| arg.render_str(config))
+                    .join(", ")
             );
         }
         if config.extension_version {
@@ -413,7 +416,10 @@ impl DataflowOpTrait for OpaqueOp {
             name = format!(
                 "{}<{}>",
                 name,
-                self.args().iter().map(TypeArg::render_str).join(", ")
+                self.args()
+                    .iter()
+                    .map(|arg| arg.render_str(config))
+                    .join(", ")
             );
         }
         if config.extension_version {

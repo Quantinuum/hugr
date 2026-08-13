@@ -373,10 +373,13 @@ pub(in crate::hugr) fn edge_style<'a>(
         };
 
         // Compute the label for the edge, given the setting flags.
-        fn type_label(e: EdgeKind) -> Option<String> {
+        fn type_label(e: EdgeKind, config: RenderStringConfig) -> Option<String> {
             match e {
-                EdgeKind::Const(ty) | EdgeKind::Value(ty) => Some(format!("{ty}")),
-                EdgeKind::Function(pf) => Some(format!("{pf}")),
+                EdgeKind::Const(ty) | EdgeKind::Value(ty) => {
+                    Some(format!("{}", ty.render_str(config)))
+                }
+                // todo: use the render_str method for function types
+                EdgeKind::Function(pf) => Some(format!("Function§{pf}")),
                 _ => None,
             }
         }
@@ -384,7 +387,8 @@ pub(in crate::hugr) fn edge_style<'a>(
         // Only static and value edges have types to display.
         let label = match (
             config.port_offsets_in_edges,
-            type_label(port_kind).filter(|_| config.type_labels_in_edges),
+            type_label(port_kind, config.render_string_config)
+                .filter(|_| config.type_labels_in_edges),
         ) {
             (true, Some(ty)) => {
                 format!("{}:{}\n{ty}", src_offset.index(), tgt_offset.index())
