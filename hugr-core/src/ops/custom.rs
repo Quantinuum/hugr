@@ -229,21 +229,12 @@ impl DataflowOpTrait for ExtensionOp {
     }
 
     fn render_str(&self, config: RenderStringConfig) -> String {
-        let mut name = if config.qualify_name {
-            self.qualified_id().to_string()
-        } else {
-            self.unqualified_id().to_string()
-        };
-        if config.print_type_args && !self.args().is_empty() {
-            name = format!(
-                "{}<{}>",
-                name,
-                self.args()
-                    .iter()
-                    .map(|arg| arg.render_str(config))
-                    .join(", ")
-            );
-        }
+        let name = render_name_with_args(
+            &self.qualified_id(),
+            self.unqualified_id(),
+            self.args(),
+            config,
+        );
         if config.extension_version {
             format!("{}@{}", name, self.extension_version())
         } else {
@@ -307,6 +298,29 @@ pub struct OpaqueOp {
 /// Qualifies an operation name with its extension, e.g. 'iadd' -> 'arithmetic.iadd'.
 pub(crate) fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
     format!("{res_id}.{name}").into()
+}
+
+/// Renders the operation name (optionally qualified) with its type arguments per `config`.
+/// The extension version suffix is handled separately by each caller.
+fn render_name_with_args(
+    qualified_id: &OpNameRef,
+    unqualified_id: &OpNameRef,
+    args: &[TypeArg],
+    config: RenderStringConfig,
+) -> String {
+    let mut name = if config.qualify_name {
+        qualified_id.to_string()
+    } else {
+        unqualified_id.to_string()
+    };
+    if config.print_type_args && !args.is_empty() {
+        name = format!(
+            "{}<{}>",
+            name,
+            args.iter().map(|arg| arg.render_str(config)).join(", ")
+        );
+    }
+    name
 }
 
 impl OpaqueOp {
@@ -407,25 +421,16 @@ impl DataflowOpTrait for OpaqueOp {
     }
 
     fn render_str(&self, config: RenderStringConfig) -> String {
-        let mut name = if config.qualify_name {
-            self.qualified_id().to_string()
-        } else {
-            self.unqualified_id().to_string()
-        };
-        if config.print_type_args && !self.args().is_empty() {
-            name = format!(
-                "{}<{}>",
-                name,
-                self.args()
-                    .iter()
-                    .map(|arg| arg.render_str(config))
-                    .join(", ")
-            );
-        }
-        if config.extension_version {
-            if let Some(version) = self.extension_version() {
-                return format!("{}@{}", name, version);
-            }
+        let name = render_name_with_args(
+            &self.qualified_id(),
+            self.unqualified_id(),
+            self.args(),
+            config,
+        );
+        if config.extension_version
+            && let Some(version) = self.extension_version()
+        {
+            return format!("{}@{}", name, version);
         }
         name
     }

@@ -181,7 +181,6 @@ impl Term {
     /// Returns a string representation of this term.
     ///
     /// Composite terms recursively render each of their nested terms.
-    #[must_use]
     pub fn render_str(&self, config: RenderStringConfig) -> String {
         match self {
             Self::ListKind(term) => format!("List[{}]", term.render_str(config)),
@@ -203,10 +202,10 @@ impl Term {
                             .join(", ")
                     );
                 }
-                if config.extension_version {
-                    if let Some(version) = custom_type.extension_version() {
-                        name = format!("{name}@{version}");
-                    }
+                if config.extension_version
+                    && let Some(version) = custom_type.extension_version()
+                {
+                    name = format!("{name}@{version}");
                 }
                 name
             }

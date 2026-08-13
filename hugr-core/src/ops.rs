@@ -154,9 +154,9 @@ pub enum OpType {
     LoadFunction,
     DFG,
     #[serde(skip_deserializing, rename = "Extension")]
-    ExtensionOp, // extension
+    ExtensionOp,
     #[serde(rename = "Extension")]
-    OpaqueOp, // extension
+    OpaqueOp,
     Tag,
     DataflowBlock,
     ExitBlock,

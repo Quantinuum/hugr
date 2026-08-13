@@ -370,11 +370,9 @@ pub(in crate::hugr) fn edge_style<'a>(
         // Compute the label for the edge, given the setting flags.
         fn type_label(e: EdgeKind, config: RenderStringConfig) -> Option<String> {
             match e {
-                EdgeKind::Const(ty) | EdgeKind::Value(ty) => {
-                    Some(format!("{}", ty.render_str(config)))
-                }
+                EdgeKind::Const(ty) | EdgeKind::Value(ty) => Some(ty.render_str(config)),
                 // todo: use the render_str method for function types
-                EdgeKind::Function(pf) => Some(format!("Function§{pf}")),
+                EdgeKind::Function(pf) => Some(pf.render_str(config)),
                 _ => None,
             }
         }
@@ -400,13 +398,9 @@ pub(in crate::hugr) fn edge_style<'a>(
 mod tests {
     use crate::{
         NodeIndex,
-        builder::{Container, DFGBuilder, Dataflow, DataflowHugr, test::simple_dfg_hugr},
-        extension::{ExtensionId, Version, prelude::bool_t},
-        ops::custom::OpaqueOp,
-        std_extensions::{
-            arithmetic::{int_ops::IntOpDef, int_types::int_type},
-            collections::array::{Array, ArrayKind},
-        },
+        builder::{DFGBuilder, Dataflow, DataflowHugr, test::simple_dfg_hugr},
+        extension::prelude::bool_t,
+        std_extensions::arithmetic::{int_ops::IntOpDef, int_types::int_type},
         types::Signature,
     };
 
@@ -423,12 +417,7 @@ mod tests {
         let config = h
             .mermaid_format()
             .with_node_labels(NodeLabel::Custom(node_labels));
-        insta::assert_snapshot!(h.mermaid_string_with_formatter(config.clone()));
-        std::fs::write(
-            "test_custom_node_labels.mmd",
-            h.mermaid_string_with_formatter(config),
-        )
-        .unwrap();
+        insta::assert_snapshot!(h.mermaid_string_with_formatter(config));
     }
 
     #[test]
@@ -443,11 +432,12 @@ mod tests {
             .out_wire(0);
         let h = builder.finish_hugr_with_outputs([output]).unwrap();
 
-        let qualified = h
+        let options_on = h
             .mermaid_format()
             .with_render_string_config(RenderStringConfig {
+                extension_version: true,
+                print_type_args: true,
                 qualify_name: true,
-                ..Default::default()
             })
             .finish();
         let unqualified = h
@@ -455,68 +445,12 @@ mod tests {
             .with_render_string_config(RenderStringConfig::default())
             .finish();
 
-        assert!(qualified.contains("arithmetic.int.ieq"));
+        assert!(options_on.contains("arithmetic.int.ieq<5>@0.1.1"));
         assert!(!unqualified.contains("arithmetic.int.ieq"));
         assert!(unqualified.contains("ieq"));
-    }
 
-    #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
-    #[test]
-    fn write_extension_version_examples() {
-        let int_type = int_type(5);
-
-        let mut custom_op_hugr = DFGBuilder::new(Signature::new(
-            [int_type.clone(), int_type.clone()],
-            [bool_t()],
-        ))
-        .unwrap();
-        let [lhs, rhs] = custom_op_hugr.input_wires_arr();
-        let result = custom_op_hugr
-            .add_dataflow_op(IntOpDef::ieq.with_log_width(5), [lhs, rhs])
-            .unwrap()
-            .out_wire(0);
-        let test_op = OpaqueOp::new(
-            ExtensionId::new_unchecked("TEST_EXT.name"),
-            Version::parse("1.0.0-parsdefrve").unwrap(),
-            "TestOp",
-            [],
-            Signature::new_endo([bool_t()]),
-        );
-        let result = custom_op_hugr
-            .add_dataflow_op(test_op, [result])
-            .unwrap()
-            .out_wire(0);
-        custom_op_hugr.set_outputs([result]).unwrap();
-        let custom_op_hugr = custom_op_hugr.hugr().clone();
-
-        let array_type = Array::ty(3, int_type.clone());
-        let array_hugr = DFGBuilder::new(Signature::new_endo([array_type])).unwrap();
-        let [array] = array_hugr.input_wires_arr();
-        let array_hugr = array_hugr.finish_hugr_with_outputs([array]).unwrap();
-
-        let mut int_op_hugr =
-            DFGBuilder::new(Signature::new([int_type.clone(), int_type], [bool_t()])).unwrap();
-        let [lhs, rhs] = int_op_hugr.input_wires_arr();
-        let result = int_op_hugr
-            .add_dataflow_op(IntOpDef::ieq.with_log_width(5), [lhs, rhs])
-            .unwrap()
-            .out_wire(0);
-        let int_op_hugr = int_op_hugr.finish_hugr_with_outputs([result]).unwrap();
-
-        for (name, hugr) in [
-            ("test_custom_op_version.mmd", custom_op_hugr),
-            ("test_nested_type_version.mmd", array_hugr),
-            ("test_type_arg_version.mmd", int_op_hugr),
-        ] {
-            std::fs::write(
-                name,
-                hugr.mermaid_string_with_config(RenderStringConfig {
-                    qualify_name: false,
-                    extension_version: true,
-                    print_type_args: true,
-                }),
-            )
-            .unwrap();
-        }
+        assert!(options_on.contains("<br>arithmetic.int.types.int<5>@0.1.0"));
+        assert!(!unqualified.contains("<br>arithmetic.int.types.int"));
+        assert!(unqualified.contains("<br>int"));
     }
 }
