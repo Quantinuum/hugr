@@ -215,12 +215,6 @@ pub(in crate::hugr) fn node_style<'a>(
     h: &'a Hugr,
     formatter: MermaidFormatter<'a>,
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + 'a> {
-    fn node_name(h: &Hugr, n: NodeIndex, inner_label_config: RenderStringConfig) -> String {
-        // Nicola: todo: Move the logic in OpTrait -> use a struct for setting parameters -> flag for ext version, types args, qualifying names
-        // the stuff inside optype implement optrait
-        h.get_optype(n.into()).render_str(inner_label_config)
-    }
-
     fn numeric_label(
         h: &Hugr,
         n: NodeIndex,
@@ -231,10 +225,14 @@ pub(in crate::hugr) fn node_style<'a>(
             format!(
                 "({}) [**{}**]",
                 n.index(),
-                node_name(h, n, inner_label_config)
+                h.get_optype(n.into()).render_str(inner_label_config)
             )
         } else {
-            format!("({}) {}", n.index(), node_name(h, n, inner_label_config))
+            format!(
+                "({}) {}",
+                n.index(),
+                h.get_optype(n.into()).render_str(inner_label_config)
+            )
         }
     }
 
@@ -257,11 +255,11 @@ pub(in crate::hugr) fn node_style<'a>(
             if Some(n) == entrypoint {
                 NodeStyle::boxed(format!(
                     "[**{name}**]",
-                    name = node_name(h, n, render_label_config)
+                    name = h.get_optype(n.into()).render_str(render_label_config)
                 ))
                 .with_attrs(entrypoint_style.clone())
             } else {
-                NodeStyle::boxed(node_name(h, n, render_label_config))
+                NodeStyle::boxed(h.get_optype(n.into()).render_str(render_label_config))
             }
         }),
         NodeLabel::MetadataValues { print_keys } => Box::new(move |n| {
@@ -301,14 +299,14 @@ pub(in crate::hugr) fn node_style<'a>(
                 NodeStyle::boxed(format!(
                     "({label}) [**{name}**]",
                     label = labels.get(&n.into()).unwrap_or(&n.index().to_string()),
-                    name = node_name(h, n, render_label_config)
+                    name = h.get_optype(n.into()).render_str(render_label_config)
                 ))
                 .with_attrs(entrypoint_style.clone())
             } else {
                 NodeStyle::boxed(format!(
                     "({label}) {name}",
                     label = labels.get(&n.into()).unwrap_or(&n.index().to_string()),
-                    name = node_name(h, n, render_label_config)
+                    name = h.get_optype(n.into()).render_str(render_label_config)
                 ))
             }
         }),
