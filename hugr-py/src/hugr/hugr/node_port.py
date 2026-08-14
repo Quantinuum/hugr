@@ -37,12 +37,17 @@ class _Port:
     offset: PortOffset
     direction: ClassVar[Direction]
 
+    def __hash__(self) -> int:
+        # Hash the integer identity directly, avoiding nested dataclass hashes.
+        return hash((self.node.idx, self.offset))
+
 
 @dataclass(frozen=True, eq=True, order=True)
 class InPort(_Port):
     """Incoming port, defined by the `node` it belongs to and the port `offset`."""
 
     direction: ClassVar[Direction] = Direction.INCOMING
+    __hash__ = _Port.__hash__
 
     def __repr__(self) -> str:
         return f"InPort({self.node}, {self.offset})"
@@ -61,6 +66,7 @@ class OutPort(_Port, Wire):
     """Outgoing port, defined by the `node` it belongs to and the port `offset`."""
 
     direction: ClassVar[Direction] = Direction.OUTGOING
+    __hash__ = _Port.__hash__
 
     def out_port(self) -> OutPort:
         return self
@@ -233,6 +239,10 @@ class _SubPort(Generic[P]):
     port: P
     sub_offset: int = 0
 
+    def __hash__(self) -> int:
+        """Hash the flattened port and sub-offset identity."""
+        return hash((self.port.node.idx, self.port.offset, self.sub_offset))
+
     def next_sub_offset(self) -> Self:
         return replace(self, sub_offset=self.sub_offset + 1)
 
@@ -253,10 +263,14 @@ class _NodeLinks:
 
     #: All links in global insertion order.
     _items: dict[_SO, _SI] = field(init=False, default_factory=dict)
-    #: Links indexed by their outgoing parent port.
-    _fwd: dict[OutPort, dict[_SO, _SI]] = field(init=False, default_factory=dict)
-    #: Links indexed by their incoming parent port.
-    _bck: dict[InPort, dict[_SI, _SO]] = field(init=False, default_factory=dict)
+    #: Links indexed by their outgoing parent port and sub-offset.
+    #
+    # We use the offset `int` instead of `_SI` to avoid unnecessary hashing.
+    _fwd: dict[OutPort, dict[int, _SI]] = field(init=False, default_factory=dict)
+    #: Links indexed by their incoming parent port and sub-offset.
+    #
+    # We use the offset `int` instead of `_SI` to avoid unnecessary hashing.
+    _bck: dict[InPort, dict[int, _SO]] = field(init=False, default_factory=dict)
     #: Highest sub-offset allocated for each parent port.
     _max_subs: dict[OutPort | InPort, int] = field(
         init=False, default_factory=dict, repr=False
@@ -283,20 +297,20 @@ class _NodeLinks:
         dst_sub = self._unused_sub_offset(dst)
 
         self._items[src_sub] = dst_sub
-        self._fwd.setdefault(src, {})[src_sub] = dst_sub
-        self._bck.setdefault(dst, {})[dst_sub] = src_sub
+        self._fwd.setdefault(src, {})[src_sub.sub_offset] = dst_sub
+        self._bck.setdefault(dst, {})[dst_sub.sub_offset] = src_sub
 
     def _delete_left(self, src: _SO) -> None:
         """Delete a link identified by its outgoing subport."""
         dst = self._items.pop(src)
 
         outgoing = self._fwd[src.port]
-        del outgoing[src]
+        del outgoing[src.sub_offset]
         if not outgoing:
             del self._fwd[src.port]
 
         incoming = self._bck[dst.port]
-        del incoming[dst]
+        del incoming[dst.sub_offset]
         if not incoming:
             del self._bck[dst.port]
 
@@ -306,8 +320,16 @@ class _NodeLinks:
         incoming = self._bck.get(dst, {})
 
         if len(outgoing) <= len(incoming):
-            src_sub = next(
-                (sub for sub, linked in outgoing.items() if linked.port == dst), None
+            src_sub_offset = next(
+                (
+                    sub_offset
+                    for sub_offset, linked in outgoing.items()
+                    if linked.port == dst
+                ),
+                None,
+            )
+            src_sub = (
+                _SubPort(src, src_sub_offset) if src_sub_offset is not None else None
             )
         else:
             src_sub = next(
@@ -320,7 +342,9 @@ class _NodeLinks:
         """Delete every link incident to ``port``."""
         match port:
             case OutPort(_):
-                outgoing = tuple(self._fwd.get(port, {}))
+                outgoing = tuple(
+                    _SubPort(port, sub_offset) for sub_offset in self._fwd.get(port, {})
+                )
             case InPort(_):
                 outgoing = tuple(self._bck.get(port, {}).values())
         for src in outgoing:
