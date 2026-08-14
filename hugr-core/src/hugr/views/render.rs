@@ -371,7 +371,6 @@ pub(in crate::hugr) fn edge_style<'a>(
         fn type_label(e: EdgeKind, config: RenderStringConfig) -> Option<String> {
             match e {
                 EdgeKind::Const(ty) | EdgeKind::Value(ty) => Some(ty.render_str(config)),
-                // todo: use the render_str method for function types
                 EdgeKind::Function(pf) => Some(pf.render_str(config)),
                 _ => None,
             }

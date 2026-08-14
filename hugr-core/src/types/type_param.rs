@@ -1102,7 +1102,6 @@ mod test {
             qualify_name: true,
         };
 
-        print!("{}", term.render_str(config));
         assert_eq!(
             term.render_str(config),
             "[arithmetic.int.types.int<5>@0.1.0] -> [arithmetic.int.types.int<6>@0.1.0]"
