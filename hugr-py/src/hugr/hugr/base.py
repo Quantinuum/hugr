@@ -52,8 +52,8 @@ from .node_port import (
     OutPort,
     PortOffset,
     ToNode,
-    _SubPort,
     _NodeLinks,
+    _SubPort,
 )
 
 if TYPE_CHECKING:

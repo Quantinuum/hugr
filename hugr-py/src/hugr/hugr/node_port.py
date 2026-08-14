@@ -237,8 +237,10 @@ class _SubPort(Generic[P]):
     def next_sub_offset(self) -> Self:
         return replace(self, sub_offset=self.sub_offset + 1)
 
+
 _SO = _SubPort[OutPort]
 _SI = _SubPort[InPort]
+
 
 @dataclass(frozen=True)
 class _NodeLinks:
