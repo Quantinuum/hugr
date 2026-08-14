@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from collections import Counter
 from dataclasses import dataclass, field, replace
 from enum import Enum
 from typing import (
@@ -14,8 +15,6 @@ from typing import (
 )
 
 from typing_extensions import Self
-
-from hugr.utils import BiMap
 
 if TYPE_CHECKING:
     from collections.abc import Iterator
@@ -242,36 +241,105 @@ _SO = _SubPort[OutPort]
 _SI = _SubPort[InPort]
 
 
-@dataclass(frozen=True)
+@dataclass(frozen=True, eq=False)
 class _NodeLinks:
-    _inner: BiMap[_SO, _SI] = field(init=False, default_factory=BiMap)
-    _max_subs: dict[OutPort | InPort, int] = field(init=False, default_factory=dict)
+    """Bidirectional sparse-subport storage for the links in a HUGR.
+
+    Subport offsets are monotonically allocated per port, and are not reused
+    after deletion. The global map retains deterministic link insertion order,
+    while the endpoint maps make queries and removals proportional to a port's
+    degree without scanning through unused sub-offsets.
+    """
+
+    #: All links in global insertion order.
+    _items: dict[_SO, _SI] = field(init=False, default_factory=dict)
+    #: Links indexed by their outgoing parent port.
+    _fwd: dict[OutPort, dict[_SO, _SI]] = field(init=False, default_factory=dict)
+    #: Links indexed by their incoming parent port.
+    _bck: dict[InPort, dict[_SI, _SO]] = field(init=False, default_factory=dict)
+    #: Highest sub-offset allocated for each parent port.
+    _max_subs: dict[OutPort | InPort, int] = field(
+        init=False, default_factory=dict, repr=False
+    )
+
+    def __eq__(self, other: object) -> bool:
+        """Compare logical links, ignoring their internal allocation history."""
+        if not isinstance(other, _NodeLinks):
+            return NotImplemented
+        links = Counter((src.port, dst.port) for src, dst in self.items())
+        other_links = Counter((src.port, dst.port) for src, dst in other.items())
+        return links == other_links
 
     def _unused_sub_offset(self, port: P) -> _SubPort[P]:
+        """Allocate the next monotonic sub-offset for ``port``."""
         max_sub = self._max_subs.get(port, -1)
         self._max_subs[port] = max_sub + 1
 
         return _SubPort(port, sub_offset=max_sub + 1)
 
-    def establish_link(self, src: OutPort, dst: InPort):
+    def establish_link(self, src: OutPort, dst: InPort) -> None:
+        """Establish a link using fresh subports at both endpoints."""
         src_sub = self._unused_sub_offset(src)
         dst_sub = self._unused_sub_offset(dst)
 
-        self._inner.insert_left(src_sub, dst_sub)
+        self._items[src_sub] = dst_sub
+        self._fwd.setdefault(src, {})[src_sub] = dst_sub
+        self._bck.setdefault(dst, {})[dst_sub] = src_sub
 
-    def delete_left(self, key: _SO):
-        self._inner.delete_left(key)
+    def _delete_left(self, src: _SO) -> None:
+        """Delete a link identified by its outgoing subport."""
+        dst = self._items.pop(src)
 
-    def delete_right(self, key: _SI):
-        self._inner.delete_right(key)
+        outgoing = self._fwd[src.port]
+        del outgoing[src]
+        if not outgoing:
+            del self._fwd[src.port]
 
-    def items(self):
-        return self._inner.items()
+        incoming = self._bck[dst.port]
+        del incoming[dst]
+        if not incoming:
+            del self._bck[dst.port]
 
-    @property
-    def fwd(self):
-        return self._inner.fwd
+    def delete_link(self, src: OutPort, dst: InPort) -> None:
+        """Delete the first link between the given parent ports, if present."""
+        outgoing = self._fwd.get(src, {})
+        incoming = self._bck.get(dst, {})
 
-    @property
-    def bck(self):
-        return self._inner.bck
+        if len(outgoing) <= len(incoming):
+            src_sub = next(
+                (sub for sub, linked in outgoing.items() if linked.port == dst), None
+            )
+        else:
+            src_sub = next(
+                (linked for linked in incoming.values() if linked.port == src), None
+            )
+        if src_sub is not None:
+            self._delete_left(src_sub)
+
+    def disconnect_port(self, port: InPort | OutPort) -> None:
+        """Delete every link incident to ``port``."""
+        match port:
+            case OutPort(_):
+                outgoing = tuple(self._fwd.get(port, {}))
+            case InPort(_):
+                outgoing = tuple(self._bck.get(port, {}).values())
+        for src in outgoing:
+            self._delete_left(src)
+
+    @overload
+    def linked_ports(self, port: OutPort) -> Iterator[InPort]: ...
+
+    @overload
+    def linked_ports(self, port: InPort) -> Iterator[OutPort]: ...
+
+    def linked_ports(self, port: OutPort | InPort):
+        """Iterate ports linked to ``port`` without assuming dense sub-offsets."""
+        match port:
+            case OutPort(_):
+                return (sub.port for sub in self._fwd.get(port, {}).values())
+            case InPort(_):
+                return (sub.port for sub in self._bck.get(port, {}).values())
+
+    def items(self) -> Iterator[tuple[_SO, _SI]]:
+        """Iterate all stored links in insertion order."""
+        return iter(self._items.items())
