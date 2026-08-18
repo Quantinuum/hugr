@@ -262,7 +262,7 @@ class OpDef(ExtensionObject):
         Args:
             args: Type arguments corresponding to the type parameters of the definition.
             concrete_signature: Concrete function type of the operation, only required
-            if the operation is polymorphic.
+                if the operation is polymorphic.
         """
         return ops.ExtOp(self, concrete_signature, list(args or []))
 

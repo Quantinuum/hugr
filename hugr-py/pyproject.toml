@@ -1,6 +1,6 @@
 [project]
 name = "hugr"
-version = "0.18.3"
+version = "0.18.4"
 requires-python = ">=3.10"
 description = "Quantinuum's common representation for quantum programs"
 license = { file = "LICENCE" }
@@ -37,7 +37,7 @@ dependencies = [
 
 
 [project.scripts]
-hugr = "hugr._hugr:run_cli"
+hugr = "hugr._hugr.model:run_cli"
 
 [project.optional-dependencies]
 docs = [
