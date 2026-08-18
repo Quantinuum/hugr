@@ -222,26 +222,33 @@ impl<R: BufRead> EnvelopeReader<R> {
         let format = self.header().format;
         check_model_version(format)?;
 
-        let packaged_extensions = if format == EnvelopeFormat::SExpressionWithExtensions {
-            let deserializer = serde_json::Deserializer::from_reader(&mut self.reader);
-            // Deserialize the first json object, leaving the rest of the reader unconsumed.
-            let extra_extensions = deserializer
-                .into_iter::<Vec<Extension>>()
-                .next()
-                .unwrap_or(Ok(vec![]))?;
-            let weak_registry: WeakExtensionRegistry = (&self.registry).into();
-            ExtensionRegistry::new_with_extension_resolution(extra_extensions, &weak_registry)
-                .map_err(ExtensionRegistryLoadError::from)?
-        } else {
-            ExtensionRegistry::new([])
-        };
-
-        // Read the package into a string, then parse it.
-        //
-        // Due to how `to_string` works, we cannot append extensions after the package.
+        // The S-expression parser already needs the complete model in memory. Reading
+        // the payload up front also lets us retain the extension JSON prefix.
         let mut buffer = String::new();
         self.reader.read_to_string(&mut buffer)?;
-        let ast_package = hugr_model::v0::ast::Package::from_str(&buffer)?;
+
+        let (packaged_extensions, model_start) = if format
+            == EnvelopeFormat::SExpressionWithExtensions
+        {
+            let mut extensions = serde_json::Deserializer::from_str(&buffer)
+                .into_iter::<Vec<Box<serde_json::value::RawValue>>>();
+            let encoded_extensions = extensions.next().unwrap_or(Ok(vec![]))?;
+            let model_start = extensions.byte_offset();
+            let extra_extensions = encoded_extensions
+                .into_iter()
+                .map(|encoded| Extension::from_raw_json(&encoded))
+                .collect::<serde_json::Result<Vec<_>>>()?;
+            let weak_registry: WeakExtensionRegistry = (&self.registry).into();
+            let registry =
+                ExtensionRegistry::new_with_extension_resolution(extra_extensions, &weak_registry)
+                    .map_err(ExtensionRegistryLoadError::from)?;
+            (registry, model_start)
+        } else {
+            (ExtensionRegistry::new([]), 0)
+        };
+
+        // Due to how `to_string` works, extensions must precede the model.
+        let ast_package = hugr_model::v0::ast::Package::from_str(&buffer[model_start..])?;
 
         let bump = Bump::default();
         let model_package = ast_package.resolve(&bump)?;
