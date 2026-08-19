@@ -1,5 +1,17 @@
 # Changelog
 
+## [0.18.5](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.4...hugr-py-v0.18.5) (2026-08-19)
+
+
+### Features
+
+* **hugr-py:** Render extension version with render dot ([#3199](https://github.com/Quantinuum/hugr/issues/3199)) ([e040538](https://github.com/Quantinuum/hugr/commit/e04053817e9c8b512a29aec8c3bf045063c3469c))
+
+
+### Performance Improvements
+
+* Avoid computing unused sub offsets during link establishment ([#3208](https://github.com/Quantinuum/hugr/issues/3208)) ([40986a8](https://github.com/Quantinuum/hugr/commit/40986a80bde7996e4820819d6623a7d6e116e7ca))
+
 ## [0.18.4](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.3...hugr-py-v0.18.4) (2026-08-12)
 
 
