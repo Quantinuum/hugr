@@ -2,7 +2,7 @@
 
 use std::borrow::Cow;
 
-use super::{OpTag, OpTrait, impl_op_name};
+use super::{NamedOp, OpTag, OpTrait, RenderStringConfig, impl_op_name};
 
 use crate::extension::SignatureError;
 use crate::ops::StaticTag;
@@ -21,6 +21,9 @@ pub trait DataflowOpTrait: Sized {
 
     /// A human-readable description of the operation.
     fn description(&self) -> &str;
+
+    /// Returns a string representation of the operation.
+    fn render_str(&self, config: RenderStringConfig) -> String;
 
     /// The signature of the operation.
     fn signature(&self) -> Cow<'_, Signature>;
@@ -109,6 +112,10 @@ impl DataflowOpTrait for Input {
         "The input node for this dataflow subgraph"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     fn other_input(&self) -> Option<EdgeKind> {
         None
     }
@@ -129,6 +136,10 @@ impl DataflowOpTrait for Output {
 
     fn description(&self) -> &'static str {
         "The output node for this dataflow subgraph"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     // Note: We know what the input extensions should be, so we *could* give an
@@ -152,6 +163,10 @@ impl DataflowOpTrait for Output {
 impl<T: DataflowOpTrait + Clone> OpTrait for T {
     fn description(&self) -> &str {
         DataflowOpTrait::description(self)
+    }
+
+    fn render_str(&self, config: RenderStringConfig) -> String {
+        DataflowOpTrait::render_str(self, config)
     }
 
     fn tag(&self) -> OpTag {
@@ -205,6 +220,10 @@ impl DataflowOpTrait for Call {
 
     fn description(&self) -> &'static str {
         "Call a function directly"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
@@ -311,6 +330,10 @@ impl DataflowOpTrait for CallIndirect {
         "Call a function indirectly"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
         let mut s = self.signature.clone();
@@ -340,6 +363,10 @@ impl DataflowOpTrait for LoadConstant {
 
     fn description(&self) -> &'static str {
         "Load a static constant in to the local dataflow graph"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
@@ -405,6 +432,10 @@ impl DataflowOpTrait for LoadFunction {
 
     fn description(&self) -> &'static str {
         "Load a static function in to the local dataflow graph"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
@@ -515,6 +546,10 @@ impl DataflowOpTrait for DFG {
 
     fn description(&self) -> &'static str {
         "A simply nested dataflow graph"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn signature(&self) -> Cow<'_, Signature> {

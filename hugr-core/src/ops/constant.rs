@@ -6,7 +6,7 @@ mod serialize;
 use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1.76.
 use std::hash::{Hash, Hasher};
 
-use super::{NamedOp, OpName, OpTrait, StaticTag};
+use super::{NamedOp, OpName, OpTrait, RenderStringConfig, StaticTag};
 use super::{OpTag, OpType};
 use crate::types::{CustomType, EdgeKind, SumType, SumTypeError, Type, TypeRow};
 use serialize::SerialSum;
@@ -81,6 +81,10 @@ impl StaticTag for Const {
 impl OpTrait for Const {
     fn description(&self) -> &'static str {
         "Constant value"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn tag(&self) -> OpTag {

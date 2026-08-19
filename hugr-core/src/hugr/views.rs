@@ -32,7 +32,7 @@ use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::{DefaultPGNodeMap, PortgraphNodeMap};
 use crate::hugr::views::syn_edge::SynEdgeWrapper;
 use crate::metadata::{Metadata, MetadataError, RawMetadataValue};
-use crate::ops::{OpParent, OpTag, OpTrait, OpType, handle::NodeHandle};
+use crate::ops::{OpParent, OpTag, OpTrait, OpType, RenderStringConfig, handle::NodeHandle};
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
@@ -429,6 +429,14 @@ pub trait HugrView: HugrInternals {
     /// format instead.
     fn mermaid_string(&self) -> String {
         self.mermaid_string_with_formatter(self.mermaid_format())
+    }
+    /// Return the mermaid representation of the underlying hierarchical graph
+    /// using the provided rendering configuration.
+    ///
+    /// This method allows customizing the appearance of node labels and other
+    /// elements in the mermaid diagram.
+    fn mermaid_string_with_config(&self, config: RenderStringConfig) -> String {
+        self.mermaid_string_with_formatter(self.mermaid_format().with_render_string_config(config))
     }
 
     /// Return the mermaid representation of the underlying hierarchical graph
