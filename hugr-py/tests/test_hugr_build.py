@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import html
+from copy import deepcopy
 
 import pytest
 
@@ -110,6 +111,61 @@ def test_multiport(snapshot):
 
     assert list(h.hugr.linked_ports(ou_n.inp(0))) == [in_n.out(0)]
     validate(h.hugr, snap=snapshot)
+
+
+def test_sparse_subports():
+    dfg = Dfg(tys.Bool)
+    h = dfg.hugr
+    src = dfg.input_node.out(0)
+    dst = dfg.output_node
+    dst_0, dst_1, dst_2 = dst.inp(0), dst.inp(1), dst.inp(2)
+
+    h.add_link(src, dst_0)
+    h.add_link(src, dst_1)
+    h.delete_link(src, dst_0)
+
+    assert list(h.linked_ports(src)) == [dst_1]
+    assert list(h.linked_ports(dst_1)) == [src]
+
+    h.add_link(src, dst_2)
+    assert list(h.linked_ports(src)) == [dst_1, dst_2]
+
+    h.delete_link(src, dst_1)
+    assert list(h.linked_ports(src)) == [dst_2]
+
+
+def test_delete_node_with_fanout():
+    h = Hugr(ops.DFG([]))
+    src = h.add_node(Not, num_outs=1)
+    dst_0 = h.add_node(Not)
+    dst_1 = h.add_node(Not)
+
+    h.add_link(src.out(0), dst_0.inp(0))
+    h.add_link(src.out(0), dst_1.inp(0))
+    h.delete_node(src)
+
+    assert list(h.links()) == []
+    assert list(h.linked_ports(dst_0.inp(0))) == []
+    assert list(h.linked_ports(dst_1.inp(0))) == []
+
+    replacement = h.add_node(Not, num_outs=1)
+    assert replacement == src
+    h.add_link(replacement.out(0), dst_0.inp(0))
+    assert list(h.linked_ports(replacement.out(0))) == [dst_0.inp(0)]
+    assert list(h.linked_ports(dst_0.inp(0))) == [replacement.out(0)]
+
+
+def test_link_allocation_history_does_not_affect_equality():
+    h = Hugr(ops.DFG([]))
+    src = h.add_node(Not, num_outs=1)
+    dst = h.add_node(Not)
+    h.add_link(src.out(0), dst.inp(0))
+    equivalent = deepcopy(h)
+
+    h.delete_link(src.out(0), dst.inp(0))
+    h.add_link(src.out(0), dst.inp(0))
+
+    assert h == equivalent
 
 
 def test_add_op(snapshot):
