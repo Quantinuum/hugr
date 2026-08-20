@@ -1,7 +1,7 @@
 """Helpers to export hugr graphs from their python representation to hugr model."""
 
 import json
-from collections.abc import Sequence
+from collections.abc import Iterator, Sequence
 from typing import Generic, TypeVar, cast
 
 import hugr.model as model
@@ -45,31 +45,20 @@ class ModelExport:
 
     def __init__(self, hugr: Hugr):
         self.hugr = hugr
-        self.link_ports: _UnionFind[InPort | OutPort] = _UnionFind()
-        self.link_names: dict[InPort | OutPort, str] = {}
-        self.link_next = 0
-
-        for a, b in self.hugr.links():
-            self.link_ports.union(a, b)
-
-    def link_name(self, port: InPort | OutPort) -> str:
-        """Return the name of the link that a given port is connected to."""
-        root = self.link_ports[port]
-
-        if root in self.link_names:
-            return self.link_names[root]
-        else:
-            name = f"_{self.link_next}"
-            self.link_next += 1
-            self.link_names[root] = name
-            return name
+        self.link_names = _LinkNames.from_links(hugr.links())
 
     def export_node(self, node: Node) -> model.Node | None:
         """Export the node with the given node id."""
         node_data = self.hugr[node]
 
-        inputs = [self.link_name(InPort(node, i)) for i in range(node_data._num_inps)]
-        outputs = [self.link_name(OutPort(node, i)) for i in range(node_data._num_outs)]
+        inputs = [
+            self.link_names.link_name(InPort(node, i))
+            for i in range(node_data._num_inps)
+        ]
+        outputs = [
+            self.link_names.link_name(OutPort(node, i))
+            for i in range(node_data._num_outs)
+        ]
         meta = self.export_json_meta(node)
         meta += self.export_entrypoint_meta(node)
 
@@ -447,7 +436,7 @@ class ModelExport:
                 case Input() as op:
                     source_types = model.List([type.to_model() for type in op.types])
                     sources = [
-                        self.link_name(OutPort(child, i))
+                        self.link_names.link_name(OutPort(child, i))
                         for i in range(child_data._num_outs)
                     ]
 
@@ -461,7 +450,7 @@ class ModelExport:
                 case Output() as op:
                     target_types = model.List([type.to_model() for type in op.types])
                     targets = [
-                        self.link_name(InPort(child, i))
+                        self.link_names.link_name(InPort(child, i))
                         for i in range(child_data._num_inps)
                     ]
 
@@ -519,7 +508,7 @@ class ModelExport:
                         [type.to_model() for type in op.cfg_outputs]
                     )
                     targets = [
-                        self.link_name(InPort(child, i))
+                        self.link_names.link_name(InPort(child, i))
                         for i in range(child_data._num_inps)
                     ]
                 case DataflowBlock() as op:
@@ -536,8 +525,7 @@ class ModelExport:
                         #
                         # See https://github.com/Quantinuum/hugr/pull/3060.
                         if len(child_node.inputs) == 0:
-                            child_node.inputs = [f"_{self.link_next}"]
-                            self.link_next += 1
+                            child_node.inputs = [self.link_names.new_link_name()]
                         source = child_node.inputs[0]
                     else:
                         child_node = self.export_node(child)
@@ -667,7 +655,42 @@ def _versioned_symbol(name: str, version: object | None) -> str:
 T = TypeVar("T")
 
 
-class _UnionFind(Generic[T]):
+class _LinkNames:
+    def __init__(self):
+        self.next = 0
+        self.names: dict[InPort | OutPort, str] = {}
+
+    @staticmethod
+    def from_links(links: Iterator[tuple[OutPort, InPort]]) -> "_LinkNames":
+        union_builder = _UnionFindBuilder[InPort | OutPort]()
+        for a, b in links:
+            union_builder.union(a, b)
+
+        self = _LinkNames()
+        for item, root in union_builder.item_root_iterator():
+            if (link_name := self.names.get(root, None)) is None:
+                link_name = self.new_link_name()
+                self.names[root] = link_name
+            self.names[item] = link_name
+
+        return self
+
+    def new_link_name(self) -> str:
+        name = f"_{self.next}"
+        self.next += 1
+        return name
+
+    def link_name(self, port: InPort | OutPort) -> str:
+        """Return the name of the link that a given port is connected to."""
+        if (res := self.names.get(port, None)) is not None:
+            return res
+        else:
+            name = self.new_link_name()
+            self.names[port] = name
+            return name
+
+
+class _UnionFindBuilder(Generic[T]):
     def __init__(self) -> None:
         self.parents: dict[T, T] = {}
         self.sizes: dict[T, int] = {}
@@ -698,6 +721,9 @@ class _UnionFind(Generic[T]):
 
         self.parents[b] = a
         self.sizes[a] += self.sizes[b]
+
+    def item_root_iterator(self) -> Iterator[tuple[T, T]]:
+        return ((k, self[k]) for k in self.parents)
 
 
 def _has_order_links(hugr: Hugr, node: Node) -> bool:
