@@ -354,6 +354,10 @@ pub struct ModuleDesc {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub num_nodes: Option<usize>,
+    /// Number of edges in the module.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub num_edges: Option<usize>,
     /// The entrypoint node and the corresponding operation type.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
@@ -380,6 +384,11 @@ impl ModuleDesc {
     /// Sets the number of nodes in the module.
     pub fn set_num_nodes(&mut self, num_nodes: usize) {
         self.num_nodes = Some(num_nodes);
+    }
+
+    /// Sets the number of edges in the module.
+    pub fn set_num_edges(&mut self, num_edges: usize) {
+        self.num_edges = Some(num_edges);
     }
 
     /// Sets the entrypoint of the module.
@@ -490,9 +499,15 @@ impl ModuleDesc {
         self.set_num_nodes(hugr.num_nodes());
     }
 
+    /// Loads the number of edges in the module from the HUGR.
+    pub(crate) fn load_num_edges(&mut self, hugr: &impl HugrView) {
+        self.set_num_edges(hugr.num_edges());
+    }
+
     /// Loads full description of the module from the HUGR.
     pub(crate) fn load_from_hugr(&mut self, hugr: &impl HugrView<Node = Node>) {
         self.load_num_nodes(hugr);
+        self.load_num_edges(hugr);
         self.load_entrypoint(hugr);
         self.load_generator(hugr);
         self.load_used_extensions_resolved(hugr);
@@ -588,6 +603,12 @@ mod test {
     fn test_module_desc_set_num_nodes(mut empty_module_desc: ModuleDesc) {
         empty_module_desc.set_num_nodes(10);
         assert_eq!(empty_module_desc.num_nodes, Some(10));
+    }
+
+    #[rstest]
+    fn test_module_desc_set_num_edges(mut empty_module_desc: ModuleDesc) {
+        empty_module_desc.set_num_edges(20);
+        assert_eq!(empty_module_desc.num_edges, Some(20));
     }
 
     #[rstest]
