@@ -111,7 +111,8 @@ def hugr_w_function_call(direct_call: bool) -> Hugr:
 
 
 for dc in direct_call:
-    (Path(argv[0]).parent / f"hugr_w_function_{"direct" if dc else "indirect"}_call.hugr").write_bytes(
+    call_kind = "direct" if dc else "indirect"
+    (Path(argv[0]).parent / f"hugr_w_function_{call_kind}_call.hugr").write_bytes(
         hugr_w_function_call(dc).to_bytes()
     )
 
