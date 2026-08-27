@@ -1,6 +1,7 @@
 name: Rust Semver Checks
 on:
-  pull_request_target:
+  # Run source-level checks in the unprivileged pull request context.
+  pull_request:
     branches:
       - "**"
 
@@ -16,6 +17,7 @@ jobs:
     name: Check for changes
     runs-on: ubuntu-latest
     permissions:
+      contents: read
       pull-requests: read
     outputs:
       rust: ${{ steps.filter.outputs.rust }}
@@ -29,16 +31,15 @@ jobs:
     runs-on: ubuntu-latest
     needs: [changes]
     if: ${{ needs.changes.outputs.rust == 'true' }}
-    env:
-      GITHUB_TOKEN: ${{ secrets.HUGRBOT_PAT }}
+    permissions:
+      contents: read
     steps:
       - name: Install LLVM and Clang
         run: |
           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
-          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
+          sudo add-apt-repository 'deb https://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
           sudo apt update
           sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
       - name: Run Rust checks
-        uses: quantinuum/hugrverse-actions/rs-semver-checks@main
+        uses: quantinuum/hugrverse-actions/rs-semver-checks@9ee45163d8656eb06d513cb39b77d186f86789f6
         with:
-          token: ${{ secrets.HUGRBOT_PAT }}
