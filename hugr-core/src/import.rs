@@ -265,20 +265,7 @@ pub(crate) fn import_described_hugr(
     module: &table::Module,
     extensions: &ExtensionRegistry,
 ) -> (ModuleDesc, Result<Hugr, ImportError>) {
-    // TODO: Module should know about the number of edges, so that we can use a vector here.
-    // For now we use a hashmap, which will be slower.
-    let mut ctx = Context {
-        module,
-        hugr: Hugr::new(),
-        link_ports: FxHashMap::default(),
-        static_edges: Vec::new(),
-        extensions,
-        nodes: FxHashMap::default(),
-        local_vars: FxHashMap::default(),
-        custom_name_cache: FxHashMap::default(),
-        region_scope: table::RegionId::default(),
-        description: ModuleDesc::default(),
-    };
+    let mut ctx = Context::new(module, extensions);
 
     if let Some(s) = get_generator(&ctx) {
         ctx.description.set_generator(s);
@@ -327,12 +314,34 @@ struct Context<'a> {
 
     custom_name_cache: FxHashMap<&'a str, (ExtensionId, SmolStr)>,
 
+    /// Successfully imported runtime types, keyed by their model table id.
+    type_cache: FxHashMap<table::TermId, Type>,
+
     region_scope: table::RegionId,
 
     description: ModuleDesc,
 }
 
 impl<'a> Context<'a> {
+    /// Creates the state used to import one model module.
+    fn new(module: &'a table::Module<'a>, extensions: &'a ExtensionRegistry) -> Self {
+        // TODO: Module should know about the number of edges, so that we can use a vector here.
+        // For now we use a hashmap, which will be slower.
+        Self {
+            module,
+            hugr: Hugr::new(),
+            link_ports: FxHashMap::default(),
+            static_edges: Vec::new(),
+            extensions,
+            nodes: FxHashMap::default(),
+            local_vars: FxHashMap::default(),
+            custom_name_cache: FxHashMap::default(),
+            type_cache: FxHashMap::default(),
+            region_scope: table::RegionId::default(),
+            description: ModuleDesc::default(),
+        }
+    }
+
     /// Get the signature of the node with the given `NodeId`.
     fn get_node_signature(&mut self, node: table::NodeId) -> Result<Signature, ImportErrorInner> {
         let node_data = self.get_node(node)?;
@@ -1552,7 +1561,13 @@ impl<'a> Context<'a> {
     }
 
     fn import_type(&mut self, term_id: table::TermId) -> Result<Type, ImportErrorInner> {
-        Ok(Type::try_from(self.import_term(term_id)?)?)
+        if let Some(typ) = self.type_cache.get(&term_id) {
+            return Ok(typ.clone());
+        }
+
+        let typ = Type::try_from(self.import_term(term_id)?)?;
+        self.type_cache.insert(term_id, typ.clone());
+        Ok(typ)
     }
 
     fn import_term_with_bound(
@@ -1922,9 +1937,9 @@ impl<'a> Context<'a> {
         let elems = self.import_closed_list(term_id)?;
         Ok(elems
             .into_iter()
-            .map(|id| self.import_term(id))
+            .map(|id| self.import_type(id))
             .collect::<Result<Vec<_>, _>>()?
-            .try_into()?)
+            .into())
     }
 
     fn import_custom_name(
@@ -2245,9 +2260,42 @@ impl LocalVar {
 
 #[cfg(test)]
 mod test {
-    use crate::Hugr;
+    use std::str::FromStr;
+
+    use crate::{Hugr, std_extensions::std_reg};
+    use hugr_model::v0::{self as model, table};
     use rstest::rstest;
     use std::path::PathBuf;
+
+    use super::Context;
+
+    /// Check that type imports of the same term share the same underlying storage.
+    #[rstest]
+    fn repeated_runtime_type_imports_share_storage() {
+        let ast = model::ast::Package::from_str(include_str!(
+            "../../hugr-model/tests/fixtures/model-add.edn"
+        ))
+        .unwrap();
+        let bump = model::bumpalo::Bump::new();
+        let package = ast.resolve(&bump).unwrap();
+        let module = &package.modules[0];
+        let registry = std_reg();
+        let mut context = Context::new(module, &registry);
+
+        let (term_id, first) = (0..module.terms.len())
+            .map(table::TermId::new)
+            .find_map(|term_id| {
+                context
+                    .import_type(term_id)
+                    .ok()
+                    .filter(|typ| typ.as_extension().is_some())
+                    .map(|typ| (term_id, typ))
+            })
+            .expect("fixture should contain an extension type");
+        let second = context.import_type(term_id).unwrap();
+
+        assert!(first.shares_storage_with(&second));
+    }
 
     #[rstest]
     fn test_import_cases(#[files("../test_files/import_tests/*.hugr")] case: PathBuf) {

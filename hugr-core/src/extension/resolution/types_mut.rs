@@ -225,13 +225,89 @@ pub(super) fn resolve_type_exts(
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    const EMPTY: Type = Type::new_unit_sum(0); // as no Type::default()
-    let mut tm = std::mem::replace(typ, EMPTY).into();
+    if collect_current_type_exts(typ, extensions, used_extensions) {
+        return Ok(());
+    }
+
+    let mut tm = std::mem::replace(typ, Type::new_unit_sum(0)).into();
     let r = resolve_term_exts(node, &mut tm, extensions, used_extensions);
     *typ = tm
         .try_into()
         .expect("Resolving extensions cannot change kind from RuntimeType");
     r
+}
+
+/// Collects extension references when they already match the target registry.
+///
+/// Imported types already contain the correct weak references. Detecting that
+/// case before requesting mutable access preserves their shared backing.
+fn collect_current_type_exts(
+    typ: &Type,
+    extensions: &WeakExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
+) -> bool {
+    if !term_extension_refs_match(typ, extensions) {
+        return false;
+    }
+
+    let mut current_extensions = WeakExtensionRegistry::default();
+    let mut missing_extensions = ExtensionSet::new();
+    collect_term_exts(typ, &mut current_extensions, &mut missing_extensions);
+
+    if !missing_extensions.is_empty() {
+        return false;
+    }
+
+    for (id, version, extension) in current_extensions {
+        used_extensions.register(id, version, extension);
+    }
+    true
+}
+
+/// Checks every custom type reference against the target registry.
+fn term_extension_refs_match(term: &Term, extensions: &WeakExtensionRegistry) -> bool {
+    match term {
+        Term::ExtensionType(custom) => {
+            let current = custom.extension_ref();
+            current.upgrade().is_some()
+                && extensions
+                    .get_req(custom.extension(), custom.extension_version())
+                    .is_some_and(|(_, expected)| current.ptr_eq(expected))
+                && custom
+                    .args()
+                    .iter()
+                    .all(|arg| term_extension_refs_match(arg, extensions))
+        }
+        Term::FunctionType(func) => {
+            term_extension_refs_match(&func.input, extensions)
+                && term_extension_refs_match(&func.output, extensions)
+        }
+        Term::SumType(SumType::General(general)) => general
+            .rows()
+            .iter()
+            .all(|row| term_extension_refs_match(row, extensions)),
+        Term::ConstKind(typ) => term_extension_refs_match(typ, extensions),
+        Term::List(children)
+        | Term::ListConcat(children)
+        | Term::Tuple(children)
+        | Term::TupleConcat(children) => children
+            .iter()
+            .all(|child| term_extension_refs_match(child, extensions)),
+        Term::ListKind(item_type) => term_extension_refs_match(item_type, extensions),
+        Term::TupleKind(item_types) => term_extension_refs_match(item_types, extensions),
+        Term::Variable(_)
+        | Term::TypeKind(_)
+        | Term::StaticKind
+        | Term::BoundedNatKind(_)
+        | Term::StringKind
+        | Term::BytesKind
+        | Term::FloatKind
+        | Term::BoundedNat(_)
+        | Term::String(_)
+        | Term::Bytes(_)
+        | Term::Float(_)
+        | Term::SumType(SumType::Unit { .. }) => true,
+    }
 }
 
 /// Update all weak Extension pointers in the [`CustomType`]s inside a [`Term`].
