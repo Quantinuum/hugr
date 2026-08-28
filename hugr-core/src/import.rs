@@ -265,8 +265,6 @@ pub(crate) fn import_described_hugr(
     module: &table::Module,
     extensions: &ExtensionRegistry,
 ) -> (ModuleDesc, Result<Hugr, ImportError>) {
-    // TODO: Module should know about the number of edges, so that we can use a vector here.
-    // For now we use a hashmap, which will be slower.
     let mut ctx = Context::new(module, extensions);
 
     if let Some(s) = get_generator(&ctx) {
@@ -326,6 +324,8 @@ struct Context<'a> {
 impl<'a> Context<'a> {
     /// Creates the state used to import one model module.
     fn new(module: &'a table::Module<'a>, extensions: &'a ExtensionRegistry) -> Self {
+        // TODO: Module should know about the number of edges, so that we can use a vector here.
+        // For now we use a hashmap, which will be slower.
         Self {
             module,
             hugr: Hugr::new(),
