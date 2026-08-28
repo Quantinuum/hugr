@@ -434,6 +434,15 @@ mod test {
     #[case::idiv(IntOpDef::idiv_u.with_log_width(5), &[37, 8], &[4], 5)]
     #[case::imod(IntOpDef::imod_u.with_log_width(5), &[43, 8], &[3], 5)]
     #[case::ipow(IntOpDef::ipow.with_log_width(5), &[2, 8], &[256], 5)]
+    #[case::ishl_large_amount(IntOpDef::ishl.with_log_width(6), &[1, 70], &[0], 6)]
+    #[case::ishr_large_amount(
+        IntOpDef::ishr.with_log_width(6),
+        &[1 << 40, 70],
+        &[0],
+        6
+    )]
+    #[case::irotl_multiple_of_width(IntOpDef::irotl.with_log_width(6), &[1, 64], &[1], 6)]
+    #[case::irotr_multiple_of_width(IntOpDef::irotr.with_log_width(6), &[1, 128], &[1], 6)]
     #[case::iu_to_s(IntOpDef::iu_to_s.with_log_width(5), &[42], &[42], 5)]
     #[case::is_to_u(IntOpDef::is_to_u.with_log_width(5), &[42], &[42], 5)]
     #[should_panic(expected = "too large to be converted to signed")]

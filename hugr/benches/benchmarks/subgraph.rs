@@ -2,7 +2,7 @@
 #![allow(clippy::unit_arg)]
 use hugr::hugr::views::SiblingSubgraph;
 
-use super::hugr::circuit;
+use crate::examples::circuit;
 use criterion::{AxisScale, BenchmarkId, Criterion, PlotConfiguration, criterion_group};
 use std::hint::black_box;
 

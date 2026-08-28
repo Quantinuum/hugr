@@ -138,10 +138,23 @@ edges; see [operations](#node-operations).
 
 ### `Order` edges
 
-`Order` edges represent explicit constraints on ordering between nodes
-(e.g. useful for stateful operations). These can be seen as
-local value edges of unit type `()`, i.e. that pass no data, and where
-the source and target nodes must have the same parent. There can be at
+`Order` edges provide a way to express constraints on ordering between nodes
+(e.g. useful for stateful operations). They can be seen as local value edges
+of unit type `()`, i.e. that pass no data - or where the data is hidden,
+rather than represented in the graph.
+
+Nonetheless, like `Value` edges, an order edge indicates that the source node
+will, at runtime, produce some hidden state or value that is (in some way)
+consumed by the edge's target; thus during execution we can at least ask
+*whether* that state (or unit value) has been produced - no later than
+evaluation of the node being complete, see [Evaluation Semantics](#evaluation-semantics).
+<!-- even if not *what* value was produced.-->
+
+However whereas value inports must have exactly one incoming edge,
+the node's unique Order inport may have any number of incoming edges
+(including zero), which are implicitly joined together.
+
+Source and target nodes must have the same parent. There can be at
 most one `Order` edge between any two nodes.
 
 ### `ControlFlow` edges
@@ -297,12 +310,6 @@ flowchart
 
 (control-flow)=
 ### Control Flow
-
-In a dataflow graph, the evaluation semantics are simple: all nodes in
-the graph are necessarily evaluated, in some order (perhaps parallel)
-respecting the Dataflow and Order edges. This may include interleaving or
-overlapping evaluation of siblings and descendants as long as said edges
-are respected.
 
 The following operations are used to
 express control flow, i.e. conditional or repeated evaluation.
@@ -716,6 +723,37 @@ flowchart
     F == "angle" ==> G
     linkStyle 12,13,14,15,16,17 stroke:#ff3,stroke-width:4px;
 ```
+
+(evaluation-semantics)=
+## Evaluation Semantics
+
+Evaluating a dataflow sibling graph behaves as if all nodes in the graph are
+evaluated. (For hierarchical nodes, this may entail evaluating some children,
+according to the node.) For nodes that execute strictly[^1], the order of
+execution will respect the Dataflow and Order edges. Strictness and also
+atomicity may depend upon the specific toolchain or implementation, and
+*in general* Hugr allows that
+* Nodes may execute non-atomically, perhaps in parallel/overlapping other nodes
+* Nodes may execute partially or totally before all inputs are ready (if the
+  op is able to "do" anything without all its inputs).
+
+**However** an exception to the last point is that a node with an `Order` input must
+wait for all its `Order`-predecessors to produce their `Order` outputs before:
+  * the node has any side-effects (e.g. panic or print)
+  * the node produces its own `Order` output.
+
+This means that side-effects will occur in an order respecting the `Order`
+edges, but `Order` edges do not restrict pure functional computation (i.e. that
+does not depend on any global state or have any side effects).
+
+[^1]: "strictly" as in requiring *all* of a node's inputs to have been finished before beginning evaluation of the node itself.
+
+This applies both to extension ops and core constructs such as DFG, CFG, or a
+Call to a function, but may be refined (introducing more precise guarantees
+such as atomicity or strictness) for specific ops and/or by specific
+implementations.
+
+For ops such as `Conditional`, `TailLoop` and `CFG`/`BasicBlock`, the order input to the container node, or to any `Output` node within, must be treated linearly: only after all Order-predecessors have finished mutating state and produced their Order outputs, may the Order output (of exactly one `Input` node or the container itself) be ready - chosen according to the appropriate predicate. Thus, nodes reachable along Order edges from an `Input` may not be speculatively evaluated (perform any stateful update); but nodes which are not `Order`-reachable may be.
 
 ## Exception Handling
 

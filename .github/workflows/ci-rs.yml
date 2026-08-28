@@ -43,7 +43,7 @@ jobs:
       llvm: ${{ steps.filter.outputs.llvm }}
       model: ${{ steps.filter.outputs.model }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - uses: ./.github/actions/check-changes
         id: filter
 
@@ -52,8 +52,8 @@ jobs:
     if: ${{ needs.changes.outputs.rust == 'true' }}
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -81,8 +81,8 @@ jobs:
     permissions:
       checks: write
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install LLVM and Clang
@@ -100,7 +100,7 @@ jobs:
       - name: Build benchmarks
         run: cargo codspeed build --profile bench --features declarative,llvm,llvm-test
       - name: Run benchmarks
-        uses: CodSpeedHQ/action@v4
+        uses: CodSpeedHQ/action@v5
         with:
           token: ${{ secrets.CODSPEED_TOKEN }}
           run: "cargo codspeed run"
@@ -113,8 +113,8 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust stable, no features)
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -135,8 +135,8 @@ jobs:
     name: tests (Rust stable, all features)
 
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -186,8 +186,8 @@ jobs:
         rust: [beta]
     name: tests (Rust ${{ matrix.rust }})
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - id: toolchain
         uses: dtolnay/rust-toolchain@master
         with:
@@ -223,8 +223,8 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust MSRV, min dependencies)
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Install MSRV toolchain
         id: toolchain
         uses: dtolnay/rust-toolchain@master
@@ -280,7 +280,7 @@ jobs:
     name: Check standard extensions
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Download the hugr binary
         uses: actions/download-artifact@v8
         with:
@@ -306,8 +306,8 @@ jobs:
     name: Keep hugr-model capnp schema updated
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - name: Install stable toolchain
         uses: dtolnay/rust-toolchain@stable
       - name: Install CapnProto
@@ -338,8 +338,8 @@ jobs:
     runs-on: ubuntu-latest
     name: tests (Rust nightly, coverage)
     steps:
-      - uses: actions/checkout@v6
-      - uses: mozilla-actions/sccache-action@v0.0.10
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
       - uses: dtolnay/rust-toolchain@master
         with:
           # Nightly is required to count doctests coverage

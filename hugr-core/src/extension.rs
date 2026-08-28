@@ -237,7 +237,7 @@ impl ExtensionVersions {
     #[must_use]
     pub(crate) fn get_req(&self, requested: Option<&Version>) -> Option<&Arc<Extension>> {
         match requested {
-            Some(version) => self.get_compatible(version),
+            Some(version) => self.exact(version).or_else(|| self.get_compatible(version)),
             None => Some(self.latest()),
         }
     }

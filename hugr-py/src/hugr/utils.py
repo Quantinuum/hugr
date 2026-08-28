@@ -11,6 +11,8 @@ from collections.abc import (
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generic, Protocol, TypeVar
 
+from typing_extensions import deprecated
+
 if TYPE_CHECKING:
     from hugr.tys import TypeArg
 
@@ -27,6 +29,7 @@ class NotBijection(Exception):
 
 
 @dataclass()
+@deprecated("Will be removed in a future version.")  # Since 0.18.5
 class BiMap(MutableMapping, Generic[L, R]):
     """Bidirectional map backed by two dictionaries, between left types `L` and
     right types `R`.
@@ -260,3 +263,24 @@ def name_w_args(name: str, args: Sequence["TypeArg"]) -> str:
     if len(args) == 0:
         return name
     return f"{name}<{comma_sep_str(args)}>"
+
+
+def name_w_args_render(
+    name: str,
+    args: Iterable["TypeArg"],
+    *,
+    extension_version: bool = False,
+    qualified_name: bool = False,
+) -> str:
+    """Format a type name with recursively rendered type arguments."""
+    args = list(args)
+    if not args:
+        return name
+    rendered_args = (
+        arg.render(
+            extension_version=extension_version,
+            qualified_name=qualified_name,
+        )
+        for arg in args
+    )
+    return f"{name}<{comma_sep_str(rendered_args)}>"

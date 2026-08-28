@@ -59,6 +59,12 @@ impl WeakExtensionVersions {
         semver_compatible(version, requested).then_some((version, extension))
     }
 
+    /// Return the exact retained extension version, if available.
+    #[must_use]
+    fn exact(&self, version: &Version) -> Option<(&Version, &Weak<Extension>)> {
+        self.versions.get_key_value(version)
+    }
+
     /// Gets the extension satisfying an optional serialized version requirement.
     ///
     /// If `requested` is `Some(version)`, returns the highest retained
@@ -70,7 +76,7 @@ impl WeakExtensionVersions {
     #[must_use]
     fn get_req(&self, requested: Option<&Version>) -> Option<(&Version, &Weak<Extension>)> {
         match requested {
-            Some(version) => self.get_compatible(version),
+            Some(version) => self.exact(version).or_else(|| self.get_compatible(version)),
             None => Some(self.latest()),
         }
     }

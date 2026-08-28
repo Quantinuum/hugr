@@ -10,7 +10,7 @@ from hugr.std._util import _load_extension
 from hugr.utils import comma_sep_str
 
 if TYPE_CHECKING:
-    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
+    from hugr.ext import ExtensionRegistry, UsedExtensionResolver
 
 EXTENSION = _load_extension("collections.static_array")
 
@@ -40,9 +40,9 @@ class StaticArray(tys.ExtType):
         return self.ty.type_bound()
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[StaticArray, ExtensionResolutionResult]:
-        ext_type, result = super()._resolve_used_extensions(registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> StaticArray:
+        ext_type = super()._resolve_used_extensions(resolver, registry)
 
         assert isinstance(
             ext_type, tys.ExtType
@@ -53,7 +53,7 @@ class StaticArray(tys.ExtType):
 
         static_array = StaticArray(tys.Unit)
         static_array.args = ext_type.args
-        return static_array, result
+        return static_array
 
 
 @dataclass
@@ -86,13 +86,12 @@ class StaticArrayVal(val.ExtensionValue):
         return f"static_array({comma_sep_str(self.v)})"
 
     def _resolve_used_extensions_inplace(
-        self, registry: ExtensionRegistry | None = None
-    ) -> ExtensionResolutionResult:
-        resolved_ty, result = self.ty._resolve_used_extensions(registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> None:
+        resolved_ty = self.ty._resolve_used_extensions(resolver, registry)
         assert isinstance(
             resolved_ty, StaticArray
         ), "HUGR internal error, expected resolved type to be static array."
         self.ty = resolved_ty
         for value in self.v:
-            result.extend(value._resolve_used_extensions_inplace(registry))
-        return result
+            value._resolve_used_extensions_inplace(resolver, registry)

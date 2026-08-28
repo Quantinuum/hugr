@@ -9,7 +9,7 @@ from hugr import tys
 from hugr.std._util import _load_extension
 
 if TYPE_CHECKING:
-    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
+    from hugr.ext import ExtensionRegistry, UsedExtensionResolver
 
 EXTENSION = _load_extension("ptr")
 
@@ -35,9 +35,9 @@ class Ptr(tys.ExtType):
         return self.args[0].ty
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Ptr, ExtensionResolutionResult]:
-        ext_type, result = super()._resolve_used_extensions(registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Ptr:
+        ext_type = super()._resolve_used_extensions(resolver, registry)
 
         assert isinstance(
             ext_type, tys.ExtType
@@ -48,4 +48,4 @@ class Ptr(tys.ExtType):
 
         ptr = Ptr(tys.Unit)
         ptr.args = ext_type.args
-        return ptr, result
+        return ptr

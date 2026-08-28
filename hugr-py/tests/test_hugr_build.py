@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+import html
+from copy import deepcopy
+
 import pytest
 
+import hugr.ext as ext
 import hugr.ops as ops
 import hugr.tys as tys
 import hugr.val as val
@@ -9,9 +13,11 @@ from hugr.build.dfg import Dfg, Function, _ancestral_sibling
 from hugr.build.function import Module
 from hugr.hugr import Hugr
 from hugr.hugr.node_port import Node
+from hugr.hugr.render import RenderConfig
 from hugr.ops import NoConcreteFunc
 from hugr.package import Package
-from hugr.std.int import INT_T, DivMod, IntVal
+from hugr.std.collections.array import Array
+from hugr.std.int import INT_T, DivMod, IntVal, int_t
 from hugr.std.logic import Not
 
 from .conftest import QUANTUM_EXT, H, validate
@@ -105,6 +111,61 @@ def test_multiport(snapshot):
 
     assert list(h.hugr.linked_ports(ou_n.inp(0))) == [in_n.out(0)]
     validate(h.hugr, snap=snapshot)
+
+
+def test_sparse_subports():
+    dfg = Dfg(tys.Bool)
+    h = dfg.hugr
+    src = dfg.input_node.out(0)
+    dst = dfg.output_node
+    dst_0, dst_1, dst_2 = dst.inp(0), dst.inp(1), dst.inp(2)
+
+    h.add_link(src, dst_0)
+    h.add_link(src, dst_1)
+    h.delete_link(src, dst_0)
+
+    assert list(h.linked_ports(src)) == [dst_1]
+    assert list(h.linked_ports(dst_1)) == [src]
+
+    h.add_link(src, dst_2)
+    assert list(h.linked_ports(src)) == [dst_1, dst_2]
+
+    h.delete_link(src, dst_1)
+    assert list(h.linked_ports(src)) == [dst_2]
+
+
+def test_delete_node_with_fanout():
+    h = Hugr(ops.DFG([]))
+    src = h.add_node(Not, num_outs=1)
+    dst_0 = h.add_node(Not)
+    dst_1 = h.add_node(Not)
+
+    h.add_link(src.out(0), dst_0.inp(0))
+    h.add_link(src.out(0), dst_1.inp(0))
+    h.delete_node(src)
+
+    assert list(h.links()) == []
+    assert list(h.linked_ports(dst_0.inp(0))) == []
+    assert list(h.linked_ports(dst_1.inp(0))) == []
+
+    replacement = h.add_node(Not, num_outs=1)
+    assert replacement == src
+    h.add_link(replacement.out(0), dst_0.inp(0))
+    assert list(h.linked_ports(replacement.out(0))) == [dst_0.inp(0)]
+    assert list(h.linked_ports(dst_0.inp(0))) == [replacement.out(0)]
+
+
+def test_link_allocation_history_does_not_affect_equality():
+    h = Hugr(ops.DFG([]))
+    src = h.add_node(Not, num_outs=1)
+    dst = h.add_node(Not)
+    h.add_link(src.out(0), dst.inp(0))
+    equivalent = deepcopy(h)
+
+    h.delete_link(src.out(0), dst.inp(0))
+    h.add_link(src.out(0), dst.inp(0))
+
+    assert h == equivalent
 
 
 def test_add_op(snapshot):
@@ -528,3 +589,114 @@ def test_render_subgraph(snapshot):
     h = dfg.hugr
     dot = h.render_dot(root=Node(10))
     assert snapshot == dot.source
+
+
+def test_render_type_arg_extension_version() -> None:
+    nested_type = Array(INT_T, 3)
+    dfg = Dfg(nested_type)
+    dfg.set_outputs(*dfg.inputs())
+
+    dot = dfg.hugr.render_dot(
+        RenderConfig(
+            display_edge_extension_version=True,
+            max_edge_label_length=None,
+        )
+    )
+
+    assert html.escape(nested_type.render(extension_version=True)) in dot.source
+
+
+def test_render_qualified_type_names() -> None:
+    nested_type = Array(INT_T, 3)
+    dfg = Dfg(nested_type)
+    dfg.set_outputs(*dfg.inputs())
+
+    unqualified_dot = dfg.hugr.render_dot(RenderConfig(max_edge_label_length=None))
+    qualified_dot = dfg.hugr.render_dot(
+        RenderConfig(
+            qualify_op_name=True,
+            max_edge_label_length=None,
+        )
+    )
+
+    unqualified_type = html.escape(nested_type.render())
+    qualified_type = html.escape(nested_type.render(qualified_name=True))
+    assert f'xlabel="{unqualified_type}"' in unqualified_dot.source
+    assert f'xlabel="{qualified_type}"' in qualified_dot.source
+
+
+def test_render_node_type_arg_extension_version() -> None:
+    """Render versions for an operation and the type nested in its arguments."""
+    op_extension = ext.Extension(
+        name="example.int_ops",
+        version=ext.Version(0, 1, 1),
+    )
+
+    type_variable = tys.Variable(0, tys.TypeBound.Copyable)
+    ieq_definition = op_extension.add_op_def(
+        ext.OpDef(
+            name="ieq",
+            description="Equality comparison for the supplied type.",
+            signature=ext.OpDefSig(
+                tys.PolyFuncType(
+                    params=[tys.TypeTypeParam(tys.TypeBound.Copyable)],
+                    body=tys.FunctionType(
+                        input=[type_variable, type_variable],
+                        output=[tys.Bool],
+                    ),
+                )
+            ),
+        )
+    )
+
+    int_type = int_t(5)
+    ieq = ieq_definition.instantiate(
+        args=[tys.TypeTypeArg(int_type)],
+        concrete_signature=tys.FunctionType(
+            input=[int_type, int_type],
+            output=[tys.Bool],
+        ),
+    )
+
+    dfg = Dfg(int_type, int_type)
+    lhs, rhs = dfg.inputs()
+    result = dfg.add_op(ieq, lhs, rhs).out(0)
+    dfg.set_outputs(result)
+
+    dot = dfg.hugr.render_dot(
+        RenderConfig(
+            display_node_extension_version=True,
+            display_edge_extension_version=True,
+            max_node_label_length=None,
+            max_edge_label_length=None,
+        )
+    )
+
+    assert "ieq&lt;Type(int&lt;5&gt;@0.1.0)&gt;@0.1.1" in dot.source
+    assert dot.source.count('xlabel="int&lt;5&gt;@0.1.0"') >= 2
+
+    qualified_dot = dfg.hugr.render_dot(
+        RenderConfig(
+            qualify_op_name=True,
+            display_node_extension_version=True,
+            max_node_label_length=None,
+        )
+    )
+    assert (
+        "example.int_ops.ieq&lt;"
+        "Type(arithmetic.int.types.int&lt;5&gt;@0.1.0)&gt;@0.1.1"
+        in qualified_dot.source
+    )
+
+    unversioned_config = RenderConfig(
+        max_node_label_length=None,
+        max_edge_label_length=None,
+    )
+    assert not unversioned_config.display_node_extension_version
+    assert not unversioned_config.display_edge_extension_version
+
+    unversioned_dot = dfg.hugr.render_dot(unversioned_config)
+    assert "ieq&lt;Type(int&lt;5&gt;)&gt;" in unversioned_dot.source
+    assert unversioned_dot.source.count('xlabel="int&lt;5&gt;"') >= 2
+    assert "@0.1.0" not in unversioned_dot.source
+    assert "@0.1.1" not in unversioned_dot.source

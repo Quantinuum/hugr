@@ -1,5 +1,67 @@
 # Changelog
 
+## [0.18.5](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.4...hugr-py-v0.18.5) (2026-08-19)
+
+
+### Features
+
+* **hugr-py:** Render extension version with render dot ([#3199](https://github.com/Quantinuum/hugr/issues/3199)) ([e040538](https://github.com/Quantinuum/hugr/commit/e04053817e9c8b512a29aec8c3bf045063c3469c))
+
+
+### Performance Improvements
+
+* Avoid computing unused sub offsets during link establishment ([#3208](https://github.com/Quantinuum/hugr/issues/3208)) ([40986a8](https://github.com/Quantinuum/hugr/commit/40986a80bde7996e4820819d6623a7d6e116e7ca))
+
+## [0.18.4](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.3...hugr-py-v0.18.4) (2026-08-12)
+
+
+### Bug Fixes
+
+* Docstring formatting ([#3190](https://github.com/Quantinuum/hugr/issues/3190)) ([b1f37c3](https://github.com/Quantinuum/hugr/commit/b1f37c35b9d87c5251d593a321e38f4d849bd158))
+* Fix pointer to hugr cli function ([#3194](https://github.com/Quantinuum/hugr/issues/3194)) ([2f47988](https://github.com/Quantinuum/hugr/commit/2f47988e1d562ceefdd0c24d6fc5f7d3bb45d0f9))
+
+## [0.18.3](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.2...hugr-py-v0.18.3) (2026-07-27)
+
+
+### Bug Fixes
+
+* Narrow the type definition for hugr.qsystem.result.DataValue ([#3181](https://github.com/Quantinuum/hugr/issues/3181)) ([d39e670](https://github.com/Quantinuum/hugr/commit/d39e670afe24d9bc5366d50ae4cdd961ccd68b5f))
+
+## [0.18.2](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.1...hugr-py-v0.18.2) (2026-07-15)
+
+
+### Features
+
+* Standalone extension resolution on extension load ([#3160](https://github.com/Quantinuum/hugr/issues/3160)) ([6f96ce8](https://github.com/Quantinuum/hugr/commit/6f96ce8c270032f17db95333f21e3d3c589f9835))
+
+
+### Bug Fixes
+
+* Avoid breaking change to ExtensionValue present in hugr 0.18.1 ([#3163](https://github.com/Quantinuum/hugr/issues/3163)) ([eeff49d](https://github.com/Quantinuum/hugr/commit/eeff49d7201c4ffc4cf7e6f2c5ca15fc5ed36654))
+
+## [0.18.1](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.0...hugr-py-v0.18.1) (2026-07-13)
+
+
+### Features
+
+* Overrride `__repr__` for `RegionKind` ([#3144](https://github.com/Quantinuum/hugr/issues/3144)) ([2c268a3](https://github.com/Quantinuum/hugr/commit/2c268a3fa6869865d0dc332fbf0665d89be86303))
+
+
+### Performance Improvements
+
+* Register used extensions through a special resolver and lazy coalesce versions ([#3152](https://github.com/Quantinuum/hugr/issues/3152)) ([adc55c0](https://github.com/Quantinuum/hugr/commit/adc55c0c8298cf53f6225980861240dfa9e8364a))
+
+## [0.18.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.17.1...hugr-py-v0.18.0) (2026-06-29)
+
+
+### ⚠ BREAKING CHANGES
+
+* Removed `ToNode.metadata` method. Use `Hugr[node].metadata` instead.
+
+### Features
+
+* Remove metadata object from python Nodes ([#3128](https://github.com/Quantinuum/hugr/issues/3128)) ([e274098](https://github.com/Quantinuum/hugr/commit/e27409887716dc7c8d07e41c499af91c43175057))
+
 ## [0.17.1](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.17.0...hugr-py-v0.17.1) (2026-06-10)
 
 

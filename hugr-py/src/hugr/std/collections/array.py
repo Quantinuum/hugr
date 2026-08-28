@@ -11,7 +11,7 @@ from hugr.std._util import _load_extension
 from hugr.utils import comma_sep_str
 
 if TYPE_CHECKING:
-    from hugr.ext import ExtensionRegistry, ExtensionResolutionResult
+    from hugr.ext import ExtensionRegistry, UsedExtensionResolver
 
 EXTENSION = _load_extension("collections.array")
 
@@ -60,9 +60,9 @@ class Array(tys.ExtType):
         return tys.TypeBound.Linear
 
     def _resolve_used_extensions(
-        self, registry: ExtensionRegistry | None = None
-    ) -> tuple[Array, ExtensionResolutionResult]:
-        ext_type, result = super()._resolve_used_extensions(registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> Array:
+        ext_type = super()._resolve_used_extensions(resolver, registry)
 
         assert isinstance(
             ext_type, tys.ExtType
@@ -73,7 +73,7 @@ class Array(tys.ExtType):
 
         array = Array(tys.Unit, 0)
         array.args = ext_type.args
-        return array, result
+        return array
 
 
 @dataclass
@@ -110,9 +110,9 @@ class ArrayVal(val.ExtensionValue):
         )
 
     def _resolve_used_extensions_inplace(
-        self, registry: ExtensionRegistry | None = None
-    ) -> ExtensionResolutionResult:
-        resolved_ty, result = self.ty._resolve_used_extensions(registry)
+        self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
+    ) -> None:
+        resolved_ty = self.ty._resolve_used_extensions(resolver, registry)
 
         assert isinstance(
             resolved_ty, Array
@@ -120,5 +120,4 @@ class ArrayVal(val.ExtensionValue):
 
         self.ty = resolved_ty
         for value in self.v:
-            result.extend(value._resolve_used_extensions_inplace(registry))
-        return result
+            value._resolve_used_extensions_inplace(resolver, registry)

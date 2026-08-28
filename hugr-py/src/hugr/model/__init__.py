@@ -300,6 +300,9 @@ class RegionKind(Enum):
     CONTROL_FLOW = 1
     MODULE = 2
 
+    def __repr__(self) -> str:
+        return str(self)
+
 
 @dataclass
 class Region:

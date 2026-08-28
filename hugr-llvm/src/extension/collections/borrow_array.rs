@@ -2874,10 +2874,12 @@ mod test {
     #[rstest]
     fn exec_shift_by_64(mut exec_ctx: TestContext, #[values(false, true)] right: bool) {
         const SHIFTED_VAL: u64 = 35;
-        // This test generates LLVM code to shift a 64-bit value right/left by 64 places.
-        // This is a no-op in LLVM, rather than producing 0 as one might expect.
+        // This test generates LLVM code to shift a 64-bit value right/left by 64 and 65 places.
+        // We expect 0 as result.
         use hugr_core::std_extensions::arithmetic::int_ops::IntOpDef;
         let int_ty = int_type(6); // 64-bit integer
+
+        // shift by 64
         let hugr = SimpleHugrConfig::new()
             .with_outs([int_ty.clone()])
             .with_extensions(exec_registry())
@@ -2899,7 +2901,31 @@ mod test {
             cge.add_default_prelude_extensions()
                 .add_default_int_extensions()
         });
-        assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), SHIFTED_VAL);
+        assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), 0);
+
+        // shift by 65
+        let hugr = SimpleHugrConfig::new()
+            .with_outs([int_ty.clone()])
+            .with_extensions(exec_registry())
+            .finish(|mut builder| {
+                let minus_one = builder.add_load_value(ConstInt::new_u(6, SHIFTED_VAL).unwrap());
+                let shift = builder.add_load_value(ConstInt::new_u(6, 65).unwrap());
+                let op = if right {
+                    IntOpDef::ishr
+                } else {
+                    IntOpDef::ishl
+                };
+                let result = builder
+                    .add_dataflow_op(op.with_log_width(6), [minus_one, shift])
+                    .unwrap()
+                    .out_wire(0);
+                builder.finish_hugr_with_outputs([result]).unwrap()
+            });
+        exec_ctx.add_extensions(|cge| {
+            cge.add_default_prelude_extensions()
+                .add_default_int_extensions()
+        });
+        assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), 0);
     }
 
     #[rstest]

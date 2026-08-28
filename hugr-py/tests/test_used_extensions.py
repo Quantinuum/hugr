@@ -1,6 +1,7 @@
 # ruff: noqa: I001
 
 import hugr
+from hugr.ext import UsedExtensionResolver
 from hugr.package import Package
 import hugr.ops as ops
 import hugr.tys as tys
@@ -126,6 +127,36 @@ def test_op_signature_contains_same_extension() -> None:
     assert my_ext.name in exts.ids()
 
 
+def test_extension_from_json_resolves_types() -> None:
+    """Resolve opaque types throughout a deserialized extension definition."""
+    extension = ext.Extension("test.from_json", ext.Version(0, 1, 0))
+    extension.add_type_def(
+        ext.TypeDef(
+            name="Container",
+            description="A type parameterized by a constant.",
+            params=[tys.ConstParam(TEST_TYPE_OPAQUE)],
+            bound=ext.ExplicitBound(tys.TypeBound.Copyable),
+        )
+    )
+    extension.add_op_def(
+        ext.OpDef(
+            name="Make",
+            description="Return the referenced type.",
+            signature=ext.OpDefSig(tys.FunctionType([], [TEST_TYPE_OPAQUE])),
+        )
+    )
+    registry = ext.ExtensionRegistry.from_extensions([TEST_EXT])
+
+    loaded = ext.Extension.from_json(extension.to_json(), registry)
+
+    signature = loaded.get_op("Make").signature.poly_func
+    assert signature is not None
+    assert isinstance(signature.body.output[0], tys.ExtType)
+    [param] = loaded.get_type("Container").params
+    assert isinstance(param, tys.ConstParam)
+    assert isinstance(param.ty, tys.ExtType)
+
+
 @pytest.mark.parametrize(
     ("typ", "extensions"),
     [
@@ -150,7 +181,10 @@ def test_op_signature_contains_same_extension() -> None:
 )
 def test_type_resolution(typ: tys.Type, extensions: list[ext.Extension]) -> None:
     """Test that Opaque types are tracked and resolved correctly."""
-    _, result = typ._resolve_used_extensions()
+    resolver = UsedExtensionResolver()
+    _ = typ._resolve_used_extensions(resolver)
+    result = resolver.result()
+
     for extension in extensions:
         assert extension.name in result.unresolved_extensions
     if extensions:
@@ -160,7 +194,9 @@ def test_type_resolution(typ: tys.Type, extensions: list[ext.Extension]) -> None
     test_registry = ext.ExtensionRegistry()
     for extension in extensions:
         test_registry.register(extension)
-    _, result = typ._resolve_used_extensions(test_registry)
+    resolver = UsedExtensionResolver()
+    _ = typ._resolve_used_extensions(resolver, test_registry)
+    result = resolver.result()
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
     assert not result.unresolved_types
@@ -193,7 +229,9 @@ def test_type_resolution(typ: tys.Type, extensions: list[ext.Extension]) -> None
 )
 def test_type_arg_resolution(arg: tys.TypeArg, extensions: list[ext.Extension]) -> None:
     """Test that type arguments are tracked and resolved correctly."""
-    _, result = arg._resolve_used_extensions()
+    resolver = UsedExtensionResolver()
+    _ = arg._resolve_used_extensions(resolver)
+    result = resolver.result()
     for extension in extensions:
         assert extension.name in result.unresolved_extensions
     if extensions:
@@ -203,7 +241,9 @@ def test_type_arg_resolution(arg: tys.TypeArg, extensions: list[ext.Extension]) 
     test_registry = ext.ExtensionRegistry()
     for extension in extensions:
         test_registry.register(extension)
-    _, result = arg._resolve_used_extensions(test_registry)
+    resolver = UsedExtensionResolver()
+    _ = arg._resolve_used_extensions(resolver, test_registry)
+    result = resolver.result()
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
     assert not result.unresolved_types
@@ -230,7 +270,9 @@ def test_type_param_resolution(
     param: tys.TypeParam, extensions: list[ext.Extension]
 ) -> None:
     """Test that type parameters are tracked and resolved correctly."""
-    _, result = param._resolve_used_extensions()
+    resolver = UsedExtensionResolver()
+    _ = param._resolve_used_extensions(resolver)
+    result = resolver.result()
     for extension in extensions:
         assert extension.name in result.unresolved_extensions
     if extensions:
@@ -240,7 +282,9 @@ def test_type_param_resolution(
     test_registry = ext.ExtensionRegistry()
     for extension in extensions:
         test_registry.register(extension)
-    _, result = param._resolve_used_extensions(test_registry)
+    resolver = UsedExtensionResolver()
+    _ = param._resolve_used_extensions(resolver, test_registry)
+    result = resolver.result()
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
     assert not result.unresolved_types
@@ -276,7 +320,10 @@ def test_type_param_resolution(
 )
 def test_op_resolution(op: ops.Op, extensions: list[ext.Extension]) -> None:
     """Test that ops are tracked and resolved correctly."""
-    _, result = op._resolve_used_extensions()
+    resolver = UsedExtensionResolver()
+    _ = op._resolve_used_extensions(resolver)
+    result = resolver.result()
+
     for extension in extensions:
         assert extension.name in result.unresolved_extensions
 
@@ -293,7 +340,9 @@ def test_op_resolution(op: ops.Op, extensions: list[ext.Extension]) -> None:
     test_ext_registry = ext.ExtensionRegistry()
     for extension in extensions:
         test_ext_registry.register(extension)
-    _, result = op._resolve_used_extensions(test_ext_registry)
+    resolver = UsedExtensionResolver()
+    _ = op._resolve_used_extensions(resolver, test_ext_registry)
+    result = resolver.result()
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
     assert not result.unresolved_ops
@@ -315,7 +364,9 @@ def test_op_resolution(op: ops.Op, extensions: list[ext.Extension]) -> None:
 )
 def test_value_resolution(value: val.Value, extensions: list[ext.Extension]) -> None:
     """Test that values are tracked and resolved correctly."""
-    result = value._resolve_used_extensions_inplace()
+    resolver = UsedExtensionResolver()
+    value._resolve_used_extensions_inplace(resolver)
+    result = resolver.result()
     for extension in extensions:
         assert extension.name in result.unresolved_extensions
 
@@ -323,7 +374,9 @@ def test_value_resolution(value: val.Value, extensions: list[ext.Extension]) -> 
     test_ext_registry = ext.ExtensionRegistry()
     for extension in extensions:
         test_ext_registry.register(extension)
-    result = value._resolve_used_extensions_inplace(test_ext_registry)
+    resolver = UsedExtensionResolver()
+    value._resolve_used_extensions_inplace(resolver, test_ext_registry)
+    result = resolver.result()
     for extension in extensions:
         assert extension.name in result.used_extensions.ids()
 

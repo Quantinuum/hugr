@@ -560,7 +560,7 @@ impl PartialEq<dyn CustomConst> for ConstExternalSymbol {
 #[typetag::serde]
 impl CustomConst for ConstExternalSymbol {
     fn name(&self) -> ValueName {
-        format!("@{}", &self.symbol).into()
+        format!("@{}", self.symbol).into()
     }
 
     fn equal_consts(&self, other: &dyn CustomConst) -> bool {
@@ -689,10 +689,10 @@ impl MakeExtensionOp for MakeTuple {
     {
         let def = TupleOpDef::from_def(ext_op.def())?;
         if def != TupleOpDef::MakeTuple {
-            return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()))?;
+            return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()));
         }
         let [TypeArg::List(elems)] = ext_op.args() else {
-            return Err(SignatureError::InvalidTypeArgs)?;
+            return Err(SignatureError::InvalidTypeArgs.into());
         };
         Ok(Self(elems.clone().try_into()?))
     }
@@ -737,10 +737,10 @@ impl MakeExtensionOp for UnpackTuple {
     {
         let def = TupleOpDef::from_def(ext_op.def())?;
         if def != TupleOpDef::UnpackTuple {
-            return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()))?;
+            return Err(OpLoadError::NotMember(ext_op.unqualified_id().to_string()));
         }
         let [Term::List(elems)] = ext_op.args() else {
-            return Err(SignatureError::InvalidTypeArgs)?;
+            return Err(SignatureError::InvalidTypeArgs.into());
         };
         Ok(Self(elems.clone().try_into()?))
     }

@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from hugr import val
+from hugr import ext, val
 from hugr.std._util import _load_extension
 
 PRELUDE_EXTENSION = _load_extension("prelude")
@@ -30,3 +30,10 @@ class StringVal(val.ExtensionValue):
 
     def __str__(self) -> str:
         return f"{self.v}"
+
+    def _resolve_used_extensions_inplace(
+        self,
+        resolver: ext.UsedExtensionResolver,
+        registry: ext.ExtensionRegistry | None = None,
+    ) -> None:
+        resolver.register(PRELUDE_EXTENSION)

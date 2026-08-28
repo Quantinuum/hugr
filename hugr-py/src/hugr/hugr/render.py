@@ -9,7 +9,7 @@ from graphviz import Digraph
 from typing_extensions import assert_never
 
 from hugr.hugr import Hugr
-from hugr.ops import AsExtOp, Case, Custom
+from hugr.ops import AsExtOp, Case, Custom, ExtOp
 from hugr.tys import (
     CFKind,
     ConstKind,
@@ -18,7 +18,7 @@ from hugr.tys import (
     OrderKind,
     ValueKind,
 )
-from hugr.utils import name_w_args
+from hugr.utils import name_w_args_render
 
 from .node_port import InPort, Node, OutPort
 
@@ -85,7 +85,7 @@ class RenderConfig:
 
     #: The palette to use for rendering. See :obj:`PALETTE` for the included options.
     palette: Palette = field(default_factory=lambda: PALETTE["default"])
-    #: If true prepend extension name to operation name.
+    #: If true prepend extension names to operation and type names.
     qualify_op_name: bool = False
     #: If true display node metadata.
     display_metadata: bool = True
@@ -99,6 +99,10 @@ class RenderConfig:
     max_node_label_length: int | None = 24
     #: Max length for metadata display. None means no truncation.
     max_metadata_length: int | None = 20
+    #: If true, display the op extension version in node labels.
+    display_node_extension_version: bool = False
+    #: If true, display the types extension version on edges.
+    display_edge_extension_version: bool = False
 
 
 class DotRenderer:
@@ -298,14 +302,42 @@ class DotRenderer:
         )
 
         match hugr[node].op:
-            case AsExtOp() as op if not self.config.qualify_op_name:
-                op_name = name_w_args(op.op_def().name, op.type_args())
+            case AsExtOp() as op:
+                name = (
+                    op.op_def().qualified_name()
+                    if self.config.qualify_op_name
+                    else op.op_def().name
+                )
+                op_name = name_w_args_render(
+                    name,
+                    op.type_args(),
+                    extension_version=self.config.display_node_extension_version,
+                    qualified_name=self.config.qualify_op_name,
+                )
             case Case() as op if sibling_order is not None:
                 op_name = f"{op.name()}[{sibling_order}]"
             case Custom() as op:
-                op_name = name_w_args(op.name(), op.args)
+                op_name = name_w_args_render(
+                    op.name(),
+                    op.args,
+                    extension_version=self.config.display_node_extension_version,
+                    qualified_name=self.config.qualify_op_name,
+                )
             case op:
                 op_name = op.name()
+
+        # Add extension version if required
+        if self.config.display_node_extension_version:
+            match hugr[node].op:
+                case ExtOp() as op:
+                    extension_version = op.get_extension_version()
+                case Custom() as op:
+                    extension_version = op.extension_version
+                case _:
+                    extension_version = None
+
+            if extension_version is not None:
+                op_name += "@" + str(extension_version)
 
         if self.config.max_node_label_length is not None:
             op_name = _smart_truncate(
@@ -368,9 +400,12 @@ class DotRenderer:
         match kind:
             case ValueKind(ty):
                 if self.config.display_link_label:
-                    # TODO: Figure out why some nested types result in all type fields
-                    # being printed instead of just the `__str__` representation.
-                    label = html.escape(str(ty))
+                    label = html.escape(
+                        ty.render(
+                            extension_version=self.config.display_edge_extension_version,
+                            qualified_name=self.config.qualify_op_name,
+                        )
+                    )
                 color = self.config.palette.edge
             case OrderKind():
                 color = self.config.palette.dark

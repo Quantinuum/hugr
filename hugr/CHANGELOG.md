@@ -1,6 +1,46 @@
 # Changelog
 
 
+## [0.29.3](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.2...hugr-v0.29.3) - 2026-07-20
+
+### Bug Fixes
+
+- Fix rust-side extension resolution missing ops in the hugr ([#3170](https://github.com/Quantinuum/hugr/pull/3170))
+
+## [0.29.2](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.1...hugr-v0.29.2) - 2026-07-14
+
+### Bug Fixes
+
+- Fix partial const folding of logic.eq ([#3154](https://github.com/Quantinuum/hugr/pull/3154))
+- ConstFold panic on rotating/shifting by large values ([#3156](https://github.com/Quantinuum/hugr/pull/3156))
+
+### Performance
+
+- Reduce extension resolution work in envelope decoding ([#3148](https://github.com/Quantinuum/hugr/pull/3148))
+
+## [0.29.1](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.0...hugr-v0.29.1) - 2026-07-07
+
+### New Features
+
+- Fewer order edges when inlining DFGs ([#3136](https://github.com/Quantinuum/hugr/pull/3136))
+
+## [0.29.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.28.3...hugr-v0.29.0) - 2026-06-29
+
+### New Features
+
+- [**breaking**] Insert fewer order edges when inlining and update spec for order edges ([#3058](https://github.com/Quantinuum/hugr/pull/3058))
+
+## [0.28.3](https://github.com/Quantinuum/hugr/compare/hugr-v0.28.2...hugr-v0.28.3) - 2026-06-19
+
+### Bug Fixes
+
+- Display source error for errors during payload reads ([#3120](https://github.com/Quantinuum/hugr/pull/3120))
+
+### New Features
+
+- Don't error out when validating a signature with a missing validation function ([#3118](https://github.com/Quantinuum/hugr/pull/3118))
+- Allow instantiated ops with missing compute funcs when validating ([#3121](https://github.com/Quantinuum/hugr/pull/3121))
+
 ## [0.28.2](https://github.com/Quantinuum/hugr/compare/hugr-v0.28.1...hugr-v0.28.2) - 2026-06-18
 
 ### Bug Fixes
