@@ -122,6 +122,8 @@ def test_describe_json_basic(simple_hugr_bytes: bytes):
     assert isinstance(module, cli.ModuleDesc)
     assert module.num_nodes is not None
     assert module.num_nodes > 0
+    assert module.num_edges is not None
+    assert module.num_edges == 0
 
 
 def test_describe_json_with_packaged_extensions(hugr_with_extension_bytes: bytes):
@@ -165,6 +167,7 @@ def test_failed_describe(hugr_using_ext):
     mod = desc.modules[0]
     assert mod is not None
     assert mod.num_nodes == 8  # computed before error
+    assert mod.num_edges == 2  # computed before extension resolution error
     assert isinstance(desc.error, str)
     assert "requires extension ext" in desc.error
 

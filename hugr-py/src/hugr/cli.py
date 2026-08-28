@@ -93,6 +93,7 @@ class ModuleDesc(BaseModel):
         entrypoint: The entrypoint node of the module, if present.
         generator: Name and version of the generator that created this module.
         num_nodes: Total number of nodes in the module.
+        num_edges: Total number of edges in the module.
         public_symbols: List of public symbol names exported by the module.
         used_extensions_generator: Extensions claimed by the generator in metadata.
         used_extensions_resolved: Extensions actually used by the module operations.
@@ -101,6 +102,7 @@ class ModuleDesc(BaseModel):
     entrypoint: EntrypointDesc | None = None
     generator: str | None = None
     num_nodes: int | None = None
+    num_edges: int | None = None
     public_symbols: list[str] | None = None
     used_extensions_generator: list[ExtensionDesc] | None = None
     used_extensions_resolved: list[ExtensionDesc] | None = None

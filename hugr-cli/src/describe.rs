@@ -266,6 +266,8 @@ struct ModuleSummary {
     #[tabled(display("display::option", "n/a"))]
     num_nodes: Option<usize>,
     #[tabled(display("display::option", "n/a"))]
+    num_edges: Option<usize>,
+    #[tabled(display("display::option", "n/a"))]
     entrypoint_node: Option<usize>,
     #[tabled(display("display::option", "n/a"))]
     entrypoint_op: Option<String>,
@@ -285,6 +287,7 @@ impl From<&ModuleDesc> for ModuleSummary {
         };
         Self {
             num_nodes: desc.num_nodes,
+            num_edges: desc.num_edges,
             entrypoint_node,
             entrypoint_op,
             generator: desc.generator.clone(),
