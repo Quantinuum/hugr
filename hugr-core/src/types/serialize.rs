@@ -33,7 +33,7 @@ impl<RV: MaybeRV> From<TypeBase<RV>> for SerSimpleType {
         if value == usize_t() {
             return SerSimpleType::I;
         }
-        match value.0 {
+        match value.0.into_type_enum() {
             TypeEnum::Extension(o) => SerSimpleType::Opaque(o),
             TypeEnum::Alias(a) => SerSimpleType::Alias(a),
             TypeEnum::Function(sig) => SerSimpleType::G(sig),

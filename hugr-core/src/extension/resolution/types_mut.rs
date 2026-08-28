@@ -163,6 +163,10 @@ pub(super) fn resolve_type_exts<RV: MaybeRV>(
     extensions: &WeakExtensionRegistry,
     used_extensions: &mut WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
+    if collect_current_type_exts(typ, extensions, used_extensions) {
+        return Ok(());
+    }
+
     match typ.as_type_enum_mut() {
         TypeEnum::Extension(custom) => {
             resolve_custom_type_exts(node, custom, extensions, used_extensions)?;
@@ -183,6 +187,96 @@ pub(super) fn resolve_type_exts<RV: MaybeRV>(
         | TypeEnum::Sum(SumType::Unit { .. }) => {}
     }
     Ok(())
+}
+
+/// Collects extension references when they already match the target registry.
+///
+/// Imported types already contain the correct weak references. Detecting that
+/// case before requesting mutable access preserves their shared backing.
+fn collect_current_type_exts<RV: MaybeRV>(
+    typ: &TypeBase<RV>,
+    extensions: &WeakExtensionRegistry,
+    used_extensions: &mut WeakExtensionRegistry,
+) -> bool {
+    if !type_extension_refs_match(typ, extensions) {
+        return false;
+    }
+
+    let mut current_extensions = WeakExtensionRegistry::default();
+    let mut missing_extensions = ExtensionSet::new();
+    collect_type_exts(typ, &mut current_extensions, &mut missing_extensions);
+    if !missing_extensions.is_empty() {
+        return false;
+    }
+
+    for (id, extension) in current_extensions.iter() {
+        used_extensions.register(id.clone(), extension.clone());
+    }
+    true
+}
+
+/// Checks every custom type reference against the target registry.
+fn type_extension_refs_match<RV: MaybeRV>(
+    typ: &TypeBase<RV>,
+    extensions: &WeakExtensionRegistry,
+) -> bool {
+    match typ.as_type_enum() {
+        TypeEnum::Extension(custom) => {
+            let current = custom.extension_ref();
+            current.upgrade().is_some()
+                && extensions
+                    .get(custom.extension())
+                    .is_some_and(|expected| current.ptr_eq(expected))
+                && custom
+                    .args()
+                    .iter()
+                    .all(|arg| term_extension_refs_match(arg, extensions))
+        }
+        TypeEnum::Function(func) => {
+            func.input
+                .iter()
+                .all(|typ| type_extension_refs_match(typ, extensions))
+                && func
+                    .output
+                    .iter()
+                    .all(|typ| type_extension_refs_match(typ, extensions))
+        }
+        TypeEnum::Sum(SumType::General { rows }) => rows.iter().all(|row| {
+            row.iter()
+                .all(|typ| type_extension_refs_match(typ, extensions))
+        }),
+        TypeEnum::Alias(_) | TypeEnum::RowVar(_) | TypeEnum::Variable(_, _) | TypeEnum::Sum(_) => {
+            true
+        }
+    }
+}
+
+/// Checks every custom type reference nested in a static term.
+fn term_extension_refs_match(term: &Term, extensions: &WeakExtensionRegistry) -> bool {
+    match term {
+        Term::Runtime(typ) => type_extension_refs_match(typ, extensions),
+        Term::ConstType(typ) => type_extension_refs_match(typ, extensions),
+        Term::List(children)
+        | Term::ListConcat(children)
+        | Term::Tuple(children)
+        | Term::TupleConcat(children) => children
+            .iter()
+            .all(|child| term_extension_refs_match(child, extensions)),
+        Term::ListType(item_type) | Term::TupleType(item_type) => {
+            term_extension_refs_match(item_type, extensions)
+        }
+        Term::Variable(_)
+        | Term::RuntimeType(_)
+        | Term::StaticType
+        | Term::BoundedNatType(_)
+        | Term::StringType
+        | Term::BytesType
+        | Term::FloatType
+        | Term::BoundedNat(_)
+        | Term::String(_)
+        | Term::Bytes(_)
+        | Term::Float(_) => true,
+    }
 }
 
 /// Update all weak Extension pointers in a [`CustomType`].

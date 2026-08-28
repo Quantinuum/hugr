@@ -32,6 +32,7 @@ use itertools::{Either, Itertools as _};
 #[cfg(test)]
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 use crate::ops::AliasDecl;
@@ -373,8 +374,7 @@ impl<RV: MaybeRV> TypeEnum<RV> {
     }
 }
 
-#[derive(Clone, Debug, Eq, Hash, derive_more::Display, serde::Serialize, serde::Deserialize)]
-#[display("{_0}")]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 #[serde(
     into = "serialize::SerSimpleType",
     try_from = "serialize::SerSimpleType"
@@ -400,7 +400,96 @@ impl<RV: MaybeRV> TypeEnum<RV> {
 /// let func_type: Type = Type::new_function(Signature::new_endo([]));
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 /// ```
-pub struct TypeBase<RV: MaybeRV>(TypeEnum<RV>, TypeBound);
+pub struct TypeBase<RV: MaybeRV>(TypeStorage<RV>, TypeBound);
+
+/// Storage for a [`TypeBase`]'s structural representation.
+///
+/// Public constant constructors use the inline variant because stable Rust
+/// cannot allocate an [`Arc`] during constant evaluation. Runtime constructors
+/// use shared storage so cloned imported types reuse the same type tree.
+#[derive(Clone)]
+enum TypeStorage<RV: MaybeRV> {
+    Inline(TypeEnum<RV>),
+    Shared(SharedTypeEnum<RV>),
+}
+
+/// An owned shared type tree and the stable pointer used for constant access.
+///
+/// Keeping the pointer separately lets [`TypeBase::as_type_enum`] remain a
+/// `const fn`: stable Rust cannot dereference an [`Arc`] in constant evaluation.
+struct SharedTypeEnum<RV: MaybeRV> {
+    owner: Arc<TypeEnum<RV>>,
+    ptr: *const TypeEnum<RV>,
+}
+
+impl<RV: MaybeRV> SharedTypeEnum<RV> {
+    /// Allocates shared storage for a runtime-created type tree.
+    fn new(value: TypeEnum<RV>) -> Self {
+        let owner = Arc::new(value);
+        let ptr = Arc::as_ptr(&owner);
+        Self { owner, ptr }
+    }
+
+    /// Borrows the value owned by the accompanying [`Arc`].
+    const fn as_ref(&self) -> &TypeEnum<RV> {
+        // SAFETY: `ptr` comes from `owner`. It is refreshed whenever
+        // `Arc::make_mut` changes the allocation and never escapes this borrow.
+        unsafe { &*self.ptr }
+    }
+
+    /// Provides copy-on-write mutable access and refreshes the stable pointer.
+    fn make_mut(&mut self) -> &mut TypeEnum<RV> {
+        let value = Arc::make_mut(&mut self.owner);
+        self.ptr = value;
+        value
+    }
+
+    /// Consumes the owner, avoiding a clone when the allocation is unique.
+    fn into_inner(self) -> TypeEnum<RV> {
+        Arc::try_unwrap(self.owner).unwrap_or_else(|value| value.as_ref().clone())
+    }
+}
+
+impl<RV: MaybeRV> Clone for SharedTypeEnum<RV> {
+    fn clone(&self) -> Self {
+        Self {
+            owner: self.owner.clone(),
+            ptr: self.ptr,
+        }
+    }
+}
+
+// SAFETY: `ptr` only points into `owner`, and access through it is tied to a
+// borrow of this wrapper. Thread-safety therefore matches `TypeEnum<RV>`.
+unsafe impl<RV: MaybeRV + Send + Sync> Send for SharedTypeEnum<RV> {}
+// SAFETY: See the `Send` implementation above.
+unsafe impl<RV: MaybeRV + Send + Sync> Sync for SharedTypeEnum<RV> {}
+
+impl<RV: MaybeRV> TypeStorage<RV> {
+    /// Returns the structural type independent of its storage strategy.
+    const fn as_type_enum(&self) -> &TypeEnum<RV> {
+        match self {
+            Self::Inline(value) => value,
+            Self::Shared(value) => value.as_ref(),
+        }
+    }
+
+    /// Returns a mutable structural type, cloning shared storage when needed.
+    fn make_mut(&mut self) -> &mut TypeEnum<RV> {
+        match self {
+            Self::Inline(value) => value,
+            Self::Shared(value) => value.make_mut(),
+        }
+    }
+
+    /// Consumes the storage and returns its structural type.
+    fn into_type_enum(self) -> TypeEnum<RV> {
+        match self {
+            Self::Inline(value) => value,
+            Self::Shared(value) => value.into_inner(),
+        }
+    }
+}
 
 /// The type of a single value, that can be sent down a wire
 pub type Type = TypeBase<NoRV>;
@@ -425,7 +514,31 @@ impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<TypeEnum<RV1>> for TypeEnum<RV2> {
 
 impl<RV1: MaybeRV, RV2: MaybeRV> PartialEq<TypeBase<RV1>> for TypeBase<RV2> {
     fn eq(&self, other: &TypeBase<RV1>) -> bool {
-        self.0 == other.0 && self.1 == other.1
+        self.as_type_enum() == other.as_type_enum() && self.1 == other.1
+    }
+}
+
+impl<RV: MaybeRV> Eq for TypeBase<RV> {}
+
+impl<RV: MaybeRV> std::fmt::Debug for TypeBase<RV> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("TypeBase")
+            .field(self.as_type_enum())
+            .field(&self.1)
+            .finish()
+    }
+}
+
+impl<RV: MaybeRV> std::fmt::Display for TypeBase<RV> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.as_type_enum().fmt(f)
+    }
+}
+
+impl<RV: MaybeRV + std::hash::Hash> std::hash::Hash for TypeBase<RV> {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.as_type_enum().hash(state);
+        self.1.hash(state);
     }
 }
 
@@ -434,11 +547,22 @@ impl<RV: MaybeRV> TypeBase<RV> {
     pub const EMPTY_TYPEROW: TypeRowBase<RV> = TypeRowBase::<RV>::new();
     /// Unit type (empty tuple).
     pub const UNIT: Self = Self(
-        TypeEnum::Sum(SumType::Unit { size: 1 }),
+        TypeStorage::Inline(TypeEnum::Sum(SumType::Unit { size: 1 })),
         TypeBound::Copyable,
     );
 
     const EMPTY_TYPEROW_REF: &'static TypeRowBase<RV> = &Self::EMPTY_TYPEROW;
+
+    /// Returns whether two types reuse the same shared backing allocation.
+    #[cfg(test)]
+    pub(crate) fn shares_storage_with(&self, other: &Self) -> bool {
+        match (&self.0, &other.0) {
+            (TypeStorage::Shared(left), TypeStorage::Shared(right)) => {
+                Arc::ptr_eq(&left.owner, &right.owner)
+            }
+            _ => false,
+        }
+    }
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<FuncValueType>) -> Self {
@@ -469,7 +593,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
     #[must_use]
     pub const fn new_extension(opaque: CustomType) -> Self {
         let bound = opaque.bound();
-        TypeBase(TypeEnum::Extension(opaque), bound)
+        TypeBase(TypeStorage::Inline(TypeEnum::Extension(opaque)), bound)
     }
 
     /// Initialize a new alias.
@@ -480,14 +604,17 @@ impl<RV: MaybeRV> TypeBase<RV> {
 
     pub(crate) fn new(type_e: TypeEnum<RV>) -> Self {
         let bound = type_e.least_upper_bound();
-        Self(type_e, bound)
+        Self(TypeStorage::Shared(SharedTypeEnum::new(type_e)), bound)
     }
 
     /// New `UnitSum` with empty Tuple variants
     #[must_use]
     pub const fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(TypeEnum::Sum(SumType::new_unary(size)), TypeBound::Copyable)
+        Self(
+            TypeStorage::Inline(TypeEnum::Sum(SumType::new_unary(size))),
+            TypeBound::Copyable,
+        )
     }
 
     /// New use (occurrence) of the type variable with specified index.
@@ -496,7 +623,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
     /// than required for the use.
     #[must_use]
     pub const fn new_var_use(idx: usize, bound: TypeBound) -> Self {
-        Self(TypeEnum::Variable(idx, bound), bound)
+        Self(TypeStorage::Inline(TypeEnum::Variable(idx, bound)), bound)
     }
 
     /// Report the least upper [`TypeBound`]
@@ -508,18 +635,18 @@ impl<RV: MaybeRV> TypeBase<RV> {
     /// Report the component `TypeEnum`.
     #[inline(always)]
     pub const fn as_type_enum(&self) -> &TypeEnum<RV> {
-        &self.0
+        self.0.as_type_enum()
     }
 
     /// Report a mutable reference to the component `TypeEnum`.
     #[inline(always)]
     pub fn as_type_enum_mut(&mut self) -> &mut TypeEnum<RV> {
-        &mut self.0
+        self.0.make_mut()
     }
 
     /// Returns the inner [`SumType`] if the type is a sum.
     pub fn as_sum(&self) -> Option<&SumType> {
-        match &self.0 {
+        match self.as_type_enum() {
             TypeEnum::Sum(s) => Some(s),
             _ => None,
         }
@@ -527,7 +654,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
 
     /// Returns the inner [`CustomType`] if the type is from an extension.
     pub fn as_extension(&self) -> Option<&CustomType> {
-        match &self.0 {
+        match self.as_type_enum() {
             TypeEnum::Extension(ct) => Some(ct),
             _ => None,
         }
@@ -551,7 +678,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         // There is no need to check the components against the bound,
         // that is guaranteed by construction (even for deserialization)
-        match &self.0 {
+        match self.as_type_enum() {
             TypeEnum::Sum(SumType::General { rows }) => {
                 rows.iter().try_for_each(|row| row.validate(var_decls))
             }
@@ -573,7 +700,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
     /// * If [`Type::validate`]`(false)` fails, but `(true)` succeeds, this method may (depending on structure of self)
     ///   return a Vec containing any number of [Type]s. These may (or not) pass [`Type::validate`]
     fn substitute(&self, t: &Substitution) -> Vec<Self> {
-        match &self.0 {
+        match self.as_type_enum() {
             TypeEnum::RowVar(rv) => rv.substitute(t),
             TypeEnum::Alias(_) | TypeEnum::Sum(SumType::Unit { .. }) => vec![self.clone()],
             TypeEnum::Variable(idx, bound) => {
@@ -610,7 +737,7 @@ impl<RV: MaybeRV> TypeBase<RV> {
 
 impl<RV: MaybeRV> Transformable for TypeBase<RV> {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
-        match &mut self.0 {
+        match self.as_type_enum_mut() {
             TypeEnum::Alias(_) | TypeEnum::RowVar(_) | TypeEnum::Variable(..) => Ok(false),
             TypeEnum::Extension(custom_type) => {
                 if let Some(nt) = tr.apply_custom(custom_type)? {
@@ -631,7 +758,7 @@ impl<RV: MaybeRV> Transformable for TypeBase<RV> {
             TypeEnum::Function(fty) => fty.transform(tr),
             TypeEnum::Sum(sum_type) => {
                 let ch = sum_type.transform(tr)?;
-                self.1 = self.0.least_upper_bound();
+                self.1 = self.as_type_enum().least_upper_bound();
                 Ok(ch)
             }
         }
@@ -650,7 +777,7 @@ impl TypeRV {
     /// Tells if this Type is a row variable, i.e. could stand for any number >=0 of Types
     #[must_use]
     pub fn is_row_var(&self) -> bool {
-        matches!(self.0, TypeEnum::RowVar(_))
+        matches!(self.as_type_enum(), TypeEnum::RowVar(_))
     }
 
     /// New use (occurrence) of the row variable with specified index.
@@ -662,7 +789,10 @@ impl TypeRV {
     /// [FuncDefn]: crate::ops::FuncDefn
     #[must_use]
     pub const fn new_row_var_use(idx: usize, bound: TypeBound) -> Self {
-        Self(TypeEnum::RowVar(RowVariable(idx, bound)), bound)
+        Self(
+            TypeStorage::Inline(TypeEnum::RowVar(RowVariable(idx, bound))),
+            bound,
+        )
     }
 }
 
@@ -671,17 +801,14 @@ impl<RV: MaybeRV> TypeBase<RV> {
     /// (Fallibly) converts a `TypeBase` (parameterized, so may or may not be able
     /// to contain [`RowVariable`]s) into a [Type] that definitely does not.
     pub fn try_into_type(self) -> Result<Type, RowVariable> {
-        Ok(TypeBase(
-            match self.0 {
-                TypeEnum::Extension(e) => TypeEnum::Extension(e),
-                TypeEnum::Alias(a) => TypeEnum::Alias(a),
-                TypeEnum::Function(f) => TypeEnum::Function(f),
-                TypeEnum::Variable(idx, bound) => TypeEnum::Variable(idx, bound),
-                TypeEnum::RowVar(rv) => Err(rv.as_rv().clone())?,
-                TypeEnum::Sum(s) => TypeEnum::Sum(s),
-            },
-            self.1,
-        ))
+        Ok(TypeBase::new(match self.0.into_type_enum() {
+            TypeEnum::Extension(e) => TypeEnum::Extension(e),
+            TypeEnum::Alias(a) => TypeEnum::Alias(a),
+            TypeEnum::Function(f) => TypeEnum::Function(f),
+            TypeEnum::Variable(idx, bound) => TypeEnum::Variable(idx, bound),
+            TypeEnum::RowVar(rv) => Err(rv.as_rv().clone())?,
+            TypeEnum::Sum(s) => TypeEnum::Sum(s),
+        }))
     }
 }
 
@@ -699,17 +826,14 @@ impl<RV1: MaybeRV> TypeBase<RV1> {
     where
         RV1: Into<RV2>,
     {
-        TypeBase(
-            match self.0 {
-                TypeEnum::Extension(e) => TypeEnum::Extension(e),
-                TypeEnum::Alias(a) => TypeEnum::Alias(a),
-                TypeEnum::Function(f) => TypeEnum::Function(f),
-                TypeEnum::Variable(idx, bound) => TypeEnum::Variable(idx, bound),
-                TypeEnum::RowVar(rv) => TypeEnum::RowVar(rv.into()),
-                TypeEnum::Sum(s) => TypeEnum::Sum(s),
-            },
-            self.1,
-        )
+        TypeBase::new(match self.0.into_type_enum() {
+            TypeEnum::Extension(e) => TypeEnum::Extension(e),
+            TypeEnum::Alias(a) => TypeEnum::Alias(a),
+            TypeEnum::Function(f) => TypeEnum::Function(f),
+            TypeEnum::Variable(idx, bound) => TypeEnum::Variable(idx, bound),
+            TypeEnum::RowVar(rv) => TypeEnum::RowVar(rv.into()),
+            TypeEnum::Sum(s) => TypeEnum::Sum(s),
+        })
     }
 }
 
@@ -768,7 +892,7 @@ impl<'a> Substitution<'a> {
                     panic!("Not a list of types - call validate() ?")
                 })
                 .collect(),
-            Term::Runtime(ty) if matches!(ty.0, TypeEnum::RowVar(_)) => {
+            Term::Runtime(ty) if matches!(ty.as_type_enum(), TypeEnum::RowVar(_)) => {
                 // Standalone "Type" can be used iff its actually a Row Variable not an actual (single) Type
                 vec![ty.clone().into()]
             }
@@ -862,6 +986,30 @@ pub(crate) mod test {
     use crate::std_extensions::collections::list::list_type;
     use crate::types::type_param::TermTypeError;
     use crate::{Extension, hugr::IdentList, type_row};
+
+    /// Public type operations remain usable in downstream constant expressions.
+    const CONST_UNIT_SUM: Type = Type::new_unit_sum(2);
+    const CONST_UNIT_SUM_REF: &Type = &CONST_UNIT_SUM;
+    const CONST_VAR: Type = Type::new_var_use(0, TypeBound::Linear);
+    const CONST_ROW_VAR: TypeRV = TypeRV::new_row_var_use(0, TypeBound::Copyable);
+    const CONST_BOUND: TypeBound = CONST_UNIT_SUM_REF.least_upper_bound();
+    const CONST_COPYABLE: bool = CONST_UNIT_SUM_REF.copyable();
+    const CONST_TYPE_ENUM: &TypeEnum<NoRV> = CONST_UNIT_SUM_REF.as_type_enum();
+
+    #[rstest::rstest]
+    fn const_api() {
+        assert_eq!(std::hint::black_box(CONST_BOUND), TypeBound::Copyable);
+        assert!(std::hint::black_box(CONST_COPYABLE));
+        assert!(matches!(
+            CONST_TYPE_ENUM,
+            TypeEnum::Sum(SumType::Unit { size: 2 })
+        ));
+        assert!(matches!(
+            CONST_VAR.as_type_enum(),
+            TypeEnum::Variable(0, TypeBound::Linear)
+        ));
+        assert!(CONST_ROW_VAR.is_row_var());
+    }
 
     #[test]
     fn construct() {
@@ -971,9 +1119,13 @@ pub(crate) mod test {
         let lin = e.get_type(&LIN).unwrap().instantiate([]).unwrap();
 
         let lin_to_usize = FnTransformer(|ct: &CustomType| (*ct == lin).then_some(usize_t()));
-        let mut t = Type::new_extension(lin.clone());
+        let original = Type::new(TypeEnum::Extension(lin.clone()));
+        let mut t = original.clone();
+        assert!(original.shares_storage_with(&t));
         assert_eq!(t.transform(&lin_to_usize), Ok(true));
         assert_eq!(t, usize_t());
+        assert_eq!(original, Type::new_extension(lin.clone()));
+        assert!(!original.shares_storage_with(&t));
 
         for coln in [
             list_type,

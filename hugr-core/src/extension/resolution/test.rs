@@ -13,7 +13,10 @@ use crate::builder::{
 use crate::envelope::EnvelopeConfig;
 use crate::extension::prelude::{ConstUsize, bool_t, usize_custom_t, usize_t};
 use crate::extension::resolution::WeakExtensionRegistry;
-use crate::extension::resolution::{resolve_op_extensions, resolve_op_types_extensions};
+use crate::extension::resolution::{
+    resolve_op_extensions, resolve_op_types_extensions,
+    resolve_type_extensions as resolve_type_extension_refs,
+};
 use crate::extension::{
     ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY, TypeDefBound,
 };
@@ -28,7 +31,7 @@ use crate::std_extensions::arithmetic::int_types::{self, int_type};
 use crate::std_extensions::collections::list::ListValue;
 use crate::std_extensions::std_reg;
 use crate::types::type_param::TypeParam;
-use crate::types::{PolyFuncType, Signature, Type, TypeBound};
+use crate::types::{PolyFuncType, Signature, Type, TypeBound, TypeEnum};
 use crate::{Extension, Hugr, HugrView, type_row};
 
 #[rstest]
@@ -71,6 +74,22 @@ fn resolve_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: Ex
         deser_extensions, extensions,
         "{deser_extensions} != {extensions}"
     );
+}
+
+/// Resolving an already-resolved type preserves its shared backing allocation.
+#[rstest]
+fn resolving_current_type_extensions_preserves_shared_storage() {
+    let registry = std_reg();
+    let weak_registry = WeakExtensionRegistry::from(&registry);
+    let original = Type::new(TypeEnum::Extension(
+        usize_t().as_extension().unwrap().clone(),
+    ));
+    let mut resolved = original.clone();
+    assert!(original.shares_storage_with(&resolved));
+
+    resolve_type_extension_refs(&mut resolved, &weak_registry).unwrap();
+
+    assert!(original.shares_storage_with(&resolved));
 }
 
 /// Create a new test extension with a single operation.
