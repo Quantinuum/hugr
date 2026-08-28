@@ -26,10 +26,7 @@ pub use weak_registry::WeakExtensionRegistry;
 
 pub(crate) use ops::{collect_op_extension, resolve_op_extensions};
 pub(crate) use types::{collect_op_types_extensions, collect_signature_exts, collect_term_exts};
-pub(crate) use types_mut::resolve_op_types_extensions;
-use types_mut::{
-    resolve_custom_type_exts, resolve_term_exts, resolve_type_exts, resolve_value_exts,
-};
+pub(crate) use types_mut::TypeExtensionResolver;
 
 use derive_more::{Display, Error, From};
 
@@ -46,8 +43,7 @@ pub fn resolve_type_extensions(
     typ: &mut Type,
     extensions: &WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    let mut used_extensions = WeakExtensionRegistry::default();
-    resolve_type_exts(None, typ, extensions, &mut used_extensions)
+    TypeExtensionResolver::new(extensions).resolve_type(None, typ)
 }
 
 /// Update all weak Extension pointers in a custom type.
@@ -55,8 +51,7 @@ pub fn resolve_custom_type_extensions(
     typ: &mut CustomType,
     extensions: &WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    let mut used_extensions = WeakExtensionRegistry::default();
-    resolve_custom_type_exts(None, typ, extensions, &mut used_extensions)
+    TypeExtensionResolver::new(extensions).resolve_custom_type(None, typ)
 }
 
 /// Update all weak Extension pointers inside a type argument.
@@ -64,8 +59,7 @@ pub fn resolve_typearg_extensions(
     arg: &mut TypeArg,
     extensions: &WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    let mut used_extensions = WeakExtensionRegistry::default();
-    resolve_term_exts(None, arg, extensions, &mut used_extensions)
+    TypeExtensionResolver::new(extensions).resolve_term(None, arg)
 }
 
 /// Update all weak Extension pointers inside a constant value.
@@ -73,8 +67,7 @@ pub fn resolve_value_extensions(
     value: &mut Value,
     extensions: &WeakExtensionRegistry,
 ) -> Result<(), ExtensionResolutionError> {
-    let mut used_extensions = WeakExtensionRegistry::default();
-    resolve_value_exts(None, value, extensions, &mut used_extensions)
+    TypeExtensionResolver::new(extensions).resolve_value(None, value)
 }
 
 /// Errors that can occur during extension resolution.
