@@ -570,6 +570,12 @@ impl Type {
 
 impl Transformable for Type {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
+        // Note that this forces cloning the type even if the transformation
+        // does not actually change it.
+        //
+        // The resulting types are always unique.
+        //
+        // TODO: Can we keep the sharing of types after transformation via some cache?
         self.0.make_mut().transform(tr)
     }
 }
