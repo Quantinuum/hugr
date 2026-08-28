@@ -13,7 +13,10 @@ use crate::builder::{
 use crate::envelope::EnvelopeConfig;
 use crate::extension::prelude::{ConstUsize, bool_t, usize_custom_t, usize_t};
 use crate::extension::resolution::WeakExtensionRegistry;
-use crate::extension::resolution::{resolve_op_extensions, resolve_op_types_extensions};
+use crate::extension::resolution::{
+    resolve_op_extensions, resolve_op_types_extensions,
+    resolve_type_extensions as resolve_type_extension_refs,
+};
 use crate::extension::{
     ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY, TypeDefBound, Version,
 };
@@ -145,6 +148,20 @@ fn resolve_custom_type_uses_highest_compatible_extension() {
         panic!("expected custom type");
     };
     assert_eq!(custom.extension_version(), Some(&Version::new(0, 2, 5)));
+}
+
+/// Resolving an already-resolved type should preserve its shared storage.
+#[test]
+fn resolving_current_type_extensions_preserves_shared_storage() {
+    let registry = std_reg();
+    let weak_registry = WeakExtensionRegistry::from(&registry);
+    let original = usize_t();
+    let mut resolved = original.clone();
+    assert!(original.shares_storage_with(&resolved));
+
+    resolve_type_extension_refs(&mut resolved, &weak_registry).unwrap();
+
+    assert!(original.shares_storage_with(&resolved));
 }
 
 /// Create a new test extension with a single operation.
