@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.29.4](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.3...hugr-v0.29.4) - 2026-08-28
+
+### New Features
+
+- Add froundeven float op ([#3122](https://github.com/Quantinuum/hugr/pull/3122))
+
 ## [0.29.3](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.2...hugr-v0.29.3) - 2026-07-20
 
 ### Bug Fixes
