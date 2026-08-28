@@ -44,8 +44,8 @@ pub enum FloatOps {
     ffloor,
     fceil,
     fround,
-    froundeven,
     ftostring,
+    froundeven,
 }
 
 impl MakeOpDef for FloatOps {
