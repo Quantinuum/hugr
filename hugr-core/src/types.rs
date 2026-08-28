@@ -435,12 +435,14 @@ impl TypeStorage {
         };
         Arc::make_mut(term)
     }
+}
 
+impl From<TypeStorage> for Term {
     /// Consumes the storage, avoiding a clone when shared storage is unique.
-    fn into_term(self) -> Term {
-        match self {
-            Self::Static(term) => term.clone(),
-            Self::Shared(term) => {
+    fn from(storage: TypeStorage) -> Term {
+        match storage {
+            TypeStorage::Static(term) => term.clone(),
+            TypeStorage::Shared(term) => {
                 Arc::try_unwrap(term).unwrap_or_else(|term| term.as_ref().clone())
             }
         }
@@ -454,6 +456,8 @@ impl Type {
     pub const UNIT: Self = Self(TypeStorage::Static(&UNIT_TERM));
 
     /// Wraps a validated runtime type term in shared storage.
+    ///
+    /// The caller should check term is a valid type.
     fn from_term(term: Term) -> Self {
         Self(TypeStorage::Shared(Arc::new(term)))
     }
@@ -630,7 +634,7 @@ impl TryFrom<Term> for Type {
 
 impl From<Type> for Term {
     fn from(t: Type) -> Self {
-        t.0.into_term()
+        t.0.into()
     }
 }
 
