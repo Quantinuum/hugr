@@ -1,5 +1,5 @@
 {
-  "version": "0.1.1",
+  "version": "0.1.2",
   "name": "arithmetic.float",
   "types": {},
   "operations": {
@@ -581,6 +581,37 @@
       "extension": "arithmetic.float",
       "name": "fround",
       "description": "round",
+      "signature": {
+        "params": [],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "extension_version": "0.1.0",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "arithmetic.float.types",
+              "extension_version": "0.1.0",
+              "id": "float64",
+              "args": [],
+              "bound": "C"
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
+    "froundeven": {
+      "extension": "arithmetic.float",
+      "name": "froundeven",
+      "description": "round to nearest even integer",
       "signature": {
         "params": [],
         "body": {

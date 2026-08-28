@@ -114,6 +114,17 @@ fn emit_float_op<'c, H: HugrView<Node = Node>>(
                     .as_basic_value_enum(),
             ])
         }),
+        FloatOps::froundeven => emit_custom_unary_op(context, args, |ctx, v, _| {
+            let float_ty = ctx.iw_context().f64_type().as_basic_type_enum();
+            let func = get_intrinsic(ctx.get_current_module(), "llvm.roundeven.f64", [float_ty])?;
+            Ok(vec![
+                ctx.builder()
+                    .build_call(func, &[v.into()], "")?
+                    .try_as_basic_value()
+                    .unwrap_basic()
+                    .as_basic_value_enum(),
+            ])
+        }),
         // Missing ops, not supported by inkwell
         FloatOps::fmax
         | FloatOps::fmin
@@ -229,6 +240,7 @@ mod test {
     #[case::fdiv(FloatOps::fdiv)]
     #[case::fpow(FloatOps::fpow)]
     #[case::fround(FloatOps::fround)]
+    #[case::froundeven(FloatOps::froundeven)]
     fn float_operations(mut llvm_ctx: TestContext, #[case] op: FloatOps) {
         let name: &str = op.into();
         let mut hugr = test_float_op(op);
@@ -256,6 +268,10 @@ mod test {
     #[case::fdiv(FloatOps::fdiv, &[7., 2.], 3.5)]
     #[case::fpow(FloatOps::fpow, &[0.5, 3.], 0.125)]
     #[case::fround(FloatOps::fround, &[42.42], 42.)]
+    #[case::froundeven_tie_down(FloatOps::froundeven, &[42.5], 42.)]
+    #[case::froundeven_tie_up(FloatOps::froundeven, &[43.5], 44.)]
+    #[case::froundeven_tie_down_neg(FloatOps::froundeven, &[-43.5], -44.)]
+    #[case::froundeven_tie_up_neg(FloatOps::froundeven, &[-42.5], -42.)]
     fn float_operations_exec_f64<T: PartialEq + Debug>(
         mut exec_ctx: TestContext,
         #[case] op: FloatOps,

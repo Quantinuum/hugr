@@ -298,6 +298,7 @@ pub(crate) fn import_described_hugr(
             return (ctx.description, Err(ImportError { inner: e }));
         }
     }
+    ctx.description.set_num_edges(ctx.hugr.num_edges());
     (ctx.description, Ok(ctx.hugr))
 }
 
