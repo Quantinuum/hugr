@@ -5,7 +5,7 @@
 
 ### Bug Fixes
 
-- avoid poisoned values when using ishl/ishr whith large shift amounts ([#3192](https://github.com/Quantinuum/hugr/pull/3192))
+- avoid poisoned values when using ishl/ishr with large shift amounts ([#3192](https://github.com/Quantinuum/hugr/pull/3192))
 
 ### New Features
 
