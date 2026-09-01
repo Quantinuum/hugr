@@ -418,6 +418,9 @@ enum TypeStorage<RV: MaybeRV> {
 /// Keeping the pointer separately lets [`TypeBase::as_type_enum`] remain a
 /// `const fn`: stable Rust cannot dereference an [`Arc`] in constant evaluation.
 struct SharedTypeEnum<RV: MaybeRV> {
+    /// The owned `Arc` that keeps the type tree alive.
+    ///
+    /// This should never be mutated directly; use `new`/`make_mut` instead.
     owner: Arc<TypeEnum<RV>>,
     ptr: *const TypeEnum<RV>,
 }
@@ -461,9 +464,9 @@ impl<RV: MaybeRV> Clone for SharedTypeEnum<RV> {
 
 // SAFETY: `ptr` only points into `owner`, and access through it is tied to a
 // borrow of this wrapper. Thread-safety therefore matches `TypeEnum<RV>`.
-unsafe impl<RV: MaybeRV + Send + Sync> Send for SharedTypeEnum<RV> {}
+unsafe impl<RV: MaybeRV + Send + Sync> Send for SharedTypeEnum<RV> where TypeEnum<RV>: Send + Sync {}
 // SAFETY: See the `Send` implementation above.
-unsafe impl<RV: MaybeRV + Send + Sync> Sync for SharedTypeEnum<RV> {}
+unsafe impl<RV: MaybeRV + Send + Sync> Sync for SharedTypeEnum<RV> where TypeEnum<RV>: Send + Sync {}
 
 impl<RV: MaybeRV> TypeStorage<RV> {
     /// Returns the structural type independent of its storage strategy.

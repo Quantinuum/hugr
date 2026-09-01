@@ -550,7 +550,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
     }
 
     /// Check the validity of the subgraph, as described in the docs of
-    /// [`SiblingSubgraph::try_new`], but do not check convexity.    
+    /// [`SiblingSubgraph::try_new`], but do not check convexity.
     pub fn validate_skip_convexity(
         &self,
         hugr: &impl HugrView<Node = N>,
