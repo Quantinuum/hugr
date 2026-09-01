@@ -19,13 +19,13 @@ use crate::{Extension, Node};
 ///
 /// It wraps a [`Type`], but compares and hashes based on the underlying storage
 /// pointer rather than the type's structural content.
-#[derive(Clone)]
+#[derive(Clone, Eq)]
 struct TypeStorageKey(Type);
 
 impl TypeStorageKey {
     /// Creates a key retaining the type's current backing allocation.
-    fn new(typ: &Type) -> Self {
-        Self(typ.clone())
+    fn new(typ: Type) -> Self {
+        Self(typ)
     }
 }
 
@@ -34,8 +34,6 @@ impl PartialEq for TypeStorageKey {
         std::ptr::eq(self.0.storage_ptr(), other.0.storage_ptr())
     }
 }
-
-impl Eq for TypeStorageKey {}
 
 impl Hash for TypeStorageKey {
     fn hash<H: Hasher>(&self, state: &mut H) {
@@ -229,7 +227,7 @@ impl<'a> TypeExtensionResolver<'a> {
         node: Option<Node>,
         typ: &mut Type,
     ) -> Result<(), ExtensionResolutionError> {
-        let original_key = TypeStorageKey::new(typ);
+        let original_key = TypeStorageKey::new(typ.clone());
         if self.seen_types.contains(&original_key) {
             return Ok(());
         }
@@ -247,7 +245,7 @@ impl<'a> TypeExtensionResolver<'a> {
 
         // Map stale siblings to the resolved value and record its new backing
         // allocation as already traversed.
-        let resolved_key = TypeStorageKey::new(typ);
+        let resolved_key = TypeStorageKey::new(typ.clone());
         self.resolved_types.insert(original_key, typ.clone());
         self.seen_types.insert(resolved_key);
         Ok(())
