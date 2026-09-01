@@ -64,12 +64,12 @@ fn resolve_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: Ex
 
     let dummy_node = portgraph::NodeIndex::new(0).into();
 
-    resolve_op_extensions(dummy_node, &mut deser_op, &extensions).unwrap();
-
     let weak_extensions: WeakExtensionRegistry = (&extensions).into();
     resolve_op_types_extensions(Some(dummy_node), &mut deser_op, &weak_extensions)
         .unwrap()
         .for_each(|_| ());
+
+    resolve_op_extensions(dummy_node, &mut deser_op, &extensions).unwrap();
 
     let deser_extensions = deser_op.used_extensions().unwrap();
 
