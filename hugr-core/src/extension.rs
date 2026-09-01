@@ -1051,7 +1051,9 @@ impl Extension {
         Ok(())
     }
 
-    /// Write this extension as JSON, reusing its cached encoding when available.
+    /// Write this extension as JSON.
+    ///
+    /// Reuses its cached encoding when available.
     fn write_json(&self, mut writer: impl io::Write) -> serde_json::Result<()> {
         if let Some(encoded) = self.encoded_json.get() {
             return writer.write_all(encoded).map_err(serde_json::Error::io);
@@ -1066,7 +1068,16 @@ impl Extension {
         writer.write_all(encoded).map_err(serde_json::Error::io)
     }
 
-    /// Deserialize an extension while retaining its source JSON.
+    /// Deserialize an extension from a raw json value.
+    ///
+    /// Retains the encoded JSON in the extension's cache, to speed up future
+    /// serialization. The in-memory extension may be updated during resolution
+    /// to point to updated versions of transitive extension dependencies, but
+    /// the original serialization always remains valid.
+    ///
+    /// If the encoded JSON contains additional fields not recognized by the
+    /// current version of the extension, they will be ignored. These will
+    /// remain in the encoded JSON cache.
     pub(crate) fn from_raw_json(encoded: &serde_json::value::RawValue) -> serde_json::Result<Self> {
         let extension: Self = serde_json::from_str(encoded.get())?;
         let _ = extension
