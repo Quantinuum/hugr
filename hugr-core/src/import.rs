@@ -6,6 +6,7 @@
 use std::sync::Arc;
 
 use crate::envelope::description::{ExtensionDesc, GeneratorDesc, ModuleDesc};
+use crate::extension::prelude::{ConstString, ConstUsize};
 use crate::metadata::{self, Metadata, RawMetadataValue};
 use crate::types::type_param::{SeqPart, TermKindError, TypeParam};
 use crate::types::{
@@ -2122,6 +2123,12 @@ impl<'a> Context<'a> {
                 // - function definitions
                 // - custom constructors for values
             }
+
+            table::Term::Literal(model::Literal::Str(s)) => {
+                Ok(ConstString::new((*s).to_string()).into())
+            }
+
+            table::Term::Literal(model::Literal::Nat(n)) => Ok(ConstUsize::new(*n).into()),
 
             table::Term::List { .. } | table::Term::Tuple(_) | table::Term::Literal(_) => {
                 Err(error_invalid!("expected constant"))
