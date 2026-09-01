@@ -42,13 +42,20 @@ impl DataflowOpTrait for TailLoop {
             Direction::Incoming => (&self.just_inputs, &self.rest),
             Direction::Outgoing => (&self.just_outputs, &self.rest),
         };
-        head.get(port.index())
-            .or_else(|| {
-                port.index()
-                    .checked_sub(head.len())
-                    .and_then(|index| tail.get(index))
-            })
-            .cloned()
+        let mut index = port.index();
+
+        // The op value ports are defined as the concatenation of `head` and `tail`.
+        // See if `index` falls within any of those segments.
+        if index < head.len() {
+            return Some(head[index].clone());
+        }
+        index -= head.len();
+
+        if index < tail.len() {
+            return Some(tail[index].clone());
+        }
+
+        None
     }
 
     fn value_port_count(&self, dir: Direction) -> usize {
