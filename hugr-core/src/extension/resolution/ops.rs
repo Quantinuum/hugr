@@ -140,26 +140,29 @@ pub(crate) fn resolve_op_extensions<'e>(
                 opaque.unqualified_id(),
             )?;
 
-            let ext_op =
-                ExtensionOp::new_with_cached(op_def.clone(), opaque.args().to_vec(), opaque)
-                    .map_err(|e| OpaqueOpError::SignatureError {
+            let signature =
+                ExtensionOp::compute_signature_with_cached(op_def, opaque).map_err(|e| {
+                    OpaqueOpError::SignatureError {
                         node,
                         name: opaque.name().clone(),
                         cause: e,
-                    })?;
+                    }
+                })?;
 
-            if opaque.signature().io() != ext_op.signature().io() {
+            if opaque.signature().io() != signature.io() {
                 return Err(OpaqueOpError::SignatureMismatch {
                     node,
                     extension: opaque.extension().clone(),
                     op: op_def.name().clone(),
-                    computed: Box::new(ext_op.signature().into_owned()),
+                    computed: Box::new(signature),
                     stored: Box::new(opaque.signature().into_owned()),
                 }
                 .into());
             }
 
             // Replace the opaque operation with the resolved extension operation.
+            let args = opaque.take_args();
+            let ext_op = ExtensionOp::from_resolved_parts(op_def.clone(), args, signature);
             *op = ext_op.into();
 
             Ok(Some(extension))

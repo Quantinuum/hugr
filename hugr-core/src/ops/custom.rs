@@ -53,28 +53,34 @@ impl ExtensionOp {
         })
     }
 
-    /// If `OpDef` is missing binary computation, trust the cached signature.
-    pub(crate) fn new_with_cached(
-        def: Arc<OpDef>,
-        args: impl IntoIterator<Item = TypeArg>,
+    /// Compute a resolved signature, trusting the serialized signature when
+    /// the definition does not provide a binary signature function.
+    pub(crate) fn compute_signature_with_cached(
+        def: &OpDef,
         opaque: &OpaqueOp,
-    ) -> Result<Self, SignatureError> {
-        let args: Vec<TypeArg> = args.into_iter().collect();
+    ) -> Result<Signature, SignatureError> {
         // TODO skip computation depending on config
         // see https://github.com/CQCL/hugr/issues/1363
-        let signature = match def.compute_signature(&args) {
-            Ok(sig) => sig,
-            Err(SignatureError::MissingComputeFunc) => {
-                // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
-                opaque.signature().into_owned()
-            }
-            Err(e) => return Err(e),
-        };
-        Ok(Self {
+        let computed = def.compute_signature(opaque.args());
+        // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
+        if let Err(SignatureError::MissingComputeFunc) = computed {
+            return Ok(opaque.signature().into_owned());
+        }
+        computed
+    }
+
+    /// Build an operation from arguments and a signature already validated
+    /// against `def`.
+    pub(crate) fn from_resolved_parts(
+        def: Arc<OpDef>,
+        args: Vec<TypeArg>,
+        signature: Signature,
+    ) -> Self {
+        Self {
             def,
             args,
             signature,
-        })
+        }
     }
 
     /// Replace this operation's definition with the matching definition from
@@ -374,6 +380,11 @@ impl OpaqueOp {
     pub(crate) fn args_mut(&mut self) -> &mut [TypeArg] {
         self.args.as_mut_slice()
     }
+
+    /// Move out the argument allocation after resolution has succeeded.
+    pub(crate) fn take_args(&mut self) -> Vec<TypeArg> {
+        std::mem::take(&mut self.args)
+    }
 }
 
 impl DataflowOpTrait for OpaqueOp {
@@ -598,9 +609,10 @@ mod test {
             ext_id.clone(),
             Version::new(0, 0, 0),
             comp_name,
-            vec![],
+            vec![usize_t().into()],
             endo_sig,
         );
+        let args_ptr = opaque_comp.args().as_ptr();
         let mut resolved_val = opaque_val.into();
         resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),
@@ -618,5 +630,10 @@ mod test {
         )
         .unwrap();
         assert_eq!(resolve_res_definition(&resolved_comp).name(), comp_name);
+        assert_eq!(
+            resolved_comp.as_extension_op().unwrap().args().as_ptr(),
+            args_ptr,
+            "resolving an opaque operation should reuse its argument allocation"
+        );
     }
 }
