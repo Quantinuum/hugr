@@ -26,6 +26,18 @@ impl Tag {
     pub fn new(tag: usize, variants: Vec<TypeRow>) -> Self {
         Self { tag, variants }
     }
+
+    /// Return the TypeRow of the selected variant.
+    ///
+    /// Panics if the tag is out of bounds.
+    fn variant(&self) -> &TypeRow {
+        self.variants.get(self.tag).unwrap_or_else(|| {
+            panic!(
+                "Not a valid tag {} for variants {:?}",
+                self.tag, self.variants
+            )
+        })
+    }
 }
 
 impl_op_name!(Tag);
@@ -42,17 +54,14 @@ impl DataflowOpTrait for Tag {
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
         Cow::Owned(Signature::new(
-            self.variants
-                .get(self.tag)
-                .expect("Not a valid tag")
-                .clone(),
+            self.variant().clone(),
             vec![Type::new_sum(self.variants.clone())],
         ))
     }
 
     fn value_port_type(&self, port: Port) -> Option<Type> {
         match port.direction() {
-            Direction::Incoming => self.variants.get(self.tag)?.get(port.index()).cloned(),
+            Direction::Incoming => self.variant().get(port.index()).cloned(),
             Direction::Outgoing if port.index() == 0 => Some(Type::new_sum(self.variants.clone())),
             Direction::Outgoing => None,
         }
@@ -60,7 +69,7 @@ impl DataflowOpTrait for Tag {
 
     fn value_port_count(&self, dir: Direction) -> usize {
         match dir {
-            Direction::Incoming => self.variants.get(self.tag).expect("Not a valid tag").len(),
+            Direction::Incoming => self.variant().len(),
             Direction::Outgoing => 1,
         }
     }
