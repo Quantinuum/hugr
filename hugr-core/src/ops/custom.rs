@@ -61,14 +61,12 @@ impl ExtensionOp {
     ) -> Result<Signature, SignatureError> {
         // TODO skip computation depending on config
         // see https://github.com/CQCL/hugr/issues/1363
-        match def.compute_signature(opaque.args()) {
-            Ok(sig) => Ok(sig),
-            Err(SignatureError::MissingComputeFunc) => {
-                // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
-                Ok(opaque.signature().into_owned())
-            }
-            Err(e) => Err(e),
+        let computed = def.compute_signature(opaque.args());
+        // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
+        if let Err(SignatureError::MissingComputeFunc) = computed {
+            return Ok(opaque.signature().into_owned());
         }
+        computed
     }
 
     /// Build an operation from arguments and a signature already validated
