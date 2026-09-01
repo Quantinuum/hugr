@@ -462,16 +462,29 @@ impl Type {
         Self(TypeStorage::Shared(Arc::new(term)))
     }
 
+    /// Returns a pointer identifying the current backing allocation.
+    ///
+    /// This is only used for equality checks to avoid repeated computations.
+    pub(crate) fn storage_ptr(&self) -> *const Term {
+        match &self.0 {
+            TypeStorage::Static(term) => std::ptr::from_ref(*term),
+            TypeStorage::Shared(term) => Arc::as_ptr(term),
+        }
+    }
+
+    /// Returns mutable access to the backing term using copy-on-write.
+    ///
+    /// Callers must preserve the invariant that the term is a runtime type.
+    pub(crate) fn term_mut(&mut self) -> &mut Term {
+        self.0.make_mut()
+    }
+
     /// Returns whether two types use the same backing allocation.
     ///
     /// Used for testing only.
     #[cfg(test)]
     pub(crate) fn shares_storage_with(&self, other: &Self) -> bool {
-        match (&self.0, &other.0) {
-            (TypeStorage::Static(left), TypeStorage::Static(right)) => std::ptr::eq(*left, *right),
-            (TypeStorage::Shared(left), TypeStorage::Shared(right)) => Arc::ptr_eq(left, right),
-            _ => false,
-        }
+        std::ptr::eq(self.storage_ptr(), other.storage_ptr())
     }
 
     /// Initialize a new function type.
