@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.27.3](https://github.com/quantinuum/hugr/compare/hugr-core-v0.27.2...hugr-core-v0.27.3) - 2026-09-01
+
+### Performance
+
+- Reuse shared types during HUGR import ([#3221](https://github.com/quantinuum/hugr/pull/3221))
+
 ## [0.27.2](https://github.com/quantinuum/hugr/compare/hugr-core-v0.27.1...hugr-core-v0.27.2) - 2026-07-14
 
 ### Bug Fixes
