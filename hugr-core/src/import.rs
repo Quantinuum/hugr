@@ -3,7 +3,10 @@
 //! **Warning**: This module is still under development and is expected to change.
 //! It is included in the library to allow for early experimentation, and for
 //! the core and model to converge incrementally.
-use std::sync::Arc;
+use std::{
+    any::{Any, TypeId},
+    sync::Arc,
+};
 
 use crate::envelope::description::GeneratorDesc;
 use crate::metadata::{self, Metadata};
@@ -241,20 +244,7 @@ pub(crate) fn import_described_hugr(
     module: &table::Module,
     extensions: &ExtensionRegistry,
 ) -> (ModuleDesc, Result<Hugr, ImportError>) {
-    // TODO: Module should know about the number of edges, so that we can use a vector here.
-    // For now we use a hashmap, which will be slower.
-    let mut ctx = Context {
-        module,
-        hugr: Hugr::new(),
-        link_ports: FxHashMap::default(),
-        static_edges: Vec::new(),
-        extensions,
-        nodes: FxHashMap::default(),
-        local_vars: FxHashMap::default(),
-        custom_name_cache: FxHashMap::default(),
-        region_scope: table::RegionId::default(),
-        description: ModuleDesc::default(),
-    };
+    let mut ctx = Context::new(module, extensions);
 
     if let Some(s) = get_generator(&ctx) {
         ctx.description.set_generator(s);
@@ -302,12 +292,34 @@ struct Context<'a> {
 
     custom_name_cache: FxHashMap<&'a str, (ExtensionId, SmolStr)>,
 
+    /// Successfully imported runtime types, keyed by model id and row-variable kind.
+    type_cache: FxHashMap<(table::TermId, TypeId), Box<dyn Any>>,
+
     region_scope: table::RegionId,
 
     description: ModuleDesc,
 }
 
 impl<'a> Context<'a> {
+    /// Creates the state used to import one model module.
+    fn new(module: &'a table::Module<'a>, extensions: &'a ExtensionRegistry) -> Self {
+        // TODO: Module should know about the number of edges, so that we can use a vector here.
+        // For now we use a hashmap, which will be slower.
+        Self {
+            module,
+            hugr: Hugr::new(),
+            link_ports: FxHashMap::default(),
+            static_edges: Vec::new(),
+            extensions,
+            nodes: FxHashMap::default(),
+            local_vars: FxHashMap::default(),
+            custom_name_cache: FxHashMap::default(),
+            type_cache: FxHashMap::default(),
+            region_scope: table::RegionId::default(),
+            description: ModuleDesc::default(),
+        }
+    }
+
     /// Get the signature of the node with the given `NodeId`.
     fn get_node_signature(&mut self, node: table::NodeId) -> Result<Signature, ImportErrorInner> {
         let node_data = self.get_node(node)?;
@@ -1563,84 +1575,105 @@ impl<'a> Context<'a> {
         &mut self,
         term_id: table::TermId,
     ) -> Result<TypeBase<RV>, ImportErrorInner> {
-        (|| {
-            if let Some([_, _]) = self.match_symbol(term_id, model::CORE_FN)? {
-                let func_type = self.import_func_type::<RowVariable>(term_id)?;
-                return Ok(TypeBase::new_function(func_type));
-            }
+        let cache_key = (term_id, TypeId::of::<RV>());
+        if let Some(typ) = self
+            .type_cache
+            .get(&cache_key)
+            .and_then(|typ| typ.downcast_ref::<TypeBase<RV>>())
+        {
+            return Ok(typ.clone());
+        }
 
-            if let Some([variants]) = self.match_symbol(term_id, model::CORE_ADT)? {
-                let variants = (|| {
-                    self.import_closed_list(variants)?
-                        .iter()
-                        .map(|variant| self.import_type_row::<RowVariable>(*variant))
-                        .collect::<Result<Vec<_>, _>>()
-                })()
-                .map_err(|err| error_context!(err, "adt variants"))?;
+        let result = self
+            .import_type_uncached(term_id)
+            .map_err(|err| error_context!(err, "term {} as `Type`", term_id));
 
-                return Ok(TypeBase::new_sum(variants));
-            }
+        if let Ok(typ) = &result {
+            self.type_cache.insert(cache_key, Box::new(typ.clone()));
+        }
+        result
+    }
 
-            match self.get_term(term_id)? {
-                table::Term::Wildcard => Err(error_uninferred!("wildcard")),
+    /// Imports a runtime type without consulting or updating the type cache.
+    fn import_type_uncached<RV: MaybeRV>(
+        &mut self,
+        term_id: table::TermId,
+    ) -> Result<TypeBase<RV>, ImportErrorInner> {
+        if let Some([_, _]) = self.match_symbol(term_id, model::CORE_FN)? {
+            let func_type = self.import_func_type::<RowVariable>(term_id)?;
+            return Ok(TypeBase::new_function(func_type));
+        }
 
-                table::Term::Apply(symbol, args) => {
-                    let name = self.get_symbol_name(*symbol)?;
+        if let Some([variants]) = self.match_symbol(term_id, model::CORE_ADT)? {
+            let variants = (|| {
+                self.import_closed_list(variants)?
+                    .iter()
+                    .map(|variant| self.import_type_row::<RowVariable>(*variant))
+                    .collect::<Result<Vec<_>, _>>()
+            })()
+            .map_err(|err| error_context!(err, "adt variants"))?;
 
-                    let args = args
-                        .iter()
-                        .map(|arg| self.import_term(*arg))
-                        .collect::<Result<Vec<_>, _>>()
-                        .map_err(|err| {
-                            error_context!(err, "type argument of custom type `{}`", name)
+            return Ok(TypeBase::new_sum(variants));
+        }
+
+        match self.get_term(term_id)? {
+            table::Term::Wildcard => Err(error_uninferred!("wildcard")),
+
+            table::Term::Apply(symbol, args) => {
+                let name = self.get_symbol_name(*symbol)?;
+
+                let args = args
+                    .iter()
+                    .map(|arg| self.import_term(*arg))
+                    .collect::<Result<Vec<_>, _>>()
+                    .map_err(|err| {
+                        error_context!(err, "type argument of custom type `{}`", name)
+                    })?;
+
+                let (extension, id) = self.import_custom_name(name)?;
+
+                let extension_ref =
+                    self.extensions
+                        .get(&extension)
+                        .ok_or_else(|| ExtensionError::Missing {
+                            missing_ext: extension.clone(),
+                            available: self.extensions.ids().cloned().collect(),
                         })?;
 
-                    let (extension, id) = self.import_custom_name(name)?;
+                let ext_type =
+                    extension_ref
+                        .get_type(&id)
+                        .ok_or_else(|| ExtensionError::MissingType {
+                            ext: extension.clone(),
+                            name: id.clone(),
+                        })?;
 
-                    let extension_ref =
-                        self.extensions
-                            .get(&extension)
-                            .ok_or_else(|| ExtensionError::Missing {
-                                missing_ext: extension.clone(),
-                                available: self.extensions.ids().cloned().collect(),
-                            })?;
+                let bound = ext_type.bound(&args);
 
-                    let ext_type =
-                        extension_ref
-                            .get_type(&id)
-                            .ok_or_else(|| ExtensionError::MissingType {
-                                ext: extension.clone(),
-                                name: id.clone(),
-                            })?;
-
-                    let bound = ext_type.bound(&args);
-
-                    Ok(TypeBase::new_extension(CustomType::new(
-                        id,
-                        args,
-                        extension,
-                        bound,
-                        &Arc::downgrade(extension_ref),
-                    )))
-                }
-
-                table::Term::Var(var @ table::VarId(_, index)) => {
-                    let local_var = self
-                        .local_vars
-                        .get(var)
-                        .ok_or(error_invalid!("unknown var {}", var))?;
-                    Ok(TypeBase::new_var_use(*index as _, local_var.bound))
-                }
-
-                // The following terms are not runtime types, but the core `Type` only contains runtime types.
-                // We therefore report a type error here.
-                table::Term::Literal(_)
-                | table::Term::List { .. }
-                | table::Term::Tuple { .. }
-                | table::Term::Func { .. } => Err(error_invalid!("expected a runtime type")),
+                Ok(TypeBase::new(TypeEnum::Extension(CustomType::new(
+                    id,
+                    args,
+                    extension,
+                    bound,
+                    &Arc::downgrade(extension_ref),
+                ))))
             }
-        })()
-        .map_err(|err| error_context!(err, "term {} as `Type`", term_id))
+
+            table::Term::Var(var @ table::VarId(_, index)) => {
+                let local_var = self
+                    .local_vars
+                    .get(var)
+                    .ok_or(error_invalid!("unknown var {}", var))?;
+                Ok(TypeBase::new_var_use(*index as _, local_var.bound))
+            }
+
+            // The following terms are not runtime types, but the core `Type` only contains runtime types.
+            // We therefore report a type error here.
+            table::Term::Literal(_)
+            | table::Term::List { .. }
+            | table::Term::Tuple { .. }
+            | table::Term::Func { .. } => Err(error_invalid!("expected a runtime type")),
+        }
     }
 
     fn get_func_type(
@@ -2148,5 +2181,44 @@ impl LocalVar {
             r#type,
             bound: TypeBound::Linear,
         }
+    }
+}
+
+#[cfg(test)]
+mod test {
+    use std::str::FromStr;
+
+    use hugr_model::v0::{self as model, table};
+    use rstest::rstest;
+
+    use super::Context;
+    use crate::std_extensions::std_reg;
+
+    /// Repeated imports of the same model type reuse their backing allocation.
+    #[rstest]
+    fn repeated_runtime_type_imports_share_storage() {
+        let ast = model::ast::Package::from_str(include_str!(
+            "../../hugr-model/tests/fixtures/model-add.edn"
+        ))
+        .unwrap();
+        let bump = model::bumpalo::Bump::new();
+        let package = ast.resolve(&bump).unwrap();
+        let module = &package.modules[0];
+        let registry = std_reg();
+        let mut context = Context::new(module, &registry);
+
+        let (term_id, first) = (0..module.terms.len())
+            .map(table::TermId::new)
+            .find_map(|term_id| {
+                context
+                    .import_type::<crate::types::NoRV>(term_id)
+                    .ok()
+                    .filter(|typ| typ.as_extension().is_some())
+                    .map(|typ| (term_id, typ))
+            })
+            .expect("fixture should contain an extension type");
+        let second = context.import_type::<crate::types::NoRV>(term_id).unwrap();
+
+        assert!(first.shares_storage_with(&second));
     }
 }
