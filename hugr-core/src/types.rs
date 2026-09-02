@@ -29,6 +29,7 @@ use itertools::{Either, Itertools as _};
 use proptest_derive::Arbitrary;
 use serde::{Deserialize, Serialize};
 use std::ops::Deref;
+use std::sync::Arc;
 
 use crate::extension::{ExtensionRegistry, ExtensionSet, SignatureError};
 
@@ -371,10 +372,7 @@ impl From<SumType> for Type {
     }
 }
 
-#[derive(
-    Clone, Debug, Eq, Hash, PartialEq, derive_more::Display, serde::Serialize, serde::Deserialize,
-)]
-#[display("{_0}")]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 #[serde(
     into = "serialize::SerSimpleType",
     try_from = "serialize::SerSimpleType"
@@ -401,17 +399,97 @@ impl From<SumType> for Type {
 /// let func_type: Type = Type::new_function(Signature::new_endo([]));
 /// assert_eq!(func_type.least_upper_bound(), TypeBound::Copyable);
 /// ```
-pub struct Type(Term);
+pub struct Type(TypeStorage);
+
+/// The backing storage for a [`Type`].
+///
+/// Runtime-created types use reference-counted storage so cloning a type does
+/// not recursively clone its term tree. The static variant keeps simple type
+/// constants allocation-free.
+#[derive(Clone)]
+enum TypeStorage {
+    Static(&'static Term),
+    Shared(Arc<Term>),
+}
+
+/// The term backing the allocation-free [`Type::UNIT`] constant.
+static UNIT_TERM: Term = Term::SumType(SumType::Unit { size: 1 });
+
+impl TypeStorage {
+    /// Returns the stored term independent of the storage strategy.
+    fn as_term(&self) -> &Term {
+        match self {
+            Self::Static(term) => term,
+            Self::Shared(term) => term,
+        }
+    }
+
+    /// Returns a mutable term, cloning shared or static storage when needed.
+    fn make_mut(&mut self) -> &mut Term {
+        if let Self::Static(term) = self {
+            *self = Self::Shared(Arc::new((*term).clone()));
+        }
+
+        let Self::Shared(term) = self else {
+            unreachable!("static type storage was converted to shared storage")
+        };
+        Arc::make_mut(term)
+    }
+}
+
+impl From<TypeStorage> for Term {
+    /// Consumes the storage, avoiding a clone when shared storage is unique.
+    fn from(storage: TypeStorage) -> Term {
+        match storage {
+            TypeStorage::Static(term) => term.clone(),
+            TypeStorage::Shared(term) => {
+                Arc::try_unwrap(term).unwrap_or_else(|term| term.as_ref().clone())
+            }
+        }
+    }
+}
 
 impl Type {
     /// An empty `TypeRow` or `TypeRowRV`. Provided here for convenience
     pub const EMPTY_TYPEROW: TypeRow = TypeRow::new();
     /// Unit type (empty tuple).
-    pub const UNIT: Self = Self(Term::SumType(SumType::Unit { size: 1 }));
+    pub const UNIT: Self = Self(TypeStorage::Static(&UNIT_TERM));
+
+    /// Wraps a validated runtime type term in shared storage.
+    ///
+    /// The caller should check term is a valid type.
+    fn from_term(term: Term) -> Self {
+        Self(TypeStorage::Shared(Arc::new(term)))
+    }
+
+    /// Returns a pointer identifying the current backing allocation.
+    ///
+    /// This is only used for equality checks to avoid repeated computations.
+    pub(crate) fn storage_ptr(&self) -> *const Term {
+        match &self.0 {
+            TypeStorage::Static(term) => std::ptr::from_ref(*term),
+            TypeStorage::Shared(term) => Arc::as_ptr(term),
+        }
+    }
+
+    /// Returns mutable access to the backing term using copy-on-write.
+    ///
+    /// Callers must preserve the invariant that the term is a runtime type.
+    pub(crate) fn term_mut(&mut self) -> &mut Term {
+        self.0.make_mut()
+    }
+
+    /// Returns whether two types use the same backing allocation.
+    ///
+    /// Used for testing only.
+    #[cfg(test)]
+    pub(crate) fn shares_storage_with(&self, other: &Self) -> bool {
+        std::ptr::eq(self.storage_ptr(), other.storage_ptr())
+    }
 
     /// Initialize a new function type.
     pub fn new_function(fun_ty: impl Into<FuncValueType>) -> Self {
-        Self(Term::FunctionType(Box::new(fun_ty.into())))
+        Self::from_term(Term::FunctionType(Box::new(fun_ty.into())))
     }
 
     /// Initialize a new tuple type by providing the elements.
@@ -431,21 +509,21 @@ impl Type {
         R: Into<TypeRowRV>,
     {
         let st = SumType::new(variants);
-        Self(Term::SumType(st))
+        Self::from_term(Term::SumType(st))
     }
 
     /// Initialize a new custom type.
     // TODO remove? Extensions/TypeDefs should just provide `Type` directly
     #[must_use]
-    pub const fn new_extension(opaque: CustomType) -> Self {
-        Self(Term::ExtensionType(opaque))
+    pub fn new_extension(opaque: CustomType) -> Self {
+        Self::from_term(Term::ExtensionType(opaque))
     }
 
     /// New `UnitSum` with empty Tuple variants
     #[must_use]
-    pub const fn new_unit_sum(size: u8) -> Self {
+    pub fn new_unit_sum(size: u8) -> Self {
         // should be the only way to avoid going through SumType::new
-        Self(Term::SumType(SumType::new_unary(size)))
+        Self::from_term(Term::SumType(SumType::new_unary(size)))
     }
 
     /// New use (occurrence) of the type variable with specified index.
@@ -454,18 +532,18 @@ impl Type {
     /// than required for the use.
     #[must_use]
     pub fn new_var_use(idx: usize, bound: TypeBound) -> Self {
-        Self(Term::new_var_use(idx, bound))
+        Self::from_term(Term::new_var_use(idx, bound))
     }
 
     /// Report the least upper [`TypeBound`]
     #[inline(always)]
-    pub const fn least_upper_bound(&self) -> TypeBound {
-        self.0.least_upper_bound().unwrap()
+    pub fn least_upper_bound(&self) -> TypeBound {
+        self.deref().least_upper_bound().unwrap()
     }
 
     /// Report if the type is copyable - i.e.the least upper bound of the type
     /// is contained by the copyable bound.
-    pub const fn copyable(&self) -> bool {
+    pub fn copyable(&self) -> bool {
         TypeBound::Copyable.contains(self.least_upper_bound())
     }
 
@@ -477,7 +555,7 @@ impl Type {
     /// [validate]: crate::types::type_param::TypeArg::validate
     /// [TypeDef]: crate::extension::TypeDef
     pub(crate) fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
-        self.0.validate(var_decls)?;
+        self.deref().validate(var_decls)?;
         Ok(())
     }
 
@@ -486,7 +564,7 @@ impl Type {
     /// Always produces exactly one type, but may narrow the bound (from
     /// [TypeBound::Linear] to [TypeBound::Copyable]).
     fn substitute(&self, s: &Substitution) -> Self {
-        Self(self.0.substitute(s))
+        Self::from_term(self.deref().substitute(s))
     }
 
     /// Returns a registry with the concrete extensions used by this type.
@@ -509,7 +587,13 @@ impl Type {
 
 impl Transformable for Type {
     fn transform<T: TypeTransformer>(&mut self, tr: &T) -> Result<bool, T::Err> {
-        self.0.transform(tr)
+        // Note that this forces cloning the type even if the transformation
+        // does not actually change it.
+        //
+        // The resulting types are always unique.
+        //
+        // TODO: Can we keep the sharing of types after transformation via some cache?
+        self.0.make_mut().transform(tr)
     }
 }
 
@@ -517,7 +601,33 @@ impl Deref for Type {
     type Target = Term;
 
     fn deref(&self) -> &Self::Target {
-        &self.0
+        self.0.as_term()
+    }
+}
+
+impl std::fmt::Debug for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Type").field(self.deref()).finish()
+    }
+}
+
+impl std::fmt::Display for Type {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.deref().fmt(f)
+    }
+}
+
+impl PartialEq for Type {
+    fn eq(&self, other: &Self) -> bool {
+        self.deref() == other.deref()
+    }
+}
+
+impl Eq for Type {}
+
+impl std::hash::Hash for Type {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.deref().hash(state);
     }
 }
 
@@ -526,7 +636,7 @@ impl TryFrom<Term> for Type {
 
     fn try_from(t: Term) -> Result<Self, TermKindError> {
         match t.is_runtime_type() {
-            true => Ok(Self(t)),
+            true => Ok(Self::from_term(t)),
             false => Err(TermKindError::KindMismatch {
                 term: Box::new(t),
                 kind: Box::new(TypeBound::Linear.into()),
@@ -537,7 +647,7 @@ impl TryFrom<Term> for Type {
 
 impl From<Type> for Term {
     fn from(t: Type) -> Self {
-        t.0
+        t.0.into()
     }
 }
 
@@ -747,9 +857,13 @@ pub(crate) mod test {
         let lin = e.get_type(&LIN).unwrap().instantiate([]).unwrap();
 
         let lin_to_usize = FnTransformer(|ct: &CustomType| (*ct == lin).then_some(usize_t()));
-        let mut t = Type::new_extension(lin.clone());
+        let original = Type::new_extension(lin.clone());
+        let mut t = original.clone();
+        assert!(original.shares_storage_with(&t));
         assert_eq!(t.transform(&lin_to_usize), Ok(true));
         assert_eq!(t, usize_t());
+        assert_eq!(original, Type::new_extension(lin.clone()));
+        assert!(!original.shares_storage_with(&t));
 
         for coln in [
             list_type,

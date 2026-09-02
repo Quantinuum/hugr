@@ -648,16 +648,16 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             .iter()
             .map(|part| {
                 let &(n, p) = part.iter().next().expect("is non-empty");
-                let sig = hugr.signature(n).expect("must have dataflow signature");
-                sig.port_type(p).cloned().expect("must be dataflow edge")
+                let op = hugr.get_optype(n);
+                op.value_input_type(p).expect("must be dataflow edge")
             })
             .collect_vec();
         let output = self
             .outputs
             .iter()
             .map(|&(n, p)| {
-                let sig = hugr.signature(n).expect("must have dataflow signature");
-                sig.port_type(p).cloned().expect("must be dataflow edge")
+                let op = hugr.get_optype(n);
+                op.value_output_type(p).expect("must be dataflow edge")
             })
             .collect_vec();
 
@@ -1212,12 +1212,14 @@ fn get_edge_type<H: HugrView, P: Into<Port> + Copy>(
     ports: &[(H::Node, P)],
 ) -> Option<Type> {
     let &(n, p) = ports.first()?;
-    let edge_t = hugr.signature(n)?.port_type(p)?.clone();
+    let op = hugr.get_optype(n);
+    let edge_t = op.value_port_type(p.into())?.clone();
     ports
         .iter()
         .all(|&(n, p)| {
-            hugr.signature(n)
-                .is_some_and(|s| s.port_type(p) == Some(&edge_t))
+            hugr.get_optype(n)
+                .value_port_type(p.into())
+                .is_some_and(|t| t == edge_t)
         })
         .then_some(edge_t)
 }

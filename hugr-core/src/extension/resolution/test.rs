@@ -13,14 +13,17 @@ use crate::builder::{
 use crate::envelope::EnvelopeConfig;
 use crate::extension::prelude::{ConstUsize, bool_t, usize_custom_t, usize_t};
 use crate::extension::resolution::WeakExtensionRegistry;
-use crate::extension::resolution::{resolve_op_extensions, resolve_op_types_extensions};
+use crate::extension::resolution::{
+    resolve_op_extensions, resolve_type_extensions as resolve_type_extension_refs,
+};
 use crate::extension::{
     ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY, TypeDefBound, Version,
 };
+use crate::hugr::HugrMut;
 use crate::ops::constant::CustomConst;
 use crate::ops::constant::test::CustomTestValue;
 use crate::ops::dataflow::IOTrait;
-use crate::ops::{CallIndirect, ExtensionOp, Input, NamedOp, OpType, OpaqueOp, Tag, Value};
+use crate::ops::{CallIndirect, ExtensionOp, Input, NamedOp, OpType, OpaqueOp, Output, Tag, Value};
 use crate::package::Package;
 use crate::std_extensions::arithmetic::conversions::{self, ConvertOpDef};
 use crate::std_extensions::arithmetic::float_types::{self, ConstF64, float64_type};
@@ -31,6 +34,8 @@ use crate::std_extensions::std_reg;
 use crate::types::type_param::TypeParam;
 use crate::types::{CustomType, PolyFuncType, Signature, Term, Type, TypeBound};
 use crate::{Extension, Hugr, HugrView, type_row};
+
+use super::types_mut::resolve_op_types_extensions;
 
 #[rstest]
 #[case::empty(Input { types: type_row![]}, ExtensionRegistry::default())]
@@ -59,12 +64,12 @@ fn resolve_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: Ex
 
     let dummy_node = portgraph::NodeIndex::new(0).into();
 
-    resolve_op_extensions(dummy_node, &mut deser_op, &extensions).unwrap();
-
     let weak_extensions: WeakExtensionRegistry = (&extensions).into();
     resolve_op_types_extensions(Some(dummy_node), &mut deser_op, &weak_extensions)
         .unwrap()
         .for_each(|_| ());
+
+    resolve_op_extensions(dummy_node, &mut deser_op, &extensions).unwrap();
 
     let deser_extensions = deser_op.used_extensions().unwrap();
 
@@ -145,6 +150,60 @@ fn resolve_custom_type_uses_highest_compatible_extension() {
         panic!("expected custom type");
     };
     assert_eq!(custom.extension_version(), Some(&Version::new(0, 2, 5)));
+}
+
+/// Resolving an already-resolved type should preserve its shared storage.
+#[test]
+fn resolving_current_type_extensions_preserves_shared_storage() {
+    let registry = std_reg();
+    let weak_registry = WeakExtensionRegistry::from(&registry);
+    let original = usize_t();
+    let mut resolved = original.clone();
+    assert!(original.shares_storage_with(&resolved));
+
+    resolve_type_extension_refs(&mut resolved, &weak_registry).unwrap();
+
+    assert!(original.shares_storage_with(&resolved));
+}
+
+/// Shared stale types should be resolved once and reuse the resolved storage.
+#[test]
+fn resolving_shared_stale_types_reuses_resolved_storage() {
+    let ext_id = ExtensionId::new_unchecked("shared_type_ext");
+    let version = Version::new(1, 0, 0);
+    let stale_extension = make_versioned_extension(&ext_id, version.clone());
+    let shared_type: Type = stale_extension
+        .get_type("MyType")
+        .unwrap()
+        .instantiate([])
+        .unwrap()
+        .into();
+
+    let mut hugr = Hugr::new();
+    let root = hugr.module_root();
+    let input = hugr.add_node_with_parent(root, Input::new([shared_type.clone()]));
+    let output = hugr.add_node_with_parent(root, Output::new([shared_type]));
+    drop(stale_extension);
+
+    let current_extension = make_versioned_extension(&ext_id, version);
+    let registry = ExtensionRegistry::new([current_extension.clone()]);
+    hugr.resolve_extension_defs(&registry).unwrap();
+
+    let OpType::Input(input_op) = hugr.get_optype(input) else {
+        panic!("expected input op");
+    };
+    let OpType::Output(output_op) = hugr.get_optype(output) else {
+        panic!("expected output op");
+    };
+    let input_type = &input_op.types[0];
+    let output_type = &output_op.types[0];
+    assert!(input_type.shares_storage_with(output_type));
+
+    let Term::ExtensionType(custom) = &**input_type else {
+        panic!("expected custom type");
+    };
+    let resolved_extension = custom.extension_ref().upgrade().unwrap();
+    assert!(Arc::ptr_eq(&resolved_extension, &current_extension));
 }
 
 /// Create a new test extension with a single operation.

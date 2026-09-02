@@ -32,8 +32,7 @@ pub use self::views::HugrView;
 use crate::core::NodeIndex;
 use crate::envelope::{self, EnvelopeConfig, ReadError, WriteError};
 use crate::extension::resolution::{
-    ExtensionResolutionError, WeakExtensionRegistry, resolve_op_extensions,
-    resolve_op_types_extensions,
+    ExtensionResolutionError, TypeExtensionResolver, WeakExtensionRegistry, resolve_op_extensions,
 };
 use crate::extension::{EMPTY_REG, ExtensionId, ExtensionRegistry, ExtensionSet, Version};
 use crate::metadata::RawMetadataValue;
@@ -295,6 +294,7 @@ impl Hugr {
         let mut seen_extensions = BTreeSet::<(ExtensionId, Version)>::new();
 
         let weak_extensions: WeakExtensionRegistry = extensions.into();
+        let mut type_resolver = TypeExtensionResolver::new(&weak_extensions);
         for pg_node in self.graph.nodes_iter() {
             let node: Node = pg_node.into();
             let op = &mut self.op_types[pg_node];
@@ -305,16 +305,16 @@ impl Hugr {
                     used_extensions.register(extension.clone());
                 }
             }
-            for extension in
-                resolve_op_types_extensions(Some(node), op, &weak_extensions)?.map(|weak| {
-                    weak.upgrade()
-                        .expect("Extension comes from a valid registry")
-                })
-            {
-                let extension_key = (extension.name().clone(), extension.version().clone());
-                if seen_extensions.insert(extension_key) {
-                    used_extensions.register(extension);
-                }
+            type_resolver.resolve_op(Some(node), op)?;
+        }
+
+        for weak in type_resolver.into_used_extensions() {
+            let extension = weak
+                .upgrade()
+                .expect("Extension comes from a valid registry");
+            let extension_key = (extension.name().clone(), extension.version().clone());
+            if seen_extensions.insert(extension_key) {
+                used_extensions.register(extension);
             }
         }
 

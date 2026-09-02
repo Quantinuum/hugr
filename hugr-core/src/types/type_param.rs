@@ -676,7 +676,7 @@ impl Transformable for Term {
         match self {
             Term::ExtensionType(custom_type) => {
                 if let Some(nt) = tr.apply_custom(custom_type)? {
-                    *self = nt.0;
+                    *self = nt.into();
                     Ok(true)
                 } else {
                     let args_changed = custom_type.args_mut().transform(tr)?;
