@@ -409,6 +409,27 @@ impl OpType {
         (0..self.value_port_count(dir)).map(move |i| Port::new(dir, i))
     }
 
+    /// Return the dataflow value ports and their types for the given direction.
+    #[inline]
+    pub fn value_types(&self, dir: Direction) -> impl Iterator<Item = (Port, Type)> {
+        self.value_ports(dir)
+            .map(|port| (port, self.value_port_type(port).unwrap()))
+    }
+
+    /// Return the dataflow value input ports and their types.
+    #[inline]
+    pub fn value_input_types(&self) -> impl Iterator<Item = (IncomingPort, Type)> {
+        self.value_types(Direction::Incoming)
+            .map(|(port, typ)| (port.as_incoming().unwrap(), typ))
+    }
+
+    /// Return the dataflow value output ports and their types.
+    #[inline]
+    pub fn value_output_types(&self) -> impl Iterator<Item = (OutgoingPort, Type)> {
+        self.value_types(Direction::Outgoing)
+            .map(|(port, typ)| (port.as_outgoing().unwrap(), typ))
+    }
+
     /// Return the dataflow value input ports for the given direction.
     #[inline]
     #[must_use]
