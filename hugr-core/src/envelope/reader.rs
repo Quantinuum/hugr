@@ -106,7 +106,7 @@ impl<R: BufRead> EnvelopeReader<R> {
     /// Handle extension resolution errors by recording missing extensions in the description.
     ///
     /// This function inspects the error and adds any missing extensions to the module description
-    /// with a default version of 0.0.0.
+    /// without a version.
     fn handle_resolution_error(desc: &mut ModuleDesc, err: &ExtensionResolutionError) {
         match err {
             ExtensionResolutionError::MissingOpExtension {
@@ -433,11 +433,7 @@ mod test {
             for ext_id in expected_ids {
                 assert!(names.contains(&&ext_id.to_string()));
             }
-            assert!(
-                resolved
-                    .iter()
-                    .all(|e| e.version == crate::extension::Version::new(0, 0, 0))
-            );
+            assert!(resolved.iter().all(|e| e.version.is_none()));
         };
 
         // Test MissingOpExtension
