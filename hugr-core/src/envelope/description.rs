@@ -133,17 +133,19 @@ impl PackageDesc {
     serde::Serialize,
     schemars::JsonSchema,
 )]
-#[display("Extension {name} v{version}")]
+#[display(
+    "Extension {name}{}",
+    version
+        .as_ref()
+        .map_or_else(String::new, |version| format!(" v{version}"))
+)]
 pub struct ExtensionDesc {
     /// Name of the extension.
     pub name: String,
     /// Version of the extension.
-    ///
-    /// A version value of `0.0.0` is used for extensions that do not have a version.
-    //
-    // TODO: Make this optional in `hugr-rs 0.27.0`.
-    #[schemars(with = "String")]
-    pub version: Version,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>")]
+    pub version: Option<Version>,
 }
 
 impl ExtensionDesc {
@@ -151,7 +153,7 @@ impl ExtensionDesc {
     pub fn new(name: impl ToString, version: impl Into<Version>) -> Self {
         Self {
             name: name.to_string(),
-            version: version.into(),
+            version: Some(version.into()),
         }
     }
 
@@ -159,7 +161,7 @@ impl ExtensionDesc {
     pub fn new_unversioned(name: impl ToString) -> Self {
         Self {
             name: name.to_string(),
-            version: Version::new(0, 0, 0),
+            version: None,
         }
     }
 }
@@ -169,7 +171,7 @@ impl<E: AsRef<crate::Extension>> From<&E> for ExtensionDesc {
         let ext = ext.as_ref();
         Self {
             name: ext.name.to_string(),
-            version: ext.version.clone(),
+            version: Some(ext.version.clone()),
         }
     }
 }
@@ -643,7 +645,21 @@ mod test {
         let version = Version::new(1, 0, 0);
         let extension = ExtensionDesc::new(name, version.clone());
         assert_eq!(extension.name, name);
-        assert_eq!(extension.version, version);
+        assert_eq!(extension.version, Some(version));
+        assert_eq!(extension.to_string(), "Extension test_extension v1.0.0");
+    }
+
+    #[test]
+    fn test_extension_desc_new_unversioned() {
+        let extension = ExtensionDesc::new_unversioned("test_extension");
+
+        assert_eq!(extension.name, "test_extension");
+        assert_eq!(extension.version, None);
+        assert_eq!(extension.to_string(), "Extension test_extension");
+        assert_eq!(
+            serde_json::to_value(extension).unwrap(),
+            serde_json::json!({"name": "test_extension"})
+        );
     }
 
     #[rstest]

@@ -198,10 +198,14 @@ pub enum ExtensionBreakingError {
     Deserialization(#[from] serde_json::Error),
 }
 
-/// If HUGR metadata contains a list of used extensions, under the key [`USED_EXTENSIONS_KEY`],
-/// and extension is registered in the given registry, check that the
-/// version of the extension in the metadata matches the registered version.
-/// Version compatibility is defined by [`compatible_versions`].
+/// If HUGR metadata contains a list of used extensions, under the key
+/// [`USED_EXTENSIONS_KEY`], and extension is registered in the given registry,
+/// check that the version of the extension in the metadata matches the
+/// registered version. Version compatibility is defined by
+/// [`compatible_versions`].
+///
+/// If an ExtensionDesc does not specify a version, it is assumed to be
+/// compatible with any registered version.
 fn check_breaking_extensions<'e>(
     registry: &ExtensionRegistry,
     used_exts: impl IntoIterator<Item = &'e description::ExtensionDesc>,
@@ -210,14 +214,17 @@ fn check_breaking_extensions<'e>(
         let Some(registered) = registry.get(ext.name.as_str()) else {
             continue; // Extension not registered, ignore
         };
-        if !compatible_versions(registered.version(), &ext.version) {
+        let Some(used) = &ext.version else {
+            continue; // Extension version not specified, compatibility cannot be checked
+        };
+        if !compatible_versions(registered.version(), used) {
             // This is a breaking change, raise an error.
 
             return Err(ExtensionBreakingError::ExtensionVersionMismatch(
                 ExtensionVersionMismatch {
                     name: ext.name.clone(),
                     registered: registered.version().clone(),
-                    used: ext.version.clone(),
+                    used: used.clone(),
                 },
             ));
         }
@@ -537,17 +544,12 @@ pub(crate) mod test {
         hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
         assert_matches!(check(&hugr, &registry), Ok(()));
 
-        //  Multiple extensions with one unversioned - should fail
+        // Multiple extensions with one unversioned - should pass
         let used_exts = vec![
             ExtensionDesc::new("test-v0", Version::new(0, 2, 2)),
             ExtensionDesc::new_unversioned("test-v1"),
         ];
         hugr.set_metadata::<HugrUsedExtensions>(hugr.module_root(), used_exts);
-        assert_matches!(check(&hugr, &registry), Err(ExtensionBreakingError::ExtensionVersionMismatch(ExtensionVersionMismatch {
-            name,
-            registered,
-            used
-        })) if name == "test-v1" && registered == Version::new(1, 2, 3) && used == Version::new(0, 0, 0)
-        );
+        assert_matches!(check(&hugr, &registry), Ok(()));
     }
 }
