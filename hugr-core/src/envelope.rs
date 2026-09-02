@@ -198,10 +198,14 @@ pub enum ExtensionBreakingError {
     Deserialization(#[from] serde_json::Error),
 }
 
-/// If HUGR metadata contains a list of used extensions, under the key [`USED_EXTENSIONS_KEY`],
-/// and extension is registered in the given registry, check that the
-/// version of the extension in the metadata matches the registered version.
-/// Version compatibility is defined by [`compatible_versions`].
+/// If HUGR metadata contains a list of used extensions, under the key
+/// [`USED_EXTENSIONS_KEY`], and extension is registered in the given registry,
+/// check that the version of the extension in the metadata matches the
+/// registered version. Version compatibility is defined by
+/// [`compatible_versions`].
+///
+/// If an ExtensionDesc does not specify a version, it is assumed to be
+/// compatible with any registered version.
 fn check_breaking_extensions<'e>(
     registry: &ExtensionRegistry,
     used_exts: impl IntoIterator<Item = &'e description::ExtensionDesc>,
