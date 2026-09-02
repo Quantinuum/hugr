@@ -62,3 +62,15 @@
 (declare-func public example.const_as_param
   (param ?c (core.const arithmetic.float.types.float64))
   (core.fn [] [arithmetic.float.types.float64]))
+
+(define-func public example.const_literals
+  (core.fn [] [prelude.usize prelude.string])
+  (dfg [] [%0 %1]
+   (signature (core.fn [] [prelude.usize prelude.string]))
+
+   ((core.load_const prelude.string "hello") [] [%1]
+    (signature (core.fn [] [prelude.string])))
+   ((core.load_const prelude.usize 42) [] [%0]
+    (signature (core.fn [] [prelude.usize])))
+  )
+)
