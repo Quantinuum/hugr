@@ -5,7 +5,7 @@
 
 ### Performance
 
-- [**breaking**] Reuse shared types during HUGR import ([#3215](https://github.com/Quantinuum/hugr/pull/3215))
+- [**breaking**] Reuse shared `Type`s during HUGR import ([#3215](https://github.com/Quantinuum/hugr/pull/3215))
 
 ### Refactor
 

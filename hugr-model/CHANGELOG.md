@@ -9,7 +9,7 @@
 
 ### Performance
 
-- Improve pest AST parsing ([#3235](https://github.com/Quantinuum/hugr/pull/3235))
+- Improve `pest` AST parsing ([#3235](https://github.com/Quantinuum/hugr/pull/3235))
 
 ## [0.28.1](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.28.0...hugr-model-v0.28.1) - 2026-06-10
 
