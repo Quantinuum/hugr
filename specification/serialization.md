@@ -27,110 +27,99 @@ The usual serialization path is:
 1. A tool builds or receives one or more in-memory HUGRs.
 2. The HUGRs are grouped into a package, together with any extension
    definitions that should travel with it.
-3. The package is exported into the `hugr-model` representation.
-4. The model package is encoded either as a compact Cap'n Proto payload or as a
-   textual S-expression/EDN-style payload.
+3. The package is exported into the `hugr-model` table representation.
+4. The table representation is either encoded directly as a compact Cap'n Proto
+   payload, or converted to the `hugr-model` AST representation and printed as
+   a textual S-expression/EDN-style payload.
 5. The encoded payload is wrapped in a HUGR envelope. The envelope records the
    payload format and optional compression settings.
 
 Loading runs the same steps in reverse:
 
 1. Read the envelope header to discover the payload format and compression.
-2. Decode the payload into a `hugr-model` package.
-3. Import the model package into runtime HUGRs.
+2. Decode a Cap'n Proto payload directly into the `hugr-model` table
+   representation, or parse an S-expression payload into the AST representation
+   and resolve it into the table representation.
+3. Import the table package into runtime HUGRs.
 4. Resolve extension references using the packaged extension definitions and any
    extension registry provided by the caller.
 5. Validate the resulting package before using it for compilation, execution, or
    further transformation.
 
-The intermediate `hugr-model` representation is a key part of the workflow. It
-serves as a conversion layer to keep a stable serialization logic when the
-runtime HUGR data structures evolve. It is also a shared component between the
-rust and python implementations, so a single source of truth for the model
+The intermediate `hugr-model` representations are a key part of the workflow.
+They serve as a conversion layer to keep a stable serialization logic when the
+runtime HUGR data structures evolve. They are also shared components between
+the Rust and Python implementations, so a single source of truth for the model
 format can be maintained.
 
-## Serialized HUGR Envelopes and payload formats
+## Serialized HUGR envelopes and model formats
 
 Serialized HUGRs are normally stored in an envelope. The envelope begins with a
-small header containing:
+10B header with the following fields:
 
-- a magic number identifying the data as a HUGR envelope,
-- the payload format,
-- flags, including optional zstd compression.
+| Field  | Size (bytes) | Description |
+|--------|--------------|-------------|
+| Magic  | 8            | a magic number identifying the data as a HUGR envelope (`HUGRiHJv` in ASCII) |
+| Format | 1            | An identifier describing the payload format |
+| Flags  | 1            | Additional configuration flags, including optional zstd compression |
 
 The payload immediately follows the header. Some envelope formats are ASCII
 printable and can be stored as strings; others are binary and should be treated
 as bytes.
 
-### Cap'n Proto binary payload
+The main supported payload formats are listed in the table below:
 
-This is the compact binary encoding of `hugr-model`. It is the preferred format
-for storage, network transfer, and Rust-to-Rust workflows where speed and size
-matter more than readability.
+| Format identifier | `hugr-model` representation       | Payload encoding |
+|-------------------|-----------------------------------|-----|
+| 0x1               | Table representation              | Cap'n Proto binary |
+| 0x2               | Table representation + extensions | Cap'n Proto binary + JSON-encoded extensions |
+| 0x28 / ASCII '('  | AST representation                | Textual S-expression |
+| 0x29 / ASCII ')'  | AST representation + extensions   | JSON-encoded extensions + Textual S-expression |
 
-The binary payload stores a versioned `hugr-model` package using a Cap'n Proto
-schema. It uses table-style identifiers for modules, regions, nodes, terms, and
-links, so references are encoded as numeric IDs rather than as nested objects.
-
-When written through the envelope API, the binary model can appear in two
-payload formats:
-
-- `Model`: a Cap'n Proto `hugr-model` payload.
-- `ModelWithExtensions`: a Cap'n Proto `hugr-model` payload followed by a
-  JSON-encoded extension registry.
-
-`ModelWithExtensions` is the default package format today because decoding a
-HUGR requires access to the relevant extension definitions. Bundling
-non-standard extensions allows toolchains to share HUGRs without previous
-knowledge of all the available extensions.
-
-### Textual EDN payload
-
-The text format is an S-expression/EDN-style rendering of the same
-`hugr-model` data. It is intended for debugging, snapshots, tests, and review.
-It should be readable enough to understand the shape of a HUGR, but it is not
-the primary authoring interface.
-
-The text format has two envelope variants:
-
-- `SExpression`: a textual `hugr-model` package.
-- `SExpressionWithExtensions`: JSON-encoded extensions followed by the textual
-  `hugr-model` package.
-
-The text representation is useful because it exposes the model concepts
-directly: modules, regions, nodes, operations, symbol declarations, terms,
-metadata, and links. The parser resolves the text AST into the same table model
-used by the binary format.
-
-## The `hugr-model` intermediate serialization format
-
-`hugr-model` is the serialization-oriented representation of HUGR. It sits
-between the in-memory HUGR objects and the serialized formats.
+`hugr-model` contains the serialization-oriented representations of a HUGR. It
+sits between the runtime HUGR objects and the serialized payloads. Its `table`
+and `AST` in-memory representations correspond directly to the two payload
+encodings.
 
 The runtime HUGR data structures are optimized for construction, querying, and
 transformation. The model data structures are optimized for a stable serialized
 shape. Export converts runtime HUGRs into `hugr-model`; import converts
 `hugr-model` back into runtime HUGRs using an extension registry.
 
-### Table format
+In the future, we expect `AST` and `Table` formats to optionally include the
+definition of the extensions used to define the HUGR. At the moment, we
+concatenate a JSON serialization of the extension definitions to the payloads
+instead.
 
-The table format is the resolved model representation used by the binary
-encoder. It stores package data in arenas/tables and uses IDs to refer between
-objects. For example, a term application points to the node that introduces the
-symbol it applies, and regions refer to their child nodes by ID.
+### Table representation and Cap'n Proto binary payload
 
-This format is convenient for serialization because references are explicit and
-compact. It is also the form produced after parsing the text AST.
+The table representation is the resolved form of the model. It stores package
+data in arenas/tables and uses IDs to refer between objects. For example, a term
+application points to the node that introduces the symbol it applies, and
+regions refer to their child nodes by ID. This makes references explicit and
+compact.
 
-### AST format
+The Cap'n Proto schema encodes this representation directly as a compact binary
+payload. It is the preferred format for storage, network transfer, and
+Rust-to-Rust workflows where speed and size matter more than readability.
 
-The AST format is the unresolved, text-like representation used by the parser
-and printer. It keeps names and syntactic structure close to the textual format.
-Resolving the AST produces the table format by assigning IDs, checking scoped
-names, and creating implicit imports where required.
+### AST representation and textual S-expression payload
 
-The distinction lets the project keep a human-readable format without making
-that format the main runtime representation.
+The AST representation is the unresolved, text-like form of the model. It
+expresses references with scoped names and nesting instead of table IDs, keeping
+the structure close to the textual syntax. Resolving the AST produces the table
+representation by assigning IDs, checking scoped names, and creating implicit
+imports where required.
+
+The text parser and printer serialize the AST as an S-expression/EDN-style
+payload. This form is intended for debugging, snapshots, tests, and review. It
+should be readable enough to understand the shape of a HUGR, but it is not the
+primary authoring interface.
+
+The text representation is useful because it exposes the model concepts
+directly: modules, regions, nodes, operations, symbol declarations, terms,
+metadata, and links. This lets the project provide a human-readable format
+without making it the main runtime representation.
 
 ## Versioning and migration
 
