@@ -3,6 +3,14 @@
 
 ## [0.30.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.4...hugr-v0.30.0) - 2026-09-03
 
+This release is focused on performance and memory footprint. Encoding and
+decoding envelopes has been greatly improved for both the binary and text
+formats, and memory usage on loaded HUGRs has been significantly reduced by
+deduplicating type definitions.
+
+Check out the new API for faster port queries when a full signature is not
+required ([#3149](https://github.com/Quantinuum/hugr/pull/3149)).
+
 ### New Features
 
 - *(cli)* Include edge counts in `describe` output ([#3209](https://github.com/Quantinuum/hugr/pull/3209))
