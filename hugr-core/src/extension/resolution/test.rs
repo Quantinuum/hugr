@@ -2,7 +2,7 @@
 
 use core::{f64, panic};
 use std::io::BufReader;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use itertools::Itertools;
 use rstest::rstest;
@@ -10,7 +10,7 @@ use rstest::rstest;
 use crate::builder::{
     DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
-use crate::envelope::EnvelopeConfig;
+use crate::envelope::{EnvelopeConfig, EnvelopeFormat};
 use crate::extension::prelude::{ConstUsize, bool_t, usize_custom_t, usize_t};
 use crate::extension::resolution::WeakExtensionRegistry;
 use crate::extension::resolution::{
@@ -538,6 +538,88 @@ fn resolve_custom_const(#[case] custom_const: impl CustomConst) {
         .unwrap_or_else(|e| panic!("{e}"));
 
     check_extension_resolution(hugr);
+}
+
+/// A bare HUGR must retain the packaged allocation referenced by its types,
+/// even when a custom constant reports the same type from a static extension.
+#[rstest]
+fn packaged_extension_lifetime() {
+    const PACKAGED_TYPE_EXTENSION_ID: ExtensionId =
+        ExtensionId::new_unchecked("test.packaged_type");
+
+    static PACKAGED_TYPE_EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+        Extension::new_arc(
+            PACKAGED_TYPE_EXTENSION_ID,
+            Version::new(1, 0, 0),
+            |extension, extension_ref| {
+                extension
+                    .add_type(
+                        "value".into(),
+                        vec![],
+                        "A type returned by a stateless custom constant.".into(),
+                        TypeDefBound::copyable(),
+                        extension_ref,
+                    )
+                    .unwrap();
+            },
+        )
+    });
+
+    /// A stateless constant whose type comes from a process-wide extension.
+    #[derive(Clone, Debug, Hash, PartialEq, serde::Deserialize, serde::Serialize)]
+    struct PackagedValue;
+
+    #[typetag::serde]
+    impl CustomConst for PackagedValue {
+        fn name(&self) -> crate::ops::constant::ValueName {
+            "PackagedValue".into()
+        }
+
+        fn get_type(&self) -> Type {
+            CustomType::new(
+                "value",
+                [],
+                PACKAGED_TYPE_EXTENSION_ID,
+                Version::new(1, 0, 0),
+                TypeBound::Copyable,
+                &Arc::downgrade(&PACKAGED_TYPE_EXTENSION),
+            )
+            .into()
+        }
+    }
+
+    let mut builder = DFGBuilder::new(Signature::new([], [PackagedValue.get_type()])).unwrap();
+    let value = builder.add_load_value(Value::extension(PackagedValue));
+    let hugr = builder.finish_hugr_with_outputs([value]).unwrap();
+
+    let mut package = Package::from_hugr(hugr);
+    package.extensions.register(PACKAGED_TYPE_EXTENSION.clone());
+    let mut encoded = Vec::new();
+    package
+        .store(
+            &mut encoded,
+            EnvelopeConfig::new(EnvelopeFormat::ModelWithExtensions),
+        )
+        .unwrap();
+
+    let hugr = Hugr::load(encoded.as_slice(), None).unwrap();
+    hugr.validate().unwrap();
+
+    let datatype = hugr
+        .nodes()
+        .find_map(|node| match hugr.get_optype(node) {
+            OpType::LoadConstant(load) => Some(&load.datatype),
+            _ => None,
+        })
+        .unwrap();
+    let referenced = datatype
+        .used_extensions()
+        .unwrap()
+        .get("test.packaged_type")
+        .unwrap()
+        .clone();
+    let retained = hugr.extensions().get("test.packaged_type").unwrap();
+    assert!(Arc::ptr_eq(&referenced, retained));
 }
 
 /// Test resolution of function call with type arguments.
