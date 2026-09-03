@@ -1,6 +1,27 @@
 # Changelog
 
 
+## [0.30.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.4...hugr-v0.30.0) - 2026-09-03
+
+### New Features
+
+- *(cli)* include edge counts in describe output ([#3209](https://github.com/Quantinuum/hugr/pull/3209))
+- *(hugr-model)* Allow parsing literals as constants ([#3230](https://github.com/Quantinuum/hugr/pull/3230))
+- [**breaking**] Read ext version as optional in ExtensionDesc metadata ([#3231](https://github.com/Quantinuum/hugr/pull/3231))
+
+### Performance
+
+- [**breaking**] Reuse shared types during HUGR import ([#3215](https://github.com/Quantinuum/hugr/pull/3215))
+- Avoid various intermediate clones during op resolution ([#3220](https://github.com/Quantinuum/hugr/pull/3220))
+- Cache serialized extensions to speed up encoding ([#3210](https://github.com/Quantinuum/hugr/pull/3210))
+- Pre-compute hugr capacity when decoding a hugr-model ([#3219](https://github.com/Quantinuum/hugr/pull/3219))
+- Avoid cloning signatures for simple port checks ([#3149](https://github.com/Quantinuum/hugr/pull/3149))
+
+### Refactor
+
+- Add a shared TypeResolverContext to avoid repeated resolution ([#3217](https://github.com/Quantinuum/hugr/pull/3217))
+- [**breaking**] Remove deprecated definitions ([#3232](https://github.com/Quantinuum/hugr/pull/3232))
+
 ## [0.29.4](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.3...hugr-v0.29.4) - 2026-08-28
 
 ### New Features

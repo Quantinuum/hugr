@@ -1,6 +1,13 @@
 # Changelog
 
 
+## [0.30.0](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.29.4...hugr-cli-v0.30.0) - 2026-09-03
+
+### New Features
+
+- *(cli)* include edge counts in describe output ([#3209](https://github.com/Quantinuum/hugr/pull/3209))
+- [**breaking**] Read ext version as optional in ExtensionDesc metadata ([#3231](https://github.com/Quantinuum/hugr/pull/3231))
+
 ## [0.28.1](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.28.0...hugr-cli-v0.28.1) - 2026-06-10
 
 ### Bug Fixes
