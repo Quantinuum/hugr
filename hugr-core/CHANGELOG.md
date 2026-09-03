@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.30.1](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.30.0...hugr-core-v0.30.1) - 2026-09-03
+
+### Bug Fixes
+
+- Force resolution of extension types inside constants ([#3242](https://github.com/Quantinuum/hugr/pull/3242))
+
+### Performance
+
+- Cache extension type helpers ([#3241](https://github.com/Quantinuum/hugr/pull/3241))
+
 ## [0.30.0](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.29.4...hugr-core-v0.30.0) - 2026-09-03
 
 ### New Features
