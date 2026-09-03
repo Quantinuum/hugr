@@ -8,9 +8,7 @@ use std::sync::Weak;
 
 use rustc_hash::{FxHashMap, FxHashSet};
 
-use super::types::collect_term_exts;
 use super::{ExtensionResolutionError, WeakExtensionRegistry};
-use crate::extension::ExtensionSet;
 use crate::ops::{OpType, Value};
 use crate::types::{CustomType, FuncValueType, Signature, SumType, Term, Type, TypeRow, TypeRowRV};
 use crate::{Extension, Node};
@@ -315,17 +313,11 @@ impl<'a> TypeExtensionResolver<'a> {
             Value::Extension { e } => {
                 e.value_mut().update_extensions(self.extensions)?;
 
-                // Custom constants should return types with valid extensions
-                // after their own extension update.
-                let typ = e.get_type();
-                let mut missing = ExtensionSet::new();
-                collect_term_exts(&typ, &mut self.used_extensions, &mut missing);
-                if !missing.is_empty() {
-                    return Err(ExtensionResolutionError::InvalidConstTypes {
-                        value: e.name(),
-                        missing_extensions: missing,
-                    });
-                }
+                // Custom constants may contain types resolved from local extensions rather than the
+                // extension registry being collected.
+                // We force a resolution against the target registry here.
+                let mut typ = e.get_type();
+                self.resolve_type(node, &mut typ)?;
             }
             Value::Sum(sum) => {
                 if let SumType::General(general) = &mut sum.sum_type {
