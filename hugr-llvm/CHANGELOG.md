@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.30.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.29.4...hugr-llvm-v0.30.0) - 2026-09-03
+
+### Performance
+
+- [**breaking**] Reuse shared types during HUGR import ([#3215](https://github.com/Quantinuum/hugr/pull/3215))
+
+### Refactor
+
+- [**breaking**] Remove deprecated definitions ([#3232](https://github.com/Quantinuum/hugr/pull/3232))
+
 ## [0.29.4](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.29.3...hugr-llvm-v0.29.4) - 2026-08-28
 
 ### Bug Fixes
