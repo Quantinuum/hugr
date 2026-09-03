@@ -170,20 +170,24 @@ pub(crate) fn qb_custom_t(extension_ref: &Weak<Extension>) -> CustomType {
     )
 }
 
+static QB_T: LazyLock<Type> = LazyLock::new(|| qb_custom_t(&Arc::downgrade(&PRELUDE)).into());
+static USIZE_T: LazyLock<Type> = LazyLock::new(|| usize_custom_t(&Arc::downgrade(&PRELUDE)).into());
+static BOOL_T: LazyLock<Type> = LazyLock::new(|| Type::new_unit_sum(2));
+
 /// Qubit type.
 #[must_use]
 pub fn qb_t() -> Type {
-    qb_custom_t(&Arc::downgrade(&PRELUDE)).into()
+    QB_T.clone()
 }
 /// Unsigned size type.
 #[must_use]
 pub fn usize_t() -> Type {
-    usize_custom_t(&Arc::downgrade(&PRELUDE)).into()
+    USIZE_T.clone()
 }
 /// Boolean type - Sum of two units.
 #[must_use]
 pub fn bool_t() -> Type {
-    Type::new_unit_sum(2)
+    BOOL_T.clone()
 }
 
 /// Name of the prelude `MakeError` operation.
@@ -237,10 +241,13 @@ fn string_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
     )
 }
 
+static STRING_TYPE: LazyLock<Type> =
+    LazyLock::new(|| string_custom_type(&Arc::downgrade(&PRELUDE)).into());
+
 /// String type.
 #[must_use]
 pub fn string_type() -> Type {
-    string_custom_type(&Arc::downgrade(&PRELUDE)).into()
+    STRING_TYPE.clone()
 }
 
 #[derive(Debug, Clone, PartialEq, Hash, serde::Serialize, serde::Deserialize)]
@@ -294,10 +301,13 @@ fn error_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
     )
 }
 
+static ERROR_TYPE: LazyLock<Type> =
+    LazyLock::new(|| error_custom_type(&Arc::downgrade(&PRELUDE)).into());
+
 /// Unspecified opaque error type.
 #[must_use]
 pub fn error_type() -> Type {
-    error_custom_type(&Arc::downgrade(&PRELUDE)).into()
+    ERROR_TYPE.clone()
 }
 
 /// The string name of the error type.
@@ -996,6 +1006,13 @@ mod test {
     };
 
     use crate::hugr::views::HugrView;
+
+    #[test]
+    fn common_types_share_storage() {
+        for make_type in [qb_t, usize_t, bool_t, string_type, error_type] {
+            assert!(make_type().shares_storage_with(&make_type()));
+        }
+    }
 
     #[test]
     fn test_make_tuple() {
