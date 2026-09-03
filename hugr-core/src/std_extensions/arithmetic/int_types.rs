@@ -43,13 +43,24 @@ pub fn int_custom_type(
 ///
 /// Constructed from [`int_custom_type`].
 pub fn int_type(width_arg: impl Into<TypeArg>) -> Type {
-    int_custom_type(width_arg.into(), &Arc::<Extension>::downgrade(&EXTENSION)).into()
+    let width_arg = width_arg.into();
+    match get_log_width(&width_arg) {
+        Ok(log_width) => INT_TYPES[usize::from(log_width)].clone(),
+        Err(_) => new_int_type(width_arg),
+    }
+}
+
+/// Initialize a integer type of a given bit width.
+///
+/// Does not attempt to use cached integer types.
+fn new_int_type(width_arg: TypeArg) -> Type {
+    int_custom_type(width_arg, &Arc::<Extension>::downgrade(&EXTENSION)).into()
 }
 
 /// Array of valid integer types, indexed by log width of the integer.
 pub static INT_TYPES: LazyLock<[Type; LOG_WIDTH_BOUND as usize]> = LazyLock::new(|| {
     (0..LOG_WIDTH_BOUND)
-        .map(|i| int_type(Term::from(u64::from(i))))
+        .map(|i| new_int_type(Term::from(u64::from(i))))
         .collect::<Vec<_>>()
         .try_into()
         .unwrap()
@@ -224,6 +235,16 @@ mod test {
     use cool_asserts::assert_matches;
 
     use super::*;
+
+    #[test]
+    fn concrete_int_types_share_storage() {
+        for log_width in 0..LOG_WIDTH_BOUND {
+            assert!(
+                int_type(TypeArg::BoundedNat(u64::from(log_width)))
+                    .shares_storage_with(&INT_TYPES[usize::from(log_width)])
+            );
+        }
+    }
 
     #[test]
     fn test_int_types_extension() {
