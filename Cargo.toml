@@ -84,8 +84,6 @@ bumpalo = "3.20.3"
 pathsearch = "0.2.0"
 base64 = "0.23.0"
 ordered-float = "5.3.0"
-pest = "2.8.6"
-pest_derive = "2.8.6"
 pretty = "0.12.5"
 pretty_assertions = "1.4.1"
 zstd = "0.13.2"
@@ -93,6 +91,14 @@ relrc = "0.5.0"
 wyhash = "0.6.0"
 fxhash = "0.2.1"
 schemars = "1.2.1"
+# Pinned at pre-2.9.0 due to a big slowdown in the newer versions.
+#
+# The `serialization/t_factory/sexpr/without_extensions/decode` and `simple_cfg`
+# benchmarks had a ~20% slowdown.
+#
+# We should try updating later versions once the performance issue is resolved.
+pest = "=2.8.8"
+pest_derive = "=2.8.8"
 
 # These public dependencies usually require breaking changes downstream, so we
 # try to be as permissive as possible.
