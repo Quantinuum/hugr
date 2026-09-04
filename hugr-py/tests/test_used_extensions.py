@@ -530,3 +530,12 @@ def test_packaged_versions_different_than_resolve_from() -> None:
     resolved_ext = used_exts.used_extensions.get_extension("pytest.smoke")
     # There is no op using the newer extension, and the older one is packaged
     assert resolved_ext.version == ext.Version(0, 1, 0)
+
+
+def test_registry_register_keeps_newest() -> None:
+    ext_0_1_0 = ext.Extension("pytest.smoke", ext.Version(0, 1, 0))
+    ext_0_1_1 = ext.Extension("pytest.smoke", ext.Version(0, 1, 1))
+
+    exts = ExtensionRegistry.from_extensions([ext_0_1_1])
+
+    assert exts.register(ext_0_1_0) is ext_0_1_1
