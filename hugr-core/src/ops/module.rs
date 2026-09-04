@@ -13,7 +13,7 @@ use crate::Visibility;
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type, TypeBound};
 
 use super::dataflow::DataflowParent;
-use super::{OpTag, OpTrait, StaticTag, impl_op_name};
+use super::{NamedOp, OpTag, OpTrait, RenderStringConfig, StaticTag, impl_op_name};
 
 /// The root of a module, parent of all other `OpType`s.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -40,6 +40,10 @@ impl StaticTag for Module {
 impl OpTrait for Module {
     fn description(&self) -> &'static str {
         "The root of a module, parent of all other `OpType`s"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn tag(&self) -> super::OpTag {
@@ -131,6 +135,10 @@ impl OpTrait for FuncDefn {
         "A function definition"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        format!("FuncDefn: \"{}\"", self.func_name())
+    }
+
     fn tag(&self) -> OpTag {
         <Self as StaticTag>::TAG
     }
@@ -219,6 +227,10 @@ impl OpTrait for FuncDecl {
         "External function declaration, linked at runtime"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        format!("FuncDecl: \"{}\"", self.func_name())
+    }
+
     fn tag(&self) -> OpTag {
         <Self as StaticTag>::TAG
     }
@@ -247,6 +259,10 @@ impl StaticTag for AliasDefn {
 impl OpTrait for AliasDefn {
     fn description(&self) -> &'static str {
         "A type alias definition"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        NamedOp::name(self).to_string()
     }
 
     fn tag(&self) -> OpTag {
@@ -291,6 +307,10 @@ impl StaticTag for AliasDecl {
 impl OpTrait for AliasDecl {
     fn description(&self) -> &'static str {
         "A type alias declaration"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        NamedOp::name(self).to_string()
     }
 
     fn tag(&self) -> OpTag {

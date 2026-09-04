@@ -7,7 +7,7 @@ use crate::{Direction, Port, PortIndex};
 
 use super::OpTag;
 use super::dataflow::{DataflowOpTrait, DataflowParent};
-use super::{OpTrait, StaticTag, impl_op_name};
+use super::{NamedOp, OpTrait, RenderStringConfig, StaticTag, impl_op_name};
 
 /// Tail-controlled loop.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -28,6 +28,10 @@ impl DataflowOpTrait for TailLoop {
 
     fn description(&self) -> &'static str {
         "A tail-controlled loop"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
@@ -134,6 +138,10 @@ impl DataflowOpTrait for Conditional {
         "HUGR conditional operation"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
         let mut inputs = self.other_inputs.clone();
@@ -189,6 +197,10 @@ impl DataflowOpTrait for CFG {
 
     fn description(&self) -> &'static str {
         "A dataflow node defined by a child CFG"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
@@ -250,6 +262,11 @@ impl OpTrait for DataflowBlock {
     fn description(&self) -> &'static str {
         "A CFG basic block node"
     }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag {
         Self::TAG
@@ -283,6 +300,11 @@ impl OpTrait for ExitBlock {
     fn description(&self) -> &'static str {
         "A CFG exit block node"
     }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag {
         Self::TAG
@@ -363,6 +385,10 @@ impl DataflowParent for Case {
 impl OpTrait for Case {
     fn description(&self) -> &'static str {
         "A case node inside a conditional"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn tag(&self) -> OpTag {

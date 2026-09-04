@@ -583,6 +583,11 @@ impl Type {
             Err(ExtensionCollectionError::dropped_type(self, missing))
         }
     }
+
+    /// Render the type as a string using the supplied configuration.
+    pub fn render_str(&self, config: crate::ops::RenderStringConfig) -> String {
+        self.0.render_str(config)
+    }
 }
 
 impl Transformable for Type {
