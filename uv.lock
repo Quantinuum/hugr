@@ -403,7 +403,7 @@ requires-dist = [
     { name = "furo", marker = "extra == 'docs'" },
     { name = "graphviz", specifier = ">=0.20.3" },
     { name = "myst-parser", marker = "extra == 'docs'", specifier = ">=4.0,<6" },
-    { name = "pydantic", specifier = "~=2.13" },
+    { name = "pydantic", specifier = "~=2.8" },
     { name = "pydantic-extra-types", specifier = "~=2.9" },
     { name = "pytket", marker = "extra == 'pytket'", specifier = ">=2.18.1" },
     { name = "semver", specifier = "~=3.0" },
