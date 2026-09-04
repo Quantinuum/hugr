@@ -622,13 +622,16 @@ class ExtensionRegistry:
     def register(self, extension: Extension) -> Extension:
         """Add an extension to the registry.
 
-        If a different version of the same extension already exists, keeps both.
+        If a different non semver-compatible version of the same extension already
+        exists, keeps both.
+        If a semver-compatible version of the same extension already exists, keeps the
+        latest one.
 
         Args:
             extension: The extension to add.
 
         Returns:
-            The added extension.
+            The latest extension in the registry compatible with the given one.
 
         Raises:
             ExtensionExists: If an extension with the same name already exists.
