@@ -107,9 +107,10 @@ impl<R: BufRead> EnvelopeReader<R> {
     ///
     /// This function inspects the error and adds any missing extensions to the module description,
     /// preserving the required version when one was supplied.
-    #[expect(deprecated)]
     fn handle_resolution_error(desc: &mut ModuleDesc, err: &ExtensionResolutionError) {
         match err {
+            // `MissingOpExtension` and `MissingTypeExtension` will be removed in a breaking release.
+            #[expect(deprecated)]
             ExtensionResolutionError::MissingOpExtension {
                 missing_extension, ..
             }

@@ -312,7 +312,7 @@ impl ExtensionResolutionErrorDescription {
     }
 
     /// Format every available extension as `id@version`.
-    fn available(&self) -> String {
+    fn all_available(&self) -> String {
         self.available_extensions
             .iter()
             .map(|(id, version)| format!("{id}@{version}"))
@@ -335,7 +335,7 @@ impl ExtensionResolutionErrorDescription {
             return format!(
                 "Extension {} is required, but it was not found. The available extensions are: {}",
                 self.required(),
-                self.available()
+                self.all_available()
             );
         }
         if let Some(version) = available_versions
@@ -347,9 +347,18 @@ impl ExtensionResolutionErrorDescription {
             })
             .max()
         {
+            let others = available_versions
+                .iter()
+                .filter(|&&v| v != version)
+                .join(", ");
             return format!(
-                "Extension {} is required, but the available version {version} is too old",
-                self.required()
+                "Extension {} is required, but the available version {version} is too old{}",
+                self.required(),
+                if others.is_empty() {
+                    String::new()
+                } else {
+                    format!(". Other available versions: {others}")
+                }
             );
         }
 

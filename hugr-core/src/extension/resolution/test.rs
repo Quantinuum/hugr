@@ -203,7 +203,7 @@ fn opaque_op_reports_version_mismatch(
             .contains(&format!("{ext_id}@{required_version}"))
     );
     assert!(error.to_string().contains(expected_reason));
-    assert!(!error.to_string().contains("other_ext@9.0.0"));
+    assert!(!error.to_string().contains(&format!("{other_id}@9.0.0")));
 }
 
 #[rstest]
