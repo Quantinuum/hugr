@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.7](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.6...hugr-py-v0.18.7) (2026-09-04)
+
+
+### Features
+
+* Improve extension resolution errors ([#3247](https://github.com/Quantinuum/hugr/issues/3247)) ([3c7f736](https://github.com/Quantinuum/hugr/commit/3c7f7360b0ef220222822f4fa7a73ff8c6aa54bf))
+
 ## [0.18.6](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.5...hugr-py-v0.18.6) (2026-09-04)
 
 
