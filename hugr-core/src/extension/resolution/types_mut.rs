@@ -201,16 +201,25 @@ impl<'a> TypeExtensionResolver<'a> {
         }
 
         let ext_id = custom.extension();
+        let required_version = custom.extension_version();
         let (version, extension) = self
             .extensions
-            .get_req(ext_id, custom.extension_version())
-            .ok_or_else(|| {
-                ExtensionResolutionError::missing_type_extension(
+            .get_req(ext_id, required_version)
+            .ok_or_else(|| match required_version {
+                Some(version) => ExtensionResolutionError::unresolved_type_extension(
+                    node,
+                    custom.name(),
+                    ext_id,
+                    version,
+                    self.extensions,
+                ),
+                #[expect(deprecated)]
+                None => ExtensionResolutionError::missing_type_extension(
                     node,
                     custom.name(),
                     ext_id,
                     self.extensions,
-                )
+                ),
             })?;
 
         self.used_extensions

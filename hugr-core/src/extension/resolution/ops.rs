@@ -76,11 +76,21 @@ pub(crate) fn resolve_op_extensions<'e>(
         unqualified_id: impl AsRef<OpNameRef>,
     ) -> Result<(&'e Arc<OpDef>, &'e Arc<Extension>), ExtensionResolutionError> {
         let Some(extension) = extensions.get_req(ext_id, ext_version) else {
-            return Err(ExtensionResolutionError::MissingOpExtension {
-                node: Some(node),
-                op: qualified_id.as_ref().into(),
-                missing_extension: ext_id.clone(),
-                available_extensions: extensions.ids().cloned().collect(),
+            return Err(match ext_version {
+                Some(version) => ExtensionResolutionError::unresolved_op_extension(
+                    Some(node),
+                    qualified_id.as_ref().into(),
+                    ext_id,
+                    version,
+                    extensions,
+                ),
+                #[expect(deprecated)]
+                None => ExtensionResolutionError::MissingOpExtension {
+                    node: Some(node),
+                    op: qualified_id.as_ref().into(),
+                    missing_extension: ext_id.clone(),
+                    available_extensions: extensions.ids().cloned().collect(),
+                },
             });
         };
         let Some(op_def) = extension.get_op(unqualified_id.as_ref()) else {
