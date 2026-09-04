@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.30.2](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.30.1...hugr-core-v0.30.2) - 2026-09-04
+
+### New Features
+
+- Improve extension resolution errors ([#3247](https://github.com/Quantinuum/hugr/pull/3247))
+
 ## [0.30.1](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.30.0...hugr-core-v0.30.1) - 2026-09-03
 
 ### Bug Fixes
