@@ -105,8 +105,9 @@ impl<R: BufRead> EnvelopeReader<R> {
 
     /// Handle extension resolution errors by recording missing extensions in the description.
     ///
-    /// This function inspects the error and adds any missing extensions to the module description
-    /// without a version.
+    /// This function inspects the error and adds any missing extensions to the module description,
+    /// preserving the required version when one was supplied.
+    #[expect(deprecated)]
     fn handle_resolution_error(desc: &mut ModuleDesc, err: &ExtensionResolutionError) {
         match err {
             ExtensionResolutionError::MissingOpExtension {
@@ -117,6 +118,12 @@ impl<R: BufRead> EnvelopeReader<R> {
             } => desc.extend_used_extensions_resolved([ExtensionDesc::new_unversioned(
                 missing_extension,
             )]),
+            ExtensionResolutionError::UnresolvedOpExtension { description, .. }
+            | ExtensionResolutionError::UnresolvedTypeExtension { description, .. } => desc
+                .extend_used_extensions_resolved([ExtensionDesc::new(
+                    &description.required_extension,
+                    description.required_version.clone(),
+                )]),
             ExtensionResolutionError::InvalidConstTypes {
                 missing_extensions, ..
             } => desc.extend_used_extensions_resolved(
@@ -417,8 +424,11 @@ mod test {
     }
 
     #[test]
+    #[expect(deprecated)]
     fn test_handle_resolution_error() {
         use crate::extension::ExtensionId;
+        use crate::extension::Version;
+        use crate::extension::resolution::ExtensionResolutionErrorDescription;
         use crate::ops::{OpName, constant::ValueName};
         use crate::types::TypeName;
 
@@ -458,6 +468,24 @@ mod test {
         };
         handle_error(&mut desc, &error);
         assert_extensions(&desc, &[&ext_id2]);
+
+        // Versioned resolution errors preserve the required version.
+        desc.used_extensions_resolved = None;
+        let required_version = Version::new(1, 2, 3);
+        let error = ExtensionResolutionError::UnresolvedTypeExtension {
+            node: None,
+            ty: TypeName::new("test.type"),
+            description: Box::new(ExtensionResolutionErrorDescription {
+                required_extension: ext_id2.clone(),
+                required_version: required_version.clone(),
+                available_extensions: vec![(ext_id2.clone(), Version::new(1, 2, 2))],
+            }),
+        };
+        handle_error(&mut desc, &error);
+        assert_eq!(
+            desc.used_extensions_resolved.as_deref(),
+            Some(&[ExtensionDesc::new(&ext_id2, required_version)][..])
+        );
 
         // Test InvalidConstTypes with multiple extensions
         desc.used_extensions_resolved = None;

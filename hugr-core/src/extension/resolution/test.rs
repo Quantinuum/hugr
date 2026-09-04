@@ -12,7 +12,9 @@ use crate::builder::{
 };
 use crate::envelope::{EnvelopeConfig, EnvelopeFormat};
 use crate::extension::prelude::{ConstUsize, bool_t, usize_custom_t, usize_t};
-use crate::extension::resolution::WeakExtensionRegistry;
+use crate::extension::resolution::{
+    ExtensionResolutionError, ExtensionResolutionErrorDescription, WeakExtensionRegistry,
+};
 use crate::extension::resolution::{
     resolve_op_extensions, resolve_type_extensions as resolve_type_extension_refs,
 };
@@ -150,6 +152,162 @@ fn resolve_custom_type_uses_highest_compatible_extension() {
         panic!("expected custom type");
     };
     assert_eq!(custom.extension_version(), Some(&Version::new(0, 2, 5)));
+}
+
+#[rstest]
+#[case::too_new(Version::new(0, 2, 6), "the available version 0.2.5 is too old")]
+#[case::incompatible(
+    Version::new(0, 4, 0),
+    "the available versions [0.2.5, 0.3.0] are incompatible"
+)]
+fn opaque_op_reports_version_mismatch(
+    #[case] required_version: Version,
+    #[case] expected_reason: &str,
+) {
+    let ext_id = ExtensionId::new_unchecked("versioned_ext");
+    let other_id = ExtensionId::new_unchecked("other_ext");
+    let registry = ExtensionRegistry::new([
+        make_versioned_extension(&ext_id, Version::new(0, 2, 5)),
+        make_versioned_extension(&ext_id, Version::new(0, 3, 0)),
+        make_versioned_extension(&other_id, Version::new(9, 0, 0)),
+    ]);
+    let mut op: OpType = OpaqueOp::new(
+        ext_id.clone(),
+        required_version.clone(),
+        "my_op",
+        [],
+        Signature::new_endo([bool_t()]),
+    )
+    .into();
+
+    let node = portgraph::NodeIndex::new(0).into();
+    let error = resolve_op_extensions(node, &mut op, &registry).unwrap_err();
+    let ExtensionResolutionError::UnresolvedOpExtension { description, .. } = &error else {
+        panic!("expected an operation extension version mismatch, got {error:?}");
+    };
+    assert_eq!(
+        description.as_ref(),
+        &ExtensionResolutionErrorDescription {
+            required_extension: ext_id.clone(),
+            required_version: required_version.clone(),
+            available_extensions: vec![
+                (other_id.clone(), Version::new(9, 0, 0)),
+                (ext_id.clone(), Version::new(0, 2, 5)),
+                (ext_id.clone(), Version::new(0, 3, 0)),
+            ],
+        }
+    );
+    assert!(
+        error
+            .to_string()
+            .contains(&format!("{ext_id}@{required_version}"))
+    );
+    assert!(error.to_string().contains(expected_reason));
+    assert!(!error.to_string().contains("other_ext@9.0.0"));
+}
+
+#[rstest]
+#[case::too_new(Version::new(0, 2, 6), "the available version 0.2.5 is too old")]
+#[case::incompatible(
+    Version::new(0, 4, 0),
+    "the available versions [0.2.5, 0.3.0] are incompatible"
+)]
+fn custom_type_reports_version_mismatch(
+    #[case] required_version: Version,
+    #[case] expected_reason: &str,
+) {
+    let ext_id = ExtensionId::new_unchecked("versioned_type_ext");
+    let registry = ExtensionRegistry::new([
+        make_versioned_extension(&ext_id, Version::new(0, 2, 5)),
+        make_versioned_extension(&ext_id, Version::new(0, 3, 0)),
+    ]);
+    let weak_registry = WeakExtensionRegistry::from(&registry);
+    let custom = CustomType::new(
+        "MyType",
+        [],
+        ext_id.clone(),
+        required_version.clone(),
+        TypeBound::Copyable,
+        &Default::default(),
+    );
+
+    let error =
+        resolve_type_extension_refs(&mut Type::new_extension(custom.clone()), &weak_registry)
+            .unwrap_err();
+    let ExtensionResolutionError::UnresolvedTypeExtension { description, .. } = &error else {
+        panic!("expected a type extension version mismatch, got {error:?}");
+    };
+    assert_eq!(
+        description.as_ref(),
+        &ExtensionResolutionErrorDescription {
+            required_extension: ext_id.clone(),
+            required_version: required_version.clone(),
+            available_extensions: vec![
+                (ext_id.clone(), Version::new(0, 2, 5)),
+                (ext_id.clone(), Version::new(0, 3, 0)),
+            ],
+        }
+    );
+    assert!(
+        error
+            .to_string()
+            .contains(&format!("{ext_id}@{required_version}"))
+    );
+    assert!(error.to_string().contains(expected_reason));
+}
+
+#[test]
+fn opaque_op_reports_versioned_missing_extension() {
+    let ext_id = ExtensionId::new_unchecked("missing_ext");
+    let required_version = Version::new(1, 2, 3);
+    let registry = ExtensionRegistry::new([make_versioned_extension(
+        &ExtensionId::new_unchecked("available_ext"),
+        Version::new(2, 0, 0),
+    )]);
+    let mut op: OpType = OpaqueOp::new(
+        ext_id.clone(),
+        required_version.clone(),
+        "my_op",
+        [],
+        Signature::new_endo([bool_t()]),
+    )
+    .into();
+
+    let node = portgraph::NodeIndex::new(0).into();
+    let error = resolve_op_extensions(node, &mut op, &registry).unwrap_err();
+    assert!(matches!(
+        error,
+        ExtensionResolutionError::UnresolvedOpExtension { .. }
+    ));
+    assert!(error.to_string().contains("missing_ext@1.2.3"));
+    assert!(error.to_string().contains("available_ext@2.0.0"));
+}
+
+#[test]
+fn custom_type_reports_versioned_missing_extension() {
+    let ext_id = ExtensionId::new_unchecked("missing_type_ext");
+    let required_version = Version::new(1, 2, 3);
+    let registry = ExtensionRegistry::new([make_versioned_extension(
+        &ExtensionId::new_unchecked("available_ext"),
+        Version::new(2, 0, 0),
+    )]);
+    let weak_registry = WeakExtensionRegistry::from(&registry);
+    let mut typ = Type::new_extension(CustomType::new(
+        "MyType",
+        [],
+        ext_id,
+        required_version,
+        TypeBound::Copyable,
+        &Default::default(),
+    ));
+
+    let error = resolve_type_extension_refs(&mut typ, &weak_registry).unwrap_err();
+    assert!(matches!(
+        error,
+        ExtensionResolutionError::UnresolvedTypeExtension { .. }
+    ));
+    assert!(error.to_string().contains("missing_type_ext@1.2.3"));
+    assert!(error.to_string().contains("available_ext@2.0.0"));
 }
 
 /// Resolving an already-resolved type should preserve its shared storage.
