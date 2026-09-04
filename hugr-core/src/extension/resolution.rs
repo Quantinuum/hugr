@@ -333,7 +333,7 @@ impl ExtensionResolutionErrorDescription {
             .collect();
         if available_versions.is_empty() {
             return format!(
-                "extension {} is required, but it was not found. The available extensions are: {}",
+                "Extension {} is required, but it was not found. The available extensions are: {}",
                 self.required(),
                 self.available()
             );
@@ -348,13 +348,13 @@ impl ExtensionResolutionErrorDescription {
             .max()
         {
             return format!(
-                "extension {} is required, but the available version {version} is too old",
+                "Extension {} is required, but the available version {version} is too old",
                 self.required()
             );
         }
 
         format!(
-            "extension {} is required, but the available versions [{}] are incompatible",
+            "Extension {} is required, but the available versions [{}] are incompatible",
             self.required(),
             available_versions.iter().join(", ")
         )
