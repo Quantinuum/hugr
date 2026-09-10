@@ -3,7 +3,7 @@
 use std::borrow::Cow;
 
 use super::dataflow::DataflowOpTrait;
-use super::{OpTag, impl_op_name};
+use super::{NamedOp, OpTag, RenderStringConfig, impl_op_name};
 use crate::types::{EdgeKind, Signature, Type, TypeRow, TypeRowLike};
 use crate::{Direction, Port, PortIndex};
 
@@ -48,6 +48,10 @@ impl DataflowOpTrait for Tag {
     /// A human-readable description of the operation.
     fn description(&self) -> &'static str {
         "Tag Sum operation"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     /// The signature of the operation.

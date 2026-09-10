@@ -18,8 +18,8 @@ graph LR
                 style 4 stroke:#832561,stroke-width:3px
                 5["(5) Input"]
                 6["(6) Output"]
-                7["(7) test.quantum.CX"]
-                8["(8) test.quantum.CX"]
+                7["(7) CX"]
+                8["(8) CX"]
                 5--"0:0<br>qubit"-->7
                 5--"1:1<br>qubit"-->7
                 7--"0:1<br>qubit"-->8

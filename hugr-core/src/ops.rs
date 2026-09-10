@@ -567,11 +567,25 @@ pub trait StaticTag {
     const TAG: OpTag;
 }
 
+/// Configuration for rendering an operation as a string.
+#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
+pub struct RenderStringConfig {
+    /// Include the version of the extension defining the operation.
+    pub extension_version: bool,
+    /// Include the operation's type arguments.
+    pub print_type_args: bool,
+    /// Qualify operation name with their extension identifier.
+    pub qualify_name: bool,
+}
+
 #[enum_dispatch]
 /// Trait implemented by all `OpType` variants.
 pub trait OpTrait: Sized + Clone {
     /// A human-readable description of the operation.
     fn description(&self) -> &str;
+
+    /// Returns an exhaustive string representation of the operation.
+    fn render_str(&self, config: RenderStringConfig) -> String;
 
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag;
