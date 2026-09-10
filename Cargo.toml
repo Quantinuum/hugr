@@ -59,7 +59,7 @@ proptest-derive = "0.8.0"
 rand = "0.10.1"
 regex = "1.12.3"
 regex-syntax = "0.8.9"
-rstest = "0.26.1"
+rstest = "0.27.0"
 semver = "1.0.28"
 serde = "1.0.228"
 serde_json = { version = "1.0.150", features = ["raw_value"] }
