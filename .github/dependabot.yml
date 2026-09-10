@@ -46,7 +46,7 @@ updates:
     labels:
       - "X-dependabot"
       - "A-python"
-    versioning-strategy: "widen"
+    versioning-strategy: "increase-if-necessary"
 
   - package-ecosystem: "github-actions"
     directory: "/"
