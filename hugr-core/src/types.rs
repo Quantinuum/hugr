@@ -11,6 +11,7 @@ pub mod type_row;
 use crate::extension::resolution::{
     ExtensionCollectionError, WeakExtensionRegistry, collect_term_exts,
 };
+use crate::hugr::views::render::RenderStringConfig;
 pub use crate::ops::constant::{ConstTypeError, CustomCheckFailure};
 use crate::types::type_param::{TermKindError, check_term_kind};
 use crate::utils::display_list_with_separator;
@@ -237,22 +238,11 @@ impl PartialEq for SumType {
 
 impl std::fmt::Display for SumType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        if self.num_variants() == 0 {
-            return write!(f, "⊥");
-        }
-
-        match self {
-            SumType::Unit { size: 1 } => write!(f, "Unit"),
-            SumType::Unit { size: 2 } => write!(f, "Bool"),
-            SumType::Unit { size } => {
-                display_list_with_separator(itertools::repeat_n("[]", *size as usize), f, "+")
-            }
-            SumType::General(GeneralSum { rows, .. }) => match rows.len() {
-                1 if rows[0].is_empty() => write!(f, "Unit"),
-                2 if rows[0].is_empty() && rows[1].is_empty() => write!(f, "Bool"),
-                _ => display_list_with_separator(rows.iter(), f, "+"),
-            },
-        }
+        self.write_with(
+            f,
+            |f, text| f.write_str(text),
+            |f, rows, separator| display_list_with_separator(rows, f, separator),
+        )
     }
 }
 
@@ -343,6 +333,41 @@ impl SumType {
         match self {
             SumType::Unit { .. } => TypeBound::Copyable,
             SumType::General(GeneralSum { bound, .. }) => *bound,
+        }
+    }
+
+    fn render_str(&self, config: RenderStringConfig) -> String {
+        let mut output = String::new();
+        self.write_with(
+            &mut output,
+            |output, text| output.push_str(text),
+            |output, rows, separator| {
+                output.push_str(&rows.map(|row| row.render_str(config)).join(separator));
+            },
+        );
+        output
+    }
+
+    /// Share sum syntax while allowing callers to choose how to write variant rows.
+    fn write_with<'a, W: ?Sized, R>(
+        &'a self,
+        writer: &mut W,
+        base_writer: impl FnOnce(&mut W, &str) -> R,
+        list_writer: impl FnOnce(&mut W, &mut dyn Iterator<Item = &'a TypeRowRV>, &str) -> R,
+    ) -> R {
+        if self.num_variants() == 0 {
+            return base_writer(writer, "⊥");
+        }
+
+        match self {
+            SumType::Unit { size: 1 } => base_writer(writer, "Unit"),
+            SumType::Unit { size: 2 } => base_writer(writer, "Bool"),
+            SumType::Unit { .. } => list_writer(writer, &mut self.variants(), "+"),
+            SumType::General(GeneralSum { rows, .. }) => match rows.len() {
+                1 if rows[0].is_empty() => base_writer(writer, "Unit"),
+                2 if rows[0].is_empty() && rows[1].is_empty() => base_writer(writer, "Bool"),
+                _ => list_writer(writer, &mut rows.iter(), "+"),
+            },
         }
     }
 }
@@ -507,7 +532,7 @@ impl Type {
     }
 
     /// Render the type as a string using the supplied configuration.
-    pub fn render_str(&self, config: crate::ops::RenderStringConfig) -> String {
+    pub fn render_str(&self, config: crate::hugr::views::render::RenderStringConfig) -> String {
         self.0.render_str(config)
     }
 }

@@ -1,6 +1,6 @@
 ---
 source: hugr-core/src/hugr/views/tests.rs
-expression: h.dot_string()
+expression: dot
 ---
 digraph {
 0 [shape=plain label=<<table border="1"><tr><td align="text" border="0" colspan="1">(0) Module</td></tr></table>>]
@@ -17,14 +17,14 @@ digraph {
 7 [shape=plain label=<<table border="1"><tr><td align="text" border="0" colspan="1">(7) Input</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: usize</td></tr></table>>]
 7:out0 -> 9:in0 [style=""]
 8 [shape=plain label=<<table border="1"><tr><td port="in0" align="text" colspan="1" cellpadding="1" >0: [usize]+[usize]</td></tr><tr><td align="text" border="0" colspan="1">(8) Output</td></tr></table>>]
-9 [shape=plain label=<<table border="1"><tr><td port="in0" align="text" colspan="1" cellpadding="1" >0: usize</td></tr><tr><td align="text" border="0" colspan="1">(9) Tag</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: [usize]+[usize]</td></tr></table>>]
+9 [shape=plain label=<<table border="1"><tr><td port="in0" align="text" colspan="1" cellpadding="1" >0: usize</td></tr><tr><td align="text" border="0" colspan="1">(9) Tag(1)</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: [usize]+[usize]</td></tr></table>>]
 9:out0 -> 8:in0 [style=""]
 10 [shape=plain label=<<table border="1"><tr><td port="in0" align="text" colspan="1" cellpadding="1" border="0">0</td></tr><tr><td align="text" border="0" colspan="1">(10) DataflowBlock</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" border="0">0</td></tr></table>>]
 10:out0 -> 5:in0 [style="dashed"]
 11 [shape=plain label=<<table border="1"><tr><td align="text" border="0" colspan="1">(11) Input</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: usize</td></tr></table>>]
 11:out0 -> 12:in1 [style=""]
 12 [shape=plain label=<<table border="1"><tr><td port="in0" align="text" colspan="1" cellpadding="1" >0: Unit</td><td port="in1" align="text" colspan="1" cellpadding="1" >1: usize</td></tr><tr><td align="text" border="0" colspan="2">(12) Output</td></tr></table>>]
-13 [shape=plain label=<<table border="1"><tr><td align="text" border="0" colspan="1">(13) const:seq:{}</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: Unit</td></tr></table>>]
+13 [shape=plain label=<<table border="1"><tr><td align="text" border="0" colspan="1">(13) Unit</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: Unit</td></tr></table>>]
 13:out0 -> 14:in0 [style=""]
 14 [shape=plain label=<<table border="1"><tr><td port="in0" align="text" colspan="1" cellpadding="1" >0: Unit</td></tr><tr><td align="text" border="0" colspan="1">(14) LoadConstant</td></tr><tr><td port="out0" align="text" colspan="1" cellpadding="1" >0: Unit</td></tr></table>>]
 14:out0 -> 12:in0 [style=""]

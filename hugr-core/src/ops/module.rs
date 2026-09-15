@@ -10,10 +10,11 @@ use {
 };
 
 use crate::Visibility;
+use crate::hugr::views::render::RenderStringConfig;
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type, TypeBound};
 
 use super::dataflow::DataflowParent;
-use super::{NamedOp, OpTag, OpTrait, RenderStringConfig, StaticTag, impl_op_name};
+use super::{NamedOp, OpTag, OpTrait, StaticTag, impl_op_name};
 
 /// The root of a module, parent of all other `OpType`s.
 #[derive(Debug, Clone, PartialEq, Eq, Default, serde::Serialize, serde::Deserialize)]
@@ -136,7 +137,7 @@ impl OpTrait for FuncDefn {
     }
 
     fn render_str(&self, _config: RenderStringConfig) -> String {
-        format!("FuncDefn: \"{}\"", self.func_name())
+        "FuncDefn: ".to_string() + "\"" + self.func_name() + "\""
     }
 
     fn tag(&self) -> OpTag {
@@ -228,7 +229,7 @@ impl OpTrait for FuncDecl {
     }
 
     fn render_str(&self, _config: RenderStringConfig) -> String {
-        format!("FuncDecl: \"{}\"", self.func_name())
+        "FuncDecl: ".to_string() + "\"" + self.func_name() + "\""
     }
 
     fn tag(&self) -> OpTag {

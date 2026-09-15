@@ -3,11 +3,12 @@
 use std::borrow::Cow;
 
 use crate::Direction;
+use crate::hugr::views::render::RenderStringConfig;
 use crate::types::{EdgeKind, Signature, Type, TypeRow, TypeRowLike};
 
 use super::OpTag;
 use super::dataflow::{DataflowOpTrait, DataflowParent};
-use super::{NamedOp, OpTrait, RenderStringConfig, StaticTag, impl_op_name};
+use super::{NamedOp, OpTrait, StaticTag, impl_op_name};
 
 /// Tail-controlled loop.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]

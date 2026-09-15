@@ -17,7 +17,7 @@ use tracing::warn;
 
 use super::{Substitution, Transformable, Type, TypeBound, TypeRowLike, TypeTransformer};
 use crate::extension::SignatureError;
-use crate::ops::RenderStringConfig;
+use crate::hugr::views::render::RenderStringConfig;
 use crate::types::{CustomType, FuncValueType, SumType};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
@@ -181,79 +181,40 @@ impl Term {
     /// Returns a string representation of this term.
     ///
     /// Composite terms recursively render each of their nested terms.
+    #[allow(unused_must_use)]
     pub fn render_str(&self, config: RenderStringConfig) -> String {
         match self {
-            Self::ListKind(term) => format!("List[{}]", term.render_str(config)),
-            Self::TupleKind(term) => format!("Tuple[{}]", term.render_str(config)),
-            Self::ExtensionType(custom_type) => {
-                let mut name = if config.qualify_name {
-                    format!("{}.{}", custom_type.extension(), custom_type.name())
-                } else {
-                    custom_type.name().to_string()
-                };
-                if config.print_type_args && !custom_type.args().is_empty() {
-                    name = format!(
-                        "{}<{}>",
-                        name,
-                        custom_type
-                            .args()
-                            .iter()
-                            .map(|arg| arg.render_str(config))
-                            .join(", ")
-                    );
-                }
-                if config.extension_version
-                    && let Some(version) = custom_type.extension_version()
-                {
-                    name = format!("{name}@{version}");
-                }
-                name
+            Self::ListKind(term) => "List[".to_string() + &term.render_str(config) + "]",
+            Self::TupleKind(term) => "Tuple[".to_string() + &term.render_str(config) + "]",
+            Self::ExtensionType(custom_type) => custom_type.render_str(config),
+            Self::FunctionType(function_type) => {
+                function_type.input().render_str(config)
+                    + " -> "
+                    + &function_type.output().render_str(config)
             }
-            Self::FunctionType(function_type) => format!(
-                "{} -> {}",
-                function_type.input().render_str(config),
-                function_type.output().render_str(config)
-            ),
-            Self::SumType(sum_type) => {
-                if sum_type.num_variants() == 0 {
-                    return "⊥".to_string();
-                }
-
-                match sum_type {
-                    SumType::Unit { size: 1 } => "Unit".to_string(),
-                    SumType::Unit { size: 2 } => "Bool".to_string(),
-                    SumType::Unit { size } => itertools::repeat_n("[]", *size as usize).join("+"),
-                    SumType::General(sum) => match sum.rows() {
-                        [row] if row.is_empty() => "Unit".to_string(),
-                        [left, right] if left.is_empty() && right.is_empty() => "Bool".to_string(),
-                        rows => rows.iter().map(|row| row.render_str(config)).join("+"),
-                    },
-                }
+            Self::SumType(sum_type) => sum_type.render_str(config),
+            Self::List(terms) => {
+                "[".to_string() + &terms.iter().map(|term| term.render_str(config)).join(", ") + "]"
             }
-            Self::List(terms) => format!(
-                "[{}]",
-                terms.iter().map(|term| term.render_str(config)).join(", ")
-            ),
-            Self::ListConcat(terms) => format!(
-                "[{}]",
-                terms
-                    .iter()
-                    .map(|term| format!("... {}", term.render_str(config)))
-                    .join(",")
-            ),
+            Self::ListConcat(terms) => {
+                "[".to_string()
+                    + &terms
+                        .iter()
+                        .map(|term| "... ".to_string() + &term.render_str(config))
+                        .join(",")
+                    + "]"
+            }
             Self::Tuple(terms) => {
-                format!(
-                    "({})",
-                    terms.iter().map(|term| term.render_str(config)).join(",")
-                )
+                "(".to_string() + &terms.iter().map(|term| term.render_str(config)).join(",") + ")"
             }
-            Self::TupleConcat(terms) => format!(
-                "({})",
-                terms
-                    .iter()
-                    .map(|term| format!("... {}", term.render_str(config)))
-                    .join(",")
-            ),
+            Self::TupleConcat(terms) => {
+                "(".to_string()
+                    + &terms
+                        .iter()
+                        .map(|term| "... ".to_string() + &term.render_str(config))
+                        .join(",")
+                    + ")"
+            }
             Self::ConstKind(ty) => ty.render_str(config),
             _ => self.to_string(),
         }
@@ -1040,17 +1001,17 @@ mod test {
         ]);
 
         assert_eq!(
-            term.render_str(crate::ops::RenderStringConfig::default()),
+            term.render_str(crate::hugr::views::render::RenderStringConfig::new()),
             r#"([1, ("inner",2)],List[(3,4)])"#
         );
     }
 
     #[test]
     fn render_composite_term_cases() {
-        use crate::ops::RenderStringConfig;
+        use crate::hugr::views::render::RenderStringConfig;
         use crate::std_extensions::arithmetic::int_types::int_type;
 
-        let config = RenderStringConfig::default();
+        let config = RenderStringConfig::new().with_qualify_name(false);
         assert_eq!(
             Term::new_tuple_kind(Term::new_tuple([Term::from(1_u64), Term::from(2_u64),]))
                 .render_str(config),
@@ -1074,33 +1035,36 @@ mod test {
 
     #[test]
     fn render_extension_type_config_cases() {
-        use crate::ops::RenderStringConfig;
+        use crate::hugr::views::render::RenderStringConfig;
         use crate::std_extensions::arithmetic::int_types::int_type;
 
         let term = Term::from(int_type(5));
-        assert_eq!(term.render_str(RenderStringConfig::default()), "int");
         assert_eq!(
-            term.render_str(RenderStringConfig {
-                extension_version: true,
-                print_type_args: true,
-                qualify_name: true,
-            }),
+            term.render_str(RenderStringConfig::new().with_qualify_name(false)),
+            "int"
+        );
+        assert_eq!(
+            term.render_str(
+                RenderStringConfig::new()
+                    .with_extension_version(true)
+                    .with_print_type_args(true)
+                    .with_qualify_name(true)
+            ),
             "arithmetic.int.types.int<5>@0.1.0"
         );
     }
 
     #[test]
     fn render_function_type_propagates_config() {
-        use crate::ops::RenderStringConfig;
+        use crate::hugr::views::render::RenderStringConfig;
         use crate::std_extensions::arithmetic::int_types::int_type;
         use crate::types::FuncValueType;
 
         let term = Term::FunctionType(Box::new(FuncValueType::new([int_type(5)], [int_type(6)])));
-        let config = RenderStringConfig {
-            extension_version: true,
-            print_type_args: true,
-            qualify_name: true,
-        };
+        let config = RenderStringConfig::new()
+            .with_extension_version(true)
+            .with_print_type_args(true)
+            .with_qualify_name(true);
 
         assert_eq!(
             term.render_str(config),
@@ -1110,11 +1074,11 @@ mod test {
 
     #[test]
     fn render_sum_type_propagates_config() {
-        use crate::ops::RenderStringConfig;
+        use crate::hugr::views::render::RenderStringConfig;
         use crate::std_extensions::arithmetic::int_types::int_type;
         use crate::types::{GeneralSum, SumType, TypeRowRV};
 
-        let config = RenderStringConfig::default();
+        let config = RenderStringConfig::new();
         assert_eq!(Term::SumType(SumType::new_unary(0)).render_str(config), "⊥");
         assert_eq!(
             Term::SumType(SumType::new_unary(1)).render_str(config),
@@ -1143,11 +1107,10 @@ mod test {
         );
 
         let term = Term::SumType(SumType::new([[int_type(5)], [int_type(6)]]));
-        let config = RenderStringConfig {
-            extension_version: true,
-            print_type_args: true,
-            qualify_name: true,
-        };
+        let config = RenderStringConfig::new()
+            .with_extension_version(true)
+            .with_print_type_args(true)
+            .with_qualify_name(true);
 
         assert_eq!(
             term.render_str(config),

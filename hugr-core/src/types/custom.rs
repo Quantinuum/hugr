@@ -1,11 +1,13 @@
 //! Opaque types, used to represent a user-defined [`Type`].
 //!
 //! [`Type`]: super::Type
+use itertools::Itertools;
 use std::fmt::{self, Display};
 use std::sync::{Arc, Weak};
 
 use crate::Extension;
 use crate::extension::{ExtensionId, SignatureError, TypeDef, Version};
+use crate::hugr::views::render::RenderStringConfig;
 
 use super::{
     Substitution, Type, TypeBound, TypeName,
@@ -175,17 +177,56 @@ impl CustomType {
             .map(|extension| extension.version().clone());
         self.extension_ref = extension_ref;
     }
+
+    /// Returns a string representation of this type.
+    pub(crate) fn render_str(&self, config: RenderStringConfig) -> String {
+        let mut output = String::new();
+        self.write_with(&mut output, config, |output, args| {
+            fmt::Write::write_str(
+                output,
+                &args.iter().map(|arg| arg.render_str(config)).join(", "),
+            )
+        })
+        .expect("writing to a String cannot fail");
+        output
+    }
+
+    /// Share custom type syntax while allowing callers to choose how to write arguments.
+    fn write_with<W: fmt::Write + ?Sized>(
+        &self,
+        writer: &mut W,
+        config: RenderStringConfig,
+        args_writer: impl FnOnce(&mut W, &[TypeArg]) -> fmt::Result,
+    ) -> fmt::Result {
+        if config.qualify_name() {
+            writer.write_str(self.extension())?;
+            writer.write_str(".")?;
+        }
+        writer.write_str(self.name())?;
+        if config.print_type_args() && !self.args().is_empty() {
+            writer.write_str("<")?;
+            args_writer(writer, self.args())?;
+            writer.write_str(">")?;
+        }
+        if config.extension_version()
+            && let Some(version) = self.extension_version()
+        {
+            writer.write_str("@")?;
+            writer.write_str(&version.to_string())?;
+        }
+        Ok(())
+    }
 }
 
 impl Display for CustomType {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
-        write!(f, "{}", self.id)?;
-        if !self.args.is_empty() {
-            write!(f, "<")?;
-            crate::utils::display_list(&self.args, f)?;
-            write!(f, ">")?;
-        }
-        Ok(())
+        self.write_with(
+            f,
+            RenderStringConfig::new()
+                .with_print_type_args(true)
+                .with_qualify_name(false),
+            |f, args| crate::utils::display_list(args, f),
+        )
     }
 }
 

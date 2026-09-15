@@ -18,18 +18,18 @@ graph LR
                 style 4 stroke:#832561,stroke-width:3px
                 5["(5) Input"]
                 6["(6) Output"]
-                7["(7) CX"]
-                5--"0:1<br>qubit"-->7
-                5--"1:2<br>qubit"-->6
-                5--"2:0<br>qubit"-->7
-                7--"0:0<br>qubit"-->6
-                7--"1:1<br>qubit"-->6
+                7["(7) test.quantum.CX"]
+                5--"0:1<br>prelude.qubit"-->7
+                5--"1:2<br>prelude.qubit"-->6
+                5--"2:0<br>prelude.qubit"-->7
+                7--"0:0<br>prelude.qubit"-->6
+                7--"1:1<br>prelude.qubit"-->6
             end
-            2--"0:0<br>qubit"-->4
-            2--"1:1<br>qubit"-->4
-            2--"2:2<br>qubit"-->4
-            4--"0:0<br>qubit"-->3
-            4--"1:1<br>qubit"-->3
-            4--"2:2<br>qubit"-->3
+            2--"0:0<br>prelude.qubit"-->4
+            2--"1:1<br>prelude.qubit"-->4
+            2--"2:2<br>prelude.qubit"-->4
+            4--"0:0<br>prelude.qubit"-->3
+            4--"1:1<br>prelude.qubit"-->3
+            4--"2:2<br>prelude.qubit"-->3
         end
     end

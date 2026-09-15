@@ -6,7 +6,7 @@ use itertools::Itertools;
 
 use crate::{
     extension::SignatureError,
-    ops::RenderStringConfig,
+    hugr::views::render::RenderStringConfig,
     types::{TypeRow, TypeRowLike, TypeRowRV},
 };
 
@@ -106,23 +106,22 @@ impl<T: TypeRowLike> PolyFuncTypeBase<T> {
     /// Render the polymorphic function type using the supplied configuration.
     pub fn render_str(&self, config: RenderStringConfig) -> String {
         let params = if self.params.is_empty() {
-            Cow::Borrowed("")
+            "".to_string()
         } else {
-            Cow::Owned(format!(
-                "∀ {}. ",
-                self.params
+            "∀ ".to_string()
+                + &self
+                    .params
                     .iter()
                     .enumerate()
                     .map(|(i, param)| format!("(#{i} : {})", param.render_str(config)))
                     .join(" ")
-            ))
+                + ". "
         };
 
-        format!(
-            "{params}{} -> {}",
-            self.body.input().render_str(config),
-            self.body.output().render_str(config)
-        )
+        params
+            + &self.body.input().render_str(config)
+            + " -> "
+            + &self.body.output().render_str(config)
     }
 
     /// The type parameters, aka binders, over which this type is polymorphic
@@ -237,7 +236,7 @@ pub(crate) mod test {
 
     #[test]
     fn render_str_propagates_config() {
-        use crate::ops::RenderStringConfig;
+        use crate::hugr::views::render::RenderStringConfig;
         use crate::std_extensions::arithmetic::int_types::int_type;
 
         let poly_func: crate::types::PolyFuncType = PolyFuncTypeBase::new(
@@ -246,11 +245,12 @@ pub(crate) mod test {
         );
 
         assert_eq!(
-            poly_func.render_str(RenderStringConfig {
-                extension_version: true,
-                print_type_args: true,
-                qualify_name: true,
-            }),
+            poly_func.render_str(
+                RenderStringConfig::new()
+                    .with_extension_version(true)
+                    .with_print_type_args(true)
+                    .with_qualify_name(true)
+            ),
             "∀ (#0 : Type). [#0] -> [arithmetic.int.types.int<5>@0.1.0]"
         );
     }

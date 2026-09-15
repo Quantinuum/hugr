@@ -112,6 +112,7 @@ use std::cmp::Ordering;
 
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ExtensionId, ExtensionRegistry};
+use crate::hugr::views::render::RenderStringConfig;
 use crate::types::{EdgeKind, Signature, Substitution};
 use crate::{Direction, Node, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
@@ -548,17 +549,6 @@ pub trait StaticTag {
     const TAG: OpTag;
 }
 
-/// Configuration for rendering an operation as a string.
-#[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
-pub struct RenderStringConfig {
-    /// Include the version of the extension defining the operation.
-    pub extension_version: bool,
-    /// Include the operation's type arguments.
-    pub print_type_args: bool,
-    /// Qualify operation name with their extension identifier.
-    pub qualify_name: bool,
-}
-
 #[enum_dispatch]
 /// Trait implemented by all `OpType` variants.
 pub trait OpTrait: Sized + Clone {
@@ -566,7 +556,12 @@ pub trait OpTrait: Sized + Clone {
     fn description(&self) -> &str;
 
     /// Returns an exhaustive string representation of the operation.
-    fn render_str(&self, config: RenderStringConfig) -> String;
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        // TODO: Remove this default implementation with the next breaking release.
+        unimplemented!(
+            "This operation is relying on the default undefined render_str implementation, implement one."
+        )
+    }
 
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag;

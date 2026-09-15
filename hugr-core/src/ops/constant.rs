@@ -6,8 +6,9 @@ mod serialize;
 use std::collections::hash_map::DefaultHasher; // Moves into std::hash in Rust 1.76.
 use std::hash::{Hash, Hasher};
 
-use super::{NamedOp, OpName, OpTrait, RenderStringConfig, StaticTag};
+use super::{NamedOp, OpName, OpTrait, StaticTag};
 use super::{OpTag, OpType};
+use crate::hugr::views::render::RenderStringConfig;
 use crate::types::{CustomType, EdgeKind, SumType, SumTypeError, Type, TypeRow};
 use serialize::SerialSum;
 
@@ -423,17 +424,34 @@ impl Value {
 
     fn name(&self) -> OpName {
         match self {
-            Self::Extension { e } => format!("const:custom:{}", e.name()),
+            Self::Extension { e } => "const:custom:".to_string() + &e.name(),
             Self::Sum(Sum {
                 tag,
                 values,
                 sum_type,
             }) => {
-                if sum_type.as_tuple().is_some() {
-                    let names: Vec<_> = values.iter().map(Value::name).collect();
-                    format!("const:seq:{{{}}}", names.iter().join(", "))
+                let n_variants = sum_type.num_variants();
+                if *self == Self::true_val() {
+                    "TRUE".to_string()
+                } else if *self == Self::false_val() {
+                    "FALSE".to_string()
+                } else if *self == Self::unit() {
+                    "Unit".to_string()
+                } else if sum_type.variants().all(|row| row.is_empty()) {
+                    format!("UnitSum({tag}, {n_variants})")
+                } else if n_variants == 1 {
+                    format!("Tuple({})", values.iter().map(Value::name).join(", "))
+                } else if sum_type.as_option().is_some() {
+                    if *tag == 0 {
+                        "None".to_string()
+                    } else {
+                        format!("Some({})", values.iter().map(Value::name).join(", "))
+                    }
+                } else if n_variants == 2 {
+                    let variant = if *tag == 0 { "Left" } else { "Right" };
+                    format!("{variant}({})", values.iter().map(Value::name).join(", "))
                 } else {
-                    format!("const:sum:{{tag:{tag}, vals:{values:?}}}")
+                    format!("Sum({tag}, {sum_type}, {values:?})")
                 }
             }
         }
@@ -689,10 +707,52 @@ pub(crate) mod test {
     }
 
     #[rstest]
-    #[case(Value::unit(), Type::UNIT, "const:seq:{}")]
+    #[case::extension(ConstUsize::new(257).into(), "const:custom:ConstUsize(257)")]
+    #[case::true_value(Value::true_val(), "TRUE")]
+    #[case::false_value(Value::false_val(), "FALSE")]
+    #[case::unit(Value::unit(), "Unit")]
+    #[case::empty_tuple(Value::tuple([]), "Unit")]
+    #[case::unit_sum(Value::unit_sum(2, 3).unwrap(), "UnitSum(2, 3)")]
+    #[case::general_unit_sum(
+        Value::sum(
+            1,
+            [],
+            SumType::General(crate::types::GeneralSum::new(vec![type_row![].into(); 3])),
+        ).unwrap(),
+        "UnitSum(1, 3)"
+    )]
+    #[case::tuple(Value::tuple([Value::true_val(), Value::false_val()]), "Tuple(TRUE, FALSE)")]
+    #[case::none(Value::none(vec![bool_t()]), "None")]
+    #[case::some(Value::some([Value::true_val(), Value::unit()]), "Some(TRUE, Unit)")]
+    #[case::left(
+        Value::sum(0, [Value::true_val()], SumType::new([vec![bool_t()], vec![]])).unwrap(),
+        "Left(TRUE)"
+    )]
+    #[case::right(
+        Value::sum(1, [Value::false_val()], SumType::new([vec![bool_t()], vec![bool_t()]])).unwrap(),
+        "Right(FALSE)"
+    )]
+    #[case::empty_right(
+        Value::sum(1, [], SumType::new([vec![bool_t()], vec![]])).unwrap(),
+        "Right()"
+    )]
+    #[case::general_sum(
+        Value::sum(2, [], SumType::new([vec![bool_t()], vec![], vec![]])).unwrap(),
+        "Sum(2, [Bool]+[]+[], [])"
+    )]
+    #[case::nested(
+        Value::tuple([Value::some([Value::tuple([Value::true_val(), Value::unit()])]), Value::none(vec![bool_t()])]),
+        "Tuple(Some(Tuple(TRUE, Unit)), None)"
+    )]
+    fn value_name(#[case] value: Value, #[case] expected: &str) {
+        assert_eq!(value.name(), expected);
+    }
+
+    #[rstest]
+    #[case(Value::unit(), Type::UNIT, "Unit")]
     #[case(const_usize(), usize_t(), "const:custom:ConstUsize(")]
     #[case(serialized_float(17.4), float64_type(), "const:custom:json:Object")]
-    #[case(const_tuple(), Type::new_tuple(vec![usize_t(), bool_t()]), "const:seq:{")]
+    #[case(const_tuple(), Type::new_tuple(vec![usize_t(), bool_t()]), "Tuple(")]
     #[case(const_array_bool(), array_type(2, bool_t()), "const:custom:array")]
     #[case(
         const_borrow_array_bool(),

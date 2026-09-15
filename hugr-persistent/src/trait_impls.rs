@@ -293,7 +293,9 @@ impl HugrView for PersistentHugr {
             .with_node_labels(node_labels)
             .with_port_offsets(formatter.port_offsets())
             .with_type_labels(formatter.type_labels())
-            .with_render_string_config(formatter.render_string_config());
+            .with_extension_version(formatter.extension_version())
+            .with_print_type_args(formatter.print_type_args())
+            .with_qualify_name(formatter.qualify_name());
 
         config.finish()
     }

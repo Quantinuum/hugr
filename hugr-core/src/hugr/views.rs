@@ -32,7 +32,7 @@ use crate::extension::ExtensionRegistry;
 use crate::hugr::internal::{DefaultPGNodeMap, PortgraphNodeMap};
 use crate::hugr::views::syn_edge::SynEdgeWrapper;
 use crate::metadata::{Metadata, MetadataError, RawMetadataValue};
-use crate::ops::{OpParent, OpTag, OpTrait, OpType, RenderStringConfig, handle::NodeHandle};
+use crate::ops::{OpParent, OpTag, OpTrait, OpType, handle::NodeHandle};
 use crate::types::{EdgeKind, PolyFuncType, Signature, Type};
 use crate::{Direction, IncomingPort, OutgoingPort, Port};
 
@@ -424,19 +424,8 @@ pub trait HugrView: HugrInternals {
     ///
     /// The hierarchy is represented using subgraphs. Edges are labelled with
     /// their source and target ports.
-    ///
-    /// For a more detailed representation, use the [`HugrView::dot_string`]
-    /// format instead.
     fn mermaid_string(&self) -> String {
         self.mermaid_string_with_formatter(self.mermaid_format())
-    }
-    /// Return the mermaid representation of the underlying hierarchical graph
-    /// using the provided rendering configuration.
-    ///
-    /// This method allows customizing the appearance of node labels and other
-    /// elements in the mermaid diagram.
-    fn mermaid_string_with_config(&self, config: RenderStringConfig) -> String {
-        self.mermaid_string_with_formatter(self.mermaid_format().with_render_string_config(config))
     }
 
     /// Return the mermaid representation of the underlying hierarchical graph
@@ -444,9 +433,6 @@ pub trait HugrView: HugrInternals {
     ///
     /// The hierarchy is represented using subgraphs. Edges are labelled with
     /// their source and target ports.
-    ///
-    /// For a more detailed representation, use the [`HugrView::dot_string`]
-    /// format instead.
     fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String;
 
     /// Construct a mermaid representation of the underlying hierarchical graph.
@@ -456,16 +442,14 @@ pub trait HugrView: HugrInternals {
     ///
     /// The hierarchy is represented using subgraphs. Edges are labelled with
     /// their source and target ports.
-    ///
-    /// For a more detailed representation, use the [`HugrView::dot_string`]
-    /// format instead.
     fn mermaid_format(&self) -> MermaidFormatter<'_, Self> {
         MermaidFormatter::new(self).with_entrypoint(self.entrypoint())
     }
 
     /// Return the graphviz representation of the underlying graph and hierarchy side by side.
     ///
-    /// For a simpler representation, use the [`HugrView::mermaid_string`] format instead.
+    /// Deprecated, use the [`HugrView::mermaid_string`] format instead.
+    #[deprecated(since = "0.29.4", note = "Use `mermaid_string` instead.")]
     fn dot_string(&self) -> String
     where
         Self: Sized;

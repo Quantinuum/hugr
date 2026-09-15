@@ -2,9 +2,10 @@
 
 use std::borrow::Cow;
 
-use super::{NamedOp, OpTag, OpTrait, RenderStringConfig, impl_op_name};
+use super::{NamedOp, OpTag, OpTrait, impl_op_name};
 
 use crate::extension::SignatureError;
+use crate::hugr::views::render::RenderStringConfig;
 use crate::ops::StaticTag;
 use crate::types::{
     EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow, TypeRowLike,
@@ -23,7 +24,10 @@ pub trait DataflowOpTrait: Sized {
     fn description(&self) -> &str;
 
     /// Returns a string representation of the operation.
-    fn render_str(&self, config: RenderStringConfig) -> String;
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        // TODO: Remove this default implementation with the next breaking release.
+        unimplemented!("render_str default implementation is not yet implemented");
+    }
 
     /// The signature of the operation.
     fn signature(&self) -> Cow<'_, Signature>;
