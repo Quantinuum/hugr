@@ -460,6 +460,10 @@ impl TypeStorage {
         };
         Arc::make_mut(term)
     }
+
+    fn render_str(&self, config: RenderStringConfig) -> String {
+        self.as_term().render_str(config)
+    }
 }
 
 impl From<TypeStorage> for Term {
@@ -610,7 +614,7 @@ impl Type {
     }
 
     /// Render the type as a string using the supplied configuration.
-    pub fn render_str(&self, config: crate::hugr::views::render::RenderStringConfig) -> String {
+    pub fn render_str(&self, config: RenderStringConfig) -> String {
         self.0.render_str(config)
     }
 }
