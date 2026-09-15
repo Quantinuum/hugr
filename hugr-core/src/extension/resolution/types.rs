@@ -3,8 +3,8 @@
 //!
 //! Fails if any of the weak extension pointers have been invalidated.
 //!
-//! See [`super::resolve_op_types_extensions`] for a mutating version that
-//! updates the weak links to point to the correct extensions.
+//! See [`crate::Hugr::resolve_extension_defs`] for a mutating operation that
+//! updates weak links across a complete HUGR.
 
 use super::{ExtensionCollectionError, WeakExtensionRegistry};
 use crate::Node;
@@ -19,8 +19,8 @@ use crate::types::{FuncValueType, Signature, SumType, Term, TypeRow};
 /// happens when deserializing a HUGR. On such cases, we return an error with
 /// the missing extension names.
 ///
-/// Use [`super::resolve_op_types_extensions`] instead to update the weak references and
-/// ensure they point to valid extensions.
+/// Use [`crate::Hugr::resolve_extension_defs`] instead to update weak references
+/// across a complete HUGR and collect its extensions in one pass.
 ///
 /// # Attributes
 ///

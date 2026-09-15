@@ -19,7 +19,7 @@ mod const_fold;
 /// The extension identifier.
 pub const EXTENSION_ID: ExtensionId = ExtensionId::new_unchecked("arithmetic.float");
 /// Extension version.
-pub const VERSION: semver::Version = semver::Version::new(0, 1, 1);
+pub const VERSION: semver::Version = semver::Version::new(0, 1, 2);
 
 /// Integer extension operation definitions.
 #[derive(Clone, Copy, Debug, Hash, PartialEq, Eq, EnumIter, IntoStaticStr, EnumString)]
@@ -45,6 +45,7 @@ pub enum FloatOps {
     fceil,
     fround,
     ftostring,
+    froundeven,
 }
 
 impl MakeOpDef for FloatOps {
@@ -74,7 +75,9 @@ impl MakeOpDef for FloatOps {
             fmax | fmin | fadd | fsub | fmul | fdiv | fpow => {
                 Signature::new(vec![float64_type(); 2], vec![float64_type()])
             }
-            fneg | fabs | ffloor | fceil | fround => Signature::new_endo([float64_type()]),
+            fneg | fabs | ffloor | fceil | fround | froundeven => {
+                Signature::new_endo([float64_type()])
+            }
             ftostring => Signature::new(vec![float64_type()], [string_type()]),
         }
         .into()
@@ -101,6 +104,7 @@ impl MakeOpDef for FloatOps {
             ffloor => "floor",
             fceil => "ceiling",
             fround => "round",
+            froundeven => "round to nearest even integer",
             ftostring => "string representation",
         }
         .to_string()

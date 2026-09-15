@@ -2,7 +2,7 @@
 
 use core::{f64, panic};
 use std::io::BufReader;
-use std::sync::Arc;
+use std::sync::{Arc, LazyLock};
 
 use itertools::Itertools;
 use rstest::rstest;
@@ -10,17 +10,22 @@ use rstest::rstest;
 use crate::builder::{
     DFGBuilder, Dataflow, DataflowHugr, DataflowSubContainer, HugrBuilder, ModuleBuilder,
 };
-use crate::envelope::EnvelopeConfig;
+use crate::envelope::{EnvelopeConfig, EnvelopeFormat};
 use crate::extension::prelude::{ConstUsize, bool_t, usize_custom_t, usize_t};
-use crate::extension::resolution::WeakExtensionRegistry;
-use crate::extension::resolution::{resolve_op_extensions, resolve_op_types_extensions};
+use crate::extension::resolution::{
+    ExtensionResolutionError, ExtensionResolutionErrorDescription, WeakExtensionRegistry,
+};
+use crate::extension::resolution::{
+    resolve_op_extensions, resolve_type_extensions as resolve_type_extension_refs,
+};
 use crate::extension::{
     ExtensionId, ExtensionRegistry, ExtensionSet, PRELUDE, PRELUDE_REGISTRY, TypeDefBound, Version,
 };
+use crate::hugr::HugrMut;
 use crate::ops::constant::CustomConst;
 use crate::ops::constant::test::CustomTestValue;
 use crate::ops::dataflow::IOTrait;
-use crate::ops::{CallIndirect, ExtensionOp, Input, NamedOp, OpType, OpaqueOp, Tag, Value};
+use crate::ops::{CallIndirect, ExtensionOp, Input, NamedOp, OpType, OpaqueOp, Output, Tag, Value};
 use crate::package::Package;
 use crate::std_extensions::arithmetic::conversions::{self, ConvertOpDef};
 use crate::std_extensions::arithmetic::float_types::{self, ConstF64, float64_type};
@@ -31,6 +36,8 @@ use crate::std_extensions::std_reg;
 use crate::types::type_param::TypeParam;
 use crate::types::{CustomType, PolyFuncType, Signature, Term, Type, TypeBound};
 use crate::{Extension, Hugr, HugrView, type_row};
+
+use super::types_mut::resolve_op_types_extensions;
 
 #[rstest]
 #[case::empty(Input { types: type_row![]}, ExtensionRegistry::default())]
@@ -59,12 +66,12 @@ fn resolve_type_extensions(#[case] op: impl Into<OpType>, #[case] extensions: Ex
 
     let dummy_node = portgraph::NodeIndex::new(0).into();
 
-    resolve_op_extensions(dummy_node, &mut deser_op, &extensions).unwrap();
-
     let weak_extensions: WeakExtensionRegistry = (&extensions).into();
     resolve_op_types_extensions(Some(dummy_node), &mut deser_op, &weak_extensions)
         .unwrap()
         .for_each(|_| ());
+
+    resolve_op_extensions(dummy_node, &mut deser_op, &extensions).unwrap();
 
     let deser_extensions = deser_op.used_extensions().unwrap();
 
@@ -145,6 +152,216 @@ fn resolve_custom_type_uses_highest_compatible_extension() {
         panic!("expected custom type");
     };
     assert_eq!(custom.extension_version(), Some(&Version::new(0, 2, 5)));
+}
+
+#[rstest]
+#[case::too_new(Version::new(0, 2, 6), "the available version 0.2.5 is too old")]
+#[case::incompatible(
+    Version::new(0, 4, 0),
+    "the available versions [0.2.5, 0.3.0] are incompatible"
+)]
+fn opaque_op_reports_version_mismatch(
+    #[case] required_version: Version,
+    #[case] expected_reason: &str,
+) {
+    let ext_id = ExtensionId::new_unchecked("versioned_ext");
+    let other_id = ExtensionId::new_unchecked("other_ext");
+    let registry = ExtensionRegistry::new([
+        make_versioned_extension(&ext_id, Version::new(0, 2, 5)),
+        make_versioned_extension(&ext_id, Version::new(0, 3, 0)),
+        make_versioned_extension(&other_id, Version::new(9, 0, 0)),
+    ]);
+    let mut op: OpType = OpaqueOp::new(
+        ext_id.clone(),
+        required_version.clone(),
+        "my_op",
+        [],
+        Signature::new_endo([bool_t()]),
+    )
+    .into();
+
+    let node = portgraph::NodeIndex::new(0).into();
+    let error = resolve_op_extensions(node, &mut op, &registry).unwrap_err();
+    let ExtensionResolutionError::UnresolvedOpExtension { description, .. } = &error else {
+        panic!("expected an operation extension version mismatch, got {error:?}");
+    };
+    assert_eq!(
+        description.as_ref(),
+        &ExtensionResolutionErrorDescription {
+            required_extension: ext_id.clone(),
+            required_version: required_version.clone(),
+            available_extensions: vec![
+                (other_id.clone(), Version::new(9, 0, 0)),
+                (ext_id.clone(), Version::new(0, 2, 5)),
+                (ext_id.clone(), Version::new(0, 3, 0)),
+            ],
+        }
+    );
+    assert!(
+        error
+            .to_string()
+            .contains(&format!("{ext_id}@{required_version}"))
+    );
+    assert!(error.to_string().contains(expected_reason));
+    assert!(!error.to_string().contains(&format!("{other_id}@9.0.0")));
+}
+
+#[rstest]
+#[case::too_new(Version::new(0, 2, 6), "the available version 0.2.5 is too old")]
+#[case::incompatible(
+    Version::new(0, 4, 0),
+    "the available versions [0.2.5, 0.3.0] are incompatible"
+)]
+fn custom_type_reports_version_mismatch(
+    #[case] required_version: Version,
+    #[case] expected_reason: &str,
+) {
+    let ext_id = ExtensionId::new_unchecked("versioned_type_ext");
+    let registry = ExtensionRegistry::new([
+        make_versioned_extension(&ext_id, Version::new(0, 2, 5)),
+        make_versioned_extension(&ext_id, Version::new(0, 3, 0)),
+    ]);
+    let weak_registry = WeakExtensionRegistry::from(&registry);
+    let custom = CustomType::new(
+        "MyType",
+        [],
+        ext_id.clone(),
+        required_version.clone(),
+        TypeBound::Copyable,
+        &Default::default(),
+    );
+
+    let error =
+        resolve_type_extension_refs(&mut Type::new_extension(custom.clone()), &weak_registry)
+            .unwrap_err();
+    let ExtensionResolutionError::UnresolvedTypeExtension { description, .. } = &error else {
+        panic!("expected a type extension version mismatch, got {error:?}");
+    };
+    assert_eq!(
+        description.as_ref(),
+        &ExtensionResolutionErrorDescription {
+            required_extension: ext_id.clone(),
+            required_version: required_version.clone(),
+            available_extensions: vec![
+                (ext_id.clone(), Version::new(0, 2, 5)),
+                (ext_id.clone(), Version::new(0, 3, 0)),
+            ],
+        }
+    );
+    assert!(
+        error
+            .to_string()
+            .contains(&format!("{ext_id}@{required_version}"))
+    );
+    assert!(error.to_string().contains(expected_reason));
+}
+
+#[test]
+fn opaque_op_reports_versioned_missing_extension() {
+    let ext_id = ExtensionId::new_unchecked("missing_ext");
+    let required_version = Version::new(1, 2, 3);
+    let registry = ExtensionRegistry::new([make_versioned_extension(
+        &ExtensionId::new_unchecked("available_ext"),
+        Version::new(2, 0, 0),
+    )]);
+    let mut op: OpType = OpaqueOp::new(
+        ext_id.clone(),
+        required_version.clone(),
+        "my_op",
+        [],
+        Signature::new_endo([bool_t()]),
+    )
+    .into();
+
+    let node = portgraph::NodeIndex::new(0).into();
+    let error = resolve_op_extensions(node, &mut op, &registry).unwrap_err();
+    assert!(matches!(
+        error,
+        ExtensionResolutionError::UnresolvedOpExtension { .. }
+    ));
+    assert!(error.to_string().contains("missing_ext@1.2.3"));
+    assert!(error.to_string().contains("available_ext@2.0.0"));
+}
+
+#[test]
+fn custom_type_reports_versioned_missing_extension() {
+    let ext_id = ExtensionId::new_unchecked("missing_type_ext");
+    let required_version = Version::new(1, 2, 3);
+    let registry = ExtensionRegistry::new([make_versioned_extension(
+        &ExtensionId::new_unchecked("available_ext"),
+        Version::new(2, 0, 0),
+    )]);
+    let weak_registry = WeakExtensionRegistry::from(&registry);
+    let mut typ = Type::new_extension(CustomType::new(
+        "MyType",
+        [],
+        ext_id,
+        required_version,
+        TypeBound::Copyable,
+        &Default::default(),
+    ));
+
+    let error = resolve_type_extension_refs(&mut typ, &weak_registry).unwrap_err();
+    assert!(matches!(
+        error,
+        ExtensionResolutionError::UnresolvedTypeExtension { .. }
+    ));
+    assert!(error.to_string().contains("missing_type_ext@1.2.3"));
+    assert!(error.to_string().contains("available_ext@2.0.0"));
+}
+
+/// Resolving an already-resolved type should preserve its shared storage.
+#[test]
+fn resolving_current_type_extensions_preserves_shared_storage() {
+    let registry = std_reg();
+    let weak_registry = WeakExtensionRegistry::from(&registry);
+    let original = usize_t();
+    let mut resolved = original.clone();
+    assert!(original.shares_storage_with(&resolved));
+
+    resolve_type_extension_refs(&mut resolved, &weak_registry).unwrap();
+
+    assert!(original.shares_storage_with(&resolved));
+}
+
+/// Shared stale types should be resolved once and reuse the resolved storage.
+#[test]
+fn resolving_shared_stale_types_reuses_resolved_storage() {
+    let ext_id = ExtensionId::new_unchecked("shared_type_ext");
+    let version = Version::new(1, 0, 0);
+    let stale_extension = make_versioned_extension(&ext_id, version.clone());
+    let shared_type: Type = stale_extension
+        .get_type("MyType")
+        .unwrap()
+        .instantiate([])
+        .unwrap()
+        .into();
+
+    let mut hugr = Hugr::new();
+    let root = hugr.module_root();
+    let input = hugr.add_node_with_parent(root, Input::new([shared_type.clone()]));
+    let output = hugr.add_node_with_parent(root, Output::new([shared_type]));
+    drop(stale_extension);
+
+    let current_extension = make_versioned_extension(&ext_id, version);
+    let registry = ExtensionRegistry::new([current_extension.clone()]);
+    hugr.resolve_extension_defs(&registry).unwrap();
+
+    let OpType::Input(input_op) = hugr.get_optype(input) else {
+        panic!("expected input op");
+    };
+    let OpType::Output(output_op) = hugr.get_optype(output) else {
+        panic!("expected output op");
+    };
+    let input_type = &input_op.types[0];
+    let output_type = &output_op.types[0];
+    assert!(input_type.shares_storage_with(output_type));
+
+    let Term::ExtensionType(custom) = &**input_type else {
+        panic!("expected custom type");
+    };
+    let resolved_extension = custom.extension_ref().upgrade().unwrap();
+    assert!(Arc::ptr_eq(&resolved_extension, &current_extension));
 }
 
 /// Create a new test extension with a single operation.
@@ -479,6 +696,88 @@ fn resolve_custom_const(#[case] custom_const: impl CustomConst) {
         .unwrap_or_else(|e| panic!("{e}"));
 
     check_extension_resolution(hugr);
+}
+
+/// A bare HUGR must retain the packaged allocation referenced by its types,
+/// even when a custom constant reports the same type from a static extension.
+#[rstest]
+fn packaged_extension_lifetime() {
+    const PACKAGED_TYPE_EXTENSION_ID: ExtensionId =
+        ExtensionId::new_unchecked("test.packaged_type");
+
+    static PACKAGED_TYPE_EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
+        Extension::new_arc(
+            PACKAGED_TYPE_EXTENSION_ID,
+            Version::new(1, 0, 0),
+            |extension, extension_ref| {
+                extension
+                    .add_type(
+                        "value".into(),
+                        vec![],
+                        "A type returned by a stateless custom constant.".into(),
+                        TypeDefBound::copyable(),
+                        extension_ref,
+                    )
+                    .unwrap();
+            },
+        )
+    });
+
+    /// A stateless constant whose type comes from a process-wide extension.
+    #[derive(Clone, Debug, Hash, PartialEq, serde::Deserialize, serde::Serialize)]
+    struct PackagedValue;
+
+    #[typetag::serde]
+    impl CustomConst for PackagedValue {
+        fn name(&self) -> crate::ops::constant::ValueName {
+            "PackagedValue".into()
+        }
+
+        fn get_type(&self) -> Type {
+            CustomType::new(
+                "value",
+                [],
+                PACKAGED_TYPE_EXTENSION_ID,
+                Version::new(1, 0, 0),
+                TypeBound::Copyable,
+                &Arc::downgrade(&PACKAGED_TYPE_EXTENSION),
+            )
+            .into()
+        }
+    }
+
+    let mut builder = DFGBuilder::new(Signature::new([], [PackagedValue.get_type()])).unwrap();
+    let value = builder.add_load_value(Value::extension(PackagedValue));
+    let hugr = builder.finish_hugr_with_outputs([value]).unwrap();
+
+    let mut package = Package::from_hugr(hugr);
+    package.extensions.register(PACKAGED_TYPE_EXTENSION.clone());
+    let mut encoded = Vec::new();
+    package
+        .store(
+            &mut encoded,
+            EnvelopeConfig::new(EnvelopeFormat::ModelWithExtensions),
+        )
+        .unwrap();
+
+    let hugr = Hugr::load(encoded.as_slice(), None).unwrap();
+    hugr.validate().unwrap();
+
+    let datatype = hugr
+        .nodes()
+        .find_map(|node| match hugr.get_optype(node) {
+            OpType::LoadConstant(load) => Some(&load.datatype),
+            _ => None,
+        })
+        .unwrap();
+    let referenced = datatype
+        .used_extensions()
+        .unwrap()
+        .get("test.packaged_type")
+        .unwrap()
+        .clone();
+    let retained = hugr.extensions().get("test.packaged_type").unwrap();
+    assert!(Arc::ptr_eq(&referenced, retained));
 }
 
 /// Test resolution of function call with type arguments.

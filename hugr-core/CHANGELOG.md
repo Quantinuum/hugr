@@ -1,6 +1,49 @@
 # Changelog
 
 
+## [0.30.2](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.30.1...hugr-core-v0.30.2) - 2026-09-04
+
+### New Features
+
+- Improve extension resolution errors ([#3247](https://github.com/Quantinuum/hugr/pull/3247))
+
+## [0.30.1](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.30.0...hugr-core-v0.30.1) - 2026-09-03
+
+### Bug Fixes
+
+- Force resolution of extension types inside constants ([#3242](https://github.com/Quantinuum/hugr/pull/3242))
+
+### Performance
+
+- Cache extension type helpers ([#3241](https://github.com/Quantinuum/hugr/pull/3241))
+
+## [0.30.0](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.29.4...hugr-core-v0.30.0) - 2026-09-03
+
+### New Features
+
+- *(cli)* Include edge counts in `describe` output ([#3209](https://github.com/Quantinuum/hugr/pull/3209))
+- *(hugr-model)* Allow parsing literals as constants ([#3230](https://github.com/Quantinuum/hugr/pull/3230))
+- [**breaking**] Read the extension version as optional in `ExtensionDesc` metadata ([#3231](https://github.com/Quantinuum/hugr/pull/3231))
+
+### Performance
+
+- [**breaking**] Reuse shared `Type`s during HUGR import ([#3215](https://github.com/Quantinuum/hugr/pull/3215))
+- Avoid various intermediate clones during op resolution ([#3220](https://github.com/Quantinuum/hugr/pull/3220))
+- Cache serialized extensions to speed up encoding ([#3210](https://github.com/Quantinuum/hugr/pull/3210))
+- Pre-compute HUGR capacity when decoding a `hugr-model` ([#3219](https://github.com/Quantinuum/hugr/pull/3219))
+- Avoid cloning signatures for simple port checks ([#3149](https://github.com/Quantinuum/hugr/pull/3149))
+
+### Refactor
+
+- Add a shared `TypeResolverContext` to avoid repeated resolution ([#3217](https://github.com/Quantinuum/hugr/pull/3217))
+- [**breaking**] Remove deprecated definitions ([#3232](https://github.com/Quantinuum/hugr/pull/3232))
+
+## [0.29.4](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.29.3...hugr-core-v0.29.4) - 2026-08-28
+
+### New Features
+
+- Add froundeven float op ([#3122](https://github.com/Quantinuum/hugr/pull/3122))
+
 ## [0.29.3](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.29.2...hugr-core-v0.29.3) - 2026-07-20
 
 ### Bug Fixes

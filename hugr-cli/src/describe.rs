@@ -248,15 +248,9 @@ struct SymbolRow {
 
 impl From<ExtensionDesc> for ExtensionRow {
     fn from(desc: ExtensionDesc) -> Self {
-        // TODO: Remove this once `hugr-rs 0.27.0` is released and `ExtensionDesc::version` is made optional.
-        let version = if desc.version == Version::new(0, 0, 0) {
-            None
-        } else {
-            Some(desc.version)
-        };
         Self {
             name: desc.name,
-            version,
+            version: desc.version,
         }
     }
 }
@@ -265,6 +259,8 @@ impl From<ExtensionDesc> for ExtensionRow {
 struct ModuleSummary {
     #[tabled(display("display::option", "n/a"))]
     num_nodes: Option<usize>,
+    #[tabled(display("display::option", "n/a"))]
+    num_edges: Option<usize>,
     #[tabled(display("display::option", "n/a"))]
     entrypoint_node: Option<usize>,
     #[tabled(display("display::option", "n/a"))]
@@ -285,6 +281,7 @@ impl From<&ModuleDesc> for ModuleSummary {
         };
         Self {
             num_nodes: desc.num_nodes,
+            num_edges: desc.num_edges,
             entrypoint_node,
             entrypoint_op,
             generator: desc.generator.clone(),

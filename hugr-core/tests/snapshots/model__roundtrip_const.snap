@@ -30,6 +30,10 @@ expression: ast
 
 (import collections.array.array@0.1.2)
 
+(import prelude.string@0.2.2)
+
+(import prelude.usize@0.2.2)
+
 (define-func
   public example.bools (core.fn [] [(core.adt [[] []]) (core.adt [[] []])])
   (dfg [] [%0 %1]
@@ -101,3 +105,18 @@ expression: ast
   example.const_as_param
   (param ?_0 (core.const arithmetic.float.types.float64))
   (core.fn [] [arithmetic.float.types.float64]))
+
+(define-func
+  public example.const_literals (core.fn [] [prelude.usize prelude.string])
+  (dfg [] [%0 %1]
+    (signature (core.fn [] [prelude.usize prelude.string]))
+    ((core.load_const
+        (compat.const_json
+          prelude.string
+          "{\"c\":\"ConstString\",\"v\":\"hello\"}"))
+      [] [%1]
+      (signature (core.fn [] [prelude.string])))
+    ((core.load_const
+        (compat.const_json prelude.usize "{\"c\":\"ConstUsize\",\"v\":42}"))
+      [] [%0]
+      (signature (core.fn [] [prelude.usize])))))

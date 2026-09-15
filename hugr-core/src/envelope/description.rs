@@ -133,17 +133,19 @@ impl PackageDesc {
     serde::Serialize,
     schemars::JsonSchema,
 )]
-#[display("Extension {name} v{version}")]
+#[display(
+    "Extension {name}{}",
+    version
+        .as_ref()
+        .map_or_else(String::new, |version| format!(" v{version}"))
+)]
 pub struct ExtensionDesc {
     /// Name of the extension.
     pub name: String,
     /// Version of the extension.
-    ///
-    /// A version value of `0.0.0` is used for extensions that do not have a version.
-    //
-    // TODO: Make this optional in `hugr-rs 0.27.0`.
-    #[schemars(with = "String")]
-    pub version: Version,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    #[schemars(with = "Option<String>")]
+    pub version: Option<Version>,
 }
 
 impl ExtensionDesc {
@@ -151,7 +153,7 @@ impl ExtensionDesc {
     pub fn new(name: impl ToString, version: impl Into<Version>) -> Self {
         Self {
             name: name.to_string(),
-            version: version.into(),
+            version: Some(version.into()),
         }
     }
 
@@ -159,7 +161,7 @@ impl ExtensionDesc {
     pub fn new_unversioned(name: impl ToString) -> Self {
         Self {
             name: name.to_string(),
-            version: Version::new(0, 0, 0),
+            version: None,
         }
     }
 }
@@ -169,7 +171,7 @@ impl<E: AsRef<crate::Extension>> From<&E> for ExtensionDesc {
         let ext = ext.as_ref();
         Self {
             name: ext.name.to_string(),
-            version: ext.version.clone(),
+            version: Some(ext.version.clone()),
         }
     }
 }
@@ -354,6 +356,10 @@ pub struct ModuleDesc {
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
     pub num_nodes: Option<usize>,
+    /// Number of edges in the module.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    #[serde(default)]
+    pub num_edges: Option<usize>,
     /// The entrypoint node and the corresponding operation type.
     #[serde(skip_serializing_if = "Option::is_none")]
     #[serde(default)]
@@ -380,6 +386,11 @@ impl ModuleDesc {
     /// Sets the number of nodes in the module.
     pub fn set_num_nodes(&mut self, num_nodes: usize) {
         self.num_nodes = Some(num_nodes);
+    }
+
+    /// Sets the number of edges in the module.
+    pub fn set_num_edges(&mut self, num_edges: usize) {
+        self.num_edges = Some(num_edges);
     }
 
     /// Sets the entrypoint of the module.
@@ -490,9 +501,15 @@ impl ModuleDesc {
         self.set_num_nodes(hugr.num_nodes());
     }
 
+    /// Loads the number of edges in the module from the HUGR.
+    pub(crate) fn load_num_edges(&mut self, hugr: &impl HugrView) {
+        self.set_num_edges(hugr.num_edges());
+    }
+
     /// Loads full description of the module from the HUGR.
     pub(crate) fn load_from_hugr(&mut self, hugr: &impl HugrView<Node = Node>) {
         self.load_num_nodes(hugr);
+        self.load_num_edges(hugr);
         self.load_entrypoint(hugr);
         self.load_generator(hugr);
         self.load_used_extensions_resolved(hugr);
@@ -591,6 +608,12 @@ mod test {
     }
 
     #[rstest]
+    fn test_module_desc_set_num_edges(mut empty_module_desc: ModuleDesc) {
+        empty_module_desc.set_num_edges(20);
+        assert_eq!(empty_module_desc.num_edges, Some(20));
+    }
+
+    #[rstest]
     fn test_module_desc_set_entrypoint(mut empty_module_desc: ModuleDesc) {
         let node = Node::from(portgraph::NodeIndex::new(0));
         let optype: OpType = crate::ops::DFG {
@@ -622,7 +645,21 @@ mod test {
         let version = Version::new(1, 0, 0);
         let extension = ExtensionDesc::new(name, version.clone());
         assert_eq!(extension.name, name);
-        assert_eq!(extension.version, version);
+        assert_eq!(extension.version, Some(version));
+        assert_eq!(extension.to_string(), "Extension test_extension v1.0.0");
+    }
+
+    #[test]
+    fn test_extension_desc_new_unversioned() {
+        let extension = ExtensionDesc::new_unversioned("test_extension");
+
+        assert_eq!(extension.name, "test_extension");
+        assert_eq!(extension.version, None);
+        assert_eq!(extension.to_string(), "Extension test_extension");
+        assert_eq!(
+            serde_json::to_value(extension).unwrap(),
+            serde_json::json!({"name": "test_extension"})
+        );
     }
 
     #[rstest]

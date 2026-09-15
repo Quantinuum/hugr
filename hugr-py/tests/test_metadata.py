@@ -93,7 +93,7 @@ def test_metadata_roundtrip() -> None:
     assert raw[HugrGenerator.KEY] == {"name": "hugr-py-test", "version": "1.2.3"}
     assert raw[HugrUsedExtensions.KEY] == [
         {"name": "ext.a", "version": "0.1.0"},
-        {"name": "ext.b", "version": "0.0.0"},
+        {"name": "ext.b"},
     ]
     assert raw["custom.metadata"] == custom_payload
 

@@ -1,7 +1,7 @@
 # ruff: noqa: I001
 
 import hugr
-from hugr.ext import UsedExtensionResolver
+from hugr.ext import UsedExtensionResolver, ExtensionRegistry
 from hugr.package import Package
 import hugr.ops as ops
 import hugr.tys as tys
@@ -508,3 +508,34 @@ def test_default_resolution() -> None:
         if isinstance(data.op, ops.Custom):
             assert data.op.extension == extension.name
             assert data.op.op_name == op_def.name
+
+
+def test_packaged_versions_different_than_resolve_from() -> None:
+    """Resolving extensions from a registry housing a newer, but compatible version than
+    the packaged one should not fail.
+
+    Regression test for https://github.com/Quantinuum/hugr/issues/3244."""
+
+    # Two instances of the same extension with compatible versions
+    ext_0_1_0 = ext.Extension("pytest.smoke", ext.Version(0, 1, 0))
+    ext_0_1_1 = ext.Extension("pytest.smoke", ext.Version(0, 1, 1))
+
+    h = Dfg(tys.Bool)
+    h.set_outputs(*h.inputs())
+    package = Package([h.hugr], extensions=[ext_0_1_0])
+
+    exts = ExtensionRegistry.from_extensions([ext_0_1_1])
+
+    used_exts = package.used_extensions(resolve_from=exts)
+    resolved_ext = used_exts.used_extensions.get_extension("pytest.smoke")
+    # There is no op using the newer extension, and the older one is packaged
+    assert resolved_ext.version == ext.Version(0, 1, 0)
+
+
+def test_registry_register_keeps_newest() -> None:
+    ext_0_1_0 = ext.Extension("pytest.smoke", ext.Version(0, 1, 0))
+    ext_0_1_1 = ext.Extension("pytest.smoke", ext.Version(0, 1, 1))
+
+    exts = ExtensionRegistry.from_extensions([ext_0_1_1])
+
+    assert exts.register(ext_0_1_0) is ext_0_1_1

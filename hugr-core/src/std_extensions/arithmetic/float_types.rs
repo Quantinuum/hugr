@@ -32,10 +32,13 @@ pub fn float64_custom_type(extension_ref: &Weak<Extension>) -> CustomType {
     )
 }
 
+static FLOAT64_TYPE: LazyLock<Type> =
+    LazyLock::new(|| float64_custom_type(&Arc::downgrade(&EXTENSION)).into());
+
 /// 64-bit IEEE 754-2019 floating-point type (as [Type])
 #[must_use]
 pub fn float64_type() -> Type {
-    float64_custom_type(&Arc::downgrade(&EXTENSION)).into()
+    FLOAT64_TYPE.clone()
 }
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -119,6 +122,11 @@ pub static EXTENSION: LazyLock<Arc<Extension>> = LazyLock::new(|| {
 #[cfg(test)]
 mod test {
     use super::*;
+
+    #[test]
+    fn float_type_shares_storage() {
+        assert!(float64_type().shares_storage_with(&float64_type()));
+    }
 
     #[test]
     fn test_float_types_extension() {

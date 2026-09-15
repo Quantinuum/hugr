@@ -6,6 +6,7 @@
 use std::sync::Arc;
 
 use crate::envelope::description::{ExtensionDesc, GeneratorDesc, ModuleDesc};
+use crate::extension::prelude::{ConstString, ConstUsize};
 use crate::metadata::{self, Metadata, RawMetadataValue};
 use crate::types::type_param::{SeqPart, TermKindError, TypeParam};
 use crate::types::{
@@ -21,8 +22,8 @@ use crate::{
     hugr::HugrMut,
     ops::{
         AliasDecl, AliasDefn, CFG, Call, CallIndirect, Case, Conditional, Const, DFG,
-        DataflowBlock, ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction, OpType,
-        OpaqueOp, Output, Tag, TailLoop, Value,
+        DataflowBlock, ExitBlock, FuncDecl, FuncDefn, Input, LoadConstant, LoadFunction,
+        Module as ModuleOp, OpType, OpaqueOp, Output, Tag, TailLoop, Value,
         constant::{CustomConst, CustomSerialized, OpaqueValue},
     },
     package::Package,
@@ -265,20 +266,7 @@ pub(crate) fn import_described_hugr(
     module: &table::Module,
     extensions: &ExtensionRegistry,
 ) -> (ModuleDesc, Result<Hugr, ImportError>) {
-    // TODO: Module should know about the number of edges, so that we can use a vector here.
-    // For now we use a hashmap, which will be slower.
-    let mut ctx = Context {
-        module,
-        hugr: Hugr::new(),
-        link_ports: FxHashMap::default(),
-        static_edges: Vec::new(),
-        extensions,
-        nodes: FxHashMap::default(),
-        local_vars: FxHashMap::default(),
-        custom_name_cache: FxHashMap::default(),
-        region_scope: table::RegionId::default(),
-        description: ModuleDesc::default(),
-    };
+    let mut ctx = Context::new(module, extensions);
 
     if let Some(s) = get_generator(&ctx) {
         ctx.description.set_generator(s);
@@ -298,6 +286,7 @@ pub(crate) fn import_described_hugr(
             return (ctx.description, Err(ImportError { inner: e }));
         }
     }
+    ctx.description.set_num_edges(ctx.hugr.num_edges());
     (ctx.description, Ok(ctx.hugr))
 }
 
@@ -326,12 +315,168 @@ struct Context<'a> {
 
     custom_name_cache: FxHashMap<&'a str, (ExtensionId, SmolStr)>,
 
+    /// Successfully imported runtime types, keyed by their model table id.
+    type_cache: FxHashMap<table::TermId, Type>,
+
     region_scope: table::RegionId,
 
     description: ModuleDesc,
 }
 
+/// Initial capacities for importer-owned graph and lookup storage.
+///
+/// These estimates are derived only from the model tables and the small set of
+/// nodes and ports synthesized by the importer. Correctness does not depend on
+/// them: malformed or future model constructs can still grow the collections.
+#[derive(Debug, Clone, Copy)]
+struct ImportCapacity {
+    hugr_nodes: usize,
+    hugr_ports: usize,
+    node_map: usize,
+    link_map: usize,
+    static_edges: usize,
+}
+
+impl ImportCapacity {
+    /// Estimate the storage needed while importing `module`.
+    fn for_module(module: &table::Module<'_>) -> Self {
+        let mut hugr_nodes = 1usize.saturating_add(module.nodes.len());
+        let mut hugr_ports = 0usize;
+        let mut static_edges = 0usize;
+
+        for node in &module.nodes {
+            hugr_ports = hugr_ports
+                .saturating_add(node.inputs.len())
+                .saturating_add(node.outputs.len());
+
+            match &node.operation {
+                table::Operation::DefineFunc(_) | table::Operation::DeclareFunc(_) => {
+                    // Function definitions and declarations have a static output.
+                    hugr_ports = hugr_ports.saturating_add(1);
+                }
+                table::Operation::Dfg
+                | table::Operation::Cfg
+                | table::Operation::TailLoop
+                | table::Operation::Conditional => {
+                    // Dataflow operations have an order port in each direction.
+                    hugr_ports = hugr_ports.saturating_add(2);
+                }
+                table::Operation::Custom(operation) => {
+                    // Imported custom operations are dataflow operations.
+                    hugr_ports = hugr_ports.saturating_add(2);
+
+                    let Some((name, args)) = applied_symbol(module, *operation) else {
+                        continue;
+                    };
+                    if name == model::CORE_CALL {
+                        hugr_ports = hugr_ports.saturating_add(1);
+                        static_edges = static_edges.saturating_add(1);
+                    } else if name == model::CORE_LOAD_CONST {
+                        let loads_function = args
+                            .last()
+                            .and_then(|value| match module.get_term(*value)? {
+                                table::Term::Apply(symbol, _) => module.get_node(*symbol),
+                                _ => None,
+                            })
+                            .is_some_and(|node| {
+                                matches!(
+                                    node.operation,
+                                    table::Operation::DefineFunc(_)
+                                        | table::Operation::DeclareFunc(_)
+                                )
+                            });
+
+                        if loads_function {
+                            // LoadFunction has one static input.
+                            hugr_ports = hugr_ports.saturating_add(1);
+                            static_edges = static_edges.saturating_add(1);
+                        } else {
+                            // A value load synthesizes a Const node and a static edge.
+                            hugr_nodes = hugr_nodes.saturating_add(1);
+                            hugr_ports = hugr_ports.saturating_add(2);
+                        }
+                    }
+                }
+                _ => {}
+            }
+        }
+
+        let mut link_map = 0usize;
+        for region in &module.regions {
+            if let Some(scope) = &region.scope {
+                link_map = link_map.saturating_add(scope.links as usize);
+            }
+
+            match region.kind {
+                model::RegionKind::DataFlow => {
+                    // Input and Output boundary nodes each have an order port.
+                    hugr_nodes = hugr_nodes.saturating_add(2);
+                    hugr_ports = hugr_ports
+                        .saturating_add(region.sources.len())
+                        .saturating_add(region.targets.len())
+                        .saturating_add(2);
+                }
+                model::RegionKind::ControlFlow => {
+                    // Control-flow regions synthesize one ExitBlock.
+                    hugr_nodes = hugr_nodes.saturating_add(1);
+                    hugr_ports = hugr_ports.saturating_add(region.targets.len());
+                }
+                model::RegionKind::Module => {}
+            }
+        }
+
+        // Each conditional region is wrapped in an otherwise portless Case node.
+        let case_nodes = module
+            .nodes
+            .iter()
+            .filter(|node| matches!(node.operation, table::Operation::Conditional))
+            .map(|node| node.regions.len())
+            .fold(0usize, usize::saturating_add);
+        hugr_nodes = hugr_nodes.saturating_add(case_nodes);
+
+        Self {
+            hugr_nodes,
+            hugr_ports,
+            node_map: module.nodes.len(),
+            link_map,
+            static_edges,
+        }
+    }
+}
+
+/// Return the referenced symbol name and arguments of an application term.
+fn applied_symbol<'a>(
+    module: &table::Module<'a>,
+    term: table::TermId,
+) -> Option<(&'a str, &'a [table::TermId])> {
+    let table::Term::Apply(symbol, args) = module.get_term(term)? else {
+        return None;
+    };
+    Some((module.get_node(*symbol)?.operation.symbol()?, args))
+}
+
 impl<'a> Context<'a> {
+    /// Creates the state used to import one model module.
+    fn new(module: &'a table::Module<'a>, extensions: &'a ExtensionRegistry) -> Self {
+        // TODO: Module should know about the number of edges, so that we can use a vector here.
+        // For now we use a hashmap, which will be slower.
+        let capacity = ImportCapacity::for_module(module);
+        Self {
+            module,
+            hugr: Hugr::with_capacity(ModuleOp::new(), capacity.hugr_nodes, capacity.hugr_ports)
+                .expect("a module is always a supported HUGR root"),
+            link_ports: FxHashMap::with_capacity_and_hasher(capacity.link_map, Default::default()),
+            static_edges: Vec::with_capacity(capacity.static_edges),
+            extensions,
+            nodes: FxHashMap::with_capacity_and_hasher(capacity.node_map, Default::default()),
+            local_vars: FxHashMap::default(),
+            custom_name_cache: FxHashMap::default(),
+            type_cache: FxHashMap::default(),
+            region_scope: table::RegionId::default(),
+            description: ModuleDesc::default(),
+        }
+    }
+
     /// Get the signature of the node with the given `NodeId`.
     fn get_node_signature(&mut self, node: table::NodeId) -> Result<Signature, ImportErrorInner> {
         let node_data = self.get_node(node)?;
@@ -1551,7 +1696,13 @@ impl<'a> Context<'a> {
     }
 
     fn import_type(&mut self, term_id: table::TermId) -> Result<Type, ImportErrorInner> {
-        Ok(Type::try_from(self.import_term(term_id)?)?)
+        if let Some(typ) = self.type_cache.get(&term_id) {
+            return Ok(typ.clone());
+        }
+
+        let typ = Type::try_from(self.import_term(term_id)?)?;
+        self.type_cache.insert(term_id, typ.clone());
+        Ok(typ)
     }
 
     fn import_term_with_bound(
@@ -1921,9 +2072,9 @@ impl<'a> Context<'a> {
         let elems = self.import_closed_list(term_id)?;
         Ok(elems
             .into_iter()
-            .map(|id| self.import_term(id))
+            .map(|id| self.import_type(id))
             .collect::<Result<Vec<_>, _>>()?
-            .try_into()?)
+            .into())
     }
 
     fn import_custom_name(
@@ -2107,6 +2258,12 @@ impl<'a> Context<'a> {
                 // - custom constructors for values
             }
 
+            table::Term::Literal(model::Literal::Str(s)) => {
+                Ok(ConstString::new((*s).to_string()).into())
+            }
+
+            table::Term::Literal(model::Literal::Nat(n)) => Ok(ConstUsize::new(*n).into()),
+
             table::Term::List { .. } | table::Term::Tuple(_) | table::Term::Literal(_) => {
                 Err(error_invalid!("expected constant"))
             }
@@ -2244,9 +2401,74 @@ impl LocalVar {
 
 #[cfg(test)]
 mod test {
-    use crate::Hugr;
+    use std::str::FromStr;
+
+    use crate::{Direction, Hugr, HugrView, std_extensions::std_reg};
+    use hugr_model::v0::{self as model, table};
     use rstest::rstest;
     use std::path::PathBuf;
+
+    use super::{Context, ImportCapacity};
+
+    /// Parse the small model fixture used by importer unit tests.
+    fn model_add_ast() -> model::ast::Package {
+        model::ast::Package::from_str(include_str!(
+            "../../hugr-model/tests/fixtures/model-add.edn"
+        ))
+        .unwrap()
+    }
+
+    #[rstest]
+    #[case(include_str!("../../hugr-model/tests/fixtures/model-add.edn"))]
+    #[case(include_str!("../../hugr-model/tests/fixtures/model-call.edn"))]
+    #[case(include_str!("../../hugr-model/tests/fixtures/model-cfg.edn"))]
+    #[case(include_str!("../../hugr-model/tests/fixtures/model-cond.edn"))]
+    #[case(include_str!("../../hugr-model/tests/fixtures/model-const.edn"))]
+    #[case(include_str!("../../hugr-model/tests/fixtures/model-loop.edn"))]
+    fn import_capacity_covers_generated_graph_storage(#[case] source: &str) {
+        let bump = model::bumpalo::Bump::new();
+        let ast = model::ast::Package::from_str(source).unwrap();
+        let package = ast.resolve(&bump).unwrap();
+        let module = &package.modules[0];
+        let capacity = ImportCapacity::for_module(module);
+        let hugr = super::import_hugr(module, &std_reg()).unwrap();
+        let port_count = hugr
+            .nodes()
+            .map(|node| {
+                hugr.node_ports(node, Direction::Incoming).count()
+                    + hugr.node_ports(node, Direction::Outgoing).count()
+            })
+            .sum::<usize>();
+
+        assert!(capacity.hugr_nodes >= hugr.num_nodes());
+        assert!(capacity.hugr_ports >= port_count);
+        assert!(capacity.node_map >= module.nodes.len());
+    }
+
+    /// Check that type imports of the same term share the same underlying storage.
+    #[rstest]
+    fn repeated_runtime_type_imports_share_storage() {
+        let bump = model::bumpalo::Bump::new();
+        let ast = model_add_ast();
+        let package = ast.resolve(&bump).unwrap();
+        let module = &package.modules[0];
+        let registry = std_reg();
+        let mut context = Context::new(module, &registry);
+
+        let (term_id, first) = (0..module.terms.len())
+            .map(table::TermId::new)
+            .find_map(|term_id| {
+                context
+                    .import_type(term_id)
+                    .ok()
+                    .filter(|typ| typ.as_extension().is_some())
+                    .map(|typ| (term_id, typ))
+            })
+            .expect("fixture should contain an extension type");
+        let second = context.import_type(term_id).unwrap();
+
+        assert!(first.shares_storage_with(&second));
+    }
 
     #[rstest]
     fn test_import_cases(#[files("../test_files/import_tests/*.hugr")] case: PathBuf) {

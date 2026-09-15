@@ -11,6 +11,8 @@ from collections.abc import (
 from dataclasses import dataclass, field
 from typing import TYPE_CHECKING, Generic, Protocol, TypeVar
 
+from typing_extensions import deprecated
+
 if TYPE_CHECKING:
     from hugr.tys import TypeArg
 
@@ -27,6 +29,7 @@ class NotBijection(Exception):
 
 
 @dataclass()
+@deprecated("Will be removed in a future version.")  # Since 0.18.5
 class BiMap(MutableMapping, Generic[L, R]):
     """Bidirectional map backed by two dictionaries, between left types `L` and
     right types `R`.

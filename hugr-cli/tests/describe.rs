@@ -179,6 +179,7 @@ fn test_describe_default(package_with_exts_default_file: NamedTempFile, mut desc
           },
           "generator": "my_generator-v2.0.0",
           "num_nodes": 6,
+          "num_edges": 2,
           "used_extensions_resolved": [
             {
               "name": "resolved_ext",
@@ -214,6 +215,7 @@ fn test_describe_packaged_extensions(
         .assert()
         .success()
         .stdout(contains("my_generator-v2.0.0"))
+        .stdout(contains("num_edges"))
         .stdout(contains("Resolved extensions:"))
         .stdout(contains("Packaged extensions:"))
         .stdout(contains("used_ext").not())
@@ -410,13 +412,15 @@ fn test_schema(mut describe_cmd: Command) {
               "type": "string"
             },
             "version": {
-              "description": "Version of the extension.\n\nA version value of `0.0.0` is used for extensions that do not have a version.",
-              "type": "string"
+              "description": "Version of the extension.",
+              "type": [
+                "string",
+                "null"
+              ]
             }
           },
           "required": [
-            "name",
-            "version"
+            "name"
           ]
         },
         "ModuleDesc": {
@@ -443,6 +447,15 @@ fn test_schema(mut describe_cmd: Command) {
             },
             "num_nodes": {
               "description": "Number of nodes in the module.",
+              "type": [
+                "integer",
+                "null"
+              ],
+              "format": "uint",
+              "minimum": 0
+            },
+            "num_edges": {
+              "description": "Number of edges in the module.",
               "type": [
                 "integer",
                 "null"

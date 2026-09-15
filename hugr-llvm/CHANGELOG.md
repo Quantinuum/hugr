@@ -1,6 +1,26 @@
 # Changelog
 
 
+## [0.30.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.29.4...hugr-llvm-v0.30.0) - 2026-09-03
+
+### Performance
+
+- [**breaking**] Reuse shared `Type`s during HUGR import ([#3215](https://github.com/Quantinuum/hugr/pull/3215))
+
+### Refactor
+
+- [**breaking**] Remove deprecated definitions ([#3232](https://github.com/Quantinuum/hugr/pull/3232))
+
+## [0.29.4](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.29.3...hugr-llvm-v0.29.4) - 2026-08-28
+
+### Bug Fixes
+
+- avoid poisoned values when using ishl/ishr with large shift amounts ([#3192](https://github.com/Quantinuum/hugr/pull/3192))
+
+### New Features
+
+- Add froundeven float op ([#3122](https://github.com/Quantinuum/hugr/pull/3122))
+
 ## [0.29.2](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.29.1...hugr-llvm-v0.29.2) - 2026-07-14
 
 ### Bug Fixes

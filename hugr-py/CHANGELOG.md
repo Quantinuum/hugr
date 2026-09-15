@@ -1,5 +1,31 @@
 # Changelog
 
+## [0.18.6](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.5...hugr-py-v0.18.6) (2026-09-04)
+
+
+### Features
+
+* Add froundeven float op ([#3122](https://github.com/Quantinuum/hugr/issues/3122)) ([98a5122](https://github.com/Quantinuum/hugr/commit/98a5122bd1abbcdfc8a207cac2c877aada3a6707))
+* **cli:** include edge counts in describe output ([#3209](https://github.com/Quantinuum/hugr/issues/3209)) ([caa558d](https://github.com/Quantinuum/hugr/commit/caa558dc2c39ce7f6a8ddd994a96023d7cd75c58))
+* Read ext version as optional in ExtensionDesc metadata ([#3231](https://github.com/Quantinuum/hugr/issues/3231)) ([8fd517b](https://github.com/Quantinuum/hugr/commit/8fd517bd5dfe2b0df3da4cd86ca6b390962d2f57))
+
+
+### Bug Fixes
+
+* **hugr-py:** Return newest compatible version when registering an extension in a registry ([#3245](https://github.com/Quantinuum/hugr/issues/3245)) ([a793e38](https://github.com/Quantinuum/hugr/commit/a793e38511f03639bbe0aa48fa748169d49e05c6)), closes [#3244](https://github.com/Quantinuum/hugr/issues/3244)
+
+## [0.18.5](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.4...hugr-py-v0.18.5) (2026-08-19)
+
+
+### Features
+
+* **hugr-py:** Render extension version with render dot ([#3199](https://github.com/Quantinuum/hugr/issues/3199)) ([e040538](https://github.com/Quantinuum/hugr/commit/e04053817e9c8b512a29aec8c3bf045063c3469c))
+
+
+### Performance Improvements
+
+* Avoid computing unused sub offsets during link establishment ([#3208](https://github.com/Quantinuum/hugr/issues/3208)) ([40986a8](https://github.com/Quantinuum/hugr/commit/40986a80bde7996e4820819d6623a7d6e116e7ca))
+
 ## [0.18.4](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.3...hugr-py-v0.18.4) (2026-08-12)
 
 

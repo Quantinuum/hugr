@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.30.0](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.29.4...hugr-model-v0.30.0) - 2026-09-03
+
+### New Features
+
+- *(hugr-model)* Allow parsing literals as constants ([#3230](https://github.com/Quantinuum/hugr/pull/3230))
+
+### Performance
+
+- Improve `pest` AST parsing ([#3235](https://github.com/Quantinuum/hugr/pull/3235))
+
 ## [0.28.1](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.28.0...hugr-model-v0.28.1) - 2026-06-10
 
 ### Bug Fixes

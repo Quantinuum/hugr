@@ -631,6 +631,7 @@ impl Extension {
             constant_folder: Default::default(),
         };
 
+        self.clear_json_cache();
         match self.operations.entry(op.name.clone()) {
             Entry::Occupied(_) => Err(ExtensionBuildError::OpDefExists(op.name)),
             // Just made the arc so should only be one reference to it, can get_mut,

@@ -33,6 +33,11 @@ impl From<Type> for SerSimpleType {
         if value == usize_t() {
             return SerSimpleType::I;
         }
+        // TODO: `value.into()` into a `Term` forces cloning of shared types
+        // inside `TypeStorage` before they are serialized.
+        //
+        // Avoiding this requires rewriting the serialization logic to handle
+        // shared storage directly.
         match value.into() {
             Term::ExtensionType(o) => SerSimpleType::Opaque(o),
             Term::FunctionType(sig) => SerSimpleType::G(sig),
