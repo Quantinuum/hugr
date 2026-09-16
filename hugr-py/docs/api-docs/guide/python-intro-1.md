@@ -1,31 +1,46 @@
-# A Beginner's Guide to Building HUGRs in Python
+# A Beginner's Guide to Building HUGR Graphs in Python
 
-We will start by building a dataflow graph corresponding to the simple circuit constructing a bell pair below and then progressively add more features to it.
+[TODO: Intro]
 
-![](resources/tmp-circuit.jpg)
+## Translating a basic circuit into HUGR
+
+Consider this circuit that constructs a bell pair from two qubits and then measures one of them.
+
+![](images/bell-pair-circuit.png)
+
+It consists of two basic types of components: the wires representing qubit values flowing through the circuit, and quantum operations that can be applied to the wires, representing an action being performed on one or more qubits.
+
+Now let's look at a simple HUGR graph and compare it to the circuit.
+
+A HUGR graph is essentially just a **dataflow graph** (DFG), meaning a graph where nodes are operations and edges represent values flowing from the output of one operation to the input of another, implicitly encoding which computations depend on which other computations. We'll start by initialising a dataflow graph (`Dfg`) with two qubits.
 
 ```py
 from hugr import tys
 from hugr.build.tracked_dfg import TrackedDfg
 
 circ = TrackedDfg(tys.Qubit, tys.Qubit, track_inputs=True)
+
+circ.set_tracked_outputs()
 ```
 
-- `TrackedDfg` allows us to work on wires by index instead of passing them around
-- `tys` is the built-in module of types, `Qubit` is one of them
+The `Tracked` in `TrackedDfg` means we can refer to any tracked wires in the graph by index (as opposed to passing them around directly as we will see in later examples). Even though we are not doing anything in particular with the qubits yet, we need to define the inputs and outputs of the graph. We define the inputs of the graph by passing their types: in this case `Qubit` is available in the built-in `tys` module. The outputs are set by calling `set_tracked_outputs`, which automatically connects all tracked wires to the output node.
 
-> You can visualise HUGRs using `render_dot` in Python.
+Visualising the HUGR results in the following diagram:
 
-![](resources/tmp-hugr-simple.png)
+![](images/basic1.svg)
 
-We haven't added any operations ourselves, but notice in the graph:
-- Nodes representing operations, with indexed inports and outports, some of which creating new dataflow regions (creating a hierarchy, hence "hierarchical" graph representation)
-- Module node with function definition `main` as entrypoint, though executable module must take no arguments as input
-- Input and output nodes in each region container, with edges representing the qubit values
+> In Python you can visualise HUGRs by using the `render_dot` method.
 
-Let's add operations representing quantum gates to the graph. This requires the use of a HUGR extension. An extension is a collection of custom types and operations, in this case `tket.quantum` contains common quantum operations.
+While we haven't added any nodes to the graph ourselves yet, we can already notice the similarity between dataflow graph edges of type `Qubit` and wires in a circuit both representing qubit values.
 
-```
+However there are also differences - notably, the HUGR consists of multiple **regions**, with each region container having its own input and output nodes. This is where the **hierarchical** part of "Hierarchical Unified Graph Representation" (HUGR) comes from. Certain nodes can themselves subgraphs as their children. In our graph we can see some of those nodes:
+- The `Module` node is a top-level node which as children can only have function definitions, function declarations, or constants.
+- Each module needs at least one function definition that acts as an entrypoint to the graph (however for the module to be executable, the function cannot take any inputs). In this case we have a `FuncDefn` node called `main` by default.
+- Finally, the function definition contains the `DFG` we created, so far only containing an input and output node. Note how each port on a node is indexed and ordered.
+
+Let's try to further copy the circuit by adding operations representing quantum gates to the graph, using the `add` method. This requires the use of a HUGR **extension**. An extension is a collection of custom types and operations, in this case `tket.quantum` contains common quantum operations.
+
+```py
 import tket.extensions as ext
 
 quantum = ext.quantum
@@ -34,25 +49,23 @@ circ.add(quantum.H(0))
 circ.add(quantum.CX(0, 1))
 ```
 
-After adding a measurement operation on the first qubit, we should also add a `read` operation in order to obtain a `Bool`. The `extend` method lets us add multiple operations at the same time.
+As this is a DFG with tracked wires, we simply refer to each qubit by its index. The `extend` method lets us add multiple operations at the same time. In this case, after adding a measurement operation on the first qubit, we should also add a `read` operation in order to obtain a `Bool`.
 
-```
+```py
 circ.extend(quantum.measure_free(0), measure.read(0))
 ```
 
-Finally we also need to connect the wires to the output node after the gates have been applied.
+ Connecting the outputs as before with `set_tracked_outputs` to finish, we now get the following graph:
 
-```
-circ.set_tracked_outputs()
-```
+![](images/basic2.svg)
 
-![](resources/tmp-measure.png)
+**We now have a HUGR representing the circuit at the start of the guide, with nodes corresponding to gates, and wires corresponding to edges!**
 
-Note that `set_tracked_outputs` connects all wires to the output automatically. If we instead set the outputs manually by index using we need to be careful to not drop any linear values.
-- All types in HUGR are either linear or copyable
-- Linear values need to be used exactly once, so they cannot be dropped or copied
+Of course a HUGR is more general than a circuit, with nodes and edges being able to represent various classical values and operations too. For this it is important to know that all nodes and edges are **statically typed**, meaning you can only connect edges to ports with matching types according to the signature of a node.
 
-If we connected only the second wire using `circ.set_indexed_outputs(1)` and then tried to validate the resulting HUGR, we would get the following error as `Qubit` is a linear type.
+An important concept for types in HUGR is **linearity**: all types in HUGR are either linear or copyable, where linear values are values that need to be used exactly once so they cannot be dropped or copied (whereas copyable values can be). In graph terms this means that edges of linear types go from exactly one outport to exactly one inport (multuple or no connections are not allowed). This is useful for representing the no-clone and no-delete properties of qubits.
+
+We can demonstrate this concept by looking at the outputs of our DFG. As mentioned before, `set_tracked_outputs` connects all wires to the output automatically. If we instead set the outputs manually by index, we need to be careful to not drop any linear values. So if we connected only the first wire using `circ.set_indexed_outputs(0)` and then tried to validate the resulting HUGR, we would get the following error, as `Qubit` is a linear type:
 
 ```
 hugr._hugr.model.HugrCliError: Error validating HUGR.
@@ -62,85 +75,97 @@ Caused by:
     1: Node(8) has an unconnected port Port(Outgoing, 1) of type qubit.
 ```
 
-> Note you can validate HUGRs either using the CLI or by using `hugr.cli.validate` on a package (note having to load extensions into package).
+> You can validate HUGRs either using the CLI tool or by calling `hugr.cli.validate` with a package containing the module you want to check.
 
-If we only connected the first wire with `circ.set_indexed_outputs(0)`, the HUGR would be valid as `Bool` is a copyable type that can be dropped.
+If we only connected the second wire with `circ.set_indexed_outputs(1)`, the HUGR would be valid as `Bool` is a copyable type that can be dropped.
 
-> Note that if we were using just a `Dfg` you would have to pass the wires in the following manner instead of indexing. This is useful to keep in mind when adding operations in dataflow containers which have no tracked versions (such as the conditionals we will see in the next section). The Guppy compiler generally passes wires directly.
+> For debugging these kind of validation errors visually, it may be be useful to pass a `RenderConfig` with `display_node_id` set to `True` to `render_dot`.
 
-We now have a HUGR representing a bell pair preparation circuit!
+It was mentioned earlier that for this HUGR to be executable, you need the `main` entrypoint to not have any inputs. Let's do this by allocating the qubits instead. This is also useful for demonstrating how to assign and pass around wires directly instead of using indices, which is useful for the remaining examples (it is also how the Guppy compiler generally handles wires).
 
-## Adding control flow to the graph
-
-What if we now wanted to change the second qubit based on the measurement of the first qubit? First we will get the bool wire directly in order to be able to branch on it.
+First initialise the DFG without any inputs:
 
 ```py
-_, bit = circ.extend(quantum.measure_free(0), measure.read(0))
+circ = TrackedDfg()
 ```
 
-Then we can add a new conditional block, consisting of an if branch followed by an else branch.
+Then use the `qAlloc` operation to get two qubit wires, and optionally register them as being tracked wires if you still want to refer to them by index (as opposed to using the `q0` and `q1` variables).
 
 ```py
-with circ.add_if(bit, circ.tracked_wire(1)) as if_:
-       if_.set_outputs(if_.add(quantum.X(if_.input_node[0])))
+q0 = circ.add(quantum.qAlloc()).out(0)
+q1 = circ.add(quantum.qAlloc()).out(0)
+circ.track_wires([q0, q1])
+```
+
+![](images/basic3.svg)
+
+You can find the full example code [here](code/example-basic.py).
+
+## Adding control flow to represent dynamic measurements
+
+So far all the data in our graph only followed one specific path. What if we now wanted change the example to do something depending on the outcome of the measurement of the first qubit?
+
+We still start with a `TrackedDfg` with no inputs as before, but then to make it easier to follow what happens with each qubit, let's rename `q0` and `q1` to `data` and `ancilla` and also give the measurement result a name.
+
+```py
+data = circ.add(quantum.qAlloc())
+ancilla = circ.add(quantum.qAlloc())
+
+ancilla = circ.add(quantum.H(ancilla))
+data, ancilla = circ.add(quantum.CX(data, ancilla))
+
+measurement = circ.add(quantum.measure_free(ancilla))
+result = circ.add(measure.read(measurement))
+```
+
+We then add a `Conditional` node, which creates a new region with subgraphs for each case. We can use `add_if` as a special short hand for a conditional with two cases that branches based on a `Bool` value. In the `True` branch (`result = 1`) we will "correct" the `data` qubit by applying an `X` gate operation, otherwise we just pass the qubit back untouched.
+
+```py
+with circ.add_if(result, data) as if_:
+    flipped = if_.add(quantum.X(if_.input_node[0]))
+    if_.set_outputs(flipped)
 
 with if_.add_else() as else_:
-       else_.set_outputs(else_.input_node[0])
-       circ.tracked[1] = else_.conditional_node
+    else_.set_outputs(else_.input_node[0])
+
+circ.set_outputs(if_.conditional_node[0])
 ```
 
-![](resources/tmp-if.png)
+It is possible to not use context managers and instead assign the results of `add_if` and `add_else` to builder variables (and then it is also possible to convert those builders into tracked versions). However using `with` blocks is a useful way of keeping track of the hierarchy, as each block represents a new subgraph inside a node in the dataflow graph.
 
-- `If`/`else` is a special case of conditional nodes with two cases
-- Branching happens on sum types, explain sum types (in particular, `tys.Either`)
-- Sum types also used for `TailLoops`, explain tail loops
-- Example for tail loops: reset qubits through repeat-until-success using `add_tail_loop` / `ops.Continue` / `ops.Break`
+![](images/control-flow1.svg)
 
-## Generalising the graph
+[TODO: Finish writing this section]
 
-- In this section generalise the running example to create a GHZ state using a generic funtion
-- `define_function` on an explicit module / `main.call` to call the created function
-- Maybe first use `load_constant` to have a specific function and showcase constants, then params
+- Not a realistic scenario, but general building block of preparing and then correcting based on some ancilla measurement
+- Another common scenario are repeat-until-success algorithms, where we do not only branch once, but keep iterating until some condition is met
 
-> At this point also have a notebook link to the full examples?
+[TODO: Add break and continue to diagram, fix retry condition]
 
-## Exploring a generated graph
+![](images/loop-diagram.png)
 
-Let's now go back to the original bell pair HUGR and compare it to one generated by the Guppy compiler for a program representing the circuit we want to implement.
+- The way this can be represented in HUGR is TailLoops
+- Tail loops branch based on sum types, generalisation of the bool type which is a special unit sum
+- In general can tag types, here we use break and continue (alias for left and right)
 
-```py
-from guppylang import guppy
-from guppylang.std.lang import owned
-from guppylang.std.quantum import Measurement, cx, h, measure, qubit
+![](images/control-flow2.svg)
 
+You can find the full example code [here](code/example-control-flow2.py).
 
-@guppy
-def bell_pair(q1: qubit @ owned, q2: qubit @ owned) -> tuple[bool, Measurement]:
-    h(q1)
-    cx(q1, q2)
-    return measure(q1).read(), measure(q2)
+## Generalising through functions and polymorphism
 
-@guppy
-def main() -> None:
-    q1 = qubit()
-    q2 = qubit()
-    bell_pair(q1, q2)
+[TODO: Finish writing this section]
 
-hugr = main.with_minimal_opt().compile().modules[0]
-```
+- As diagram showed earlier, you might want to generalise this loop, or group together common sequences of gates that can be reused
+- We can do this by defining functions on the module in addition to the main function, and then calling them where we previously added operations directly
 
-- Note we are using `with_minimal_opt` to get the graph as it is built by the compiler before any optimisations first
-- This time instead of immediately looking at the visualisation, we will first try to explore the graph programmatically
-- `nodes` / `children`, `descendants` / `in/output_neighbours`, `neighbours` / `in/outcoming_links`, `linked_ports` / `sorted_region_nodes` / `port_type`, `port_kind`
-- It will become obvious that there is a `CFG` node which we then can also see in the visualiation, explain why CFGs are used in addition to conditionals (incl. the `Tag` node)
+![](images/functions1.svg)
 
-![](resources/tmp-gupppy-min.png)
+- We can use this same pattern to now use more complicated useful preparation and correction gadgets defined in those function, with the repeat-until-success loops working in the same manner
+- One final feature for this tutorial that might prove useful to do this is polymophism, so the ability to define functions that work for different types or different parameters
+- a common data structure utilising bounded nats for example are arrays
+- To start with a simple extention to demonstrate this, let's add a `correct_all` function which operates on an array of qubits instead of only one, and use it inside of our loop (even though we only have one qubit)
 
-- There are a few other differences to the graph we built with the `TrackedDfg`
-- Explain order edges around `QAlloc`/`Measure`
-- Explain the metadata added to various nodes
-- Explain the `MakeTuple` nodes
+[TODO: Finish diagram and code for polymorphic example]
 
-If we now compile the Guppy code again this time with default optimisations turned on, we can see that a lot of the differing nodes above are now removed as they weren't necessary in this particular program, and the graph now looks pretty much like the one we constructed earlier in the tutorial.
-
-![](resources/tmp-guppy.png)
+You can see the full example code [here](code/example-functions2.py).
