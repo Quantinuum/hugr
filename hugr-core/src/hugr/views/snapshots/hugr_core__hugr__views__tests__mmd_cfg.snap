@@ -20,7 +20,7 @@ graph LR
                     direction LR
                     7["(7) Input"]
                     8["(8) Output"]
-                    9["(9) Tag(1)"]
+                    9["(9) Tag(Right)"]
                     7--"0:0<br>prelude.usize"-->9
                     9--"0:0<br>[prelude.usize]+[prelude.usize]"-->8
                 end

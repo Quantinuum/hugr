@@ -88,11 +88,11 @@ pub struct MermaidFormatter<'h, H: HugrInternals + ?Sized = Hugr> {
     /// A node to highlight as the graph entrypoint.
     entrypoint: Option<H::Node>,
     /// Include the version of the extension defining the operation.
-    pub extension_version: bool,
+    extension_version: bool,
     /// Include the operation's type arguments.
-    pub print_type_args: bool,
+    print_type_args: bool,
     /// Qualify operation name with their extension identifier.
-    pub qualify_name: bool,
+    qualify_name: bool,
 }
 
 impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {

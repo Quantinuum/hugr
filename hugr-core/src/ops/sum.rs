@@ -52,7 +52,26 @@ impl DataflowOpTrait for Tag {
     }
 
     fn render_str(&self, _config: RenderStringConfig) -> String {
-        "Tag(".to_string() + &self.tag.to_string() + ")"
+        let content = match &self.variants[..] {
+            [val] => {
+                if val.is_empty() {
+                    "Unit"
+                } else {
+                    "Tuple"
+                }
+            }
+            [left, right] => {
+                if left.is_empty() && right.is_empty() {
+                    if self.tag == 0 { "False" } else { "True" }
+                } else if left.is_empty() {
+                    if self.tag == 0 { "None" } else { "Some" }
+                } else {
+                    if self.tag == 0 { "Left" } else { "Right" }
+                }
+            }
+            _ => &self.tag.to_string(),
+        };
+        "Tag(".to_string() + content + ")"
     }
 
     /// The signature of the operation.
