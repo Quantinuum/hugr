@@ -112,6 +112,7 @@ use std::cmp::Ordering;
 
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ExtensionId, ExtensionRegistry};
+use crate::hugr::views::render::RenderStringConfig;
 use crate::types::{EdgeKind, Signature, Substitution, Type};
 use crate::{Direction, Node, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
@@ -572,6 +573,14 @@ pub trait StaticTag {
 pub trait OpTrait: Sized + Clone {
     /// A human-readable description of the operation.
     fn description(&self) -> &str;
+
+    /// Returns an exhaustive string representation of the operation.
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        // TODO: Remove this default implementation with the next breaking release.
+        unimplemented!(
+            "This operation is relying on the default undefined render_str implementation, implement one."
+        )
+    }
 
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag;

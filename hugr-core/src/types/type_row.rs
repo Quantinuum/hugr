@@ -1,13 +1,8 @@
 //! Rows of types, used for function signatures,
 //! designed to support efficient static allocation.
 
-use std::{
-    borrow::Cow,
-    fmt::{self, Display, Write},
-    ops::{Deref, DerefMut},
-};
-
 use super::{Substitution, Term, Transformable, Type, TypeTransformer, type_param::TypeParam};
+use crate::hugr::views::render::RenderStringConfig;
 use crate::{
     extension::SignatureError,
     types::{
@@ -19,6 +14,11 @@ use crate::{
 use delegate::delegate;
 use derive_more::Display;
 use itertools::Itertools;
+use std::{
+    borrow::Cow,
+    fmt::{self, Display, Write},
+    ops::{Deref, DerefMut},
+};
 
 /// List of types, of known length, used for node signatures.
 ///
@@ -82,6 +82,7 @@ impl TypeRow {
 /// warning when the trait is used as a type bound on a public struct.
 mod internal {
     use super::{SignatureError, Substitution, Transformable, TypeParam};
+    use crate::hugr::views::render::RenderStringConfig;
 
     /// Sub-trait of [`Transformable`] implemented by things that represent
     /// rows of types (fixed-length [`TypeRow`] or variable-length [`TypeRowRV`]).
@@ -89,6 +90,9 @@ mod internal {
     /// [`TypeRow`]: super::TypeRow
     /// [`TypeRowRV`]: super::TypeRowRV
     pub trait TypeRowLike: Transformable {
+        /// Render this row using the supplied configuration.
+        fn render_str(&self, config: RenderStringConfig) -> String;
+
         /// Checks all variables used in `self` are in the provided list of bound
         /// variables, and that for each [`CustomType`]  the corresponding [`TypeDef`]
         ///  is in the [`ExtensionRegistry`] and the type arguments validate (recursively)
@@ -113,6 +117,10 @@ mod internal {
 pub(crate) use internal::TypeRowLike;
 
 impl TypeRowLike for TypeRow {
+    fn render_str(&self, config: RenderStringConfig) -> String {
+        "[".to_string() + &self.iter().map(|ty| ty.render_str(config)).join(", ") + "]"
+    }
+
     fn validate(&self, var_decls: &[TypeParam]) -> Result<(), SignatureError> {
         self.iter().try_for_each(|t| t.validate(var_decls))
     }
@@ -287,6 +295,10 @@ impl TypeRowRV {
 }
 
 impl TypeRowLike for TypeRowRV {
+    fn render_str(&self, config: RenderStringConfig) -> String {
+        self.0.render_str(config)
+    }
+
     /// Checks that this is indeed a list of runtime types;
     /// and that all variables are as declared in the supplied list of params.
     fn validate(&self, vars: &[TypeParam]) -> Result<(), SignatureError> {

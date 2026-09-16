@@ -20,18 +20,18 @@ graph LR
                     direction LR
                     7["(7) Input"]
                     8["(8) Output"]
-                    9["(9) Tag"]
-                    7--"0:0<br>usize"-->9
-                    9--"0:0<br>[usize]+[usize]"-->8
+                    9["(9) Tag(Right)"]
+                    7--"0:0<br>prelude.usize"-->9
+                    9--"0:0<br>[prelude.usize]+[prelude.usize]"-->8
                 end
                 5["(5) ExitBlock"]
                 subgraph 10 ["(10) DataflowBlock"]
                     direction LR
                     11["(11) Input"]
                     12["(12) Output"]
-                    13["(13) const:seq:{}"]
+                    13["(13) Unit"]
                     14["(14) LoadConstant"]
-                    11--"0:1<br>usize"-->12
+                    11--"0:1<br>prelude.usize"-->12
                     13--"0:0<br>Unit"-->14
                     14--"0:0<br>Unit"-->12
                 end
@@ -39,7 +39,7 @@ graph LR
                 6-."1:0".->5
                 10-."0:0".->5
             end
-            2--"0:0<br>usize"-->4
-            4--"0:0<br>usize"-->3
+            2--"0:0<br>prelude.usize"-->4
+            4--"0:0<br>prelude.usize"-->3
         end
     end
