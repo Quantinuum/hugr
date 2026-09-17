@@ -29,8 +29,9 @@ pub(crate) use types::{collect_op_types_extensions, collect_signature_exts, coll
 pub(crate) use types_mut::TypeExtensionResolver;
 
 use derive_more::{Display, Error, From};
+use itertools::Itertools;
 
-use super::{Extension, ExtensionId, ExtensionRegistry, ExtensionSet};
+use super::{Extension, ExtensionId, ExtensionRegistry, ExtensionSet, Version, semver_compatible};
 use crate::Node;
 use crate::core::HugrNode;
 use crate::ops::constant::ValueName;
@@ -78,7 +79,8 @@ pub enum ExtensionResolutionError<N: HugrNode = Node> {
     #[display("Error resolving opaque operation: {_0}")]
     #[from]
     OpaqueOpError(OpaqueOpError<N>),
-    /// An operation requires an extension that is not in the given registry.
+    /// A legacy unversioned operation requires an extension that is not in the registry.
+    #[deprecated(since = "0.30.2", note = "use `UnresolvedOpExtension` instead")]
     #[display(
         "{op}{} requires extension {missing_extension}, but it could not be found in the extension list used during resolution. The available extensions are: {}",
         node.map(|n| format!(" in {n}")).unwrap_or_default(),
@@ -94,7 +96,8 @@ pub enum ExtensionResolutionError<N: HugrNode = Node> {
         /// A list of available extensions.
         available_extensions: Vec<ExtensionId>,
     },
-    /// A type references an extension that is not in the given registry.
+    /// A legacy unversioned type references an extension that is not in the registry.
+    #[deprecated(since = "0.30.2", note = "use `UnresolvedTypeExtension` instead")]
     #[display(
         "Type {ty}{} requires extension {missing_extension}, but it could not be found in the extension list used during resolution. The available extensions are: {}",
         node.map(|n| format!(" in {n}")).unwrap_or_default(),
@@ -148,10 +151,40 @@ pub enum ExtensionResolutionError<N: HugrNode = Node> {
     #[display("Error collecting extension dependencies: {_0}")]
     #[from]
     ExtensionDependencyError(ExtensionCollectionError<N>),
+    /// A versioned extension required by an operation could not be resolved.
+    #[display(
+        "Could not resolve operation {op}{}: {}",
+        node.map(|n| format!(" in {n}")).unwrap_or_default(),
+        description.failure()
+    )]
+    UnresolvedOpExtension {
+        /// The node that requires the extension.
+        node: Option<N>,
+        /// The operation that requires the extension.
+        op: OpName,
+        /// The required and available extension versions.
+        description: Box<ExtensionResolutionErrorDescription>,
+    },
+    /// A versioned extension required by a type could not be resolved.
+    #[display(
+        "Could not resolve type {ty}{}: {}",
+        node.map(|n| format!(" in {n}")).unwrap_or_default(),
+        description.failure()
+    )]
+    UnresolvedTypeExtension {
+        /// The node that requires the extension.
+        node: Option<N>,
+        /// The type that requires the extension.
+        ty: TypeName,
+        /// The required and available extension versions.
+        description: Box<ExtensionResolutionErrorDescription>,
+    },
 }
 
 impl<N: HugrNode> ExtensionResolutionError<N> {
-    /// Create a new error for missing operation extensions.
+    /// Create an error for a missing legacy unversioned operation extension.
+    #[deprecated(since = "0.30.2", note = "use `unresolved_op_extension` instead")]
+    #[expect(deprecated)]
     pub fn missing_op_extension(
         node: Option<N>,
         op: &OpType,
@@ -166,7 +199,9 @@ impl<N: HugrNode> ExtensionResolutionError<N> {
         }
     }
 
-    /// Create a new error for missing type extensions.
+    /// Create an error for a missing legacy unversioned type extension.
+    #[deprecated(since = "0.30.2", note = "use `unresolved_type_extension` instead")]
+    #[expect(deprecated)]
     pub fn missing_type_extension(
         node: Option<N>,
         ty: &TypeName,
@@ -179,6 +214,159 @@ impl<N: HugrNode> ExtensionResolutionError<N> {
             missing_extension: missing_extension.clone(),
             available_extensions: extensions.ids().cloned().collect(),
         }
+    }
+
+    /// Create an error for a failed versioned operation extension lookup.
+    pub fn unresolved_op_extension(
+        node: Option<N>,
+        op: OpName,
+        required_extension: &ExtensionId,
+        required_version: &Version,
+        extensions: &ExtensionRegistry,
+    ) -> Self {
+        let description = Box::new(ExtensionResolutionErrorDescription::from_registry(
+            required_extension,
+            required_version,
+            extensions,
+        ));
+        Self::UnresolvedOpExtension {
+            node,
+            op,
+            description,
+        }
+    }
+
+    /// Create an error for a failed versioned type extension lookup.
+    pub fn unresolved_type_extension(
+        node: Option<N>,
+        ty: &TypeName,
+        required_extension: &ExtensionId,
+        required_version: &Version,
+        extensions: &WeakExtensionRegistry,
+    ) -> Self {
+        let description = Box::new(ExtensionResolutionErrorDescription::from_weak_registry(
+            required_extension,
+            required_version,
+            extensions,
+        ));
+        Self::UnresolvedTypeExtension {
+            node,
+            ty: ty.clone(),
+            description,
+        }
+    }
+}
+
+/// Version information for an extension that could not be resolved.
+///
+/// The available extensions are stored in registry order so diagnostics are
+/// deterministic. Each entry includes both its id and version, allowing the
+/// description to be shared by missing-extension and version-mismatch errors.
+#[derive(Debug, Clone, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ExtensionResolutionErrorDescription {
+    /// The required extension id.
+    pub required_extension: ExtensionId,
+    /// The minimum compatible extension version required by the HUGR.
+    pub required_version: Version,
+    /// The extension versions available during resolution.
+    pub available_extensions: Vec<(ExtensionId, Version)>,
+}
+
+impl ExtensionResolutionErrorDescription {
+    /// Describe a failed lookup in a strong extension registry.
+    fn from_registry(
+        required_extension: &ExtensionId,
+        required_version: &Version,
+        extensions: &ExtensionRegistry,
+    ) -> Self {
+        Self {
+            required_extension: required_extension.clone(),
+            required_version: required_version.clone(),
+            available_extensions: extensions
+                .iter_all()
+                .map(|extension| (extension.name().clone(), extension.version().clone()))
+                .collect(),
+        }
+    }
+
+    /// Describe a failed lookup in a weak extension registry.
+    fn from_weak_registry(
+        required_extension: &ExtensionId,
+        required_version: &Version,
+        extensions: &WeakExtensionRegistry,
+    ) -> Self {
+        Self {
+            required_extension: required_extension.clone(),
+            required_version: required_version.clone(),
+            available_extensions: extensions
+                .iter_all()
+                .map(|(id, version, _)| (id.clone(), version.clone()))
+                .collect(),
+        }
+    }
+
+    /// Format the required extension as `id@version`.
+    fn required(&self) -> String {
+        format!("{}@{}", self.required_extension, self.required_version)
+    }
+
+    /// Format every available extension as `id@version`.
+    fn all_available(&self) -> String {
+        self.available_extensions
+            .iter()
+            .map(|(id, version)| format!("{id}@{version}"))
+            .join(", ")
+    }
+
+    /// Explain why the extension requirement could not be resolved.
+    ///
+    /// If the extension id is absent, the complete registry contents are
+    /// included. A lower version in the same compatibility group means that
+    /// the requirement is newer than the registry entry. Otherwise, all
+    /// versions registered under the requested extension id are incompatible.
+    fn failure(&self) -> String {
+        let available_versions: Vec<_> = self
+            .available_extensions
+            .iter()
+            .filter_map(|(id, version)| (id == &self.required_extension).then_some(version))
+            .collect();
+        if available_versions.is_empty() {
+            return format!(
+                "Extension {} is required, but it was not found. The available extensions are: {}",
+                self.required(),
+                self.all_available()
+            );
+        }
+        if let Some(version) = available_versions
+            .iter()
+            .copied()
+            .filter(|version| {
+                *version < &self.required_version
+                    && semver_compatible(&self.required_version, version)
+            })
+            .max()
+        {
+            let others = available_versions
+                .iter()
+                .filter(|&&v| v != version)
+                .join(", ");
+            return format!(
+                "Extension {} is required, but the available version {version} is too old{}",
+                self.required(),
+                if others.is_empty() {
+                    String::new()
+                } else {
+                    format!(". Other available versions: {others}")
+                }
+            );
+        }
+
+        format!(
+            "Extension {} is required, but the available versions [{}] are incompatible",
+            self.required(),
+            available_versions.iter().join(", ")
+        )
     }
 }
 

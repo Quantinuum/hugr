@@ -17,6 +17,7 @@ use tracing::warn;
 
 use super::{Substitution, Transformable, Type, TypeBound, TypeRowLike, TypeTransformer};
 use crate::extension::SignatureError;
+use crate::hugr::views::render::RenderStringConfig;
 use crate::types::{CustomType, FuncValueType, SumType};
 
 /// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
@@ -176,6 +177,48 @@ pub enum Term {
 impl Term {
     /// An empty list of Terms.
     pub const EMPTY_LIST: Self = Self::List(vec![]);
+
+    /// Returns a string representation of this term.
+    ///
+    /// Composite terms recursively render each of their nested terms.
+    #[allow(unused_must_use)]
+    pub fn render_str(&self, config: RenderStringConfig) -> String {
+        match self {
+            Self::ListKind(term) => "List[".to_string() + &term.render_str(config) + "]",
+            Self::TupleKind(term) => "Tuple[".to_string() + &term.render_str(config) + "]",
+            Self::ExtensionType(custom_type) => custom_type.render_str(config),
+            Self::FunctionType(function_type) => {
+                function_type.input().render_str(config)
+                    + " -> "
+                    + &function_type.output().render_str(config)
+            }
+            Self::SumType(sum_type) => sum_type.render_str(config),
+            Self::List(terms) => {
+                "[".to_string() + &terms.iter().map(|term| term.render_str(config)).join(", ") + "]"
+            }
+            Self::ListConcat(terms) => {
+                "[".to_string()
+                    + &terms
+                        .iter()
+                        .map(|term| "... ".to_string() + &term.render_str(config))
+                        .join(",")
+                    + "]"
+            }
+            Self::Tuple(terms) => {
+                "(".to_string() + &terms.iter().map(|term| term.render_str(config)).join(",") + ")"
+            }
+            Self::TupleConcat(terms) => {
+                "(".to_string()
+                    + &terms
+                        .iter()
+                        .map(|term| "... ".to_string() + &term.render_str(config))
+                        .join(",")
+                    + ")"
+            }
+            Self::ConstKind(ty) => ty.render_str(config),
+            _ => self.to_string(),
+        }
+    }
 
     /// Creates a [`Term::BoundedNatKind`] with the maximum bound (`u64::MAX` + 1).
     #[must_use]
@@ -946,6 +989,134 @@ mod test {
     use crate::extension::prelude::{bool_t, usize_t};
     use crate::types::type_param::SeqPart;
     use crate::types::{Term, Type, TypeBound, TypeRow, type_param::TermKindError};
+
+    #[test]
+    fn render_nested_term() {
+        let term = Term::Tuple(vec![
+            Term::List(vec![
+                Term::BoundedNat(1),
+                Term::Tuple(vec![Term::String("inner".into()), Term::BoundedNat(2)]),
+            ]),
+            Term::new_list_kind(Term::Tuple(vec![Term::BoundedNat(3), Term::BoundedNat(4)])),
+        ]);
+
+        assert_eq!(
+            term.render_str(crate::hugr::views::render::RenderStringConfig::new()),
+            r#"([1, ("inner",2)],List[(3,4)])"#
+        );
+    }
+
+    #[test]
+    fn render_composite_term_cases() {
+        use crate::hugr::views::render::RenderStringConfig;
+        use crate::std_extensions::arithmetic::int_types::int_type;
+
+        let config = RenderStringConfig::new().with_qualify_name(false);
+        assert_eq!(
+            Term::new_tuple_kind(Term::new_tuple([Term::from(1_u64), Term::from(2_u64),]))
+                .render_str(config),
+            "Tuple[(1,2)]"
+        );
+        assert_eq!(
+            Term::ListConcat(vec![Term::new_list([1_u64]), Term::new_list([2_u64])])
+                .render_str(config),
+            "[... [1],... [2]]"
+        );
+        assert_eq!(
+            Term::new_tuple_concat([
+                Term::new_tuple([Term::from(1_u64)]),
+                Term::new_tuple([Term::from(2_u64)]),
+            ])
+            .render_str(config),
+            "(... (1),... (2))"
+        );
+        assert_eq!(Term::new_const(int_type(5)).render_str(config), "int");
+    }
+
+    #[test]
+    fn render_extension_type_config_cases() {
+        use crate::hugr::views::render::RenderStringConfig;
+        use crate::std_extensions::arithmetic::int_types::int_type;
+
+        let term = Term::from(int_type(5));
+        assert_eq!(
+            term.render_str(RenderStringConfig::new().with_qualify_name(false)),
+            "int"
+        );
+        assert_eq!(
+            term.render_str(
+                RenderStringConfig::new()
+                    .with_extension_version(true)
+                    .with_print_type_args(true)
+                    .with_qualify_name(true)
+            ),
+            "arithmetic.int.types.int<5>@0.1.0"
+        );
+    }
+
+    #[test]
+    fn render_function_type_propagates_config() {
+        use crate::hugr::views::render::RenderStringConfig;
+        use crate::std_extensions::arithmetic::int_types::int_type;
+        use crate::types::FuncValueType;
+
+        let term = Term::FunctionType(Box::new(FuncValueType::new([int_type(5)], [int_type(6)])));
+        let config = RenderStringConfig::new()
+            .with_extension_version(true)
+            .with_print_type_args(true)
+            .with_qualify_name(true);
+
+        assert_eq!(
+            term.render_str(config),
+            "[arithmetic.int.types.int<5>@0.1.0] -> [arithmetic.int.types.int<6>@0.1.0]"
+        );
+    }
+
+    #[test]
+    fn render_sum_type_propagates_config() {
+        use crate::hugr::views::render::RenderStringConfig;
+        use crate::std_extensions::arithmetic::int_types::int_type;
+        use crate::types::{GeneralSum, SumType, TypeRowRV};
+
+        let config = RenderStringConfig::new();
+        assert_eq!(Term::SumType(SumType::new_unary(0)).render_str(config), "⊥");
+        assert_eq!(
+            Term::SumType(SumType::new_unary(1)).render_str(config),
+            "Unit"
+        );
+        assert_eq!(
+            Term::SumType(SumType::new_unary(2)).render_str(config),
+            "Bool"
+        );
+        assert_eq!(
+            Term::SumType(SumType::new_unary(3)).render_str(config),
+            "[]+[]+[]"
+        );
+        assert_eq!(
+            Term::SumType(SumType::General(GeneralSum::new(vec![TypeRowRV::new()])))
+                .render_str(config),
+            "Unit"
+        );
+        assert_eq!(
+            Term::SumType(SumType::General(GeneralSum::new(vec![
+                TypeRowRV::new(),
+                TypeRowRV::new(),
+            ])))
+            .render_str(config),
+            "Bool"
+        );
+
+        let term = Term::SumType(SumType::new([[int_type(5)], [int_type(6)]]));
+        let config = RenderStringConfig::new()
+            .with_extension_version(true)
+            .with_print_type_args(true)
+            .with_qualify_name(true);
+
+        assert_eq!(
+            term.render_str(config),
+            "[arithmetic.int.types.int<5>@0.1.0]+[arithmetic.int.types.int<6>@0.1.0]"
+        );
+    }
 
     #[test]
     fn new_list_from_parts_items() {

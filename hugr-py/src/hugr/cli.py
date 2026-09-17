@@ -79,11 +79,7 @@ class ExtensionDesc(BaseModel):
     """
 
     name: str
-    # TODO: `hugr-rs <=0.26.1` expects this field to be present.
-    #
-    # This value should be set to "0.0.0" for backwards compatibility, until the
-    # next major hugr-rs version.
-    version: str | None
+    version: str | None = None
 
 
 class ModuleDesc(BaseModel):

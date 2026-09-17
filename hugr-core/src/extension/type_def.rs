@@ -259,6 +259,7 @@ impl Extension {
             description,
             bound,
         };
+        self.clear_json_cache();
         match self.types.entry(ty.name.clone()) {
             Entry::Occupied(_) => Err(ExtensionBuildError::TypeDefExists(ty.name)),
             Entry::Vacant(ve) => Ok(ve.insert(ty)),

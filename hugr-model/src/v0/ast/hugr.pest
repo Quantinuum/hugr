@@ -38,7 +38,8 @@ reserved = @{
 }
 
 literal_string         = ${ "\"" ~ (literal_string_raw | literal_string_escape | literal_string_unicode)* ~ "\"" }
-literal_string_raw     = @{ (!("\\" | "\"") ~ ANY)+ }
+// Spell `X+` as `X ~ X*` so pest can optimize the repetition into `skip_until`.
+literal_string_raw     = @{ (!("\\" | "\"") ~ ANY) ~ (!("\\" | "\"") ~ ANY)* }
 literal_string_escape  = @{ "\\" ~ ("\"" | "\\" | "n" | "r" | "t") }
 literal_string_unicode = @{ "\\u" ~ "{" ~ ASCII_HEX_DIGIT+ ~ "}" }
 

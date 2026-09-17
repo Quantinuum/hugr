@@ -12,8 +12,6 @@ use hugr_core::ops::handle::FuncID;
 use hugr_core::types::TypeRow;
 use hugr_core::{Hugr, HugrView, Node};
 use inkwell::module::{Linkage, Module};
-#[allow(deprecated)]
-use inkwell::passes::PassManager;
 use inkwell::values::{BasicValueEnum, GlobalValue, PointerValue};
 
 use super::EmitHugr;
@@ -67,16 +65,6 @@ impl<'c> Emission<'c> {
     /// Return the inner module.
     pub fn module(&self) -> &Module<'c> {
         &self.module
-    }
-
-    /// Run passes on the inner module.
-    #[deprecated(
-        since = "0.27.0",
-        note = "Use the new pass manager API to run on the module exposed via [`Emission::module`] directly. This functon will be removed once inkwell drops support for LLVM 16."
-    )]
-    #[allow(deprecated)]
-    pub fn opt(&self, go: impl FnOnce() -> PassManager<Module<'c>>) {
-        go().run_on(&self.module);
     }
 
     // Print the inner module to stderr.

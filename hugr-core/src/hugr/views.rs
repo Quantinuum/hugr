@@ -424,9 +424,6 @@ pub trait HugrView: HugrInternals {
     ///
     /// The hierarchy is represented using subgraphs. Edges are labelled with
     /// their source and target ports.
-    ///
-    /// For a more detailed representation, use the [`HugrView::dot_string`]
-    /// format instead.
     fn mermaid_string(&self) -> String {
         self.mermaid_string_with_formatter(self.mermaid_format())
     }
@@ -436,9 +433,6 @@ pub trait HugrView: HugrInternals {
     ///
     /// The hierarchy is represented using subgraphs. Edges are labelled with
     /// their source and target ports.
-    ///
-    /// For a more detailed representation, use the [`HugrView::dot_string`]
-    /// format instead.
     fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String;
 
     /// Construct a mermaid representation of the underlying hierarchical graph.
@@ -448,16 +442,14 @@ pub trait HugrView: HugrInternals {
     ///
     /// The hierarchy is represented using subgraphs. Edges are labelled with
     /// their source and target ports.
-    ///
-    /// For a more detailed representation, use the [`HugrView::dot_string`]
-    /// format instead.
     fn mermaid_format(&self) -> MermaidFormatter<'_, Self> {
         MermaidFormatter::new(self).with_entrypoint(self.entrypoint())
     }
 
     /// Return the graphviz representation of the underlying graph and hierarchy side by side.
     ///
-    /// For a simpler representation, use the [`HugrView::mermaid_string`] format instead.
+    /// Deprecated, use the [`HugrView::mermaid_string`] format instead.
+    #[deprecated(since = "0.29.4", note = "Use `mermaid_string` instead.")]
     fn dot_string(&self) -> String
     where
         Self: Sized;
@@ -483,26 +475,22 @@ pub trait HugrView: HugrInternals {
         self.get_optype(node).dataflow_signature()
     }
 
-    /// Iterator over all outgoing ports that have Value type, along
-    /// with corresponding types.
+    /// Iterator over all ports in a direction that have Value type, along with
+    /// their corresponding types.
     fn value_types(&self, node: Self::Node, dir: Direction) -> impl Iterator<Item = (Port, Type)> {
-        let sig = self.signature(node).unwrap_or_default();
-        self.node_ports(node, dir)
-            .filter_map(move |port| sig.port_type(port).map(|typ| (port, typ.clone())))
+        self.get_optype(node).value_types(dir)
     }
 
     /// Iterator over all incoming ports that have Value type, along
     /// with corresponding types.
     fn in_value_types(&self, node: Self::Node) -> impl Iterator<Item = (IncomingPort, Type)> {
-        self.value_types(node, Direction::Incoming)
-            .map(|(p, t)| (p.as_incoming().unwrap(), t))
+        self.get_optype(node).value_input_types()
     }
 
     /// Iterator over all outgoing ports that have Value type, along
     /// with corresponding types.
     fn out_value_types(&self, node: Self::Node) -> impl Iterator<Item = (OutgoingPort, Type)> {
-        self.value_types(node, Direction::Outgoing)
-            .map(|(p, t)| (p.as_outgoing().unwrap(), t))
+        self.get_optype(node).value_output_types()
     }
 
     /// Returns the set of extensions used by the HUGR.

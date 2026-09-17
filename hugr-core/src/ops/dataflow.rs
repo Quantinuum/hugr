@@ -2,14 +2,15 @@
 
 use std::borrow::Cow;
 
-use super::{OpTag, OpTrait, impl_op_name};
+use super::{NamedOp, OpTag, OpTrait, impl_op_name};
 
 use crate::extension::SignatureError;
+use crate::hugr::views::render::RenderStringConfig;
 use crate::ops::StaticTag;
 use crate::types::{
     EdgeKind, PolyFuncType, Signature, Substitution, Type, TypeArg, TypeRow, TypeRowLike,
 };
-use crate::{IncomingPort, type_row};
+use crate::{Direction, IncomingPort, Port, PortIndex, type_row};
 
 #[cfg(test)]
 use {crate::types::proptest_utils::any_serde_type_arg_vec, proptest_derive::Arbitrary};
@@ -22,8 +23,30 @@ pub trait DataflowOpTrait: Sized {
     /// A human-readable description of the operation.
     fn description(&self) -> &str;
 
+    /// Returns a string representation of the operation.
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        // TODO: Remove this default implementation with the next breaking release.
+        unimplemented!("render_str default implementation is not yet implemented");
+    }
+
     /// The signature of the operation.
     fn signature(&self) -> Cow<'_, Signature>;
+
+    /// Returns the type of a value port.
+    ///
+    /// Operations whose signatures are synthesized should override this to
+    /// avoid constructing the complete signature.
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        self.signature().port_type(port).cloned()
+    }
+
+    /// Returns the number of value ports in one direction.
+    ///
+    /// Operations whose signatures are synthesized should override this to
+    /// avoid constructing the complete signature.
+    fn value_port_count(&self, dir: Direction) -> usize {
+        self.signature().port_count(dir)
+    }
 
     /// The edge kind for the non-dataflow or constant inputs of the operation,
     /// not described by the signature.
@@ -109,6 +132,10 @@ impl DataflowOpTrait for Input {
         "The input node for this dataflow subgraph"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     fn other_input(&self) -> Option<EdgeKind> {
         None
     }
@@ -118,12 +145,27 @@ impl DataflowOpTrait for Input {
         Cow::Owned(Signature::new(TypeRow::new(), self.types.clone()))
     }
 
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        match port.direction() {
+            Direction::Incoming => None,
+            Direction::Outgoing => self.types.get(port.index()).cloned(),
+        }
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => 0,
+            Direction::Outgoing => self.types.len(),
+        }
+    }
+
     fn substitute(&self, subst: &Substitution) -> Self {
         Self {
             types: self.types.substitute(subst),
         }
     }
 }
+
 impl DataflowOpTrait for Output {
     const TAG: OpTag = OpTag::Output;
 
@@ -131,11 +173,29 @@ impl DataflowOpTrait for Output {
         "The output node for this dataflow subgraph"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     // Note: We know what the input extensions should be, so we *could* give an
     // instantiated Signature instead
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
         Cow::Owned(Signature::new(self.types.clone(), TypeRow::new()))
+    }
+
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        match port.direction() {
+            Direction::Incoming => self.types.get(port.index()).cloned(),
+            Direction::Outgoing => None,
+        }
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.types.len(),
+            Direction::Outgoing => 0,
+        }
     }
 
     fn other_output(&self) -> Option<EdgeKind> {
@@ -154,12 +214,24 @@ impl<T: DataflowOpTrait + Clone> OpTrait for T {
         DataflowOpTrait::description(self)
     }
 
+    fn render_str(&self, config: RenderStringConfig) -> String {
+        DataflowOpTrait::render_str(self, config)
+    }
+
     fn tag(&self) -> OpTag {
         T::TAG
     }
 
     fn dataflow_signature(&self) -> Option<Cow<'_, Signature>> {
         Some(DataflowOpTrait::signature(self))
+    }
+
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        DataflowOpTrait::value_port_type(self, port)
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        DataflowOpTrait::value_port_count(self, dir)
     }
 
     fn other_input(&self) -> Option<EdgeKind> {
@@ -207,6 +279,10 @@ impl DataflowOpTrait for Call {
         "Call a function directly"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     fn signature(&self) -> Cow<'_, Signature> {
         Cow::Borrowed(&self.instantiation)
     }
@@ -233,6 +309,7 @@ impl DataflowOpTrait for Call {
         }
     }
 }
+
 impl Call {
     /// Try to make a new Call. Returns an error if the `type_args`` do not fit the [TypeParam]s
     /// declared by the function.
@@ -311,6 +388,10 @@ impl DataflowOpTrait for CallIndirect {
         "Call a function indirectly"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
         let mut s = self.signature.clone();
@@ -318,6 +399,23 @@ impl DataflowOpTrait for CallIndirect {
             .to_mut()
             .insert(0, Type::new_function(self.signature.clone()));
         Cow::Owned(s)
+    }
+
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        match port.direction() {
+            Direction::Incoming if port.index() == 0 => {
+                Some(Type::new_function(self.signature.clone()))
+            }
+            Direction::Incoming => self.signature.input().get(port.index() - 1).cloned(),
+            Direction::Outgoing => self.signature.output().get(port.index()).cloned(),
+        }
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.signature.input_count() + 1,
+            Direction::Outgoing => self.signature.output_count(),
+        }
     }
 
     fn substitute(&self, subst: &Substitution) -> Self {
@@ -342,9 +440,22 @@ impl DataflowOpTrait for LoadConstant {
         "Load a static constant in to the local dataflow graph"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
         Cow::Owned(Signature::new(TypeRow::new(), vec![self.datatype.clone()]))
+    }
+
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        (port.direction() == Direction::Outgoing && port.index() == 0)
+            .then(|| self.datatype.clone())
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        usize::from(dir == Direction::Outgoing)
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
@@ -407,11 +518,24 @@ impl DataflowOpTrait for LoadFunction {
         "Load a static function in to the local dataflow graph"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     fn signature(&self) -> Cow<'_, Signature> {
         Cow::Owned(Signature::new(
             type_row![],
             [Type::new_function(self.instantiation.clone())],
         ))
+    }
+
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        (port.direction() == Direction::Outgoing && port.index() == 0)
+            .then(|| Type::new_function(self.instantiation.clone()))
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        usize::from(dir == Direction::Outgoing)
     }
 
     fn static_input(&self) -> Option<EdgeKind> {
@@ -436,6 +560,7 @@ impl DataflowOpTrait for LoadFunction {
         }
     }
 }
+
 impl LoadFunction {
     /// Try to make a new LoadFunction op. Returns an error if the `type_args`` do not fit
     /// the [TypeParam]s declared by the function.
@@ -515,6 +640,10 @@ impl DataflowOpTrait for DFG {
 
     fn description(&self) -> &'static str {
         "A simply nested dataflow graph"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn signature(&self) -> Cow<'_, Signature> {

@@ -14,6 +14,7 @@ use {
 use crate::core::HugrNode;
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ConstFoldResult, ExtensionId, OpDef, SignatureError, Version};
+use crate::hugr::views::render::RenderStringConfig;
 use crate::types::{Signature, type_param::TypeArg};
 use crate::{IncomingPort, ops};
 
@@ -53,28 +54,34 @@ impl ExtensionOp {
         })
     }
 
-    /// If `OpDef` is missing binary computation, trust the cached signature.
-    pub(crate) fn new_with_cached(
-        def: Arc<OpDef>,
-        args: impl IntoIterator<Item = TypeArg>,
+    /// Compute a resolved signature, trusting the serialized signature when
+    /// the definition does not provide a binary signature function.
+    pub(crate) fn compute_signature_with_cached(
+        def: &OpDef,
         opaque: &OpaqueOp,
-    ) -> Result<Self, SignatureError> {
-        let args: Vec<TypeArg> = args.into_iter().collect();
+    ) -> Result<Signature, SignatureError> {
         // TODO skip computation depending on config
         // see https://github.com/CQCL/hugr/issues/1363
-        let signature = match def.compute_signature(&args) {
-            Ok(sig) => sig,
-            Err(SignatureError::MissingComputeFunc) => {
-                // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
-                opaque.signature().into_owned()
-            }
-            Err(e) => return Err(e),
-        };
-        Ok(Self {
+        let computed = def.compute_signature(opaque.args());
+        // TODO raise warning: https://github.com/CQCL/hugr/issues/1432
+        if let Err(SignatureError::MissingComputeFunc) = computed {
+            return Ok(opaque.signature().into_owned());
+        }
+        computed
+    }
+
+    /// Build an operation from arguments and a signature already validated
+    /// against `def`.
+    pub(crate) fn from_resolved_parts(
+        def: Arc<OpDef>,
+        args: Vec<TypeArg>,
+        signature: Signature,
+    ) -> Self {
+        Self {
             def,
             args,
             signature,
-        })
+        }
     }
 
     /// Replace this operation's definition with the matching definition from
@@ -228,6 +235,20 @@ impl DataflowOpTrait for ExtensionOp {
         self.def().description()
     }
 
+    fn render_str(&self, config: RenderStringConfig) -> String {
+        let name = render_name_with_args(
+            &self.qualified_id(),
+            self.unqualified_id(),
+            self.args(),
+            config,
+        );
+        if config.extension_version() {
+            name + "@" + &self.extension_version().to_string()
+        } else {
+            name
+        }
+    }
+
     fn signature(&self) -> Cow<'_, Signature> {
         Cow::Borrowed(&self.signature)
     }
@@ -283,7 +304,26 @@ pub struct OpaqueOp {
 
 /// Qualifies an operation name with its extension, e.g. 'iadd' -> 'arithmetic.iadd'.
 pub(crate) fn qualify_name(res_id: &ExtensionId, name: &OpNameRef) -> OpName {
-    format!("{res_id}.{name}").into()
+    (res_id.to_string() + "." + name).into()
+}
+
+/// Renders the operation name (optionally qualified) with its type arguments per `config`.
+/// The extension version suffix is handled separately by each caller.
+fn render_name_with_args(
+    qualified_id: &OpNameRef,
+    unqualified_id: &OpNameRef,
+    args: &[TypeArg],
+    config: RenderStringConfig,
+) -> String {
+    let mut name = if config.qualify_name() {
+        qualified_id.to_string()
+    } else {
+        unqualified_id.to_string()
+    };
+    if config.print_type_args() && !args.is_empty() {
+        name = name + "<" + &args.iter().map(|arg| arg.render_str(config)).join(", ") + ">";
+    }
+    name
 }
 
 impl OpaqueOp {
@@ -330,7 +370,7 @@ impl OpaqueOp {
 
 impl NamedOp for OpaqueOp {
     fn name(&self) -> OpName {
-        format!("OpaqueOp:{}", self.qualified_id()).into()
+        ("OpaqueOp:".to_string() + &self.qualified_id()).into()
     }
 }
 
@@ -374,6 +414,11 @@ impl OpaqueOp {
     pub(crate) fn args_mut(&mut self) -> &mut [TypeArg] {
         self.args.as_mut_slice()
     }
+
+    /// Move out the argument allocation after resolution has succeeded.
+    pub(crate) fn take_args(&mut self) -> Vec<TypeArg> {
+        std::mem::take(&mut self.args)
+    }
 }
 
 impl DataflowOpTrait for OpaqueOp {
@@ -381,6 +426,22 @@ impl DataflowOpTrait for OpaqueOp {
 
     fn description(&self) -> &str {
         "Opaque operation"
+    }
+
+    fn render_str(&self, config: RenderStringConfig) -> String {
+        let label = "OpaqueOp:".to_string();
+        let name = render_name_with_args(
+            &self.qualified_id(),
+            self.unqualified_id(),
+            self.args(),
+            config,
+        );
+        if config.extension_version()
+            && let Some(version) = self.extension_version()
+        {
+            return label + &name + "@" + &version.to_string();
+        }
+        label + &name
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
@@ -447,12 +508,14 @@ pub enum OpaqueOpError<N: HugrNode> {
 #[cfg(test)]
 mod test {
 
-    use ops::OpType;
+    use ops::{OpTrait, OpType};
 
     use crate::extension::ExtensionRegistry;
     use crate::extension::resolution::resolve_op_extensions;
+    use crate::extension::simple_op::MakeRegisteredOp;
     use crate::std_extensions::STD_REG;
     use crate::std_extensions::arithmetic::conversions::{self};
+    use crate::std_extensions::arithmetic::int_ops::IntOpDef;
     use crate::types::Type;
     use crate::{
         Extension,
@@ -483,6 +546,14 @@ mod test {
             sig.clone(),
         );
         assert_eq!(op.name(), "OpaqueOp:res.op");
+        assert_eq!(
+            OpTrait::render_str(&op, RenderStringConfig::new().with_qualify_name(false)),
+            "OpaqueOp:op"
+        );
+        assert_eq!(
+            OpTrait::render_str(&op, RenderStringConfig::new().with_qualify_name(true)),
+            "OpaqueOp:res.op"
+        );
         assert_eq!(op.args(), &[usize_t().into()]);
         assert_eq!(op.signature().as_ref(), &sig);
 
@@ -536,7 +607,81 @@ mod test {
             },
         );
         let ext_op = ext.instantiate_extension_op("op", []).unwrap();
+        assert_eq!(
+            OpTrait::render_str(&ext_op, RenderStringConfig::new().with_qualify_name(false)),
+            "op"
+        );
+        assert_eq!(
+            OpTrait::render_str(&ext_op, RenderStringConfig::new().with_qualify_name(true)),
+            "ext.op"
+        );
         assert_eq!(ext_op.make_opaque().extension_version(), Some(&version));
+    }
+
+    #[test]
+    fn render_extension_version() {
+        let ext = Extension::new_arc(
+            "ext".try_into().unwrap(),
+            Version::new(1, 2, 3),
+            |ext, extension_ref| {
+                ext.add_op(
+                    "op".into(),
+                    String::new(),
+                    SignatureFunc::PolyFuncType(
+                        FuncValueType::from(Signature::new_endo([bool_t()])).into(),
+                    ),
+                    extension_ref,
+                )
+                .unwrap();
+            },
+        );
+        let ext_op = ext.instantiate_extension_op("op", []).unwrap();
+        let config = RenderStringConfig::new()
+            .with_extension_version(true)
+            .with_qualify_name(false);
+
+        assert_eq!(OpTrait::render_str(&ext_op, config), "op@1.2.3");
+        assert_eq!(
+            OpTrait::render_str(
+                &ext_op,
+                RenderStringConfig::new()
+                    .with_qualify_name(true)
+                    .with_extension_version(true)
+            ),
+            "ext.op@1.2.3"
+        );
+
+        let mut opaque = ext_op.make_opaque();
+        assert_eq!(OpTrait::render_str(&opaque, config), "OpaqueOp:op@1.2.3");
+        opaque.set_extension_version(None);
+        assert_eq!(OpTrait::render_str(&opaque, config), "OpaqueOp:op");
+    }
+
+    #[test]
+    fn render_type_args() {
+        let ext_op = IntOpDef::ieq.with_log_width(5).to_extension_op().unwrap();
+        let config = RenderStringConfig::new()
+            .with_extension_version(true)
+            .with_print_type_args(true)
+            .with_qualify_name(true);
+
+        assert_eq!(
+            OpTrait::render_str(&ext_op, config),
+            "arithmetic.int.ieq<5>@0.1.1"
+        );
+        assert_eq!(
+            OpTrait::render_str(&ext_op.make_opaque(), config),
+            "OpaqueOp:arithmetic.int.ieq<5>@0.1.1"
+        );
+        assert_eq!(
+            OpTrait::render_str(
+                &ext_op,
+                RenderStringConfig::new()
+                    .with_print_type_args(false)
+                    .with_extension_version(true)
+            ),
+            "arithmetic.int.ieq@0.1.1"
+        );
     }
 
     #[test]
@@ -598,9 +743,10 @@ mod test {
             ext_id.clone(),
             Version::new(0, 0, 0),
             comp_name,
-            vec![],
+            vec![usize_t().into()],
             endo_sig,
         );
+        let args_ptr = opaque_comp.args().as_ptr();
         let mut resolved_val = opaque_val.into();
         resolve_op_extensions(
             Node::from(portgraph::NodeIndex::new(1)),
@@ -618,5 +764,10 @@ mod test {
         )
         .unwrap();
         assert_eq!(resolve_res_definition(&resolved_comp).name(), comp_name);
+        assert_eq!(
+            resolved_comp.as_extension_op().unwrap().args().as_ptr(),
+            args_ptr,
+            "resolving an opaque operation should reuse its argument allocation"
+        );
     }
 }

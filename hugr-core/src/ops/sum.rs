@@ -4,7 +4,9 @@ use std::borrow::Cow;
 
 use super::dataflow::DataflowOpTrait;
 use super::{OpTag, impl_op_name};
+use crate::hugr::views::render::RenderStringConfig;
 use crate::types::{EdgeKind, Signature, Type, TypeRow, TypeRowLike};
+use crate::{Direction, Port, PortIndex};
 
 /// An operation that creates a tagged sum value from one of its variants.
 #[derive(Debug, Clone, Default, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -25,6 +27,18 @@ impl Tag {
     pub fn new(tag: usize, variants: Vec<TypeRow>) -> Self {
         Self { tag, variants }
     }
+
+    /// Return the TypeRow of the selected variant.
+    ///
+    /// Panics if the tag is out of bounds.
+    fn variant_row(&self) -> &TypeRow {
+        self.variants.get(self.tag).unwrap_or_else(|| {
+            panic!(
+                "Not a valid tag {} for variants {:?}",
+                self.tag, self.variants
+            )
+        })
+    }
 }
 
 impl_op_name!(Tag);
@@ -37,16 +51,51 @@ impl DataflowOpTrait for Tag {
         "Tag Sum operation"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        let content = match &self.variants[..] {
+            [val] => {
+                if val.is_empty() {
+                    "Unit"
+                } else {
+                    "Tuple"
+                }
+            }
+            [left, right] => {
+                if left.is_empty() && right.is_empty() {
+                    if self.tag == 0 { "False" } else { "True" }
+                } else if left.is_empty() {
+                    if self.tag == 0 { "None" } else { "Some" }
+                } else {
+                    if self.tag == 0 { "Left" } else { "Right" }
+                }
+            }
+            _ => &self.tag.to_string(),
+        };
+        "Tag(".to_string() + content + ")"
+    }
+
     /// The signature of the operation.
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
         Cow::Owned(Signature::new(
-            self.variants
-                .get(self.tag)
-                .expect("Not a valid tag")
-                .clone(),
+            self.variant_row().clone(),
             vec![Type::new_sum(self.variants.clone())],
         ))
+    }
+
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        match port.direction() {
+            Direction::Incoming => self.variant_row().get(port.index()).cloned(),
+            Direction::Outgoing if port.index() == 0 => Some(Type::new_sum(self.variants.clone())),
+            Direction::Outgoing => None,
+        }
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.variant_row().len(),
+            Direction::Outgoing => 1,
+        }
     }
 
     fn other_input(&self) -> Option<EdgeKind> {

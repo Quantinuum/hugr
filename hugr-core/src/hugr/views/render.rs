@@ -9,9 +9,70 @@ use portgraph::{LinkView, MultiPortGraph, NodeIndex, PortIndex, PortView};
 
 use crate::core::HugrNode;
 use crate::hugr::internal::HugrInternals;
-use crate::ops::{NamedOp, OpType};
+use crate::ops::OpTrait;
 use crate::types::EdgeKind;
 use crate::{Hugr, HugrView, Node};
+
+/// Configuration for rendering an operation as a string.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct RenderStringConfig {
+    /// Include the version of the extension defining the operation.
+    extension_version: bool,
+    /// Include the operation's type arguments.
+    print_type_args: bool,
+    /// Qualify operation name with their extension identifier.
+    qualify_name: bool,
+}
+
+impl RenderStringConfig {
+    /// Create a configuration with qualified names and without versions or type arguments.
+    pub const fn new() -> Self {
+        Self {
+            extension_version: false,
+            print_type_args: false,
+            qualify_name: true,
+        }
+    }
+
+    /// Whether to include the extension version in the rendered output.
+    pub fn extension_version(&self) -> bool {
+        self.extension_version
+    }
+
+    /// Whether to print type arguments in the rendered output.
+    pub fn print_type_args(&self) -> bool {
+        self.print_type_args
+    }
+
+    /// Whether to qualify operation name with their extension identifier.
+    pub fn qualify_name(&self) -> bool {
+        self.qualify_name
+    }
+
+    /// Set whether to qualify operation name with their extension identifier.
+    pub fn with_qualify_name(mut self, qualify_name: bool) -> Self {
+        self.qualify_name = qualify_name;
+        self
+    }
+
+    /// Set whether to include the extension version in the rendered output.
+    pub fn with_extension_version(mut self, extension_version: bool) -> Self {
+        self.extension_version = extension_version;
+        self
+    }
+
+    /// Set whether to print type arguments in the rendered output.
+    pub fn with_print_type_args(mut self, print_type_args: bool) -> Self {
+        self.print_type_args = print_type_args;
+        self
+    }
+}
+
+impl Default for RenderStringConfig {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 /// Configuration for rendering a HUGR graph.
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -26,6 +87,12 @@ pub struct MermaidFormatter<'h, H: HugrInternals + ?Sized = Hugr> {
     type_labels_in_edges: bool,
     /// A node to highlight as the graph entrypoint.
     entrypoint: Option<H::Node>,
+    /// Include the version of the extension defining the operation.
+    extension_version: bool,
+    /// Include the operation's type arguments.
+    print_type_args: bool,
+    /// Qualify operation name with their extension identifier.
+    qualify_name: bool,
 }
 
 impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
@@ -37,6 +104,9 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
             port_offsets_in_edges: true,
             type_labels_in_edges: true,
             entrypoint: None,
+            extension_version: false,
+            print_type_args: false,
+            qualify_name: true,
         }
     }
 
@@ -60,6 +130,21 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
         self.type_labels_in_edges
     }
 
+    /// Whether to include the extension version in the rendered output.
+    pub fn extension_version(&self) -> bool {
+        self.extension_version
+    }
+
+    /// Whether to print type arguments in the rendered output.
+    pub fn print_type_args(&self) -> bool {
+        self.print_type_args
+    }
+
+    /// Whether to qualify operation name with their extension identifier.
+    pub fn qualify_name(&self) -> bool {
+        self.qualify_name
+    }
+
     /// Set the node labels style.
     pub fn with_node_labels(mut self, node_labels: NodeLabel<H::Node>) -> Self {
         self.node_labels = node_labels;
@@ -75,6 +160,24 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
     /// Set whether to show type labels in edges.
     pub fn with_type_labels(mut self, show: bool) -> Self {
         self.type_labels_in_edges = show;
+        self
+    }
+
+    /// Set whether to include the extension version in the rendered output.
+    pub fn with_extension_version(mut self, show: bool) -> Self {
+        self.extension_version = show;
+        self
+    }
+
+    /// Set whether to print type arguments in the rendered output.
+    pub fn with_print_type_args(mut self, show: bool) -> Self {
+        self.print_type_args = show;
+        self
+    }
+
+    /// Set whether to qualify operation name with their extension identifier.
+    pub fn with_qualify_name(mut self, show: bool) -> Self {
+        self.qualify_name = show;
         self
     }
 
@@ -102,6 +205,9 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
             port_offsets_in_edges,
             type_labels_in_edges,
             entrypoint,
+            extension_version,
+            print_type_args,
+            qualify_name,
         } = self;
         MermaidFormatter {
             hugr,
@@ -109,6 +215,9 @@ impl<'h, H: HugrInternals + ?Sized> MermaidFormatter<'h, H> {
             port_offsets_in_edges,
             type_labels_in_edges,
             entrypoint,
+            extension_version,
+            print_type_args,
+            qualify_name,
         }
     }
 }
@@ -132,6 +241,9 @@ macro_rules! impl_mermaid_formatter_from {
                     port_offsets_in_edges,
                     type_labels_in_edges,
                     entrypoint,
+                    extension_version,
+            print_type_args,
+            qualify_name,
                 } = value;
                 MermaidFormatter {
                     hugr,
@@ -139,6 +251,9 @@ macro_rules! impl_mermaid_formatter_from {
                     port_offsets_in_edges,
                     type_labels_in_edges,
                     entrypoint,
+                    extension_version,
+                    print_type_args,
+                    qualify_name,
                 }
             }
         }
@@ -161,6 +276,9 @@ impl<'h, H: HugrView + ToOwned> From<MermaidFormatter<'h, std::borrow::Cow<'_, H
             port_offsets_in_edges,
             type_labels_in_edges,
             entrypoint,
+            extension_version,
+            print_type_args,
+            qualify_name,
         } = value;
         MermaidFormatter {
             hugr,
@@ -168,6 +286,9 @@ impl<'h, H: HugrView + ToOwned> From<MermaidFormatter<'h, std::borrow::Cow<'_, H
             port_offsets_in_edges,
             type_labels_in_edges,
             entrypoint,
+            extension_version,
+            print_type_args,
+            qualify_name,
         }
     }
 }
@@ -195,19 +316,24 @@ pub(in crate::hugr) fn node_style<'a>(
     h: &'a Hugr,
     formatter: MermaidFormatter<'a>,
 ) -> Box<dyn FnMut(NodeIndex) -> NodeStyle + 'a> {
-    fn node_name(h: &Hugr, n: NodeIndex) -> String {
-        match h.get_optype(n.into()) {
-            OpType::FuncDecl(f) => format!("FuncDecl: \"{}\"", f.func_name()),
-            OpType::FuncDefn(f) => format!("FuncDefn: \"{}\"", f.func_name()),
-            op => op.name().to_string(),
-        }
-    }
-
-    fn numeric_label(h: &Hugr, n: NodeIndex, is_entry: bool) -> String {
+    fn numeric_label(
+        h: &Hugr,
+        n: NodeIndex,
+        is_entry: bool,
+        inner_label_config: RenderStringConfig,
+    ) -> String {
         if is_entry {
-            format!("({}) [**{}**]", n.index(), node_name(h, n))
+            format!(
+                "({}) [**{}**]",
+                n.index(),
+                h.get_optype(n.into()).render_str(inner_label_config)
+            )
         } else {
-            format!("({}) {}", n.index(), node_name(h, n))
+            format!(
+                "({}) {}",
+                n.index(),
+                h.get_optype(n.into()).render_str(inner_label_config)
+            )
         }
     }
 
@@ -215,21 +341,29 @@ pub(in crate::hugr) fn node_style<'a>(
     entrypoint_style.stroke = Some("#832561".to_string());
     entrypoint_style.stroke_width = Some("3px".to_string());
     let entrypoint = formatter.entrypoint.map(Node::into_portgraph);
+    let render_label_config = RenderStringConfig::new()
+        .with_extension_version(formatter.extension_version())
+        .with_print_type_args(formatter.print_type_args())
+        .with_qualify_name(formatter.qualify_name());
 
     match formatter.node_labels {
         NodeLabel::Numeric => Box::new(move |n| {
             if Some(n) == entrypoint {
-                NodeStyle::boxed(numeric_label(h, n, true)).with_attrs(entrypoint_style.clone())
+                NodeStyle::boxed(numeric_label(h, n, true, render_label_config))
+                    .with_attrs(entrypoint_style.clone())
             } else {
-                NodeStyle::boxed(numeric_label(h, n, false))
+                NodeStyle::boxed(numeric_label(h, n, false, render_label_config))
             }
         }),
         NodeLabel::None => Box::new(move |n| {
             if Some(n) == entrypoint {
-                NodeStyle::boxed(format!("[**{name}**]", name = node_name(h, n)))
-                    .with_attrs(entrypoint_style.clone())
+                NodeStyle::boxed(format!(
+                    "[**{name}**]",
+                    name = h.get_optype(n.into()).render_str(render_label_config)
+                ))
+                .with_attrs(entrypoint_style.clone())
             } else {
-                NodeStyle::boxed(node_name(h, n))
+                NodeStyle::boxed(h.get_optype(n.into()).render_str(render_label_config))
             }
         }),
         NodeLabel::MetadataValues { print_keys } => Box::new(move |n| {
@@ -252,10 +386,16 @@ pub(in crate::hugr) fn node_style<'a>(
                 .join("; ");
 
             if Some(n) == entrypoint {
-                NodeStyle::boxed(format!("{}; {kv_str}", numeric_label(h, n, true)))
-                    .with_attrs(entrypoint_style.clone())
+                NodeStyle::boxed(format!(
+                    "{}; {kv_str}",
+                    numeric_label(h, n, true, render_label_config)
+                ))
+                .with_attrs(entrypoint_style.clone())
             } else {
-                NodeStyle::boxed(format!("{}; {kv_str}", numeric_label(h, n, false)))
+                NodeStyle::boxed(format!(
+                    "{}; {kv_str}",
+                    numeric_label(h, n, false, render_label_config)
+                ))
             }
         }),
         NodeLabel::Custom(labels) => Box::new(move |n| {
@@ -263,14 +403,14 @@ pub(in crate::hugr) fn node_style<'a>(
                 NodeStyle::boxed(format!(
                     "({label}) [**{name}**]",
                     label = labels.get(&n.into()).unwrap_or(&n.index().to_string()),
-                    name = node_name(h, n)
+                    name = h.get_optype(n.into()).render_str(render_label_config)
                 ))
                 .with_attrs(entrypoint_style.clone())
             } else {
                 NodeStyle::boxed(format!(
                     "({label}) {name}",
                     label = labels.get(&n.into()).unwrap_or(&n.index().to_string()),
-                    name = node_name(h, n)
+                    name = h.get_optype(n.into()).render_str(render_label_config)
                 ))
             }
         }),
@@ -314,6 +454,10 @@ pub(in crate::hugr) fn edge_style<'a>(
         + 'a,
 > {
     let graph = &h.graph;
+    let render_label_config = RenderStringConfig::new()
+        .with_extension_version(config.extension_version())
+        .with_print_type_args(config.print_type_args())
+        .with_qualify_name(config.qualify_name());
     Box::new(move |src, tgt| {
         let src_node = graph.port_node(src).unwrap();
         let src_optype = h.get_optype(src_node.into());
@@ -332,10 +476,10 @@ pub(in crate::hugr) fn edge_style<'a>(
         };
 
         // Compute the label for the edge, given the setting flags.
-        fn type_label(e: EdgeKind) -> Option<String> {
+        fn type_label(e: EdgeKind, config: RenderStringConfig) -> Option<String> {
             match e {
-                EdgeKind::Const(ty) | EdgeKind::Value(ty) => Some(format!("{ty}")),
-                EdgeKind::Function(pf) => Some(format!("{pf}")),
+                EdgeKind::Const(ty) | EdgeKind::Value(ty) => Some(ty.render_str(config)),
+                EdgeKind::Function(pf) => Some(pf.render_str(config)),
                 _ => None,
             }
         }
@@ -343,7 +487,7 @@ pub(in crate::hugr) fn edge_style<'a>(
         // Only static and value edges have types to display.
         let label = match (
             config.port_offsets_in_edges,
-            type_label(port_kind).filter(|_| config.type_labels_in_edges),
+            type_label(port_kind, render_label_config).filter(|_| config.type_labels_in_edges),
         ) {
             (true, Some(ty)) => {
                 format!("{}:{}\n{ty}", src_offset.index(), tgt_offset.index())
@@ -358,7 +502,13 @@ pub(in crate::hugr) fn edge_style<'a>(
 
 #[cfg(test)]
 mod tests {
-    use crate::{NodeIndex, builder::test::simple_dfg_hugr};
+    use crate::{
+        NodeIndex,
+        builder::{DFGBuilder, Dataflow, DataflowHugr, test::simple_dfg_hugr},
+        extension::prelude::bool_t,
+        std_extensions::arithmetic::{int_ops::IntOpDef, int_types::int_type},
+        types::Signature,
+    };
 
     use super::*;
 
@@ -374,5 +524,39 @@ mod tests {
             .mermaid_format()
             .with_node_labels(NodeLabel::Custom(node_labels));
         insta::assert_snapshot!(h.mermaid_string_with_formatter(config));
+    }
+
+    #[test]
+    fn render_string_config_is_applied_to_node_labels() {
+        let int_type = int_type(5);
+        let mut builder =
+            DFGBuilder::new(Signature::new([int_type.clone(), int_type], [bool_t()])).unwrap();
+        let [lhs, rhs] = builder.input_wires_arr();
+        let output = builder
+            .add_dataflow_op(IntOpDef::ieq.with_log_width(5), [lhs, rhs])
+            .unwrap()
+            .out_wire(0);
+        let h = builder.finish_hugr_with_outputs([output]).unwrap();
+
+        let options_on = h
+            .mermaid_format()
+            .with_extension_version(true)
+            .with_print_type_args(true)
+            .with_qualify_name(true)
+            .finish();
+        let unqualified = h
+            .mermaid_format()
+            .with_extension_version(false)
+            .with_print_type_args(false)
+            .with_qualify_name(false)
+            .finish();
+
+        assert!(options_on.contains("arithmetic.int.ieq<5>@0.1.1"));
+        assert!(!unqualified.contains("arithmetic.int.ieq"));
+        assert!(unqualified.contains("ieq"));
+
+        assert!(options_on.contains("<br>arithmetic.int.types.int<5>@0.1.0"));
+        assert!(!unqualified.contains("<br>arithmetic.int.types.int"));
+        assert!(unqualified.contains("<br>int"));
     }
 }

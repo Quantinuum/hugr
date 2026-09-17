@@ -446,15 +446,10 @@ class ExtensionDesc:
         """Encodes the extension as a dictionary of native types that can be
         serialized by `json.dump`.
         """
-        return {
-            "name": self.name,
-            # TODO: We set a valid version here for backwards compatibility with
-            # `hugr-rs <=0.26.1`.
-            #
-            # This should be left as None once we use hugr-rs >=0.26.2 everywhere
-            # or after the next breaking release.
-            "version": str(self.version) if self.version is not None else "0.0.0",
-        }
+        value = {"name": self.name}
+        if self.version is not None:
+            value["version"] = str(self.version)
+        return value
 
     @classmethod
     def from_json(cls, value: Any) -> ExtensionDesc:

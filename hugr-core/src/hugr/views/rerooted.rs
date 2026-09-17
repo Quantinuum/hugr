@@ -69,45 +69,46 @@ impl<H: HugrView> HugrView for Rerooted<H> {
 
     delegate::delegate! {
         to (&self.hugr) {
-                fn module_root(&self) -> Self::Node;
-                fn contains_node(&self, node: Self::Node) -> bool;
-                fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
-                fn get_metadata<M: crate::metadata::Metadata>(&self, node: Self::Node) -> Option<<M as crate::metadata::Metadata>::Type<'_>>;
-                fn get_metadata_any(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&crate::metadata::RawMetadataValue>;
-                fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType;
-                fn num_nodes(&self) -> usize;
-                fn num_edges(&self) -> usize;
-                fn num_ports(&self, node: Self::Node, dir: crate::Direction) -> usize;
-                fn num_inputs(&self, node: Self::Node) -> usize;
-                fn num_outputs(&self, node: Self::Node) -> usize;
-                fn nodes(&self) -> impl Iterator<Item = Self::Node> + Clone;
-                fn node_ports(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = crate::Port> + Clone;
-                fn node_outputs(&self, node: Self::Node) -> impl Iterator<Item = crate::OutgoingPort> + Clone;
-                fn node_inputs(&self, node: Self::Node) -> impl Iterator<Item = crate::IncomingPort> + Clone;
-                fn all_node_ports(&self, node: Self::Node) -> impl Iterator<Item = crate::Port> + Clone;
-                fn linked_ports(&self, node: Self::Node, port: impl Into<crate::Port>) -> impl Iterator<Item = (Self::Node, crate::Port)> + Clone;
-                fn all_linked_ports(&self, node: Self::Node, dir: crate::Direction) -> itertools::Either<impl Iterator<Item = (Self::Node, crate::OutgoingPort)>, impl Iterator<Item = (Self::Node, crate::IncomingPort)>>;
-                fn all_linked_outputs(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, crate::OutgoingPort)>;
-                fn all_linked_inputs(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, crate::IncomingPort)>;
-                fn single_linked_port(&self, node: Self::Node, port: impl Into<crate::Port>) -> Option<(Self::Node, crate::Port)>;
-                fn single_linked_output(&self, node: Self::Node, port: impl Into<crate::IncomingPort>) -> Option<(Self::Node, crate::OutgoingPort)>;
-                fn single_linked_input(&self, node: Self::Node, port: impl Into<crate::OutgoingPort>) -> Option<(Self::Node, crate::IncomingPort)>;
-                fn linked_outputs(&self, node: Self::Node, port: impl Into<crate::IncomingPort>) -> impl Iterator<Item = (Self::Node, crate::OutgoingPort)>;
-                fn linked_inputs(&self, node: Self::Node, port: impl Into<crate::OutgoingPort>) -> impl Iterator<Item = (Self::Node, crate::IncomingPort)>;
-                fn node_connections(&self, node: Self::Node, other: Self::Node) -> impl Iterator<Item = [crate::Port; 2]> + Clone;
-                fn is_linked(&self, node: Self::Node, port: impl Into<crate::Port>) -> bool;
-                fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone;
-                fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
-                fn first_child(&self, node: Self::Node) -> Option<Self::Node>;
-                fn neighbours(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = Self::Node> + Clone;
-                fn all_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
-                fn dot_string(&self) -> String;
-                fn static_source(&self, node: Self::Node) -> Option<Self::Node>;
-                fn static_targets(&self, node: Self::Node) -> Option<impl Iterator<Item = (Self::Node, crate::IncomingPort)>>;
-                fn value_types(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = (crate::Port, crate::types::Type)>;
-                fn extensions(&self) -> &crate::extension::ExtensionRegistry;
-                fn validate(&self) -> Result<(), crate::hugr::ValidationError<Self::Node>>;
-                fn extract_hugr(&self, parent: Self::Node) -> (crate::Hugr, impl crate::hugr::views::ExtractionResult<Self::Node> + 'static);
+            fn module_root(&self) -> Self::Node;
+            fn contains_node(&self, node: Self::Node) -> bool;
+            fn get_parent(&self, node: Self::Node) -> Option<Self::Node>;
+            fn get_metadata<M: crate::metadata::Metadata>(&self, node: Self::Node) -> Option<<M as crate::metadata::Metadata>::Type<'_>>;
+            fn get_metadata_any(&self, node: Self::Node, key: impl AsRef<str>) -> Option<&crate::metadata::RawMetadataValue>;
+            fn get_optype(&self, node: Self::Node) -> &crate::ops::OpType;
+            fn num_nodes(&self) -> usize;
+            fn num_edges(&self) -> usize;
+            fn num_ports(&self, node: Self::Node, dir: crate::Direction) -> usize;
+            fn num_inputs(&self, node: Self::Node) -> usize;
+            fn num_outputs(&self, node: Self::Node) -> usize;
+            fn nodes(&self) -> impl Iterator<Item = Self::Node> + Clone;
+            fn node_ports(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = crate::Port> + Clone;
+            fn node_outputs(&self, node: Self::Node) -> impl Iterator<Item = crate::OutgoingPort> + Clone;
+            fn node_inputs(&self, node: Self::Node) -> impl Iterator<Item = crate::IncomingPort> + Clone;
+            fn all_node_ports(&self, node: Self::Node) -> impl Iterator<Item = crate::Port> + Clone;
+            fn linked_ports(&self, node: Self::Node, port: impl Into<crate::Port>) -> impl Iterator<Item = (Self::Node, crate::Port)> + Clone;
+            fn all_linked_ports(&self, node: Self::Node, dir: crate::Direction) -> itertools::Either<impl Iterator<Item = (Self::Node, crate::OutgoingPort)>, impl Iterator<Item = (Self::Node, crate::IncomingPort)>>;
+            fn all_linked_outputs(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, crate::OutgoingPort)>;
+            fn all_linked_inputs(&self, node: Self::Node) -> impl Iterator<Item = (Self::Node, crate::IncomingPort)>;
+            fn single_linked_port(&self, node: Self::Node, port: impl Into<crate::Port>) -> Option<(Self::Node, crate::Port)>;
+            fn single_linked_output(&self, node: Self::Node, port: impl Into<crate::IncomingPort>) -> Option<(Self::Node, crate::OutgoingPort)>;
+            fn single_linked_input(&self, node: Self::Node, port: impl Into<crate::OutgoingPort>) -> Option<(Self::Node, crate::IncomingPort)>;
+            fn linked_outputs(&self, node: Self::Node, port: impl Into<crate::IncomingPort>) -> impl Iterator<Item = (Self::Node, crate::OutgoingPort)>;
+            fn linked_inputs(&self, node: Self::Node, port: impl Into<crate::OutgoingPort>) -> impl Iterator<Item = (Self::Node, crate::IncomingPort)>;
+            fn node_connections(&self, node: Self::Node, other: Self::Node) -> impl Iterator<Item = [crate::Port; 2]> + Clone;
+            fn is_linked(&self, node: Self::Node, port: impl Into<crate::Port>) -> bool;
+            fn children(&self, node: Self::Node) -> impl DoubleEndedIterator<Item = Self::Node> + Clone;
+            fn descendants(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
+            fn first_child(&self, node: Self::Node) -> Option<Self::Node>;
+            fn neighbours(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = Self::Node> + Clone;
+            fn all_neighbours(&self, node: Self::Node) -> impl Iterator<Item = Self::Node> + Clone;
+            #[expect(deprecated)]
+            fn dot_string(&self) -> String;
+            fn static_source(&self, node: Self::Node) -> Option<Self::Node>;
+            fn static_targets(&self, node: Self::Node) -> Option<impl Iterator<Item = (Self::Node, crate::IncomingPort)>>;
+            fn value_types(&self, node: Self::Node, dir: crate::Direction) -> impl Iterator<Item = (crate::Port, crate::types::Type)>;
+            fn extensions(&self) -> &crate::extension::ExtensionRegistry;
+            fn validate(&self) -> Result<(), crate::hugr::ValidationError<Self::Node>>;
+            fn extract_hugr(&self, parent: Self::Node) -> (crate::Hugr, impl crate::hugr::views::ExtractionResult<Self::Node> + 'static);
         }
     }
     fn scheduling_graph(&self, parent: Self::Node) -> super::SchedulingGraph<'_, Self> {

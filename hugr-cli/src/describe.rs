@@ -248,15 +248,9 @@ struct SymbolRow {
 
 impl From<ExtensionDesc> for ExtensionRow {
     fn from(desc: ExtensionDesc) -> Self {
-        // TODO: Remove this once `hugr-rs 0.27.0` is released and `ExtensionDesc::version` is made optional.
-        let version = if desc.version == Version::new(0, 0, 0) {
-            None
-        } else {
-            Some(desc.version)
-        };
         Self {
             name: desc.name,
-            version,
+            version: desc.version,
         }
     }
 }

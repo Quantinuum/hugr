@@ -1,6 +1,51 @@
 # Changelog
 
 
+## [0.30.2](https://github.com/Quantinuum/hugr/compare/hugr-v0.30.1...hugr-v0.30.2) - 2026-09-04
+
+### New Features
+
+- Improve extension resolution errors ([#3247](https://github.com/Quantinuum/hugr/pull/3247))
+
+## [0.30.1](https://github.com/Quantinuum/hugr/compare/hugr-v0.30.0...hugr-v0.30.1) - 2026-09-03
+
+### Bug Fixes
+
+- Force resolution of extension types inside constants ([#3242](https://github.com/Quantinuum/hugr/pull/3242))
+
+### Performance
+
+- Cache extension type helpers ([#3241](https://github.com/Quantinuum/hugr/pull/3241))
+
+## [0.30.0](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.4...hugr-v0.30.0) - 2026-09-03
+
+This release is focused on performance and memory footprint. Encoding and
+decoding envelopes has been greatly improved for both the binary and text
+formats, and memory usage on loaded HUGRs has been significantly reduced by
+deduplicating type definitions.
+
+Check out the new API for faster port queries when a full signature is not
+required ([#3149](https://github.com/Quantinuum/hugr/pull/3149)).
+
+### New Features
+
+- *(cli)* Include edge counts in `describe` output ([#3209](https://github.com/Quantinuum/hugr/pull/3209))
+- *(hugr-model)* Allow parsing literals as constants ([#3230](https://github.com/Quantinuum/hugr/pull/3230))
+- [**breaking**] Read the extension version as optional in `ExtensionDesc` metadata ([#3231](https://github.com/Quantinuum/hugr/pull/3231))
+
+### Performance
+
+- [**breaking**] Reuse shared `Type`s during HUGR import ([#3215](https://github.com/Quantinuum/hugr/pull/3215))
+- Avoid various intermediate clones during op resolution ([#3220](https://github.com/Quantinuum/hugr/pull/3220))
+- Cache serialized extensions to speed up encoding ([#3210](https://github.com/Quantinuum/hugr/pull/3210))
+- Pre-compute HUGR capacity when decoding a `hugr-model` ([#3219](https://github.com/Quantinuum/hugr/pull/3219))
+- Avoid cloning signatures for simple port checks ([#3149](https://github.com/Quantinuum/hugr/pull/3149))
+
+### Refactor
+
+- Add a shared `TypeResolverContext` to avoid repeated resolution ([#3217](https://github.com/Quantinuum/hugr/pull/3217))
+- [**breaking**] Remove deprecated definitions ([#3232](https://github.com/Quantinuum/hugr/pull/3232))
+
 ## [0.29.4](https://github.com/Quantinuum/hugr/compare/hugr-v0.29.3...hugr-v0.29.4) - 2026-08-28
 
 ### New Features

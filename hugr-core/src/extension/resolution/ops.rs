@@ -76,11 +76,21 @@ pub(crate) fn resolve_op_extensions<'e>(
         unqualified_id: impl AsRef<OpNameRef>,
     ) -> Result<(&'e Arc<OpDef>, &'e Arc<Extension>), ExtensionResolutionError> {
         let Some(extension) = extensions.get_req(ext_id, ext_version) else {
-            return Err(ExtensionResolutionError::MissingOpExtension {
-                node: Some(node),
-                op: qualified_id.as_ref().into(),
-                missing_extension: ext_id.clone(),
-                available_extensions: extensions.ids().cloned().collect(),
+            return Err(match ext_version {
+                Some(version) => ExtensionResolutionError::unresolved_op_extension(
+                    Some(node),
+                    qualified_id.as_ref().into(),
+                    ext_id,
+                    version,
+                    extensions,
+                ),
+                #[expect(deprecated)]
+                None => ExtensionResolutionError::MissingOpExtension {
+                    node: Some(node),
+                    op: qualified_id.as_ref().into(),
+                    missing_extension: ext_id.clone(),
+                    available_extensions: extensions.ids().cloned().collect(),
+                },
             });
         };
         let Some(op_def) = extension.get_op(unqualified_id.as_ref()) else {
@@ -140,26 +150,29 @@ pub(crate) fn resolve_op_extensions<'e>(
                 opaque.unqualified_id(),
             )?;
 
-            let ext_op =
-                ExtensionOp::new_with_cached(op_def.clone(), opaque.args().to_vec(), opaque)
-                    .map_err(|e| OpaqueOpError::SignatureError {
+            let signature =
+                ExtensionOp::compute_signature_with_cached(op_def, opaque).map_err(|e| {
+                    OpaqueOpError::SignatureError {
                         node,
                         name: opaque.name().clone(),
                         cause: e,
-                    })?;
+                    }
+                })?;
 
-            if opaque.signature().io() != ext_op.signature().io() {
+            if opaque.signature().io() != signature.io() {
                 return Err(OpaqueOpError::SignatureMismatch {
                     node,
                     extension: opaque.extension().clone(),
                     op: op_def.name().clone(),
-                    computed: Box::new(ext_op.signature().into_owned()),
+                    computed: Box::new(signature),
                     stored: Box::new(opaque.signature().into_owned()),
                 }
                 .into());
             }
 
             // Replace the opaque operation with the resolved extension operation.
+            let args = opaque.take_args();
+            let ext_op = ExtensionOp::from_resolved_parts(op_def.clone(), args, signature);
             *op = ext_op.into();
 
             Ok(Some(extension))

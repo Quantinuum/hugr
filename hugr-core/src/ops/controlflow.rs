@@ -2,12 +2,13 @@
 
 use std::borrow::Cow;
 
-use crate::Direction;
+use crate::hugr::views::render::RenderStringConfig;
 use crate::types::{EdgeKind, Signature, Type, TypeRow, TypeRowLike};
+use crate::{Direction, Port, PortIndex};
 
 use super::OpTag;
 use super::dataflow::{DataflowOpTrait, DataflowParent};
-use super::{OpTrait, StaticTag, impl_op_name};
+use super::{NamedOp, OpTrait, StaticTag, impl_op_name};
 
 /// Tail-controlled loop.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
@@ -30,11 +31,44 @@ impl DataflowOpTrait for TailLoop {
         "A tail-controlled loop"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
         let [inputs, outputs] =
             [&self.just_inputs, &self.just_outputs].map(|row| row.extend(self.rest.iter()));
         Cow::Owned(Signature::new(inputs, outputs))
+    }
+
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        let (head, tail) = match port.direction() {
+            Direction::Incoming => (&self.just_inputs, &self.rest),
+            Direction::Outgoing => (&self.just_outputs, &self.rest),
+        };
+        let mut index = port.index();
+
+        // The op value ports are defined as the concatenation of `head` and `tail`.
+        // See if `index` falls within any of those segments.
+        if index < head.len() {
+            return Some(head[index].clone());
+        }
+        index -= head.len();
+
+        if index < tail.len() {
+            return Some(tail[index].clone());
+        }
+
+        None
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        let directional = match dir {
+            Direction::Incoming => &self.just_inputs,
+            Direction::Outgoing => &self.just_outputs,
+        };
+        directional.len() + self.rest.len()
     }
 
     fn substitute(&self, subst: &crate::types::Substitution) -> Self {
@@ -105,6 +139,10 @@ impl DataflowOpTrait for Conditional {
         "HUGR conditional operation"
     }
 
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     fn signature(&self) -> Cow<'_, Signature> {
         // TODO: Store a cached signature
         let mut inputs = self.other_inputs.clone();
@@ -112,6 +150,21 @@ impl DataflowOpTrait for Conditional {
             .to_mut()
             .insert(0, Type::new_sum(self.sum_rows.clone()));
         Cow::Owned(Signature::new(inputs, self.outputs.clone()))
+    }
+
+    fn value_port_type(&self, port: Port) -> Option<Type> {
+        match port.direction() {
+            Direction::Incoming if port.index() == 0 => Some(Type::new_sum(self.sum_rows.clone())),
+            Direction::Incoming => self.other_inputs.get(port.index() - 1).cloned(),
+            Direction::Outgoing => self.outputs.get(port.index()).cloned(),
+        }
+    }
+
+    fn value_port_count(&self, dir: Direction) -> usize {
+        match dir {
+            Direction::Incoming => self.other_inputs.len() + 1,
+            Direction::Outgoing => self.outputs.len(),
+        }
     }
 
     fn substitute(&self, subst: &crate::types::Substitution) -> Self {
@@ -145,6 +198,10 @@ impl DataflowOpTrait for CFG {
 
     fn description(&self) -> &'static str {
         "A dataflow node defined by a child CFG"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn signature(&self) -> Cow<'_, Signature> {
@@ -206,6 +263,11 @@ impl OpTrait for DataflowBlock {
     fn description(&self) -> &'static str {
         "A CFG basic block node"
     }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag {
         Self::TAG
@@ -239,6 +301,11 @@ impl OpTrait for ExitBlock {
     fn description(&self) -> &'static str {
         "A CFG exit block node"
     }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
+    }
+
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag {
         Self::TAG
@@ -319,6 +386,10 @@ impl DataflowParent for Case {
 impl OpTrait for Case {
     fn description(&self) -> &'static str {
         "A case node inside a conditional"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        self.name().to_string()
     }
 
     fn tag(&self) -> OpTag {
