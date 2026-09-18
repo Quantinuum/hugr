@@ -87,7 +87,7 @@ impl<AK: ArrayKind> MakeOpDef for GenericArrayRepeatDef<AK> {
     }
 
     fn description(&self) -> String {
-        "Creates a new array whose elements are initialized by calling \
+        "Creates a new array whose elements are initialised by calling \
         the given function n times"
             .into()
     }
