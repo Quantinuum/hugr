@@ -67,7 +67,7 @@ as well as anything which cannot - e.g. quantum data.
 A `Const` edge can only carry a `CopyableType`. For
 more details see the [Type System](type-system.md) section.
 
-As well as the type, `Value` and `Const` edges are also parametrized by a
+As well as the type, `Value` and `Const` edges are also parameterized by a
 `Locality`, which declares whether the edge crosses levels in the hierarchy.
 `Function` edges are always non-local (`Ext`), as they originate from
 module-level `FuncDefn` or `FuncDecl` nodes.
@@ -449,7 +449,7 @@ Some normalizations are possible:
 
 The CFG in the example below takes three inputs:
 
-- A value `v` of type "P" (its exact structure isn’t specified, but it can be converted to a boolean—this conversion is represented by the nodes labeled "P?1" and "P?2").
+- A value `v` of type "P" (its exact structure isn’t specified, but it can be converted to a boolean—this conversion is represented by the nodes labelled "P?1" and "P?2").
 - A value of type "qubit".
 - A value `t` of type "angle".
 
