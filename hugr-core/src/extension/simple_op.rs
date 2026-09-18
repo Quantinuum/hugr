@@ -85,7 +85,7 @@ pub trait MakeOpDef {
         self.opdef_id().to_string()
     }
 
-    /// Edit the opdef before finalising. By default does nothing.
+    /// Edit the opdef before finalizing. By default does nothing.
     fn post_opdef(&self, _def: &mut OpDef) {}
 
     /// Add an operation implemented as an [`MakeOpDef`], which can provide the data

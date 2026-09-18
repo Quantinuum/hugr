@@ -18,7 +18,7 @@ use crate::{Direction, IncomingPort, OutgoingPort, Port};
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
 /// Base type for listing inputs and output types.
 ///
-/// Parametrized by the type used to list the inputs and outputs. Exactly two
+/// Parameterized by the type used to list the inputs and outputs. Exactly two
 /// instantiations are used: [Signature] and [FuncValueType].
 pub struct FuncTypeBase<T> {
     /// Value inputs of the function.

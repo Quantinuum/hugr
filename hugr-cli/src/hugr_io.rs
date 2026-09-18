@@ -32,7 +32,7 @@ pub struct HugrInputArgs {
         short,
         long,
         help_heading = "Input",
-        help = "Paths to additional serialised extensions needed to load the Hugr."
+        help = "Paths to additional serialized extensions needed to load the Hugr."
     )]
     pub extensions: Vec<PathBuf>,
     /// Extension directories.
@@ -40,7 +40,7 @@ pub struct HugrInputArgs {
         short = 'E',
         long,
         help_heading = "Input",
-        help = "Directories to recursively search for serialised extensions (*.json) needed to load the Hugr. \
+        help = "Directories to recursively search for serialized extensions (*.json) needed to load the Hugr. \
         Files not matching the extension schema are ignored."
     )]
     pub extension_dirs: Vec<PathBuf>,

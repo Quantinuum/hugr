@@ -9,10 +9,10 @@
 //! - [Table]: Efficient intermediate data structure to facilitate conversions.
 //! - [AST]: Abstract syntax tree that uses direct references rather than table indices.
 //!
-//! The table and AST format are interconvertible and can be serialised to
+//! The table and AST format are interconvertible and can be serialized to
 //! a binary and text format, respectively:
 //!
-//! - [Binary]: Binary serialisation format optimised for performance and size.
+//! - [Binary]: Binary serialization format optimized for performance and size.
 //! - [Text]: Human readable s-expression based text format.
 //!
 //! # Logical Format
@@ -22,7 +22,7 @@
 //! represent named language objects. Instructions have __input__ and __output__ ports
 //! and runtime values flow between ports when they are connected by a __link__.
 //!
-//! Nodes are organised into __regions__ and do not have any explicit ordering
+//! Nodes are organized into __regions__ and do not have any explicit ordering
 //! between them; any schedule that respects the data dependencies between nodes
 //! is valid. Previous designs included order-edges that could be added between nodes
 //! to further constrain the ordering; as long as this system is still used, order hint
@@ -274,7 +274,7 @@ pub const CORE_ENTRYPOINT: &str = "core.entrypoint";
 /// Constructor for JSON encoded metadata.
 ///
 /// This is included in the model to allow for compatibility with `hugr-core`.
-/// The intention is to deprecate this in the future in favor of metadata
+/// The intention is to deprecate this in the future in favour of metadata
 /// expressed with custom constructors.
 ///
 /// - **Parameter:** `?name : core.str`
@@ -285,7 +285,7 @@ pub const COMPAT_META_JSON: &str = "compat.meta_json";
 /// Constructor for JSON encoded constants.
 ///
 /// This is included in the model to allow for compatibility with `hugr-core`.
-/// The intention is to deprecate this in the future in favor of constants
+/// The intention is to deprecate this in the future in favour of constants
 /// expressed with custom constructors.
 ///
 /// - **Parameter:** `?type : core.type`

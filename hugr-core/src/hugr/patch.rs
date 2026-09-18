@@ -85,7 +85,7 @@ pub trait Patch<H: NodesIter>: PatchVerification<Node = H::Node> {
 
 /// A patch that can be applied to any [`HugrMut`].
 ///
-/// This trait is a generalisation of [`Patch`] in that it guarantees that
+/// This trait is a generalization of [`Patch`] in that it guarantees that
 /// the patch can be applied to any type implementing [`HugrMut`].
 ///
 /// ### When to use

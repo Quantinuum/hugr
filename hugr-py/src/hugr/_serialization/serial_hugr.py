@@ -20,7 +20,7 @@ def serialization_version() -> str:
 VersionField = Field(
     default_factory=serialization_version,
     title="Version",
-    description="Serialisation Schema Version",
+    description="Serialization Schema Version",
     frozen=True,
 )
 
