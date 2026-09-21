@@ -691,7 +691,8 @@ impl<'a> Context<'a> {
         }
 
         let children = self.hugr.children(node);
-        let mut region_children = BumpVec::with_capacity_in(children.size_hint().0 - 2, self.bump);
+        let mut region_children =
+            BumpVec::with_capacity_in(children.size_hint().0.saturating_sub(2), self.bump);
 
         for child in children {
             match self.hugr.get_optype(child) {
@@ -740,10 +741,15 @@ impl<'a> Context<'a> {
             self.export_node_deep(*child_id);
         }
 
-        let signature = {
-            let inputs = self.export_type_row(input_types.unwrap());
-            let outputs = self.export_type_row(output_types.unwrap());
-            Some(self.make_term_apply(model::CORE_FN, &[inputs, outputs]))
+        // TODO: Return an error for missing Input/Output nodes when export is fallible.
+        // Until then, omit the signature when the region's boundaries are incomplete.
+        let signature = match (input_types, output_types) {
+            (Some(inputs), Some(outputs)) => {
+                let inputs = self.export_type_row(inputs);
+                let outputs = self.export_type_row(outputs);
+                Some(self.make_term_apply(model::CORE_FN, &[inputs, outputs]))
+            }
+            _ => None,
         };
 
         let scope = match closure {
