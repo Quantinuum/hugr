@@ -117,8 +117,14 @@ mod test {
     };
 
     #[rstest]
-    fn all_math_calls(mut llvm_ctx: TestContext) {
-        llvm_ctx.add_extensions(add_math_extensions);
+    #[case::registration_function(false)]
+    #[case::builder_method(true)]
+    fn all_math_calls(mut llvm_ctx: TestContext, #[case] use_builder_method: bool) {
+        if use_builder_method {
+            llvm_ctx.add_extensions(CodegenExtsBuilder::add_math_extensions);
+        } else {
+            llvm_ctx.add_extensions(add_math_extensions);
+        }
         assert_eq!(EXTENSION.operations().count(), 14);
         for op in MathOps::iter() {
             let SignatureFunc::PolyFuncType(signature) = op.signature() else {
