@@ -35,7 +35,7 @@ fn emit_math_op<'c, H: HugrView<Node = Node>>(
                 let name: &str = op.into();
                 let func = get_intrinsic(
                     ctx.get_current_module(),
-                    &format!("llvm.{name}.f64"),
+                    format!("llvm.{name}.f64"),
                     [float_ty],
                 )?;
                 Ok(vec![
@@ -61,7 +61,7 @@ fn emit_math_op<'c, H: HugrView<Node = Node>>(
             let name: &str = op.into();
             let func = get_intrinsic(
                 ctx.get_current_module(),
-                &format!("llvm.{name}.f64"),
+                format!("llvm.{name}.f64"),
                 [float_ty],
             )?;
             Ok(vec![
