@@ -106,7 +106,11 @@ use pyo3::PyTypeInfo as _;
 #[cfg(feature = "pyo3")]
 use pyo3::types::PyAnyMethods as _;
 use smol_str::SmolStr;
-use std::sync::Arc;
+use std::{
+    cmp::Ordering,
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 use table::LinkIndex;
 
 /// Describes how a function or symbol should be acted upon by a linker
@@ -564,7 +568,7 @@ impl<'py> pyo3::IntoPyObject<'py> for &LinkName {
 /// Literal values may be large since they can include strings and byte
 /// sequences of arbitrary length. To enable cheap cloning and sharing,
 /// strings and byte sequences use reference counting.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+#[derive(Debug, Clone)]
 pub enum Literal {
     /// String literal.
     Str(SmolStr),
@@ -574,6 +578,70 @@ pub enum Literal {
     Bytes(Arc<[u8]>),
     /// Floating point literal
     Float(OrderedFloat<f64>),
+}
+
+impl PartialEq for Literal {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Str(lhs), Self::Str(rhs)) => lhs == rhs,
+            (Self::Nat(lhs), Self::Nat(rhs)) => lhs == rhs,
+            (Self::Bytes(lhs), Self::Bytes(rhs)) => lhs == rhs,
+            (Self::Float(lhs), Self::Float(rhs)) => {
+                lhs == rhs && (lhs.0 != 0.0 || lhs.0.to_bits() == rhs.0.to_bits())
+            }
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Literal {}
+
+impl Hash for Literal {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Self::Str(value) => value.hash(state),
+            Self::Nat(value) => value.hash(state),
+            Self::Bytes(value) => value.hash(state),
+            // `OrderedFloat` deliberately gives both signed zeroes the same hash.
+            // Literal terms are interned during resolution, so retain the sign here.
+            Self::Float(value) if value.0 == 0.0 => value.0.to_bits().hash(state),
+            Self::Float(value) => value.hash(state),
+        }
+    }
+}
+
+impl PartialOrd for Literal {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Literal {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Self::Str(lhs), Self::Str(rhs)) => lhs.cmp(rhs),
+            (Self::Nat(lhs), Self::Nat(rhs)) => lhs.cmp(rhs),
+            (Self::Bytes(lhs), Self::Bytes(rhs)) => lhs.cmp(rhs),
+            (Self::Float(lhs), Self::Float(rhs)) => lhs.cmp(rhs).then_with(|| {
+                if lhs.0 == 0.0 {
+                    lhs.0.to_bits().cmp(&rhs.0.to_bits())
+                } else {
+                    Ordering::Equal
+                }
+            }),
+            (lhs, rhs) => literal_tag(lhs).cmp(&literal_tag(rhs)),
+        }
+    }
+}
+
+const fn literal_tag(literal: &Literal) -> u8 {
+    match literal {
+        Literal::Str(_) => 0,
+        Literal::Nat(_) => 1,
+        Literal::Bytes(_) => 2,
+        Literal::Float(_) => 3,
+    }
 }
 
 #[cfg(feature = "pyo3")]
