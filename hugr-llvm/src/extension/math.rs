@@ -102,78 +102,52 @@ mod test {
             STD_REG,
             arithmetic::{
                 float_types::{ConstF64, float64_type},
-                math::EXTENSION,
+                math::MathOpBuilder,
             },
         },
         types::TypeRow,
     };
     use rstest::rstest;
-    use strum::IntoEnumIterator;
 
     use crate::{
-        emit::test::{Emission, SimpleHugrConfig, TEST_EMIT_DEBUG},
+        check_emission,
+        emit::test::SimpleHugrConfig,
         test::{TestContext, exec_ctx, llvm_ctx},
-        utils::fat::FatExt,
     };
 
     #[rstest]
-    #[case::registration_function(false)]
-    #[case::builder_method(true)]
-    fn all_math_calls(mut llvm_ctx: TestContext, #[case] use_builder_method: bool) {
-        if use_builder_method {
-            llvm_ctx.add_extensions(CodegenExtsBuilder::add_math_extensions);
-        } else {
-            llvm_ctx.add_extensions(add_math_extensions);
-        }
-        assert_eq!(EXTENSION.operations().count(), 14);
-        for op in MathOps::iter() {
-            let SignatureFunc::PolyFuncType(signature) = op.signature() else {
-                panic!("Expected PolyFuncType");
-            };
-            let inputs: TypeRow = signature.body().input.clone().try_into().unwrap();
-            let outputs: TypeRow = signature.body().output.clone().try_into().unwrap();
-            let input_count = inputs.len();
-            let hugr = SimpleHugrConfig::new()
-                .with_ins(inputs)
-                .with_outs(outputs)
-                .with_extensions(STD_REG.clone())
-                .finish(|mut builder| {
-                    let outputs = builder
-                        .add_dataflow_op(op, builder.input_wires())
-                        .unwrap()
-                        .outputs();
-                    builder.finish_hugr_with_outputs(outputs).unwrap()
-                });
-            let emission = Emission::emit_hugr(
-                hugr.fat_root().unwrap(),
-                llvm_ctx.get_emit_hugr(),
-                TEST_EMIT_DEBUG,
-            )
-            .unwrap();
-            emission.verify().unwrap();
-            let name: &str = op.into();
-            let module = emission.module();
-            assert!(module.get_function(name).is_none());
-            if op == MathOps::fmod {
-                assert!(module.print_to_string().to_string().contains("frem double"));
-            } else {
-                let intrinsic_name = format!("llvm.{name}.f64");
-                let function = module.get_function(&intrinsic_name).unwrap();
-                let float = llvm_ctx.iw_context().f64_type();
-                let expected = float.fn_type(&vec![float.into(); input_count], false);
-                assert_eq!(function.get_type(), expected);
-                assert!(
-                    module
-                        .print_to_string()
-                        .to_string()
-                        .contains(&format!("call double @{intrinsic_name}("))
-                );
-            }
-            assert_eq!(
-                MathOps::from_def(EXTENSION.get_op(name).unwrap()).unwrap(),
-                op
-            );
-        }
+    #[case::sin(MathOps::sin)]
+    #[case::cos(MathOps::cos)]
+    #[case::tan(MathOps::tan)]
+    #[case::atan(MathOps::atan)]
+    #[case::atan2(MathOps::atan2)]
+    #[case::asin(MathOps::asin)]
+    #[case::acos(MathOps::acos)]
+    #[case::exp(MathOps::exp)]
+    #[case::exp2(MathOps::exp2)]
+    #[case::log(MathOps::log)]
+    #[case::log2(MathOps::log2)]
+    #[case::log10(MathOps::log10)]
+    #[case::pow(MathOps::pow)]
+    #[case::fmod(MathOps::fmod)]
+    fn math_emission(mut llvm_ctx: TestContext, #[case] op: MathOps) {
+        llvm_ctx.add_extensions(CodegenExtsBuilder::add_math_extensions);
+        let SignatureFunc::PolyFuncType(signature) = op.signature() else {
+            panic!("Expected PolyFuncType");
+        };
+        let inputs: TypeRow = signature.body().input.clone().try_into().unwrap();
+        let outputs: TypeRow = signature.body().output.clone().try_into().unwrap();
+        let mut hugr = SimpleHugrConfig::new()
+            .with_ins(inputs)
+            .with_outs(outputs)
+            .with_extensions(STD_REG.clone())
+            .finish(|mut builder| {
+                let inputs: Vec<_> = builder.input_wires().collect();
+                let output = builder.add_math_op(op, inputs).unwrap();
+                builder.finish_hugr_with_outputs([output]).unwrap()
+            });
+        let name: &str = op.into();
+        check_emission!(name, hugr, llvm_ctx);
     }
 
     #[rstest]
@@ -209,8 +183,8 @@ mod test {
                     .iter()
                     .map(|&v| builder.add_load_value(ConstF64::new(v)))
                     .collect();
-                let outputs = builder.add_dataflow_op(op, inputs).unwrap().outputs();
-                builder.finish_hugr_with_outputs(outputs).unwrap()
+                let output = builder.add_math_op(op, inputs).unwrap();
+                builder.finish_hugr_with_outputs([output]).unwrap()
             });
         let actual = exec_ctx.exec_hugr_f64(hugr, "main");
         assert!(
