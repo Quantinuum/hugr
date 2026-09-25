@@ -568,6 +568,10 @@ impl<'py> pyo3::IntoPyObject<'py> for &LinkName {
 /// Literal values may be large since they can include strings and byte
 /// sequences of arbitrary length. To enable cheap cloning and sharing,
 /// strings and byte sequences use reference counting.
+///
+/// Float literals compare by their bit patterns, except that all NaNs compare
+/// equal. Signed zeros are distinct. In the total order, NaNs come before
+/// negative infinity, and positive zero comes before negative zero.
 #[derive(Debug, Clone)]
 pub enum Literal {
     /// String literal.
@@ -723,6 +727,8 @@ mod test {
         let nan_a = float(f64::from_bits(0x7ff8_0000_0000_0001));
         let nan_b = float(f64::from_bits(0xfff8_0000_0000_0002));
         assert_eq!(nan_a.cmp(&nan_b), Ordering::Equal);
+        assert_eq!(float(f64::NEG_INFINITY).cmp(&nan_b), Ordering::Greater);
+        assert_eq!(float(1.0).cmp(&float(1.0)), Ordering::Equal);
 
         let values = [
             nan_a,
@@ -735,6 +741,36 @@ mod test {
         ];
         for pair in values.windows(2) {
             assert!(pair[0] < pair[1], "{pair:?}");
+        }
+    }
+
+    #[test]
+    fn literal_order_handles_other_variants() {
+        let same_variant_pairs = [
+            (Literal::Str("a".into()), Literal::Str("b".into())),
+            (Literal::Nat(1), Literal::Nat(2)),
+            (
+                Literal::Bytes(vec![1].into()),
+                Literal::Bytes(vec![2].into()),
+            ),
+        ];
+        for (lower, higher) in same_variant_pairs {
+            assert_eq!(lower.cmp(&higher), Ordering::Less);
+            assert_eq!(higher.cmp(&lower), Ordering::Greater);
+            assert_eq!(lower.cmp(&lower), Ordering::Equal);
+        }
+
+        let variants = [
+            Literal::Str("a".into()),
+            Literal::Nat(1),
+            Literal::Bytes(vec![1].into()),
+            Literal::Float(1.0.into()),
+        ];
+        for (index, lower) in variants.iter().enumerate() {
+            for higher in &variants[index + 1..] {
+                assert_eq!(lower.cmp(higher), Ordering::Less);
+                assert_eq!(higher.cmp(lower), Ordering::Greater);
+            }
         }
     }
 
