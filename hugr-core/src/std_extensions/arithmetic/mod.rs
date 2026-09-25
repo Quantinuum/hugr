@@ -5,6 +5,7 @@ pub mod float_ops;
 pub mod float_types;
 pub mod int_ops;
 pub mod int_types;
+pub mod math;
 
 #[cfg(test)]
 mod test {
