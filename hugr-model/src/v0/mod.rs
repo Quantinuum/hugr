@@ -106,7 +106,11 @@ use pyo3::PyTypeInfo as _;
 #[cfg(feature = "pyo3")]
 use pyo3::types::PyAnyMethods as _;
 use smol_str::SmolStr;
-use std::sync::Arc;
+use std::{
+    cmp::Ordering,
+    hash::{Hash, Hasher},
+    sync::Arc,
+};
 use table::LinkIndex;
 
 /// Describes how a function or symbol should be acted upon by a linker
@@ -564,7 +568,11 @@ impl<'py> pyo3::IntoPyObject<'py> for &LinkName {
 /// Literal values may be large since they can include strings and byte
 /// sequences of arbitrary length. To enable cheap cloning and sharing,
 /// strings and byte sequences use reference counting.
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+///
+/// Float literals compare by their bit patterns, except that all NaNs compare
+/// equal. Signed zeros are distinct. In the total order, NaNs come before
+/// negative infinity, and negative zero comes before positive zero.
+#[derive(Debug, Clone)]
 pub enum Literal {
     /// String literal.
     Str(SmolStr),
@@ -574,6 +582,75 @@ pub enum Literal {
     Bytes(Arc<[u8]>),
     /// Floating point literal
     Float(OrderedFloat<f64>),
+}
+
+impl PartialEq for Literal {
+    fn eq(&self, other: &Self) -> bool {
+        match (self, other) {
+            (Self::Str(lhs), Self::Str(rhs)) => lhs == rhs,
+            (Self::Nat(lhs), Self::Nat(rhs)) => lhs == rhs,
+            (Self::Bytes(lhs), Self::Bytes(rhs)) => lhs == rhs,
+            (Self::Float(lhs), Self::Float(rhs)) => {
+                // Float equality is weird with NANs and negative zeros, so we compare by bits.
+                (lhs.is_nan() && rhs.is_nan()) || lhs.to_bits() == rhs.to_bits()
+            }
+            _ => false,
+        }
+    }
+}
+
+impl Eq for Literal {}
+
+impl Hash for Literal {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        std::mem::discriminant(self).hash(state);
+        match self {
+            Self::Str(value) => value.hash(state),
+            Self::Nat(value) => value.hash(state),
+            Self::Bytes(value) => value.hash(state),
+            // All NaN bit patterns compare equal, so they must share a hash.
+            Self::Float(value) if value.is_nan() => "NAN".hash(state),
+            Self::Float(value) => value.to_bits().hash(state),
+        }
+    }
+}
+
+impl PartialOrd for Literal {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for Literal {
+    fn cmp(&self, other: &Self) -> Ordering {
+        match (self, other) {
+            (Self::Str(lhs), Self::Str(rhs)) => lhs.cmp(rhs),
+            (Self::Nat(lhs), Self::Nat(rhs)) => lhs.cmp(rhs),
+            (Self::Bytes(lhs), Self::Bytes(rhs)) => lhs.cmp(rhs),
+            (Self::Float(lhs), Self::Float(rhs)) => match (lhs.is_nan(), rhs.is_nan()) {
+                (true, true) => Ordering::Equal,
+                (true, false) => Ordering::Less,
+                (false, true) => Ordering::Greater,
+                (false, false) => lhs.cmp(rhs).then_with(|| {
+                    if lhs.0 == 0.0 {
+                        rhs.to_bits().cmp(&lhs.to_bits())
+                    } else {
+                        Ordering::Equal
+                    }
+                }),
+            },
+            (lhs, rhs) => literal_tag(lhs).cmp(&literal_tag(rhs)),
+        }
+    }
+}
+
+const fn literal_tag(literal: &Literal) -> u8 {
+    match literal {
+        Literal::Str(_) => 0,
+        Literal::Nat(_) => 1,
+        Literal::Bytes(_) => 2,
+        Literal::Float(_) => 3,
+    }
 }
 
 #[cfg(feature = "pyo3")]
@@ -623,6 +700,79 @@ impl<'py> pyo3::IntoPyObject<'py> for &Literal {
 mod test {
     use super::*;
     use proptest::{prelude::*, string::string_regex};
+    use std::collections::hash_map::DefaultHasher;
+
+    #[test]
+    fn float_literal_hash_matches_equality() {
+        fn hash(literal: &Literal) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            literal.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        let nan_a = Literal::Float(f64::from_bits(0x7ff8_0000_0000_0001).into());
+        let nan_b = Literal::Float(f64::from_bits(0xfff8_0000_0000_0002).into());
+        assert_eq!(nan_a, nan_b);
+        assert_eq!(hash(&nan_a), hash(&nan_b));
+
+        let positive_zero = Literal::Float(0.0.into());
+        let negative_zero = Literal::Float((-0.0).into());
+        assert_ne!(positive_zero, negative_zero);
+        assert_ne!(hash(&positive_zero), hash(&negative_zero));
+    }
+
+    #[test]
+    fn float_literal_order_handles_nans_and_signed_zero() {
+        let float = |value: f64| Literal::Float(value.into());
+        let nan_a = float(f64::from_bits(0x7ff8_0000_0000_0001));
+        let nan_b = float(f64::from_bits(0xfff8_0000_0000_0002));
+        assert_eq!(nan_a.cmp(&nan_b), Ordering::Equal);
+        assert_eq!(float(f64::NEG_INFINITY).cmp(&nan_b), Ordering::Greater);
+        assert_eq!(float(1.0).cmp(&float(1.0)), Ordering::Equal);
+
+        let values = [
+            nan_a,
+            float(f64::NEG_INFINITY),
+            float(-1.0),
+            float(-0.0),
+            float(0.0),
+            float(1.0),
+            float(f64::INFINITY),
+        ];
+        for pair in values.windows(2) {
+            assert!(pair[0] < pair[1], "{pair:?}");
+        }
+    }
+
+    #[test]
+    fn literal_order_handles_other_variants() {
+        let same_variant_pairs = [
+            (Literal::Str("a".into()), Literal::Str("b".into())),
+            (Literal::Nat(1), Literal::Nat(2)),
+            (
+                Literal::Bytes(vec![1].into()),
+                Literal::Bytes(vec![2].into()),
+            ),
+        ];
+        for (lower, higher) in same_variant_pairs {
+            assert_eq!(lower.cmp(&higher), Ordering::Less);
+            assert_eq!(higher.cmp(&lower), Ordering::Greater);
+            assert_eq!(lower.cmp(&lower), Ordering::Equal);
+        }
+
+        let variants = [
+            Literal::Str("a".into()),
+            Literal::Nat(1),
+            Literal::Bytes(vec![1].into()),
+            Literal::Float(1.0.into()),
+        ];
+        for (index, lower) in variants.iter().enumerate() {
+            for higher in &variants[index + 1..] {
+                assert_eq!(lower.cmp(higher), Ordering::Less);
+                assert_eq!(higher.cmp(lower), Ordering::Greater);
+            }
+        }
+    }
 
     impl Arbitrary for Literal {
         type Parameters = ();
