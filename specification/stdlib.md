@@ -194,6 +194,28 @@ except where stated.
 [^2]: The exact specification of the float-to-string conversion is
 implementation-dependent.
 
+### `arithmetic.math`
+
+This extension provides math operations on `arithmetic.float.types.float64`. All 
+angles, including the results of inverse trigonometric operations, are in radians.
+
+| Name    | Inputs               | Outputs   | Meaning                                                                                                                                   |
+| ------- | -------------------- | --------- |-------------------------------------------------------------------------------------------------------------------------------------------|
+| `sin`   | `float64`            | `float64` | sine                                                                                                                                      |
+| `cos`   | `float64`            | `float64` | cosine                                                                                                                                    |
+| `tan`   | `float64`            | `float64` | tangent                                                                                                                                   |
+| `asin`  | `float64`            | `float64` | inverse sine                                                                                                                              |
+| `acos`  | `float64`            | `float64` | inverse cosine                                                                                                                            |
+| `atan`  | `float64`            | `float64` | inverse tangent                                                                                                                           |
+| `atan2` | `float64`, `float64` | `float64` | four-quadrant inverse tangent, with inputs in the order `(y, x)`                                                                          |
+| `exp`   | `float64`            | `float64` | natural exponential, $e^x$                                                                                                                |
+| `exp2`  | `float64`            | `float64` | base-2 exponential, $2^x$                                                                                                                 |
+| `log`   | `float64`            | `float64` | natural logarithm                                                                                                                         |
+| `log2`  | `float64`            | `float64` | base-2 logarithm                                                                                                                          |
+| `log10` | `float64`            | `float64` | base-10 logarithm                                                                                                                         |
+| `pow`   | `float64`, `float64` | `float64` | first input raised to the power of the second, with inputs `(base, exponent)`                                                             |
+| `fmod`  | `float64`, `float64` | `float64` | remainder of the first input divided by the second, using a quotient truncated toward zero; the remainder has the sign of the first input |
+
 ### `arithmetic.conversions`
 
 Conversions between integers and floats:
