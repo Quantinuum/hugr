@@ -571,7 +571,7 @@ impl<'py> pyo3::IntoPyObject<'py> for &LinkName {
 ///
 /// Float literals compare by their bit patterns, except that all NaNs compare
 /// equal. Signed zeros are distinct. In the total order, NaNs come before
-/// negative infinity, and positive zero comes before negative zero.
+/// negative infinity, and negative zero comes before positive zero.
 #[derive(Debug, Clone)]
 pub enum Literal {
     /// String literal.
@@ -633,7 +633,7 @@ impl Ord for Literal {
                 (false, true) => Ordering::Greater,
                 (false, false) => lhs.cmp(rhs).then_with(|| {
                     if lhs.0 == 0.0 {
-                        lhs.to_bits().cmp(&rhs.to_bits())
+                        rhs.to_bits().cmp(&lhs.to_bits())
                     } else {
                         Ordering::Equal
                     }
@@ -734,8 +734,8 @@ mod test {
             nan_a,
             float(f64::NEG_INFINITY),
             float(-1.0),
-            float(0.0),
             float(-0.0),
+            float(0.0),
             float(1.0),
             float(f64::INFINITY),
         ];
