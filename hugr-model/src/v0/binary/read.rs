@@ -5,7 +5,7 @@ use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use std::io::{BufRead, BufReader, Read};
 
-/// An error encountered while deserialising a model.
+/// An error encountered while deserializing a model.
 #[derive(Debug, derive_more::From, derive_more::Display, derive_more::Error)]
 #[non_exhaustive]
 #[display("Error reading a HUGR model payload.")]
