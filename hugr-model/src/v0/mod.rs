@@ -587,7 +587,8 @@ impl PartialEq for Literal {
             (Self::Nat(lhs), Self::Nat(rhs)) => lhs == rhs,
             (Self::Bytes(lhs), Self::Bytes(rhs)) => lhs == rhs,
             (Self::Float(lhs), Self::Float(rhs)) => {
-                lhs == rhs && (lhs.0 != 0.0 || lhs.0.to_bits() == rhs.0.to_bits())
+                // Float equality is weird with NANs and negative zeros, so we compare by bits.
+                (lhs.is_nan() && rhs.is_nan()) || lhs.to_bits() == rhs.to_bits()
             }
             _ => false,
         }
@@ -603,10 +604,9 @@ impl Hash for Literal {
             Self::Str(value) => value.hash(state),
             Self::Nat(value) => value.hash(state),
             Self::Bytes(value) => value.hash(state),
-            // `OrderedFloat` deliberately gives both signed zeroes the same hash.
-            // Literal terms are interned during resolution, so retain the sign here.
-            Self::Float(value) if value.0 == 0.0 => value.0.to_bits().hash(state),
-            Self::Float(value) => value.hash(state),
+            // All NaN bit patterns compare equal, so they must share a hash.
+            Self::Float(value) if value.is_nan() => "NAN".hash(state),
+            Self::Float(value) => value.to_bits().hash(state),
         }
     }
 }
@@ -623,13 +623,18 @@ impl Ord for Literal {
             (Self::Str(lhs), Self::Str(rhs)) => lhs.cmp(rhs),
             (Self::Nat(lhs), Self::Nat(rhs)) => lhs.cmp(rhs),
             (Self::Bytes(lhs), Self::Bytes(rhs)) => lhs.cmp(rhs),
-            (Self::Float(lhs), Self::Float(rhs)) => lhs.cmp(rhs).then_with(|| {
-                if lhs.0 == 0.0 {
-                    lhs.0.to_bits().cmp(&rhs.0.to_bits())
-                } else {
-                    Ordering::Equal
-                }
-            }),
+            (Self::Float(lhs), Self::Float(rhs)) => match (lhs.is_nan(), rhs.is_nan()) {
+                (true, true) => Ordering::Equal,
+                (true, false) => Ordering::Less,
+                (false, true) => Ordering::Greater,
+                (false, false) => lhs.cmp(rhs).then_with(|| {
+                    if lhs.0 == 0.0 {
+                        lhs.to_bits().cmp(&rhs.to_bits())
+                    } else {
+                        Ordering::Equal
+                    }
+                }),
+            },
             (lhs, rhs) => literal_tag(lhs).cmp(&literal_tag(rhs)),
         }
     }
@@ -691,6 +696,47 @@ impl<'py> pyo3::IntoPyObject<'py> for &Literal {
 mod test {
     use super::*;
     use proptest::{prelude::*, string::string_regex};
+    use std::collections::hash_map::DefaultHasher;
+
+    #[test]
+    fn float_literal_hash_matches_equality() {
+        fn hash(literal: &Literal) -> u64 {
+            let mut hasher = DefaultHasher::new();
+            literal.hash(&mut hasher);
+            hasher.finish()
+        }
+
+        let nan_a = Literal::Float(f64::from_bits(0x7ff8_0000_0000_0001).into());
+        let nan_b = Literal::Float(f64::from_bits(0xfff8_0000_0000_0002).into());
+        assert_eq!(nan_a, nan_b);
+        assert_eq!(hash(&nan_a), hash(&nan_b));
+
+        let positive_zero = Literal::Float(0.0.into());
+        let negative_zero = Literal::Float((-0.0).into());
+        assert_ne!(positive_zero, negative_zero);
+        assert_ne!(hash(&positive_zero), hash(&negative_zero));
+    }
+
+    #[test]
+    fn float_literal_order_handles_nans_and_signed_zero() {
+        let float = |value: f64| Literal::Float(value.into());
+        let nan_a = float(f64::from_bits(0x7ff8_0000_0000_0001));
+        let nan_b = float(f64::from_bits(0xfff8_0000_0000_0002));
+        assert_eq!(nan_a.cmp(&nan_b), Ordering::Equal);
+
+        let values = [
+            nan_a,
+            float(f64::NEG_INFINITY),
+            float(-1.0),
+            float(0.0),
+            float(-0.0),
+            float(1.0),
+            float(f64::INFINITY),
+        ];
+        for pair in values.windows(2) {
+            assert!(pair[0] < pair[1], "{pair:?}");
+        }
+    }
 
     impl Arbitrary for Literal {
         type Parameters = ();
