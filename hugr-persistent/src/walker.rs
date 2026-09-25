@@ -349,7 +349,7 @@ impl<'a> Walker<'a> {
         self.selected_commits.get_wire(node, port)
     }
 
-    /// Materialise the [`PersistentHugr`] containing all the compatible commits
+    /// Materialize the [`PersistentHugr`] containing all the compatible commits
     /// that have been selected during exploration.
     pub fn into_persistent_hugr(self) -> PersistentHugr {
         self.selected_commits

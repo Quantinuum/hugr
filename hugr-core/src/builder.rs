@@ -8,7 +8,7 @@
 //! - [`ModuleBuilder`]: For building a module with function declarations and
 //!   definitions.
 //! - [`DFGBuilder`]: For building a dataflow graph.
-//! - [`FunctionBuilder`]: A `DFGBuilder` specialised in defining functions with a
+//! - [`FunctionBuilder`]: A `DFGBuilder` specialized in defining functions with a
 //!   dataflow graph.
 //! - [`CFGBuilder`]: For building a control flow graph.
 //! - [`ConditionalBuilder`]: For building a conditional node.
