@@ -20,6 +20,10 @@ env:
   LLVM_VERSION: "21.1"
   LLVM_FEATURE_NAME: "21-1"
 
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
+
 jobs:
   # Check if changes were made to the relevant files.
   # Always returns true if running on the default branch, to ensure all changes are thoroughly checked.
