@@ -1,6 +1,21 @@
 # Changelog
 
 
+## [0.30.3](https://github.com/Quantinuum/hugr/compare/hugr-v0.30.2...hugr-v0.30.3) - 2026-09-30
+
+### Bug Fixes
+
+- Avoid encoding panic for invalid hugrs with no i/o nodes ([#3274](https://github.com/Quantinuum/hugr/pull/3274))
+
+### Documentation
+
+- Use Oxford spelling consistently in public documentation ([#3273](https://github.com/Quantinuum/hugr/pull/3273))
+
+### New Features
+
+- Add configuration settings to mermaid render ([#3207](https://github.com/Quantinuum/hugr/pull/3207))
+- Add `math` extension with LLVM intrinsic lowering  ([#3277](https://github.com/Quantinuum/hugr/pull/3277))
+
 ## [0.30.2](https://github.com/Quantinuum/hugr/compare/hugr-v0.30.1...hugr-v0.30.2) - 2026-09-04
 
 ### New Features
