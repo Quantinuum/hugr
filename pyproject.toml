@@ -9,6 +9,8 @@ dev-dependencies = [
     "pytest ~=9.0",
     "pytest-cov ~=7.0",
     "pytest-xdist ~= 3.8",
+    "pytest-benchmark>=5.1.0",
+    "pytest-codspeed>=5.0.3",
     "maturin >=1.7.0,<2",
     "mypy >=1.9.0,<2",
     "ruff >=0.6.2,<0.7",
@@ -19,7 +21,7 @@ dev-dependencies = [
 ]
 
 [tool.pytest.ini_options]
-addopts = "--doctest-modules  --ignore=test_files"
+addopts = "--benchmark-disable --doctest-modules  --ignore=test_files"
 filterwarnings = "ignore::DeprecationWarning:lark.*"
 
 
