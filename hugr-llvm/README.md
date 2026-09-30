@@ -18,25 +18,6 @@ At present only `llvm21-1` is supported but we expect to introduce supported ver
 
 See the [llvm-sys][] crate for details on how to use your preferred llvm installation.
 
-### Shared pointers
-
-Register `CodegenExtsBuilder::add_default_ptr_extensions()` to lower the `ptr`
-extension with libc `malloc`/`free` and no-op mutex hooks. These defaults require
-that accesses to the same cell do not execute concurrently.
-
-For concurrent execution or a target-specific allocator, implement
-`extension::ptr::PtrCodegen` and register it with `add_ptr_extensions(hooks)`.
-Allocation/free and lock/unlock are independently overridable. Allocation returns
-an opaque handle with any mutex initialized; free owns its teardown. The
-`emit_get_ptr` hook projects the payload (reference count and HUGR value) from
-that handle, leaving the runtime storage layout under your control.
-`Map` holds the mutex throughout its callback, which must not access the same
-cell through another handle.
-
-Thread the returned pointer through successive operations to order them.
-Operations on duplicated handles have unspecified relative order, even when
-mutex hooks serialize their execution.
-
 ## Recent Changes
 
 See [CHANGELOG](CHANGELOG.md) for a list of changes. The minimum supported rust
