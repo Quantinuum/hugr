@@ -1,0 +1,93 @@
+name: Continuous Benchmarking 🏋️
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+    branches:
+      - "**"
+  workflow_dispatch: {}
+
+env:
+  SCCACHE_GHA_ENABLED: "true"
+  # Pinned version for the uv package manager
+  UV_VERSION: "0.9.5"
+  UV_FROZEN: 1
+  # different strings for install action and feature name
+  # should match https://github.com/TheDan64/inkwell/blob/master/.github/workflows/test.yml
+  LLVM_MAIN_VERSION: "21"
+  LLVM_VERSION: "21.1"
+  LLVM_FEATURE_NAME: "21-1"
+
+jobs:
+  # Check if changes were made to the relevant files.
+  # Always returns true if running on the default branch, to ensure all changes are thoroughly checked.
+  changes:
+    name: Check for changes
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: read
+    outputs:
+      rust: ${{ steps.filter.outputs.rust }}
+      python: ${{ steps.filter.outputs.python }}
+    steps:
+      - uses: actions/checkout@v7
+      - uses: ./.github/actions/check-changes
+        id: filter
+
+  benches-rs:
+    name: 🦀 Rust benches
+    needs: changes
+    if: ${{ needs.changes.outputs.rust == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: mozilla-actions/sccache-action@v0.0.11
+      - name: Install stable toolchain
+        uses: dtolnay/rust-toolchain@stable
+      - name: Install LLVM and Clang
+        run: |
+          wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+          sudo add-apt-repository 'deb http://apt.llvm.org/noble/   llvm-toolchain-noble-${{ env.LLVM_MAIN_VERSION }}  main'
+          sudo apt update
+          sudo apt install llvm-${{ env.LLVM_MAIN_VERSION }} libpolly-${{ env.LLVM_MAIN_VERSION }}-dev
+      - uses: cargo-bins/cargo-binstall@main
+      - name: Install cargo-codspeed
+        run: cargo binstall cargo-codspeed --force
+      - name: Override criterion with the CodSpeed harness
+        run: |
+          cargo add --dev codspeed-criterion-compat --rename criterion --package hugr
+      - name: Build benchmarks
+        run: cargo codspeed build --profile bench --features declarative,llvm,llvm-test
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@v5
+        with:
+          token: ${{ secrets.CODSPEED_TOKEN }}
+          run: "cargo codspeed run"
+          mode: simulation
+          exclude-allocations: "true"
+
+  benches-py:
+    name: 🐍 Python benches
+    needs: changes
+    if: ${{ needs.changes.outputs.python == 'true' }}
+    runs-on: ubuntu-latest
+    permissions:
+      checks: write
+    steps:
+      - uses: actions/checkout@v7
+      - uses: astral-sh/setup-uv@v7
+        with:
+          version: ${{ env.UV_VERSION }}
+          enable-cache: true
+      - name: Setup dependencies
+        run: uv sync --python ${{ matrix.python-version.py }}
+      - name: Run benchmarks
+        uses: CodSpeedHQ/action@v5
+        with:
+          token: ${{ secrets.CODSPEED_TOKEN }}
+          run: uv run pytest hugr-py/tests/ --codspeed -v --durations=0
+          mode: simulation
