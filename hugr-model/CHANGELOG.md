@@ -5,7 +5,7 @@
 
 ### Bug Fixes
 
-- *(hugr-model)* Preserve signed zero float literals during serialisation ([#3278](https://github.com/Quantinuum/hugr/pull/3278))
+- *(hugr-model)* Preserve signed zero float literals during serialization ([#3278](https://github.com/Quantinuum/hugr/pull/3278))
 
 ### Documentation
 

@@ -9,7 +9,7 @@
 
 ### New Features
 
-- Add configuration settings to mermaid render ([#3207](https://github.com/Quantinuum/hugr/pull/3207))
+- Add configuration settings to mermaid renderer ([#3207](https://github.com/Quantinuum/hugr/pull/3207))
 
 ## [0.7.0](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.6.1...hugr-persistent-v0.7.0) - 2026-06-05
 

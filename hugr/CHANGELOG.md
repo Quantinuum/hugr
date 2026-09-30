@@ -13,7 +13,7 @@
 
 ### New Features
 
-- Add configuration settings to mermaid render ([#3207](https://github.com/Quantinuum/hugr/pull/3207))
+- Add configuration settings to mermaid renderer ([#3207](https://github.com/Quantinuum/hugr/pull/3207))
 - Add `math` extension with LLVM intrinsic lowering  ([#3277](https://github.com/Quantinuum/hugr/pull/3277))
 
 ## [0.30.2](https://github.com/Quantinuum/hugr/compare/hugr-v0.30.1...hugr-v0.30.2) - 2026-09-04
