@@ -4,6 +4,12 @@
 //! [`PtrOpDef::Free`] to release each handle, recovering the value when the last
 //! handle is released. [`PtrOpDef::Swap`] and [`PtrOpDef::Map`] update the cell
 //! without copying or discarding its contents.
+//!
+//! Pointer handles are threaded through operations to establish their order:
+//! passing the pointer returned by one operation into the next makes the next
+//! operation wait for the first to finish. After [`PtrOpDef::Dup`], operations on
+//! the separate handles have unspecified order unless another dependency orders
+//! them. Sharing a cell does not itself establish an execution order.
 
 use std::sync::{Arc, LazyLock, Weak};
 
@@ -286,6 +292,51 @@ pub trait PtrOpBuilder: Dataflow {
         let handle = self.add_dataflow_op(PtrOpDef::Write.with_type(ty), [ptr_wire, val_wire])?;
         Ok(handle.out_wire(0))
     }
+
+    /// Exchange the stored value, returning the pointer and the previous value.
+    fn add_swap_ptr(&mut self, ptr_wire: Wire, val_wire: Wire) -> Result<(Wire, Wire), BuildError> {
+        let ty = self.get_wire_type(val_wire)?;
+        let handle = self.add_dataflow_op(PtrOpDef::Swap.with_type(ty), [ptr_wire, val_wire])?;
+        Ok((handle.out_wire(0), handle.out_wire(1)))
+    }
+
+    /// Return two handles to the same cell containing values of type `ty`.
+    fn add_dup_ptr(&mut self, ptr_wire: Wire, ty: Type) -> Result<(Wire, Wire), BuildError> {
+        let handle = self.add_dataflow_op(PtrOpDef::Dup.with_type(ty), [ptr_wire])?;
+        Ok((handle.out_wire(0), handle.out_wire(1)))
+    }
+
+    /// Release a handle to a cell containing values of type `ty`.
+    /// The returned wire has type `option<ty>` and contains the stored value only
+    /// when this was the last handle.
+    fn add_free_ptr(&mut self, ptr_wire: Wire, ty: Type) -> Result<Wire, BuildError> {
+        let handle = self.add_dataflow_op(PtrOpDef::Free.with_type(ty), [ptr_wire])?;
+        Ok(handle.out_wire(0))
+    }
+
+    /// Apply `func_wire` to the stored value and the extra `inputs`.
+    ///
+    /// The callback takes and returns the stored type `ty` first. Its remaining
+    /// input types are inferred from `inputs`, and its remaining output types
+    /// are given by `output_types`. Return the pointer and the extra outputs in
+    /// callback order. Both extra rows may be empty or contain linear values.
+    fn add_map_ptr(
+        &mut self,
+        ptr_wire: Wire,
+        func_wire: Wire,
+        ty: Type,
+        inputs: impl IntoIterator<Item = Wire>,
+        output_types: impl Into<TypeRow>,
+    ) -> Result<(Wire, Vec<Wire>), BuildError> {
+        let inputs = inputs.into_iter().collect::<Vec<_>>();
+        let input_types = inputs
+            .iter()
+            .map(|&wire| self.get_wire_type(wire))
+            .collect::<Result<Vec<_>, _>>()?;
+        let op = PtrOp::map(ty, input_types, output_types);
+        let handle = self.add_dataflow_op(op, [ptr_wire, func_wire].into_iter().chain(inputs))?;
+        Ok((handle.out_wire(0), handle.outputs().skip(1).collect()))
+    }
 }
 
 impl<D: Dataflow> PtrOpBuilder for D {}
@@ -464,15 +515,24 @@ pub(crate) mod test {
             let mut expected_inputs = vec![ptr_type(ty.clone()), callback];
             expected_inputs.extend(inputs);
             let mut expected_outputs = vec![ptr_type(ty)];
-            expected_outputs.extend(outputs);
+            expected_outputs.extend(outputs.clone());
             let expected = Signature::new(expected_inputs, expected_outputs);
             let ext = op.clone().to_extension_op().unwrap();
             assert_eq!(ext.signature().into_owned(), expected);
             assert_eq!(PtrOp::from_op(&ext).unwrap(), op);
             let mut builder = DFGBuilder::new(expected).unwrap();
             let wires = builder.input_wires().collect::<Vec<_>>();
-            let handle = builder.add_dataflow_op(op, wires).unwrap();
-            let outputs = handle.outputs().collect::<Vec<_>>();
+            let (ptr, results) = builder
+                .add_map_ptr(
+                    wires[0],
+                    wires[1],
+                    qb_t(),
+                    wires[2..].iter().copied(),
+                    outputs,
+                )
+                .unwrap();
+            assert_eq!(builder.get_wire_type(ptr).unwrap(), ptr_type(qb_t()));
+            let outputs = std::iter::once(ptr).chain(results);
             builder
                 .finish_hugr_with_outputs(outputs)
                 .unwrap()
@@ -501,23 +561,12 @@ pub(crate) mod test {
         .unwrap();
         let [value, replacement] = builder.input_wires_arr();
         let ptr = builder.add_new_ptr(value).unwrap();
-        let dup = builder
-            .add_dataflow_op(PtrOpDef::Dup.with_type(qb_t()), [ptr])
-            .unwrap();
-        let swap = builder
-            .add_dataflow_op(
-                PtrOpDef::Swap.with_type(qb_t()),
-                [dup.out_wire(0), replacement],
-            )
-            .unwrap();
-        let first = builder
-            .add_dataflow_op(PtrOpDef::Free.with_type(qb_t()), [swap.out_wire(0)])
-            .unwrap();
-        let last = builder
-            .add_dataflow_op(PtrOpDef::Free.with_type(qb_t()), [dup.out_wire(1)])
-            .unwrap();
+        let (ptr, other) = builder.add_dup_ptr(ptr, qb_t()).unwrap();
+        let (ptr, old_value) = builder.add_swap_ptr(ptr, replacement).unwrap();
+        let first = builder.add_free_ptr(ptr, qb_t()).unwrap();
+        let last = builder.add_free_ptr(other, qb_t()).unwrap();
         builder
-            .finish_hugr_with_outputs([first.out_wire(0), last.out_wire(0), swap.out_wire(1)])
+            .finish_hugr_with_outputs([first, last, old_value])
             .unwrap()
             .validate()
             .unwrap();

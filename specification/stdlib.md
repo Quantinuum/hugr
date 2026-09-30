@@ -309,6 +309,13 @@ handle to the same cell; it does not copy the stored value. Each handle must
 ultimately be released with `Free`, which returns `Some(value)` when releasing
 the last handle and `None` otherwise. The cell may contain a linear value.
 
+Pointer handles are threaded through operations so that the operations can be
+ordered. Passing a pointer returned by one operation into the next establishes a
+dataflow dependency: the next operation waits for the first to finish. After
+`Dup`, operations on the separate handles have unspecified order unless another
+dependency orders them. Sharing the same cell does not itself establish an
+execution order.
+
 | Operation | Inputs | Outputs | Meaning |
 |-----------|--------|---------|---------|
 | `New<T>` | `T` | `ptr<T>` | Create a cell containing the input value. |
