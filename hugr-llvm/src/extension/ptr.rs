@@ -5,8 +5,9 @@
 //! existing libc `malloc`/`free` helpers and no-op mutex hooks. Targets that
 //! execute shared handles concurrently must supply synchronization hooks.
 //!
-//! Each cell contains a reference count, optional mutex storage, and the stored
-//! value. Every operation except creation calls the lock and unlock hooks.
+//! Allocation returns an opaque runtime handle. Its payload contains the reference
+//! count and stored value; the runtime owns any mutex and its lifecycle. Every
+//! operation except creation calls the lock and unlock hooks on the handle.
 //! `Map` holds the lock throughout its callback. Callbacks must not access the
 //! same cell through another handle: this can deadlock a non-reentrant mutex
 //! or access a linear value already owned by the callback. A callback that does
@@ -24,7 +25,7 @@ use hugr_core::{
 };
 use inkwell::{
     IntPredicate,
-    types::{BasicTypeEnum, StructType},
+    types::StructType,
     values::{BasicValueEnum, IntValue, PointerValue},
 };
 
@@ -34,7 +35,6 @@ use crate::{
         EmitFuncContext, RowPromise, deaggregate_call_result,
         libc::{emit_libc_abort, emit_libc_free, emit_libc_malloc},
     },
-    types::TypingSession,
 };
 
 /// Runtime hooks for pointer cells.
@@ -43,11 +43,14 @@ use crate::{
 /// nothing and require that accesses to a cell do not run concurrently. For
 /// concurrent use, provide mutual exclusion and acquire/release synchronization
 /// between all handles to a cell.
-/// Override the mutex type, initialization, and destruction as well as lock and
-/// unlock when using a target-specific mutex representation. Hooks must leave
-/// the builder at the end of an unterminated basic block.
+/// Allocation returns an opaque handle with any mutex already initialized. Free
+/// owns mutex teardown. Lock, unlock, and payload projection receive that same
+/// handle, so the lowering does not depend on the runtime storage layout. Hooks
+/// must leave the builder at the end of an unterminated basic block.
 pub trait PtrCodegen: Clone {
-    /// Allocate storage for `layout`, aligned for every field, or terminate.
+    /// Allocate an opaque handle with space for `layout` and initialize any mutex.
+    /// The payload must be aligned for every field; allocation failure must terminate.
+    /// `layout` contains the lowering-owned reference count and stored HUGR value.
     /// The default uses [`emit_libc_malloc`] with the LLVM cell size and aborts
     /// on allocation failure. Override it for types requiring alignment beyond
     /// what the target's libc `malloc` provides.
@@ -65,7 +68,8 @@ pub trait PtrCodegen: Clone {
         Ok(ptr)
     }
 
-    /// Deallocate a cell after its last handle is released and its mutex destroyed.
+    /// Destroy any mutex and deallocate the opaque handle after its final release.
+    /// The handle is unlocked and its stored value has already been recovered.
     /// The default emits libc `free` and must be paired with [`Self::emit_alloc`].
     fn emit_free<'c, H: HugrView<Node = Node>>(
         &self,
@@ -75,26 +79,25 @@ pub trait PtrCodegen: Clone {
         emit_libc_free(ctx, ptr.into())
     }
 
-    /// Storage type for the embedded mutex. The default is an empty struct.
-    fn mutex_type<'c>(&self, ts: &TypingSession<'c, '_>) -> BasicTypeEnum<'c> {
-        ts.iw_context().struct_type(&[], false).into()
-    }
-
-    /// Initialize an unlocked mutex before publishing the cell. Defaults to no-op.
-    /// The pointer addresses the mutex field, not the entire cell.
-    fn emit_init_mutex<'c, H: HugrView<Node = Node>>(
+    /// Project the payload from an opaque handle returned by [`Self::emit_alloc`].
+    /// The result must point to live, aligned storage for the supplied `layout`
+    /// (reference count followed by the HUGR value). The lowering initializes it.
+    /// Called under the lock, or during creation before the handle is published.
+    /// The default allocation is the payload itself, so this returns `ptr`.
+    fn emit_get_ptr<'c, H: HugrView<Node = Node>>(
         &self,
         _ctx: &mut EmitFuncContext<'c, '_, H>,
-        _mutex: PointerValue<'c>,
-    ) -> Result<()> {
-        Ok(())
+        ptr: PointerValue<'c>,
+        _layout: StructType<'c>,
+    ) -> Result<PointerValue<'c>> {
+        Ok(ptr)
     }
 
-    /// Acquire exclusive access through the mutex field pointer. Defaults to no-op.
+    /// Acquire exclusive access through the opaque handle. Defaults to no-op.
     fn emit_lock<'c, H: HugrView<Node = Node>>(
         &self,
         _ctx: &mut EmitFuncContext<'c, '_, H>,
-        _mutex: PointerValue<'c>,
+        _ptr: PointerValue<'c>,
     ) -> Result<()> {
         Ok(())
     }
@@ -103,16 +106,7 @@ pub trait PtrCodegen: Clone {
     fn emit_unlock<'c, H: HugrView<Node = Node>>(
         &self,
         _ctx: &mut EmitFuncContext<'c, '_, H>,
-        _mutex: PointerValue<'c>,
-    ) -> Result<()> {
-        Ok(())
-    }
-
-    /// Destroy an unlocked mutex after the final release. Defaults to no-op.
-    fn emit_destroy_mutex<'c, H: HugrView<Node = Node>>(
-        &self,
-        _ctx: &mut EmitFuncContext<'c, '_, H>,
-        _mutex: PointerValue<'c>,
+        _ptr: PointerValue<'c>,
     ) -> Result<()> {
         Ok(())
     }
@@ -187,36 +181,30 @@ fn emit_ptr_op<'c, H: HugrView<Node = Node>>(
 ) -> Result<()> {
     let value_ty = ctx.llvm_type(&op.ty)?;
     let count_ty = ctx.iw_context().i64_type();
-    let cell_ty = ctx.iw_context().struct_type(
-        &[
-            count_ty.into(),
-            ccg.mutex_type(&ctx.typing_session()),
-            value_ty,
-        ],
-        false,
-    );
+    let cell_ty = ctx
+        .iw_context()
+        .struct_type(&[count_ty.into(), value_ty], false);
     let cell = if op.def == PtrOpDef::New {
         ccg.emit_alloc(ctx, cell_ty)?
     } else {
         inputs[0].into_pointer_value()
     };
+    if op.def != PtrOpDef::New {
+        ccg.emit_lock(ctx, cell)?;
+    }
+    let payload = ccg.emit_get_ptr(ctx, cell, cell_ty)?;
     let count_ptr = ctx
         .builder()
-        .build_struct_gep(cell_ty, cell, 0, "ptr.count")?;
-    let mutex = ctx
-        .builder()
-        .build_struct_gep(cell_ty, cell, 1, "ptr.mutex")?;
+        .build_struct_gep(cell_ty, payload, 0, "ptr.count")?;
     let value_ptr = ctx
         .builder()
-        .build_struct_gep(cell_ty, cell, 2, "ptr.value")?;
+        .build_struct_gep(cell_ty, payload, 1, "ptr.value")?;
     if op.def == PtrOpDef::New {
         ctx.builder()
             .build_store(count_ptr, count_ty.const_int(1, false))?;
-        ccg.emit_init_mutex(ctx, mutex)?;
         ctx.builder().build_store(value_ptr, inputs[0])?;
         return outputs.finish(ctx.builder(), [cell.into()]);
     }
-    ccg.emit_lock(ctx, mutex)?;
     let results = match op.def {
         PtrOpDef::Read => vec![
             cell.into(),
@@ -276,14 +264,13 @@ fn emit_ptr_op<'c, H: HugrView<Node = Node>>(
             let value = ctx.builder().build_load(value_ty, value_ptr, "ptr.take")?;
             let some = sum_ty.build_tag(ctx.builder(), 1, vec![value])?;
             mailbox.write(ctx.builder(), [some.into()])?;
-            ccg.emit_unlock(ctx, mutex)?;
-            ccg.emit_destroy_mutex(ctx, mutex)?;
+            ccg.emit_unlock(ctx, cell)?;
             ccg.emit_free(ctx, cell)?;
             ctx.builder().build_unconditional_branch(exit)?;
             ctx.builder().position_at_end(shared_bb);
             let none = sum_ty.build_tag(ctx.builder(), 0, vec![])?;
             mailbox.write(ctx.builder(), [none.into()])?;
-            ccg.emit_unlock(ctx, mutex)?;
+            ccg.emit_unlock(ctx, cell)?;
             ctx.builder().build_unconditional_branch(exit)?;
             ctx.builder().position_at_end(exit);
             return outputs.finish(ctx.builder(), mailbox.read_vec(ctx.builder(), [])?);
@@ -318,7 +305,7 @@ fn emit_ptr_op<'c, H: HugrView<Node = Node>>(
         }
         _ => bail!("Unsupported pointer operation: {:?}", op.def),
     };
-    ccg.emit_unlock(ctx, mutex)?;
+    ccg.emit_unlock(ctx, cell)?;
     outputs.finish(ctx.builder(), results)
 }
 

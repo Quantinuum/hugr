@@ -61,8 +61,13 @@ fn lifecycle() -> Hugr {
 }
 
 #[rstest]
-fn exec_lifecycle(mut exec_ctx: TestContext) {
+#[case(false)]
+#[case(true)]
+fn exec_lifecycle(mut exec_ctx: TestContext, #[case] custom_mutex: bool) {
     configure(&mut exec_ctx);
+    if custom_mutex {
+        exec_ctx.add_extensions(|b| b.add_ptr_extensions(SpinCodegen));
+    }
     assert!(exec_ctx.exec_hugr::<bool>(lifecycle(), "main"));
 }
 
@@ -252,8 +257,8 @@ fn custom_mutex_makes_concurrent_map_exclusive(mut exec_ctx: TestContext) {
     // storage is owned by this test and stays alive until every worker joins.
     #[repr(C)]
     struct Cell {
-        count: u64,
         mutex: AtomicU8,
+        count: u64,
         value: UnsafeCell<u64>,
     }
     let cell = Cell {
@@ -331,22 +336,23 @@ impl PtrCodegen for HookCodegen {
     ) -> Result<()> {
         hook_void(ctx, "test_ptr_free", ptr)
     }
-    fn mutex_type<'c>(&self, ts: &TypingSession<'c, '_>) -> BasicTypeEnum<'c> {
-        ts.iw_context().i64_type().into()
-    }
-    fn emit_init_mutex<'c, H: HugrView<Node = Node>>(
+    fn emit_get_ptr<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         ptr: PointerValue<'c>,
-    ) -> Result<()> {
-        hook_void(ctx, "test_ptr_init", ptr)
-    }
-    fn emit_destroy_mutex<'c, H: HugrView<Node = Node>>(
-        &self,
-        ctx: &mut EmitFuncContext<'c, '_, H>,
-        ptr: PointerValue<'c>,
-    ) -> Result<()> {
-        hook_void(ctx, "test_ptr_destroy", ptr)
+        _layout: StructType<'c>,
+    ) -> Result<PointerValue<'c>> {
+        let function = ctx.get_extern_func(
+            "test_ptr_get_ptr",
+            ctx.llvm_ptr_type()
+                .fn_type(&[ctx.llvm_ptr_type().into()], false),
+        )?;
+        Ok(ctx
+            .builder()
+            .build_call(function, &[ptr.into()], "")?
+            .try_as_basic_value()
+            .unwrap_basic()
+            .into_pointer_value())
     }
     fn emit_lock<'c, H: HugrView<Node = Node>>(
         &self,
@@ -366,22 +372,25 @@ impl PtrCodegen for HookCodegen {
 
 thread_local! {
     static EVENTS: std::cell::RefCell<Vec<&'static str>> = const { std::cell::RefCell::new(Vec::new()) };
-    static ALLOCATIONS: std::cell::RefCell<std::collections::BTreeMap<usize, std::alloc::Layout>> = const { std::cell::RefCell::new(std::collections::BTreeMap::new()) };
+    static ALLOCATIONS: std::cell::RefCell<std::collections::BTreeMap<usize, (std::alloc::Layout, usize)>> = const { std::cell::RefCell::new(std::collections::BTreeMap::new()) };
 }
 fn event(name: &'static str) {
     EVENTS.with_borrow_mut(|events| events.push(name));
 }
 extern "C" fn hook_alloc(size: u64, align: u64) -> *mut u8 {
-    let layout = std::alloc::Layout::from_size_align(size as usize, align as usize).unwrap();
+    let payload = std::alloc::Layout::from_size_align(size as usize, align as usize).unwrap();
+    let (layout, offset) = std::alloc::Layout::new::<u64>().extend(payload).unwrap();
     // LLVM supplies a nonzero sized cell and its power-of-two ABI alignment.
     let ptr = unsafe { std::alloc::alloc(layout) };
     assert!(!ptr.is_null());
-    ALLOCATIONS.with_borrow_mut(|allocs| allocs.insert(ptr as usize, layout));
+    ALLOCATIONS.with_borrow_mut(|allocs| allocs.insert(ptr as usize, (layout, offset)));
     event("alloc");
+    hook_init(ptr.cast());
     ptr
 }
 extern "C" fn hook_free(ptr: *mut u8) {
-    let layout = ALLOCATIONS
+    hook_destroy(ptr.cast());
+    let (layout, _) = ALLOCATIONS
         .with_borrow_mut(|allocs| allocs.remove(&(ptr as usize)))
         .unwrap();
     // The last Free returns the value and destroys the mutex before freeing.
@@ -389,6 +398,13 @@ extern "C" fn hook_free(ptr: *mut u8) {
         std::alloc::dealloc(ptr, layout);
     }
     event("free");
+}
+extern "C" fn hook_get_ptr(ptr: *mut u8) -> *mut u8 {
+    let offset = ALLOCATIONS.with_borrow(|allocs| allocs[&(ptr as usize)].1);
+    // Payload storage is a separate, aligned region after the runtime mutex.
+    assert!(offset > 0);
+    event("get_ptr");
+    unsafe { ptr.add(offset) }
 }
 extern "C" fn hook_init(ptr: *mut u64) {
     unsafe {
@@ -427,10 +443,9 @@ fn custom_hooks_manage_cell_once(mut exec_ctx: TestContext) {
     for (name, address) in [
         ("test_ptr_alloc", hook_alloc as *const () as usize),
         ("test_ptr_free", hook_free as *const () as usize),
-        ("test_ptr_init", hook_init as *const () as usize),
+        ("test_ptr_get_ptr", hook_get_ptr as *const () as usize),
         ("test_ptr_lock", hook_lock as *const () as usize),
         ("test_ptr_unlock", hook_unlock as *const () as usize),
-        ("test_ptr_destroy", hook_destroy as *const () as usize),
     ] {
         engine.add_global_mapping(&emission.module().get_function(name).unwrap(), address);
     }
@@ -446,8 +461,9 @@ fn custom_hooks_manage_cell_once(mut exec_ctx: TestContext) {
         assert_eq!(
             events,
             &[
-                "alloc", "init", "lock", "unlock", "lock", "unlock", "lock", "unlock", "lock",
-                "unlock", "lock", "unlock", "lock", "unlock", "destroy", "free",
+                "alloc", "init", "get_ptr", "lock", "get_ptr", "unlock", "lock", "get_ptr",
+                "unlock", "lock", "get_ptr", "unlock", "lock", "get_ptr", "unlock", "lock",
+                "get_ptr", "unlock", "lock", "get_ptr", "unlock", "destroy", "free",
             ]
         )
     });
@@ -457,17 +473,31 @@ fn custom_hooks_manage_cell_once(mut exec_ctx: TestContext) {
 #[derive(Clone)]
 struct SpinCodegen;
 impl PtrCodegen for SpinCodegen {
-    fn mutex_type<'c>(&self, ts: &TypingSession<'c, '_>) -> BasicTypeEnum<'c> {
-        ts.iw_context().i8_type().into()
-    }
-    fn emit_init_mutex<'c, H: HugrView<Node = Node>>(
+    fn emit_alloc<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
-        mutex: PointerValue<'c>,
-    ) -> Result<()> {
+        layout: StructType<'c>,
+    ) -> Result<PointerValue<'c>> {
+        let storage = ctx
+            .iw_context()
+            .struct_type(&[ctx.iw_context().i8_type().into(), layout.into()], false);
+        let ptr = DefaultPtrCodegen.emit_alloc(ctx, storage)?;
         ctx.builder()
-            .build_store(mutex, ctx.iw_context().i8_type().const_zero())?;
-        Ok(())
+            .build_store(ptr, ctx.iw_context().i8_type().const_zero())?;
+        Ok(ptr)
+    }
+    fn emit_get_ptr<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        ptr: PointerValue<'c>,
+        layout: StructType<'c>,
+    ) -> Result<PointerValue<'c>> {
+        let storage = ctx
+            .iw_context()
+            .struct_type(&[ctx.iw_context().i8_type().into(), layout.into()], false);
+        Ok(ctx
+            .builder()
+            .build_struct_gep(storage, ptr, 1, "test.payload")?)
     }
     fn emit_lock<'c, H: HugrView<Node = Node>>(
         &self,
