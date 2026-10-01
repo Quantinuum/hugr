@@ -1,9 +1,9 @@
 """Check the generated pointer extension used by Python."""
 
 import pytest
-from hugr.std import ptr
 
 from hugr import tys
+from hugr.std import ptr
 
 
 @pytest.mark.parametrize("element", [tys.Bool, tys.Qubit])
