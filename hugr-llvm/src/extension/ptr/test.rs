@@ -141,7 +141,15 @@ fn exec_linear_nested_pointer(mut exec_ctx: TestContext) {
             let inner = b.add_new_ptr(value).unwrap();
             let outer = b.add_new_ptr(inner).unwrap();
             let inner_ty = ptr::ptr_type(ty.clone());
-            let outer = b.add_free_ptr(outer, inner_ty.clone()).unwrap();
+            let (lhs, rhs) = b.add_dup_ptr(outer, inner_ty.clone()).unwrap();
+            let (lhs, rhs, equal) = b.add_eq_ptr(lhs, rhs, inner_ty.clone()).unwrap();
+            b.build_unwrap_sum::<0>(1, hugr_core::types::SumType::new_unary(2), equal)
+                .unwrap();
+            let first = b.add_free_ptr(lhs, inner_ty.clone()).unwrap();
+            b.build_unwrap_sum::<0>(0, option_type([inner_ty.clone()]), first)
+                .unwrap();
+            let outer = b.add_free_ptr(rhs, inner_ty.clone()).unwrap();
+            b.set_order(&first.node(), &outer.node());
             let [inner] = b
                 .build_unwrap_sum(1, option_type([inner_ty]), outer)
                 .unwrap();
@@ -546,4 +554,108 @@ fn default_mutex_emits_no_synchronization(mut exec_ctx: TestContext) {
     assert!(ir.contains("@free("));
     assert!(!ir.contains("atomic"));
     assert!(!ir.contains("@aligned_alloc("));
+}
+
+#[rstest]
+#[case(false, false)]
+#[case(true, false)]
+#[case(false, true)]
+#[case(true, true)]
+fn exec_eq_identity_and_handles(
+    mut exec_ctx: TestContext,
+    #[case] aliases: bool,
+    #[case] custom_mutex: bool,
+) {
+    configure(&mut exec_ctx);
+    if custom_mutex {
+        exec_ctx.add_extensions(|b| b.add_ptr_extensions(SpinCodegen));
+    }
+    let ty = int_type(6);
+    let hugr = SimpleHugrConfig::new()
+        .with_extensions(STD_REG.to_owned())
+        .with_outs([bool_t()])
+        .finish(|mut b| {
+            let seven = b.add_load_value(ConstInt::new_u(6, 7).unwrap());
+            let eleven = b.add_load_value(ConstInt::new_u(6, 11).unwrap());
+            let lhs = b.add_new_ptr(seven).unwrap();
+            let (lhs, rhs) = if aliases {
+                b.add_dup_ptr(lhs, ty.clone()).unwrap()
+            } else {
+                (lhs, b.add_new_ptr(seven).unwrap())
+            };
+            let (lhs, lhs_witness) = b.add_dup_ptr(lhs, ty.clone()).unwrap();
+            let (rhs, rhs_witness) = b.add_dup_ptr(rhs, ty.clone()).unwrap();
+            let (lhs, rhs, equal) = b.add_eq_ptr(lhs, rhs, ty.clone()).unwrap();
+            // Independent aliases pin the identity of each output, detecting an
+            // accidental output swap even when both cells have equal payloads.
+            let (lhs, lhs_witness, lhs_preserved) =
+                b.add_eq_ptr(lhs, lhs_witness, ty.clone()).unwrap();
+            let (rhs, rhs_witness, rhs_preserved) =
+                b.add_eq_ptr(rhs, rhs_witness, ty.clone()).unwrap();
+            let identity_ok = if aliases {
+                equal
+            } else {
+                b.add_not(equal).unwrap()
+            };
+            // Writing through the first result must preserve the second handle's
+            // identity. Distinct cells initially contain equal payloads.
+            let lhs = b.add_write_ptr(lhs, eleven).unwrap();
+            let (rhs, value) = b.add_read_ptr(rhs, ty.clone()).unwrap();
+            b.set_order(&lhs.node(), &rhs.node());
+            let expected = if aliases { eleven } else { seven };
+            let value_ok = b.add_ieq(6, value, expected).unwrap();
+            let lhs_witness = b.add_free_ptr(lhs_witness, ty.clone()).unwrap();
+            let rhs_witness = b.add_free_ptr(rhs_witness, ty.clone()).unwrap();
+            for witness in [lhs_witness, rhs_witness] {
+                b.build_unwrap_sum::<0>(0, option_type([ty.clone()]), witness)
+                    .unwrap();
+            }
+            let first = b.add_free_ptr(lhs, ty.clone()).unwrap();
+            let last = b.add_free_ptr(rhs, ty.clone()).unwrap();
+            b.set_order(&lhs_witness.node(), &first.node());
+            b.set_order(&rhs_witness.node(), &first.node());
+            b.set_order(&first.node(), &last.node());
+            let mut ok = b.add_and(identity_ok, value_ok).unwrap();
+            ok = b.add_and(ok, lhs_preserved).unwrap();
+            ok = b.add_and(ok, rhs_preserved).unwrap();
+            if aliases {
+                b.build_unwrap_sum::<0>(0, option_type([ty.clone()]), first)
+                    .unwrap();
+            } else {
+                let [value] = b
+                    .build_unwrap_sum(1, option_type([ty.clone()]), first)
+                    .unwrap();
+                let first_ok = b.add_ieq(6, value, eleven).unwrap();
+                ok = b.add_and(ok, first_ok).unwrap();
+            }
+            let [value] = b.build_unwrap_sum(1, option_type([ty]), last).unwrap();
+            let last_ok = b.add_ieq(6, value, expected).unwrap();
+            ok = b.add_and(ok, last_ok).unwrap();
+            b.finish_hugr_with_outputs([ok]).unwrap()
+        });
+    assert!(exec_ctx.exec_hugr::<bool>(hugr, "main"));
+}
+
+#[rstest]
+fn eq_emits_no_runtime_hooks_or_payload_access(mut exec_ctx: TestContext) {
+    configure(&mut exec_ctx);
+    exec_ctx.add_extensions(|b| b.add_ptr_extensions(HookCodegen));
+    // A nested pointer is a linear payload; Eq needs no lowering of its contents.
+    let ty = ptr::ptr_type(int_type(6));
+    let pointer = ptr::ptr_type(ty.clone());
+    let hugr = SimpleHugrConfig::new()
+        .with_extensions(STD_REG.to_owned())
+        .with_ins([pointer.clone(), pointer.clone()])
+        .with_outs([pointer.clone(), pointer, bool_t()])
+        .finish(|mut b| {
+            let [lhs, rhs] = b.input_wires_arr();
+            let (lhs, rhs, equal) = b.add_eq_ptr(lhs, rhs, ty).unwrap();
+            b.finish_hugr_with_outputs([lhs, rhs, equal]).unwrap()
+        });
+    let emission = emit(&exec_ctx, &hugr);
+    let ir = emission.module().print_to_string().to_string();
+    assert!(ir.contains("icmp eq ptr"));
+    assert!(!ir.contains("@test_ptr_"));
+    assert!(!ir.contains("getelementptr"));
+    assert!(!ir.contains("atomic"));
 }

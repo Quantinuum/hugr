@@ -7,7 +7,8 @@
 //!
 //! Allocation returns an opaque runtime handle. Its payload contains the reference
 //! count and stored value; the runtime owns any mutex and its lifecycle. Every
-//! operation except creation calls the lock and unlock hooks on the handle.
+//! operation except creation and identity comparison calls the lock and unlock
+//! hooks on the handle. `Eq` compares opaque handles without accessing the payload.
 //! `Map` holds the lock throughout its callback. Callbacks must not access the
 //! same cell through another handle: this can deadlock a non-reentrant mutex
 //! or access a linear value already owned by the callback. A callback that does
@@ -20,6 +21,7 @@ use anyhow::{Result, anyhow, bail};
 use hugr_core::{
     HugrView, Node,
     extension::{prelude::option_type, simple_op::MakeExtensionOp},
+    ops::Value,
     std_extensions::ptr::{self, PtrOp, PtrOpDef},
     types::Signature,
 };
@@ -32,7 +34,7 @@ use inkwell::{
 use crate::{
     CodegenExtension, CodegenExtsBuilder,
     emit::{
-        EmitFuncContext, RowPromise, deaggregate_call_result,
+        EmitFuncContext, RowPromise, deaggregate_call_result, emit_value,
         libc::{emit_libc_abort, emit_libc_free, emit_libc_malloc},
     },
 };
@@ -43,7 +45,9 @@ use crate::{
 /// nothing and require that accesses to a cell do not run concurrently. For
 /// concurrent use, provide mutual exclusion and acquire/release synchronization
 /// between all handles to a cell.
-/// Allocation returns an opaque handle with any mutex already initialized. Free
+/// Allocation returns an opaque handle with any mutex already initialized. Handles
+/// to the same live cell must have the same address, and distinct live cells must
+/// have distinct addresses: identity comparison uses the handle directly. Free
 /// owns mutex teardown. Lock, unlock, and payload projection receive that same
 /// handle, so the lowering does not depend on the runtime storage layout. Hooks
 /// must leave the builder at the end of an unterminated basic block.
@@ -117,7 +121,7 @@ pub trait PtrCodegen: Clone {
 pub struct DefaultPtrCodegen;
 impl PtrCodegen for DefaultPtrCodegen {}
 
-/// Registers the pointer type and all seven pointer operations.
+/// Registers the pointer type and all pointer operations.
 #[derive(Clone, Debug, Default)]
 pub struct PtrCodegenExtension<CCG>(CCG);
 impl<CCG: PtrCodegen> PtrCodegenExtension<CCG> {
@@ -179,6 +183,18 @@ fn emit_ptr_op<'c, H: HugrView<Node = Node>>(
     inputs: Vec<BasicValueEnum<'c>>,
     outputs: RowPromise<'c>,
 ) -> Result<()> {
+    if op.def == PtrOpDef::Eq {
+        let equal = ctx.builder().build_int_compare(
+            IntPredicate::EQ,
+            inputs[0].into_pointer_value(),
+            inputs[1].into_pointer_value(),
+            "ptr.eq",
+        )?;
+        let true_val = emit_value(ctx, &Value::true_val())?;
+        let false_val = emit_value(ctx, &Value::false_val())?;
+        let equal = ctx.builder().build_select(equal, true_val, false_val, "")?;
+        return outputs.finish(ctx.builder(), [inputs[0], inputs[1], equal]);
+    }
     let value_ty = ctx.llvm_type(&op.ty)?;
     let count_ty = ctx.iw_context().i64_type();
     let cell_ty = ctx
