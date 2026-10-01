@@ -323,6 +323,7 @@ execution order.
 | `Write<T>` | `ptr<T>`, `T` | `ptr<T>` | Replace and discard the old value. Requires copyable `T`. |
 | `Swap<T>` | `ptr<T>`, `T` | `ptr<T>`, `T` | Replace the stored value and return the old value. |
 | `Dup<T>` | `ptr<T>` | `ptr<T>`, `ptr<T>` | Create two handles to the same cell. |
+| `Eq<T>` | `ptr<T>`, `ptr<T>` | `ptr<T>`, `ptr<T>`, `bool` | Compare cell identity, returning both handles in input order. Does not read or compare the stored values. |
 | `Free<T>` | `ptr<T>` | `option<T>` | Release a handle and return the value if this was the last handle. |
 | `Map<T, A, B>` | `ptr<T>`, `(T, A -> T, B)`, `A` | `ptr<T>`, `B` | Apply the function to the stored value and extra inputs, store its first result, and return its remaining results. |
 

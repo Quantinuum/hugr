@@ -90,6 +90,99 @@
       },
       "binary": false
     },
+    "Eq": {
+      "extension": "ptr",
+      "name": "Eq",
+      "description": "Compare cell identity without reading the stored values, returning both handles in input order and a boolean.",
+      "signature": {
+        "params": [
+          {
+            "tp": "Type",
+            "b": "A"
+          }
+        ],
+        "body": {
+          "input": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            }
+          ],
+          "output": [
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Opaque",
+              "extension": "ptr",
+              "extension_version": "0.2.0",
+              "id": "ptr",
+              "args": [
+                {
+                  "tya": "Type",
+                  "ty": {
+                    "t": "V",
+                    "i": 0,
+                    "b": "A"
+                  }
+                }
+              ],
+              "bound": "A"
+            },
+            {
+              "t": "Sum",
+              "s": "Unit",
+              "size": 2
+            }
+          ]
+        }
+      },
+      "binary": false
+    },
     "Free": {
       "extension": "ptr",
       "name": "Free",
