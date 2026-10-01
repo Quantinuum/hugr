@@ -18,7 +18,7 @@ use strum::{EnumIter, EnumString, IntoStaticStr};
 use crate::Wire;
 use crate::builder::{BuildError, Dataflow};
 use crate::extension::TypeDefBound;
-use crate::extension::prelude::option_type;
+use crate::extension::prelude::{bool_t, option_type};
 use crate::ops::OpName;
 use crate::types::{
     CustomType, FuncValueType, PolyFuncType, PolyFuncTypeRV, Signature, Type, TypeBound, TypeName,
@@ -49,6 +49,9 @@ pub enum PtrOpDef {
     Swap,
     /// Return two handles to the same cell, without copying its contents.
     Dup,
+    /// Compare cell identity and return both handles in input order.
+    /// Does not read or compare the stored values.
+    Eq,
     /// Release a handle, returning the stored value only for the last handle.
     Free,
     /// Apply a function to the stored value and extra inputs, replacing the value.
@@ -108,6 +111,13 @@ impl MakeOpDef for PtrOpDef {
                 linear_params,
                 Signature::new([linear_ptr.clone()], [linear_ptr.clone(), linear_ptr]),
             ),
+            PtrOpDef::Eq => PolyFuncType::new(
+                linear_params,
+                Signature::new(
+                    [linear_ptr.clone(), linear_ptr.clone()],
+                    [linear_ptr.clone(), linear_ptr, bool_t()],
+                ),
+            ),
             PtrOpDef::Free => PolyFuncType::new(
                 linear_params,
                 Signature::new([linear_ptr], [option_type([linear_t]).into()]),
@@ -151,6 +161,7 @@ impl MakeOpDef for PtrOpDef {
             PtrOpDef::Write => "Replace a copyable stored value and return the pointer.".into(),
             PtrOpDef::Swap => "Exchange the stored value, returning the pointer and old value.".into(),
             PtrOpDef::Dup => "Return two handles to the same cell without copying the stored value.".into(),
+            PtrOpDef::Eq => "Compare cell identity without reading the stored values, returning both handles in input order and a boolean.".into(),
             PtrOpDef::Free => "Release a handle, returning Some(value) for the last handle and None otherwise.".into(),
             PtrOpDef::Map => "Apply a function to the stored value and extra inputs, replacing the stored value and returning the pointer and extra outputs.".into(),
         }
@@ -306,6 +317,19 @@ pub trait PtrOpBuilder: Dataflow {
         Ok((handle.out_wire(0), handle.out_wire(1)))
     }
 
+    /// Compare the identity of two cells with the same stored type `ty`.
+    /// Return both linear handles in input order, followed by the comparison result.
+    /// The stored values are neither read nor compared.
+    fn add_eq_ptr(
+        &mut self,
+        lhs: Wire,
+        rhs: Wire,
+        ty: Type,
+    ) -> Result<(Wire, Wire, Wire), BuildError> {
+        let handle = self.add_dataflow_op(PtrOpDef::Eq.with_type(ty), [lhs, rhs])?;
+        Ok((handle.out_wire(0), handle.out_wire(1), handle.out_wire(2)))
+    }
+
     /// Release a handle to a cell containing values of type `ty`.
     /// The returned wire has type `option<ty>` and contains the stored value only
     /// when this was the last handle.
@@ -365,10 +389,10 @@ impl HasDef for PtrOp {
 
 #[cfg(test)]
 pub(crate) mod test {
-    use crate::HugrView;
     use crate::builder::DFGBuilder;
     use crate::extension::prelude::{bool_t, qb_t};
     use crate::ops::ExtensionOp;
+    use crate::{HugrView, PortIndex};
     use crate::{
         builder::{Dataflow, DataflowHugr},
         std_extensions::arithmetic::int_types::INT_TYPES,
@@ -444,6 +468,11 @@ pub(crate) mod test {
             assert_eq!(ptr, declared);
             let cases = [
                 (PtrOpDef::New, vec![ty.clone()], vec![ptr.clone()]),
+                (
+                    PtrOpDef::Eq,
+                    vec![ptr.clone(), ptr.clone()],
+                    vec![ptr.clone(), ptr.clone(), bool_t()],
+                ),
                 (
                     PtrOpDef::Swap,
                     vec![ptr.clone(), ty.clone()],
@@ -570,6 +599,58 @@ pub(crate) mod test {
             .unwrap()
             .validate()
             .unwrap();
+    }
+
+    #[test]
+    fn eq_preserves_linear_handles() {
+        let ptr = ptr_type(qb_t());
+        let signature = Signature::new(
+            [ptr.clone(), ptr.clone()],
+            [ptr.clone(), ptr.clone(), bool_t()],
+        );
+        let mut builder = DFGBuilder::new(signature).unwrap();
+        let [lhs, rhs] = builder.input_wires_arr();
+        let (lhs, rhs, equal) = builder.add_eq_ptr(lhs, rhs, qb_t()).unwrap();
+        assert_eq!(lhs.source().index(), 0);
+        assert_eq!(rhs.source().index(), 1);
+        assert_eq!(equal.source().index(), 2);
+        builder
+            .finish_hugr_with_outputs([lhs, rhs, equal])
+            .unwrap()
+            .validate()
+            .unwrap();
+
+        for copy in [false, true] {
+            let outputs = if copy {
+                vec![ptr.clone(), ptr.clone(), ptr.clone(), bool_t()]
+            } else {
+                vec![ptr.clone(), bool_t()]
+            };
+            let mut builder =
+                DFGBuilder::new(Signature::new([ptr.clone(), ptr.clone()], outputs)).unwrap();
+            let [lhs, rhs] = builder.input_wires_arr();
+            let (lhs, rhs, equal) = builder.add_eq_ptr(lhs, rhs, qb_t()).unwrap();
+            let outputs = if copy {
+                vec![lhs, rhs, rhs, equal]
+            } else {
+                vec![lhs, equal]
+            };
+            assert!(builder.finish_hugr_with_outputs(outputs).is_err());
+        }
+        assert!(PtrOpDef::Eq.instantiate(&[]).is_err());
+        assert!(
+            PtrOpDef::Eq
+                .instantiate(&[qb_t().into(), bool_t().into()])
+                .is_err()
+        );
+        let mut builder = DFGBuilder::new(Signature::new(
+            [ptr_type(qb_t()), ptr_type(bool_t())],
+            [ptr_type(qb_t()), ptr_type(qb_t()), bool_t()],
+        ))
+        .unwrap();
+        let [lhs, rhs] = builder.input_wires_arr();
+        let (lhs, rhs, equal) = builder.add_eq_ptr(lhs, rhs, qb_t()).unwrap();
+        assert!(builder.finish_hugr_with_outputs([lhs, rhs, equal]).is_err());
     }
 
     #[test]
