@@ -8,6 +8,15 @@ ecosystem.
 It provides a high-fidelity representation of operations, that facilitates
 compilation and encodes runnable programs.
 
+HUGR guide
+----------
+
+.. toctree::
+   :caption: Guide
+   :maxdepth: 1
+
+   guide/python-intro-1
+
 Python API v\ |hugr_py_version| reference
 -----------------------------------------
 
