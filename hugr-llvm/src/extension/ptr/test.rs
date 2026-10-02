@@ -130,8 +130,13 @@ fn exec_map(mut exec_ctx: TestContext, #[case] extra: bool) {
 }
 
 #[rstest]
-fn exec_linear_nested_pointer(mut exec_ctx: TestContext) {
+#[case(false)]
+#[case(true)]
+fn exec_linear_nested_pointer(mut exec_ctx: TestContext, #[case] runtime: bool) {
     configure(&mut exec_ctx);
+    if runtime {
+        exec_ctx.add_extensions(|b| b.add_ptr_extensions(HookCodegen));
+    }
     let ty = int_type(6);
     let hugr = SimpleHugrConfig::new()
         .with_extensions(STD_REG.to_owned())
@@ -157,12 +162,24 @@ fn exec_linear_nested_pointer(mut exec_ctx: TestContext) {
             let [value] = b.build_unwrap_sum(1, option_type([ty]), inner).unwrap();
             b.finish_hugr_with_outputs([value]).unwrap()
         });
-    assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), 42);
+    assert_eq!(
+        if runtime {
+            exec_runtime_u64(&exec_ctx, &hugr)
+        } else {
+            exec_ctx.exec_hugr_u64(hugr, "main")
+        },
+        42
+    );
 }
 
 #[rstest]
-fn exec_zero_sized_value(mut exec_ctx: TestContext) {
+#[case(false)]
+#[case(true)]
+fn exec_zero_sized_value(mut exec_ctx: TestContext, #[case] runtime: bool) {
     configure(&mut exec_ctx);
+    if runtime {
+        exec_ctx.add_extensions(|b| b.add_ptr_extensions(HookCodegen));
+    }
     let hugr = SimpleHugrConfig::new()
         .with_extensions(STD_REG.to_owned())
         .finish(|mut b| {
@@ -173,7 +190,19 @@ fn exec_zero_sized_value(mut exec_ctx: TestContext) {
                 .unwrap();
             b.finish_hugr_with_outputs([]).unwrap()
         });
-    exec_ctx.exec_hugr::<()>(hugr, "main");
+    if runtime {
+        with_runtime_engine(&exec_ctx, &hugr, |engine| {
+            // This entry has no arguments or results.
+            unsafe {
+                engine
+                    .get_function::<unsafe extern "C" fn()>("main")
+                    .unwrap()
+                    .call()
+            }
+        });
+    } else {
+        exec_ctx.exec_hugr::<()>(hugr, "main");
+    }
 }
 
 fn emit<'c>(ctx: &'c TestContext, hugr: &'c Hugr) -> Emission<'c> {
@@ -188,8 +217,13 @@ fn emit<'c>(ctx: &'c TestContext, hugr: &'c Hugr) -> Emission<'c> {
 }
 
 #[rstest]
-fn exec_map_linear_payload_and_extra(mut exec_ctx: TestContext) {
+#[case(false)]
+#[case(true)]
+fn exec_map_linear_payload_and_extra(mut exec_ctx: TestContext, #[case] runtime: bool) {
     configure(&mut exec_ctx);
+    if runtime {
+        exec_ctx.add_extensions(|b| b.add_ptr_extensions(HookCodegen));
+    }
     let int = int_type(6);
     let inner = ptr::ptr_type(int.clone());
     let hugr = SimpleHugrConfig::new()
@@ -225,7 +259,14 @@ fn exec_map_linear_payload_and_extra(mut exec_ctx: TestContext) {
             let sum = b.add_iadd(6, old, current).unwrap();
             b.finish_hugr_with_outputs([sum]).unwrap()
         });
-    assert_eq!(exec_ctx.exec_hugr_u64(hugr, "main"), 30);
+    assert_eq!(
+        if runtime {
+            exec_runtime_u64(&exec_ctx, &hugr)
+        } else {
+            exec_ctx.exec_hugr_u64(hugr, "main")
+        },
+        30
+    );
 }
 
 #[rstest]
@@ -312,24 +353,30 @@ fn hook_void<H: HugrView<Node = Node>>(
 }
 
 impl PtrCodegen for HookCodegen {
-    fn emit_alloc<'c, H: HugrView<Node = Node>>(
+    fn emit_new<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
-        layout: StructType<'c>,
+        value: BasicValueEnum<'c>,
     ) -> Result<PointerValue<'c>> {
+        let ty = value.get_type();
+        let source = value_buffer(ctx, ty, "test.source")?;
+        ctx.builder().build_store(source, value)?;
         let i64_t = ctx.iw_context().i64_type();
         let function = ctx.get_extern_func(
-            "test_ptr_alloc",
-            ctx.llvm_ptr_type()
-                .fn_type(&[i64_t.into(), i64_t.into()], false),
+            "test_ptr_create",
+            ctx.llvm_ptr_type().fn_type(
+                &[i64_t.into(), i64_t.into(), ctx.llvm_ptr_type().into()],
+                false,
+            ),
         )?;
         Ok(ctx
             .builder()
             .build_call(
                 function,
                 &[
-                    layout.size_of().unwrap().into(),
-                    layout.get_alignment().into(),
+                    ty.size_of().unwrap().into(),
+                    ty.get_alignment().into(),
+                    source.into(),
                 ],
                 "",
             )?
@@ -337,18 +384,43 @@ impl PtrCodegen for HookCodegen {
             .unwrap_basic()
             .into_pointer_value())
     }
+
+    fn emit_dup<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        ptr: PointerValue<'c>,
+        _value_ty: BasicTypeEnum<'c>,
+    ) -> Result<()> {
+        hook_void(ctx, "test_ptr_dup", ptr)
+    }
+
     fn emit_free<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         ptr: PointerValue<'c>,
-    ) -> Result<()> {
-        hook_void(ctx, "test_ptr_free", ptr)
+        _value_ty: BasicTypeEnum<'c>,
+        destination: PointerValue<'c>,
+    ) -> Result<IntValue<'c>> {
+        let function = ctx.get_extern_func(
+            "test_ptr_release",
+            ctx.iw_context().bool_type().fn_type(
+                &[ctx.llvm_ptr_type().into(), ctx.llvm_ptr_type().into()],
+                false,
+            ),
+        )?;
+        Ok(ctx
+            .builder()
+            .build_call(function, &[ptr.into(), destination.into()], "test.final")?
+            .try_as_basic_value()
+            .unwrap_basic()
+            .into_int_value())
     }
+
     fn emit_get_ptr<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         ptr: PointerValue<'c>,
-        _layout: StructType<'c>,
+        _value_ty: BasicTypeEnum<'c>,
     ) -> Result<PointerValue<'c>> {
         let function = ctx.get_extern_func(
             "test_ptr_get_ptr",
@@ -362,6 +434,7 @@ impl PtrCodegen for HookCodegen {
             .unwrap_basic()
             .into_pointer_value())
     }
+
     fn emit_lock<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -369,6 +442,7 @@ impl PtrCodegen for HookCodegen {
     ) -> Result<()> {
         hook_void(ctx, "test_ptr_lock", ptr)
     }
+
     fn emit_unlock<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -378,67 +452,143 @@ impl PtrCodegen for HookCodegen {
     }
 }
 
+struct RuntimeAllocation {
+    layout: std::alloc::Layout,
+    offset: usize,
+    tail: usize,
+    size: usize,
+    refs: u64,
+    locked: bool,
+}
+const GUARD: u64 = 0x1234_5678_9abc_def0;
+impl RuntimeAllocation {
+    fn check_guards(&self, ptr: *mut u8) {
+        // These aligned guard words are initialized on allocation and stay live
+        // until final release. They surround the value-only payload.
+        assert_eq!(unsafe { ptr.cast::<u64>().read() }, GUARD);
+        assert_eq!(unsafe { ptr.add(self.tail).cast::<u64>().read() }, GUARD);
+    }
+}
 thread_local! {
     static EVENTS: std::cell::RefCell<Vec<&'static str>> = const { std::cell::RefCell::new(Vec::new()) };
-    static ALLOCATIONS: std::cell::RefCell<std::collections::BTreeMap<usize, (std::alloc::Layout, usize)>> = const { std::cell::RefCell::new(std::collections::BTreeMap::new()) };
+    // The count lives only in Rust metadata, completely outside the LLVM payload.
+    static ALLOCATIONS: std::cell::RefCell<std::collections::BTreeMap<usize, RuntimeAllocation>> = const { std::cell::RefCell::new(std::collections::BTreeMap::new()) };
 }
 fn event(name: &'static str) {
     EVENTS.with_borrow_mut(|events| events.push(name));
 }
-extern "C" fn hook_alloc(size: u64, align: u64) -> *mut u8 {
-    let payload = std::alloc::Layout::from_size_align(size as usize, align as usize).unwrap();
-    let (layout, offset) = std::alloc::Layout::new::<u64>().extend(payload).unwrap();
-    // LLVM supplies a nonzero sized cell and its power-of-two ABI alignment.
+extern "C" fn hook_create(size: u64, align: u64, source: *const u8) -> *mut u8 {
+    let value = std::alloc::Layout::from_size_align(size as usize, align as usize).unwrap();
+    let (layout, offset) = std::alloc::Layout::new::<u64>().extend(value).unwrap();
+    let (layout, tail) = layout.extend(std::alloc::Layout::new::<u64>()).unwrap();
+    // The JIT supplies a typed, aligned source, and creation transfers its value.
+    // Raw byte copying preserves any uninitialized padding without inspecting it.
     let ptr = unsafe { std::alloc::alloc(layout) };
     assert!(!ptr.is_null());
-    ALLOCATIONS.with_borrow_mut(|allocs| allocs.insert(ptr as usize, (layout, offset)));
-    event("alloc");
-    hook_init(ptr.cast());
+    unsafe {
+        ptr.cast::<u64>().write(GUARD);
+        ptr.add(tail).cast::<u64>().write(GUARD);
+        if size != 0 {
+            std::ptr::copy_nonoverlapping(source, ptr.add(offset), size as usize);
+        }
+    }
+    let old = ALLOCATIONS.with_borrow_mut(|allocs| {
+        allocs.insert(
+            ptr as usize,
+            RuntimeAllocation {
+                layout,
+                offset,
+                tail,
+                size: size as usize,
+                refs: 1,
+                locked: false,
+            },
+        )
+    });
+    assert!(old.is_none());
+    event("new");
     ptr
 }
-extern "C" fn hook_free(ptr: *mut u8) {
-    hook_destroy(ptr.cast());
-    let (layout, _) = ALLOCATIONS
-        .with_borrow_mut(|allocs| allocs.remove(&(ptr as usize)))
-        .unwrap();
-    // The last Free returns the value and destroys the mutex before freeing.
+extern "C" fn hook_dup(ptr: *mut u8) {
+    ALLOCATIONS.with_borrow_mut(|allocs| {
+        let allocation = allocs.get_mut(&(ptr as usize)).unwrap();
+        allocation.check_guards(ptr);
+        assert!(!allocation.locked, "Dup entered with payload lock held");
+        allocation.refs = allocation.refs.checked_add(1).unwrap();
+    });
+    event("dup");
+}
+extern "C" fn hook_release(ptr: *mut u8, destination: *mut u8) -> bool {
+    let last = ALLOCATIONS.with_borrow_mut(|allocs| {
+        let allocation = allocs.get_mut(&(ptr as usize)).unwrap();
+        allocation.check_guards(ptr);
+        assert!(!allocation.locked, "Free entered with payload lock held");
+        allocation.refs = allocation.refs.checked_sub(1).unwrap();
+        if allocation.refs == 0 {
+            allocs.remove(&(ptr as usize))
+        } else {
+            None
+        }
+    });
+    let Some(allocation) = last else {
+        event("release.shared");
+        return false;
+    };
+    assert!(!destination.is_null());
+    // Move the final value into the disjoint typed destination before destroying
+    // storage. There is no count in this payload and no destructor to invoke.
     unsafe {
-        std::alloc::dealloc(ptr, layout);
+        if allocation.size != 0 {
+            std::ptr::copy_nonoverlapping(ptr.add(allocation.offset), destination, allocation.size);
+        }
+    }
+    event("extract");
+    event("destroy");
+    unsafe {
+        std::alloc::dealloc(ptr, allocation.layout);
     }
     event("free");
+    true
 }
 extern "C" fn hook_get_ptr(ptr: *mut u8) -> *mut u8 {
-    let offset = ALLOCATIONS.with_borrow(|allocs| allocs[&(ptr as usize)].1);
-    // Payload storage is a separate, aligned region after the runtime mutex.
-    assert!(offset > 0);
+    let offset = ALLOCATIONS.with_borrow(|allocs| {
+        let allocation = &allocs[&(ptr as usize)];
+        allocation.check_guards(ptr);
+        assert!(allocation.locked, "Projection outside payload lock");
+        allocation.offset
+    });
     event("get_ptr");
+    // The value's aligned storage lies between the two runtime guard words.
     unsafe { ptr.add(offset) }
 }
-extern "C" fn hook_init(ptr: *mut u64) {
-    unsafe {
-        ptr.write(0);
-    }
-    event("init");
-}
-extern "C" fn hook_lock(ptr: *mut u64) {
-    assert_eq!(unsafe { ptr.replace(1) }, 0);
+extern "C" fn hook_lock(ptr: *mut u8) {
+    ALLOCATIONS.with_borrow_mut(|allocs| {
+        let allocation = allocs.get_mut(&(ptr as usize)).unwrap();
+        allocation.check_guards(ptr);
+        assert!(!allocation.locked, "Recursive payload lock");
+        allocation.locked = true;
+    });
     event("lock");
 }
-extern "C" fn hook_unlock(ptr: *mut u64) {
-    assert_eq!(unsafe { ptr.replace(0) }, 1);
+extern "C" fn hook_unlock(ptr: *mut u8) {
+    ALLOCATIONS.with_borrow_mut(|allocs| {
+        let allocation = allocs.get_mut(&(ptr as usize)).unwrap();
+        allocation.check_guards(ptr);
+        assert!(
+            allocation.locked,
+            "Unlock without a lock or after final release"
+        );
+        allocation.locked = false;
+    });
     event("unlock");
 }
-extern "C" fn hook_destroy(ptr: *mut u64) {
-    assert_eq!(unsafe { ptr.read() }, 0);
-    event("destroy");
-}
 
-#[rstest]
-fn custom_hooks_manage_cell_once(mut exec_ctx: TestContext) {
-    configure(&mut exec_ctx);
-    exec_ctx.add_extensions(|b| b.add_ptr_extensions(HookCodegen));
-    let hugr = lifecycle();
-    let emission = emit(&exec_ctx, &hugr);
+fn with_runtime_engine<R>(
+    ctx: &TestContext,
+    hugr: &Hugr,
+    run: impl FnOnce(&inkwell::execution_engine::ExecutionEngine<'_>) -> R,
+) -> R {
+    let emission = emit(ctx, hugr);
     emission
         .module()
         .get_function("main")
@@ -448,65 +598,139 @@ fn custom_hooks_manage_cell_once(mut exec_ctx: TestContext) {
         .module()
         .create_jit_execution_engine(inkwell::OptimizationLevel::None)
         .unwrap();
+    let ir = emission.module().print_to_string().to_string();
+    assert!(!ir.contains("ptr.count"));
+    assert!(!ir.contains("ptr.refcount.overflow"));
+    assert!(!ir.contains("ptr.last"));
     for (name, address) in [
-        ("test_ptr_alloc", hook_alloc as *const () as usize),
-        ("test_ptr_free", hook_free as *const () as usize),
+        ("test_ptr_create", hook_create as *const () as usize),
+        ("test_ptr_dup", hook_dup as *const () as usize),
+        ("test_ptr_release", hook_release as *const () as usize),
         ("test_ptr_get_ptr", hook_get_ptr as *const () as usize),
         ("test_ptr_lock", hook_lock as *const () as usize),
         ("test_ptr_unlock", hook_unlock as *const () as usize),
     ] {
-        engine.add_global_mapping(&emission.module().get_function(name).unwrap(), address);
+        if let Some(function) = emission.module().get_function(name) {
+            engine.add_global_mapping(&function, address);
+        }
     }
     EVENTS.with_borrow_mut(Vec::clear);
-    // This test's entry has no arguments and returns the LLVM boolean type.
-    let main = unsafe {
-        engine
-            .get_function::<unsafe extern "C" fn() -> bool>("main")
-            .unwrap()
-    };
-    assert!(unsafe { main.call() });
+    ALLOCATIONS.with_borrow(|allocs| assert!(allocs.is_empty()));
+    let result = run(&engine);
+    ALLOCATIONS.with_borrow(|allocs| assert!(allocs.is_empty()));
+    result
+}
+fn exec_runtime_bool(ctx: &TestContext, hugr: &Hugr) -> bool {
+    with_runtime_engine(ctx, hugr, |engine| {
+        // This test entry has no arguments and returns a HUGR boolean.
+        unsafe {
+            engine
+                .get_function::<unsafe extern "C" fn() -> bool>("main")
+                .unwrap()
+                .call()
+        }
+    })
+}
+fn exec_runtime_u64(ctx: &TestContext, hugr: &Hugr) -> u64 {
+    with_runtime_engine(ctx, hugr, |engine| {
+        // This test entry has no arguments and returns a 64-bit integer.
+        unsafe {
+            engine
+                .get_function::<unsafe extern "C" fn() -> u64>("main")
+                .unwrap()
+                .call()
+        }
+    })
+}
+
+#[rstest]
+fn runtime_backend_owns_count_and_lifecycle(mut exec_ctx: TestContext) {
+    configure(&mut exec_ctx);
+    exec_ctx.add_extensions(|b| b.add_ptr_extensions(HookCodegen));
+    assert!(exec_runtime_bool(&exec_ctx, &lifecycle()));
     EVENTS.with_borrow(|events| {
         assert_eq!(
             events,
             &[
-                "alloc", "init", "get_ptr", "lock", "get_ptr", "unlock", "lock", "get_ptr",
-                "unlock", "lock", "get_ptr", "unlock", "lock", "get_ptr", "unlock", "lock",
-                "get_ptr", "unlock", "lock", "get_ptr", "unlock", "destroy", "free",
+                "new",
+                "dup",
+                "lock",
+                "get_ptr",
+                "unlock",
+                "lock",
+                "get_ptr",
+                "unlock",
+                "lock",
+                "get_ptr",
+                "unlock",
+                "release.shared",
+                "extract",
+                "destroy",
+                "free",
             ]
         )
     });
-    ALLOCATIONS.with_borrow(|allocs| assert!(allocs.is_empty()));
 }
 
 #[derive(Clone)]
 struct SpinCodegen;
 impl PtrCodegen for SpinCodegen {
-    fn emit_alloc<'c, H: HugrView<Node = Node>>(
+    fn emit_new<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
-        layout: StructType<'c>,
+        value: BasicValueEnum<'c>,
     ) -> Result<PointerValue<'c>> {
+        let layout = counted_layout(ctx, value.get_type());
         let storage = ctx
             .iw_context()
             .struct_type(&[ctx.iw_context().i8_type().into(), layout.into()], false);
-        let ptr = DefaultPtrCodegen.emit_alloc(ctx, storage)?;
+        let ptr = emit_alloc_checked(ctx, storage)?;
         ctx.builder()
             .build_store(ptr, ctx.iw_context().i8_type().const_zero())?;
+        let payload = spin_payload(ctx, ptr, value.get_type())?;
+        emit_counted_init(ctx, payload, value)?;
         Ok(ptr)
     }
+
+    fn emit_dup<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        ptr: PointerValue<'c>,
+        value_ty: BasicTypeEnum<'c>,
+    ) -> Result<()> {
+        self.emit_lock(ctx, ptr)?;
+        let payload = spin_payload(ctx, ptr, value_ty)?;
+        let (count, _) = counted_fields(ctx, payload, value_ty)?;
+        emit_counted_dup(ctx, count)?;
+        self.emit_unlock(ctx, ptr)
+    }
+
+    fn emit_free<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        ptr: PointerValue<'c>,
+        value_ty: BasicTypeEnum<'c>,
+        destination: PointerValue<'c>,
+    ) -> Result<IntValue<'c>> {
+        self.emit_lock(ctx, ptr)?;
+        let payload = spin_payload(ctx, ptr, value_ty)?;
+        let (count, value) = counted_fields(ctx, payload, value_ty)?;
+        let last = emit_counted_take(ctx, count, value, value_ty, destination)?;
+        self.emit_unlock(ctx, ptr)?;
+        emit_free_if_last(ctx, ptr, last)?;
+        Ok(last)
+    }
+
     fn emit_get_ptr<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         ptr: PointerValue<'c>,
-        layout: StructType<'c>,
+        value_ty: BasicTypeEnum<'c>,
     ) -> Result<PointerValue<'c>> {
-        let storage = ctx
-            .iw_context()
-            .struct_type(&[ctx.iw_context().i8_type().into(), layout.into()], false);
-        Ok(ctx
-            .builder()
-            .build_struct_gep(storage, ptr, 1, "test.payload")?)
+        let payload = spin_payload(ctx, ptr, value_ty)?;
+        Ok(counted_fields(ctx, payload, value_ty)?.1)
     }
+
     fn emit_lock<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -544,6 +768,20 @@ impl PtrCodegen for SpinCodegen {
     }
 }
 
+fn spin_payload<'c, H: HugrView<Node = Node>>(
+    ctx: &mut EmitFuncContext<'c, '_, H>,
+    ptr: PointerValue<'c>,
+    value_ty: BasicTypeEnum<'c>,
+) -> Result<PointerValue<'c>> {
+    let layout = counted_layout(ctx, value_ty);
+    let storage = ctx
+        .iw_context()
+        .struct_type(&[ctx.iw_context().i8_type().into(), layout.into()], false);
+    Ok(ctx
+        .builder()
+        .build_struct_gep(storage, ptr, 1, "test.payload")?)
+}
+
 #[rstest]
 fn default_mutex_emits_no_synchronization(mut exec_ctx: TestContext) {
     configure(&mut exec_ctx);
@@ -557,18 +795,23 @@ fn default_mutex_emits_no_synchronization(mut exec_ctx: TestContext) {
 }
 
 #[rstest]
-#[case(false, false)]
-#[case(true, false)]
-#[case(false, true)]
-#[case(true, true)]
+#[case(false, 0)]
+#[case(true, 0)]
+#[case(false, 1)]
+#[case(true, 1)]
+#[case(false, 2)]
+#[case(true, 2)]
 fn exec_eq_identity_and_handles(
     mut exec_ctx: TestContext,
     #[case] aliases: bool,
-    #[case] custom_mutex: bool,
+    #[case] backend: u8,
 ) {
     configure(&mut exec_ctx);
-    if custom_mutex {
+    if backend == 1 {
         exec_ctx.add_extensions(|b| b.add_ptr_extensions(SpinCodegen));
+    }
+    if backend == 2 {
+        exec_ctx.add_extensions(|b| b.add_ptr_extensions(HookCodegen));
     }
     let ty = int_type(6);
     let hugr = SimpleHugrConfig::new()
@@ -633,7 +876,11 @@ fn exec_eq_identity_and_handles(
             ok = b.add_and(ok, last_ok).unwrap();
             b.finish_hugr_with_outputs([ok]).unwrap()
         });
-    assert!(exec_ctx.exec_hugr::<bool>(hugr, "main"));
+    assert!(if backend == 2 {
+        exec_runtime_bool(&exec_ctx, &hugr)
+    } else {
+        exec_ctx.exec_hugr::<bool>(hugr, "main")
+    });
 }
 
 #[rstest]
