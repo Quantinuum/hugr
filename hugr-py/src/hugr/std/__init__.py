@@ -2,9 +2,9 @@
 
 from hugr.ext import Extension, ExtensionRegistry
 
-from . import collections, float, int, logic, prelude, ptr
+from . import collections, float, int, logic, math, prelude, ptr
 
-__all__ = ["PRELUDE", "collections", "float", "int", "logic", "prelude", "ptr"]
+__all__ = ["PRELUDE", "collections", "float", "int", "logic", "math", "prelude", "ptr"]
 
 PRELUDE: Extension = prelude.PRELUDE_EXTENSION
 
@@ -18,6 +18,7 @@ def _std_extensions() -> ExtensionRegistry:
             int.INT_OPS_EXTENSION,
             float.FLOAT_OPS_EXTENSION,
             float.FLOAT_TYPES_EXTENSION,
+            math.EXTENSION,
             logic.EXTENSION,
             ptr.EXTENSION,
             collections.array.EXTENSION,
