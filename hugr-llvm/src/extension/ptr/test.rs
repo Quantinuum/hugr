@@ -687,7 +687,13 @@ impl PtrCodegen for SpinCodegen {
         let storage = ctx
             .iw_context()
             .struct_type(&[ctx.iw_context().i8_type().into(), layout.into()], false);
-        let ptr = emit_alloc_checked(ctx, &DefaultArrayCodegen, &DefaultPreludeCodegen, storage)?;
+        let ptr = emit_alloc_checked(
+            ctx,
+            &DefaultArrayCodegen,
+            &DefaultPreludeCodegen,
+            &ConstError::new(2, "Pointer allocation failed"),
+            storage,
+        )?;
         ctx.builder()
             .build_store(ptr, ctx.iw_context().i8_type().const_zero())?;
         let payload = spin_payload(ctx, ptr, value.get_type())?;
@@ -704,7 +710,12 @@ impl PtrCodegen for SpinCodegen {
         self.emit_lock(ctx, ptr)?;
         let payload = spin_payload(ctx, ptr, value_ty)?;
         let (count, _) = counted_fields(ctx, payload, value_ty)?;
-        emit_counted_dup(ctx, &DefaultPreludeCodegen, count)?;
+        emit_counted_dup(
+            ctx,
+            &DefaultPreludeCodegen,
+            &ConstError::new(2, "Pointer reference count overflow"),
+            count,
+        )?;
         self.emit_unlock(ctx, ptr)
     }
 
@@ -1017,26 +1028,87 @@ impl ArrayCodegen for PanicHeap {
     }
 }
 
+#[derive(Clone)]
+struct SignalCheckingPrelude {
+    expected: u32,
+}
+impl PreludeCodegen for SignalCheckingPrelude {
+    fn emit_panic<H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<H>,
+        error: BasicValueEnum,
+    ) -> Result<()> {
+        use crate::emit::test::PanicTestPreludeCodegen;
+        let signal = ctx
+            .builder()
+            .build_extract_value(error.into_struct_value(), 0, "test.signal")?
+            .into_int_value();
+        let mismatch = ctx.builder().build_int_compare(
+            IntPredicate::NE,
+            signal,
+            signal.get_type().const_int(self.expected.into(), false),
+            "",
+        )?;
+        panic_if(
+            ctx,
+            &PanicTestPreludeCodegen,
+            mismatch,
+            &ConstError::new(99, "Unexpected pointer error signal"),
+        )?;
+        PanicTestPreludeCodegen.emit_panic(ctx, error)
+    }
+}
+
 #[rstest]
 #[case(0, "Pointer cell is already locked")]
 #[case(1, "Pointer cell is not locked")]
 #[case(2, "Pointer cell is not locked")]
 #[case(3, "Pointer allocation failed")]
-fn invalid_lock_transitions_and_allocation_panic(
+#[case(4, "Pointer reference count overflow")]
+fn configured_pointer_errors_panic(
     mut exec_ctx: TestContext,
     #[case] misuse: u8,
     #[case] message: &str,
+    #[values(false, true)] configured: bool,
 ) {
-    use crate::emit::test::PanicTestPreludeCodegen;
     configure(&mut exec_ctx);
+    let expected = if configured {
+        match misuse {
+            0 => 42,
+            1 | 2 => 43,
+            3 => 40,
+            _ => 41,
+        }
+    } else {
+        2
+    };
     exec_ctx.add_extensions(move |b| {
-        b.add_prelude_extensions(PanicTestPreludeCodegen)
+        b.add_prelude_extensions(SignalCheckingPrelude { expected })
             .simple_extension_op::<PtrOpDef>(move |ctx, args, _| {
                 let op = PtrOp::from_extension_op(args.node().as_ref())?;
-                let cg = DefaultPtrCodegen::new(
-                    PanicTestPreludeCodegen,
+                let mut cg = DefaultPtrCodegen::new(
+                    SignalCheckingPrelude { expected },
                     PanicHeap { fail: misuse == 3 },
                 );
+                if configured {
+                    cg = cg
+                        .with_allocation_error(ConstError::new(
+                            40,
+                            "custom Pointer allocation failed",
+                        ))
+                        .with_refcount_overflow_error(ConstError::new(
+                            41,
+                            "custom Pointer reference count overflow",
+                        ))
+                        .with_already_locked_error(ConstError::new(
+                            42,
+                            "custom Pointer cell is already locked",
+                        ))
+                        .with_not_locked_error(ConstError::new(
+                            43,
+                            "custom Pointer cell is not locked",
+                        ));
+                }
                 if op.def == PtrOpDef::New {
                     let ptr = cg.emit_new(ctx, args.inputs[0])?;
                     match misuse {
@@ -1050,6 +1122,12 @@ fn invalid_lock_transitions_and_allocation_panic(
                             cg.emit_unlock(ctx, ptr)?;
                             cg.emit_unlock(ctx, ptr)?;
                         }
+                        4 => {
+                            let (count, _) = counted_fields(ctx, ptr, args.inputs[0].get_type())?;
+                            ctx.builder()
+                                .build_store(count, ctx.iw_context().i64_type().const_all_ones())?;
+                            cg.emit_dup(ctx, ptr, args.inputs[0].get_type())?;
+                        }
                         _ => {}
                     }
                     args.outputs.finish(ctx.builder(), [ptr.into()])
@@ -1058,7 +1136,15 @@ fn invalid_lock_transitions_and_allocation_panic(
                 }
             })
     });
-    assert_eq!(exec_ctx.exec_hugr_panicking(lifecycle(), "main"), message);
+    let expected_message = if configured {
+        format!("custom {message}")
+    } else {
+        message.to_owned()
+    };
+    assert_eq!(
+        exec_ctx.exec_hugr_panicking(lifecycle(), "main"),
+        expected_message
+    );
 }
 
 #[rstest]

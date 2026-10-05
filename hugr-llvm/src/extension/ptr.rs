@@ -105,6 +105,7 @@ pub trait PtrCodegen: Clone {
     ) -> Result<PointerValue<'c>>;
 
     /// Acquire exclusive access to the stored value through a live owner.
+    /// Implementations must panic on reentry through any alias of the same cell.
     fn emit_lock<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -112,6 +113,7 @@ pub trait PtrCodegen: Clone {
     ) -> Result<()>;
 
     /// End protected access and publish writes through the still-live owner.
+    /// Implementations must panic if the cell is not locked by this execution.
     fn emit_unlock<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
@@ -126,15 +128,75 @@ pub trait PtrCodegen: Clone {
 /// Allocation failure, count overflow and invalid lock transitions panic through
 /// the supplied prelude codegen. Lock state detects reentrant access; it provides
 /// no synchronization, so this backend requires sequential execution per cell.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct DefaultPtrCodegen<PCG, ACG> {
     prelude: PCG,
     heap: ACG,
+    allocation_error: ConstError,
+    refcount_overflow_error: ConstError,
+    already_locked_error: ConstError,
+    not_locked_error: ConstError,
 }
 impl<PCG: PreludeCodegen, ACG: ArrayCodegen> DefaultPtrCodegen<PCG, ACG> {
+    /// Default allocation-failure signal, preserving the prelude error convention.
+    pub const ALLOCATION_FAILURE_SIGNAL: u32 = 2;
+    /// Default reference-count overflow signal.
+    pub const REFCOUNT_OVERFLOW_SIGNAL: u32 = 2;
+    /// Default reentrant-lock signal.
+    pub const ALREADY_LOCKED_SIGNAL: u32 = 2;
+    /// Default unmatched-unlock signal.
+    pub const NOT_LOCKED_SIGNAL: u32 = 2;
+
+    /// Replace the error emitted when heap allocation returns null.
+    pub fn with_allocation_error(mut self, error: ConstError) -> Self {
+        self.allocation_error = error;
+        self
+    }
+    /// Replace the error emitted when retaining would overflow the count.
+    pub fn with_refcount_overflow_error(mut self, error: ConstError) -> Self {
+        self.refcount_overflow_error = error;
+        self
+    }
+    /// Replace the error emitted on reentrant locking.
+    pub fn with_already_locked_error(mut self, error: ConstError) -> Self {
+        self.already_locked_error = error;
+        self
+    }
+    /// Replace the error emitted when unlocking an unlocked cell.
+    pub fn with_not_locked_error(mut self, error: ConstError) -> Self {
+        self.not_locked_error = error;
+        self
+    }
+
     /// Use the same heap and panic implementations selected for other extensions.
     pub fn new(prelude: PCG, heap: ACG) -> Self {
-        Self { prelude, heap }
+        Self {
+            prelude,
+            heap,
+            allocation_error: ConstError::new(
+                Self::ALLOCATION_FAILURE_SIGNAL,
+                "Pointer allocation failed",
+            ),
+            refcount_overflow_error: ConstError::new(
+                Self::REFCOUNT_OVERFLOW_SIGNAL,
+                "Pointer reference count overflow",
+            ),
+            already_locked_error: ConstError::new(
+                Self::ALREADY_LOCKED_SIGNAL,
+                "Pointer cell is already locked",
+            ),
+            not_locked_error: ConstError::new(
+                Self::NOT_LOCKED_SIGNAL,
+                "Pointer cell is not locked",
+            ),
+        }
+    }
+}
+impl<PCG: PreludeCodegen + Default, ACG: ArrayCodegen + Default> Default
+    for DefaultPtrCodegen<PCG, ACG>
+{
+    fn default() -> Self {
+        Self::new(PCG::default(), ACG::default())
     }
 }
 impl<PCG: PreludeCodegen, ACG: ArrayCodegen> PtrCodegen for DefaultPtrCodegen<PCG, ACG> {
@@ -144,7 +206,13 @@ impl<PCG: PreludeCodegen, ACG: ArrayCodegen> PtrCodegen for DefaultPtrCodegen<PC
         value: BasicValueEnum<'c>,
     ) -> Result<PointerValue<'c>> {
         let layout = counted_layout(ctx.iw_context(), value.get_type());
-        let ptr = emit_alloc_checked(ctx, &self.heap, &self.prelude, layout)?;
+        let ptr = emit_alloc_checked(
+            ctx,
+            &self.heap,
+            &self.prelude,
+            &self.allocation_error,
+            layout,
+        )?;
         emit_counted_init(ctx, ptr, value)?;
         Ok(ptr)
     }
@@ -157,7 +225,7 @@ impl<PCG: PreludeCodegen, ACG: ArrayCodegen> PtrCodegen for DefaultPtrCodegen<PC
     ) -> Result<()> {
         self.emit_lock(ctx, ptr)?;
         let (count, _) = counted_fields(ctx, ptr, value_ty)?;
-        emit_counted_dup(ctx, &self.prelude, count)?;
+        emit_counted_dup(ctx, &self.prelude, &self.refcount_overflow_error, count)?;
         self.emit_unlock(ctx, ptr)
     }
 
@@ -195,7 +263,7 @@ impl<PCG: PreludeCodegen, ACG: ArrayCodegen> PtrCodegen for DefaultPtrCodegen<PC
             .builder()
             .build_load(ctx.iw_context().bool_type(), flag, "ptr.locked")?
             .into_int_value();
-        panic_if(ctx, &self.prelude, locked, "Pointer cell is already locked")?;
+        panic_if(ctx, &self.prelude, locked, &self.already_locked_error)?;
         ctx.builder()
             .build_store(flag, ctx.iw_context().bool_type().const_int(1, false))?;
         Ok(())
@@ -211,7 +279,7 @@ impl<PCG: PreludeCodegen, ACG: ArrayCodegen> PtrCodegen for DefaultPtrCodegen<PC
             .build_load(ctx.iw_context().bool_type(), flag, "ptr.locked")?
             .into_int_value();
         let unlocked = ctx.builder().build_not(locked, "")?;
-        panic_if(ctx, &self.prelude, unlocked, "Pointer cell is not locked")?;
+        panic_if(ctx, &self.prelude, unlocked, &self.not_locked_error)?;
         ctx.builder()
             .build_store(flag, ctx.iw_context().bool_type().const_zero())?;
         Ok(())
@@ -245,6 +313,7 @@ fn emit_alloc_checked<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     heap: &impl ArrayCodegen,
     prelude: &impl PreludeCodegen,
+    error: &ConstError,
     layout: impl BasicType<'c>,
 ) -> Result<PointerValue<'c>> {
     let size = layout
@@ -252,7 +321,7 @@ fn emit_alloc_checked<'c, H: HugrView<Node = Node>>(
         .ok_or_else(|| anyhow!("Unsized pointer storage"))?;
     let ptr = heap.emit_allocate_array(ctx, size)?;
     let failed = ctx.builder().build_is_null(ptr, "ptr.alloc.failed")?;
-    panic_if(ctx, prelude, failed, "Pointer allocation failed")?;
+    panic_if(ctx, prelude, failed, error)?;
     Ok(ptr)
 }
 
@@ -288,6 +357,7 @@ fn emit_counted_init<'c, H: HugrView<Node = Node>>(
 fn emit_counted_dup<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     prelude: &impl PreludeCodegen,
+    error: &ConstError,
     count_ptr: PointerValue<'c>,
 ) -> Result<()> {
     let ty = ctx.iw_context().i64_type();
@@ -301,7 +371,7 @@ fn emit_counted_dup<'c, H: HugrView<Node = Node>>(
         ty.const_all_ones(),
         "ptr.refcount.overflow",
     )?;
-    panic_if(ctx, prelude, overflow, "Pointer reference count overflow")?;
+    panic_if(ctx, prelude, overflow, error)?;
     let count = ctx
         .builder()
         .build_int_add(count, ty.const_int(1, false), "")?;
@@ -426,20 +496,14 @@ fn panic_if<H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<H>,
     prelude: &impl PreludeCodegen,
     cond: IntValue,
-    message: &str,
+    error: &ConstError,
 ) -> Result<()> {
     let failed = ctx.new_basic_block("ptr.panic", None);
     let success = ctx.new_basic_block("ptr.continue", None);
     ctx.builder()
         .build_conditional_branch(cond, failed, success)?;
     ctx.builder().position_at_end(failed);
-    let err = prelude.emit_const_error(
-        ctx,
-        &ConstError {
-            signal: 2,
-            message: message.to_owned(),
-        },
-    )?;
+    let err = prelude.emit_const_error(ctx, error)?;
     prelude.emit_panic(ctx, err)?;
     ctx.builder().build_unreachable()?;
     ctx.builder().position_at_end(success);
