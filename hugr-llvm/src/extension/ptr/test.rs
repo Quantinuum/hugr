@@ -4,6 +4,7 @@ use crate::{
         EmitDebugInfo,
         test::{Emission, SimpleHugrConfig},
     },
+    extension::{DefaultPreludeCodegen, collections::array::DefaultArrayCodegen},
     test::{TestContext, exec_ctx},
     utils::{IntOpBuilder, LogicOpBuilder, fat::FatExt},
 };
@@ -26,7 +27,7 @@ fn configure(ctx: &mut TestContext) {
         b.add_default_prelude_extensions()
             .add_default_int_extensions()
             .add_logic_extensions()
-            .add_default_ptr_extensions()
+            .add_default_ptr_extensions(DefaultPreludeCodegen, DefaultArrayCodegen)
     });
 }
 
@@ -308,10 +309,12 @@ fn custom_mutex_makes_concurrent_map_exclusive(mut exec_ctx: TestContext) {
     struct Cell {
         mutex: AtomicU8,
         count: u64,
+        locked: u8,
         value: UnsafeCell<u64>,
     }
     let cell = Cell {
         count: 4,
+        locked: 0,
         mutex: AtomicU8::new(0),
         value: UnsafeCell::new(0),
     };
@@ -680,11 +683,11 @@ impl PtrCodegen for SpinCodegen {
         ctx: &mut EmitFuncContext<'c, '_, H>,
         value: BasicValueEnum<'c>,
     ) -> Result<PointerValue<'c>> {
-        let layout = counted_layout(ctx, value.get_type());
+        let layout = counted_layout(ctx.iw_context(), value.get_type());
         let storage = ctx
             .iw_context()
             .struct_type(&[ctx.iw_context().i8_type().into(), layout.into()], false);
-        let ptr = emit_alloc_checked(ctx, storage)?;
+        let ptr = emit_alloc_checked(ctx, &DefaultArrayCodegen, &DefaultPreludeCodegen, storage)?;
         ctx.builder()
             .build_store(ptr, ctx.iw_context().i8_type().const_zero())?;
         let payload = spin_payload(ctx, ptr, value.get_type())?;
@@ -701,7 +704,7 @@ impl PtrCodegen for SpinCodegen {
         self.emit_lock(ctx, ptr)?;
         let payload = spin_payload(ctx, ptr, value_ty)?;
         let (count, _) = counted_fields(ctx, payload, value_ty)?;
-        emit_counted_dup(ctx, count)?;
+        emit_counted_dup(ctx, &DefaultPreludeCodegen, count)?;
         self.emit_unlock(ctx, ptr)
     }
 
@@ -717,7 +720,7 @@ impl PtrCodegen for SpinCodegen {
         let (count, value) = counted_fields(ctx, payload, value_ty)?;
         let last = emit_counted_take(ctx, count, value, value_ty, destination)?;
         self.emit_unlock(ctx, ptr)?;
-        emit_free_if_last(ctx, ptr, last)?;
+        emit_free_if_last(ctx, &DefaultArrayCodegen, ptr, last)?;
         Ok(last)
     }
 
@@ -773,7 +776,7 @@ fn spin_payload<'c, H: HugrView<Node = Node>>(
     ptr: PointerValue<'c>,
     value_ty: BasicTypeEnum<'c>,
 ) -> Result<PointerValue<'c>> {
-    let layout = counted_layout(ctx, value_ty);
+    let layout = counted_layout(ctx.iw_context(), value_ty);
     let storage = ctx
         .iw_context()
         .struct_type(&[ctx.iw_context().i8_type().into(), layout.into()], false);
@@ -783,7 +786,7 @@ fn spin_payload<'c, H: HugrView<Node = Node>>(
 }
 
 #[rstest]
-fn default_mutex_emits_no_synchronization(mut exec_ctx: TestContext) {
+fn default_lock_checks_are_non_atomic(mut exec_ctx: TestContext) {
     configure(&mut exec_ctx);
     let hugr = lifecycle();
     let emission = emit(&exec_ctx, &hugr);
@@ -905,4 +908,196 @@ fn eq_emits_no_runtime_hooks_or_payload_access(mut exec_ctx: TestContext) {
     assert!(!ir.contains("@test_ptr_"));
     assert!(!ir.contains("getelementptr"));
     assert!(!ir.contains("atomic"));
+}
+
+#[derive(Clone)]
+struct TestHeap;
+impl ArrayCodegen for TestHeap {
+    fn emit_allocate_array<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        size: IntValue<'c>,
+    ) -> Result<PointerValue<'c>> {
+        let f = ctx.get_extern_func(
+            "test_heap_alloc",
+            ctx.llvm_ptr_type()
+                .fn_type(&[size.get_type().into()], false),
+        )?;
+        Ok(ctx
+            .builder()
+            .build_call(f, &[size.into()], "")?
+            .try_as_basic_value()
+            .unwrap_basic()
+            .into_pointer_value())
+    }
+    fn emit_free_array<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        ptr: PointerValue<'c>,
+    ) -> Result<()> {
+        hook_void(ctx, "test_heap_free", ptr)
+    }
+}
+
+thread_local! { static HEAP_EVENTS: std::cell::RefCell<Vec<&'static str>> = const { std::cell::RefCell::new(Vec::new()) }; }
+unsafe extern "C" {
+    fn malloc(size: usize) -> *mut std::ffi::c_void;
+    fn free(ptr: *mut std::ffi::c_void);
+}
+extern "C" fn test_heap_alloc(size: usize) -> *mut std::ffi::c_void {
+    HEAP_EVENTS.with_borrow_mut(|events| events.push("allocate"));
+    // Forward the emitted allocation size to the platform allocator.
+    unsafe { malloc(size) }
+}
+extern "C" fn test_heap_free(ptr: *mut std::ffi::c_void) {
+    HEAP_EVENTS.with_borrow_mut(|events| events.push("free"));
+    // The lowering releases exactly the live allocation returned above.
+    unsafe { free(ptr) }
+}
+
+#[rstest]
+fn configured_heap_owns_allocation_and_final_free(mut exec_ctx: TestContext) {
+    configure(&mut exec_ctx);
+    exec_ctx.add_extensions(|b| b.add_default_ptr_extensions(DefaultPreludeCodegen, TestHeap));
+    let hugr = lifecycle();
+    let emission = emit(&exec_ctx, &hugr);
+    emission
+        .module()
+        .get_function("main")
+        .unwrap()
+        .set_linkage(inkwell::module::Linkage::External);
+    let engine = emission
+        .module()
+        .create_jit_execution_engine(inkwell::OptimizationLevel::None)
+        .unwrap();
+    engine.add_global_mapping(
+        &emission.module().get_function("test_heap_alloc").unwrap(),
+        test_heap_alloc as *const () as usize,
+    );
+    engine.add_global_mapping(
+        &emission.module().get_function("test_heap_free").unwrap(),
+        test_heap_free as *const () as usize,
+    );
+    HEAP_EVENTS.with_borrow_mut(Vec::clear);
+    // main has no inputs and returns the HUGR boolean success witness.
+    let result = unsafe {
+        engine
+            .get_function::<unsafe extern "C" fn() -> bool>("main")
+            .unwrap()
+            .call()
+    };
+    assert!(result);
+    HEAP_EVENTS.with_borrow(|events| assert_eq!(events, &["allocate", "free"]));
+}
+
+// Stack storage avoids leaking a heap allocation when the panic test jumps out.
+#[derive(Clone)]
+struct PanicHeap {
+    fail: bool,
+}
+impl ArrayCodegen for PanicHeap {
+    fn emit_allocate_array<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        size: IntValue<'c>,
+    ) -> Result<PointerValue<'c>> {
+        if self.fail {
+            return Ok(ctx.llvm_ptr_type().const_null());
+        }
+        Ok(ctx
+            .builder()
+            .build_array_alloca(ctx.iw_context().i64_type(), size, "test.storage")?)
+    }
+    fn emit_free_array<'c, H: HugrView<Node = Node>>(
+        &self,
+        _ctx: &mut EmitFuncContext<'c, '_, H>,
+        _ptr: PointerValue<'c>,
+    ) -> Result<()> {
+        Ok(())
+    }
+}
+
+#[rstest]
+#[case(0, "Pointer cell is already locked")]
+#[case(1, "Pointer cell is not locked")]
+#[case(2, "Pointer cell is not locked")]
+#[case(3, "Pointer allocation failed")]
+fn invalid_lock_transitions_and_allocation_panic(
+    mut exec_ctx: TestContext,
+    #[case] misuse: u8,
+    #[case] message: &str,
+) {
+    use crate::emit::test::PanicTestPreludeCodegen;
+    configure(&mut exec_ctx);
+    exec_ctx.add_extensions(move |b| {
+        b.add_prelude_extensions(PanicTestPreludeCodegen)
+            .simple_extension_op::<PtrOpDef>(move |ctx, args, _| {
+                let op = PtrOp::from_extension_op(args.node().as_ref())?;
+                let cg = DefaultPtrCodegen::new(
+                    PanicTestPreludeCodegen,
+                    PanicHeap { fail: misuse == 3 },
+                );
+                if op.def == PtrOpDef::New {
+                    let ptr = cg.emit_new(ctx, args.inputs[0])?;
+                    match misuse {
+                        0 => {
+                            cg.emit_lock(ctx, ptr)?;
+                            cg.emit_lock(ctx, ptr)?;
+                        }
+                        1 => cg.emit_unlock(ctx, ptr)?,
+                        2 => {
+                            cg.emit_lock(ctx, ptr)?;
+                            cg.emit_unlock(ctx, ptr)?;
+                            cg.emit_unlock(ctx, ptr)?;
+                        }
+                        _ => {}
+                    }
+                    args.outputs.finish(ctx.builder(), [ptr.into()])
+                } else {
+                    emit_ptr_op(&cg, ctx, op, args.inputs, args.outputs)
+                }
+            })
+    });
+    assert_eq!(exec_ctx.exec_hugr_panicking(lifecycle(), "main"), message);
+}
+
+#[rstest]
+fn reentrant_map_access_panics(mut exec_ctx: TestContext) {
+    use crate::emit::test::PanicTestPreludeCodegen;
+    configure(&mut exec_ctx);
+    exec_ctx.add_extensions(|b| {
+        b.add_prelude_extensions(PanicTestPreludeCodegen)
+            .add_default_ptr_extensions(PanicTestPreludeCodegen, PanicHeap { fail: false })
+    });
+    let int = int_type(6);
+    let ptr_ty = ptr::ptr_type(int.clone());
+    let hugr = SimpleHugrConfig::new()
+        .with_extensions(STD_REG.to_owned())
+        .finish(|mut b| {
+            let mut mb = b.module_root_builder();
+            let mut callback = mb
+                .define_function(
+                    "reenter",
+                    Signature::new_endo([int.clone(), ptr_ty.clone()]),
+                )
+                .unwrap();
+            let [value, alias] = callback.input_wires_arr();
+            let (alias, _) = callback.add_read_ptr(alias, int.clone()).unwrap();
+            let callback = callback.finish_with_outputs([value, alias]).unwrap();
+            let function = b.load_func(callback.handle(), &[]).unwrap();
+            let value = b.add_load_value(ConstInt::new_u(6, 42).unwrap());
+            let handle = b.add_new_ptr(value).unwrap();
+            let (handle, alias) = b.add_dup_ptr(handle, int.clone()).unwrap();
+            let (handle, aliases) = b
+                .add_map_ptr(handle, function, int.clone(), [alias], [ptr_ty])
+                .unwrap();
+            let a = b.add_free_ptr(handle, int.clone()).unwrap();
+            let c = b.add_free_ptr(aliases[0], int).unwrap();
+            b.set_order(&a.node(), &c.node());
+            b.finish_hugr_with_outputs([]).unwrap()
+        });
+    assert_eq!(
+        exec_ctx.exec_hugr_panicking(hugr, "main"),
+        "Pointer cell is already locked"
+    );
 }

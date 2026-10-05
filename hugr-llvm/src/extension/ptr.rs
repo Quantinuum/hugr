@@ -3,13 +3,15 @@
 //! Register [`PtrCodegenExtension`] with a [`PtrCodegen`] implementation that owns
 //! creation, duplication, final extraction and storage reclamation. The backend
 //! may emit reference-count arithmetic or delegate ownership to a runtime.
-//! [`DefaultPtrCodegen`] uses libc `malloc`/`free`, an LLVM-managed count and no-op
-//! locks. Concurrent targets must choose a backend that supplies synchronization.
+//! [`DefaultPtrCodegen`] uses configurable array heap operations, an LLVM-managed count
+//! and checked, non-atomic lock state. Concurrent targets must choose a backend
+//! that supplies synchronization.
 //!
 //! `Read`, `Write`, `Swap` and `Map` lock the handle, project only the stored value,
 //! then unlock it after accesses end. `Map` holds the lock throughout its callback.
-//! Callbacks must not access the same cell through another handle: this can deadlock
-//! a non-reentrant mutex or access a linear value already owned by the callback.
+//! Reentrant access through another handle panics in the default backend. Custom
+//! backends must also reject reentrant access rather than expose the linear value
+//! already owned by the callback.
 //! A callback that does not return normally does not unlock the cell.
 //!
 //! `New`, `Dup` and `Free` delegate their complete ownership transitions to the
@@ -21,6 +23,7 @@
 use anyhow::{Result, anyhow, bail};
 use hugr_core::{
     HugrView, Node,
+    extension::prelude::ConstError,
     extension::{prelude::option_type, simple_op::MakeExtensionOp},
     ops::Value,
     std_extensions::ptr::{self, PtrOp, PtrOpDef},
@@ -28,16 +31,15 @@ use hugr_core::{
 };
 use inkwell::{
     IntPredicate,
+    context::Context,
     types::{BasicType, BasicTypeEnum, StructType},
     values::{BasicValueEnum, IntValue, PointerValue},
 };
 
 use crate::{
     CodegenExtension, CodegenExtsBuilder,
-    emit::{
-        EmitFuncContext, RowPromise, deaggregate_call_result, emit_value,
-        libc::{emit_libc_abort, emit_libc_free, emit_libc_malloc},
-    },
+    emit::{EmitFuncContext, RowPromise, deaggregate_call_result, emit_value},
+    extension::{PreludeCodegen, collections::array::ArrayCodegen},
 };
 
 /// A complete backend for pointer storage, ownership and synchronization.
@@ -53,14 +55,7 @@ use crate::{
 /// the builder at the end of an unterminated basic block. Runtime failure must
 /// terminate execution rather than return a consumed or invalid handle.
 ///
-/// Use [`DefaultPtrCodegen`] for the complete libc backend. Partial implementations
-/// are rejected rather than inheriting storage or ownership behavior:
-///
-/// ```compile_fail,E0046
-/// #[derive(Clone)]
-/// struct Incomplete;
-/// impl hugr_llvm::extension::ptr::PtrCodegen for Incomplete {}
-/// ```
+/// Use [`DefaultPtrCodegen`] for the concrete counted-storage backend.
 pub trait PtrCodegen: Clone {
     /// Create one owner and transfer `value` into live, correctly aligned storage.
     /// Initialize any ownership metadata and synchronization before returning.
@@ -124,21 +119,32 @@ pub trait PtrCodegen: Clone {
     ) -> Result<()>;
 }
 
-/// Complete libc backend with an LLVM-managed `u64` count and no-op locking.
+/// Counted-storage backend using supplied heap operations and panic lowering.
 ///
-/// Storage holds the count followed by the value. Allocation failure and count
-/// overflow abort. Libc allocation must provide the value's required alignment.
-/// This backend requires that accesses to a cell do not execute concurrently.
+/// Storage holds a count, checked lock state and the value. The supplied array
+/// codegen controls allocation/free, and must provide the value's alignment.
+/// Allocation failure, count overflow and invalid lock transitions panic through
+/// the supplied prelude codegen. Lock state detects reentrant access; it provides
+/// no synchronization, so this backend requires sequential execution per cell.
 #[derive(Clone, Debug, Default)]
-pub struct DefaultPtrCodegen;
-impl PtrCodegen for DefaultPtrCodegen {
+pub struct DefaultPtrCodegen<PCG, ACG> {
+    prelude: PCG,
+    heap: ACG,
+}
+impl<PCG: PreludeCodegen, ACG: ArrayCodegen> DefaultPtrCodegen<PCG, ACG> {
+    /// Use the same heap and panic implementations selected for other extensions.
+    pub fn new(prelude: PCG, heap: ACG) -> Self {
+        Self { prelude, heap }
+    }
+}
+impl<PCG: PreludeCodegen, ACG: ArrayCodegen> PtrCodegen for DefaultPtrCodegen<PCG, ACG> {
     fn emit_new<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         value: BasicValueEnum<'c>,
     ) -> Result<PointerValue<'c>> {
-        let layout = counted_layout(ctx, value.get_type());
-        let ptr = emit_alloc_checked(ctx, layout)?;
+        let layout = counted_layout(ctx.iw_context(), value.get_type());
+        let ptr = emit_alloc_checked(ctx, &self.heap, &self.prelude, layout)?;
         emit_counted_init(ctx, ptr, value)?;
         Ok(ptr)
     }
@@ -151,7 +157,7 @@ impl PtrCodegen for DefaultPtrCodegen {
     ) -> Result<()> {
         self.emit_lock(ctx, ptr)?;
         let (count, _) = counted_fields(ctx, ptr, value_ty)?;
-        emit_counted_dup(ctx, count)?;
+        emit_counted_dup(ctx, &self.prelude, count)?;
         self.emit_unlock(ctx, ptr)
     }
 
@@ -166,7 +172,7 @@ impl PtrCodegen for DefaultPtrCodegen {
         let (count, value) = counted_fields(ctx, ptr, value_ty)?;
         let last = emit_counted_take(ctx, count, value, value_ty, destination)?;
         self.emit_unlock(ctx, ptr)?;
-        emit_free_if_last(ctx, ptr, last)?;
+        emit_free_if_last(ctx, &self.heap, ptr, last)?;
         Ok(last)
     }
 
@@ -181,40 +187,72 @@ impl PtrCodegen for DefaultPtrCodegen {
 
     fn emit_lock<'c, H: HugrView<Node = Node>>(
         &self,
-        _ctx: &mut EmitFuncContext<'c, '_, H>,
-        _ptr: PointerValue<'c>,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        ptr: PointerValue<'c>,
     ) -> Result<()> {
+        let flag = lock_field(ctx, ptr)?;
+        let locked = ctx
+            .builder()
+            .build_load(ctx.iw_context().bool_type(), flag, "ptr.locked")?
+            .into_int_value();
+        panic_if(ctx, &self.prelude, locked, "Pointer cell is already locked")?;
+        ctx.builder()
+            .build_store(flag, ctx.iw_context().bool_type().const_int(1, false))?;
         Ok(())
     }
-
     fn emit_unlock<'c, H: HugrView<Node = Node>>(
         &self,
-        _ctx: &mut EmitFuncContext<'c, '_, H>,
-        _ptr: PointerValue<'c>,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        ptr: PointerValue<'c>,
     ) -> Result<()> {
+        let flag = lock_field(ctx, ptr)?;
+        let locked = ctx
+            .builder()
+            .build_load(ctx.iw_context().bool_type(), flag, "ptr.locked")?
+            .into_int_value();
+        let unlocked = ctx.builder().build_not(locked, "")?;
+        panic_if(ctx, &self.prelude, unlocked, "Pointer cell is not locked")?;
+        ctx.builder()
+            .build_store(flag, ctx.iw_context().bool_type().const_zero())?;
         Ok(())
     }
 }
 
-// Counted-storage helpers belong to the concrete backend, not emit_ptr_op.
-fn counted_layout<'c, H: HugrView<Node = Node>>(
+fn lock_field<'c, H: HugrView<Node = Node>>(
     ctx: &EmitFuncContext<'c, '_, H>,
-    value_ty: BasicTypeEnum<'c>,
-) -> StructType<'c> {
-    ctx.iw_context()
-        .struct_type(&[ctx.iw_context().i64_type().into(), value_ty], false)
+    ptr: PointerValue<'c>,
+) -> Result<PointerValue<'c>> {
+    // The lock field has a fixed offset independent of the stored value type.
+    let header = ctx.iw_context().struct_type(
+        &[
+            ctx.iw_context().i64_type().into(),
+            ctx.iw_context().bool_type().into(),
+        ],
+        false,
+    );
+    Ok(ctx.builder().build_struct_gep(header, ptr, 1, "ptr.lock")?)
+}
+
+// Counted-storage helpers belong to the concrete backend, not emit_ptr_op.
+fn counted_layout<'c>(ctx: &'c Context, value_ty: BasicTypeEnum<'c>) -> StructType<'c> {
+    ctx.struct_type(
+        &[ctx.i64_type().into(), ctx.bool_type().into(), value_ty],
+        false,
+    )
 }
 
 fn emit_alloc_checked<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
+    heap: &impl ArrayCodegen,
+    prelude: &impl PreludeCodegen,
     layout: impl BasicType<'c>,
 ) -> Result<PointerValue<'c>> {
     let size = layout
         .size_of()
         .ok_or_else(|| anyhow!("Unsized pointer storage"))?;
-    let ptr = emit_libc_malloc(ctx, size.into())?.into_pointer_value();
+    let ptr = heap.emit_allocate_array(ctx, size)?;
     let failed = ctx.builder().build_is_null(ptr, "ptr.alloc.failed")?;
-    abort_if(ctx, failed)?;
+    panic_if(ctx, prelude, failed, "Pointer allocation failed")?;
     Ok(ptr)
 }
 
@@ -223,12 +261,12 @@ fn counted_fields<'c, H: HugrView<Node = Node>>(
     payload: PointerValue<'c>,
     value_ty: BasicTypeEnum<'c>,
 ) -> Result<(PointerValue<'c>, PointerValue<'c>)> {
-    let layout = counted_layout(ctx, value_ty);
+    let layout = counted_layout(ctx.iw_context(), value_ty);
     Ok((
         ctx.builder()
             .build_struct_gep(layout, payload, 0, "ptr.count")?,
         ctx.builder()
-            .build_struct_gep(layout, payload, 1, "ptr.value")?,
+            .build_struct_gep(layout, payload, 2, "ptr.value")?,
     ))
 }
 
@@ -240,12 +278,16 @@ fn emit_counted_init<'c, H: HugrView<Node = Node>>(
     let (count, value_ptr) = counted_fields(ctx, payload, value.get_type())?;
     ctx.builder()
         .build_store(count, ctx.iw_context().i64_type().const_int(1, false))?;
+    let flag = lock_field(ctx, payload)?;
+    ctx.builder()
+        .build_store(flag, ctx.iw_context().bool_type().const_zero())?;
     ctx.builder().build_store(value_ptr, value)?;
     Ok(())
 }
 
 fn emit_counted_dup<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
+    prelude: &impl PreludeCodegen,
     count_ptr: PointerValue<'c>,
 ) -> Result<()> {
     let ty = ctx.iw_context().i64_type();
@@ -259,7 +301,7 @@ fn emit_counted_dup<'c, H: HugrView<Node = Node>>(
         ty.const_all_ones(),
         "ptr.refcount.overflow",
     )?;
-    abort_if(ctx, overflow)?;
+    panic_if(ctx, prelude, overflow, "Pointer reference count overflow")?;
     let count = ctx
         .builder()
         .build_int_add(count, ty.const_int(1, false), "")?;
@@ -301,6 +343,7 @@ fn emit_counted_take<'c, H: HugrView<Node = Node>>(
 
 fn emit_free_if_last<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
+    heap: &impl ArrayCodegen,
     ptr: PointerValue<'c>,
     last: IntValue<'c>,
 ) -> Result<()> {
@@ -308,7 +351,7 @@ fn emit_free_if_last<'c, H: HugrView<Node = Node>>(
     let exit = ctx.new_basic_block("ptr.released", None);
     ctx.builder().build_conditional_branch(last, free, exit)?;
     ctx.builder().position_at_end(free);
-    emit_libc_free(ctx, ptr.into())?;
+    heap.emit_free_array(ctx, ptr)?;
     ctx.builder().build_unconditional_branch(exit)?;
     ctx.builder().position_at_end(exit);
     Ok(())
@@ -351,8 +394,13 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
         self.add_extension(PtrCodegenExtension::new(ccg))
     }
     /// Register pointer lowering with [`DefaultPtrCodegen`].
-    pub fn add_default_ptr_extensions(self) -> Self {
-        self.add_ptr_extensions(DefaultPtrCodegen)
+    #[must_use]
+    pub fn add_default_ptr_extensions(
+        self,
+        prelude: impl PreludeCodegen + 'a,
+        heap: impl ArrayCodegen + 'a,
+    ) -> Self {
+        self.add_ptr_extensions(DefaultPtrCodegen::new(prelude, heap))
     }
 }
 impl<CCG: PtrCodegen> CodegenExtension for PtrCodegenExtension<CCG> {
@@ -374,13 +422,25 @@ impl<CCG: PtrCodegen> CodegenExtension for PtrCodegenExtension<CCG> {
     }
 }
 
-fn abort_if<H: HugrView<Node = Node>>(ctx: &mut EmitFuncContext<H>, cond: IntValue) -> Result<()> {
-    let failed = ctx.new_basic_block("ptr.abort", None);
+fn panic_if<H: HugrView<Node = Node>>(
+    ctx: &mut EmitFuncContext<H>,
+    prelude: &impl PreludeCodegen,
+    cond: IntValue,
+    message: &str,
+) -> Result<()> {
+    let failed = ctx.new_basic_block("ptr.panic", None);
     let success = ctx.new_basic_block("ptr.continue", None);
     ctx.builder()
         .build_conditional_branch(cond, failed, success)?;
     ctx.builder().position_at_end(failed);
-    emit_libc_abort(ctx)?;
+    let err = prelude.emit_const_error(
+        ctx,
+        &ConstError {
+            signal: 2,
+            message: message.to_owned(),
+        },
+    )?;
+    prelude.emit_panic(ctx, err)?;
     ctx.builder().build_unreachable()?;
     ctx.builder().position_at_end(success);
     Ok(())
