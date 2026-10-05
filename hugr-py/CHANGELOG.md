@@ -1,5 +1,12 @@
 # Changelog
 
+## [0.18.8](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.7...hugr-py-v0.18.8) (2026-10-05)
+
+
+### Features
+
+* Add `arithmetic.math` to standard extension registry ([#3291](https://github.com/Quantinuum/hugr/issues/3291)) ([9cf29ad](https://github.com/Quantinuum/hugr/commit/9cf29adcde3af6cc70a117bc797137e73e744f55))
+
 ## [0.18.7](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.6...hugr-py-v0.18.7) (2026-10-01)
 
 
