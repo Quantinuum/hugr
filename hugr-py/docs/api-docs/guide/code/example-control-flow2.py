@@ -19,11 +19,11 @@ data = circ.add(quantum.qAlloc())
 # the `Break` case in the case of success, each carrying a qubit.
 either_ty = tys.Either([tys.Qubit], [tys.Qubit])
 
-# The first argument to the tail loop builder is a list of wires that are only inputs,
+# The first argument to the tail loop builder is a list of wires that are only inputs;
 # the second argument is a list of wires that are both inputs and outputs of the loop.
 with circ.add_tail_loop([data], []) as loop:
     [loop_data] = loop.inputs()
-    # Allocate a fresh ancilla each loop and entangle it with the data qubit.
+    # Allocate a fresh ancilla in each iteration and entangle it with the data qubit.
     ancilla = loop.add(quantum.qAlloc())
     ancilla = loop.add(quantum.H(ancilla))
     loop_data, ancilla = loop.add(quantum.CX(loop_data, ancilla))
@@ -32,7 +32,7 @@ with circ.add_tail_loop([data], []) as loop:
     result = loop.add(measure.read(measurement))
 
     # Same conditional as before, but this time tag the output qubit in order to
-    # use it in the loop condition which decided whether to do another iteration.
+    # use it in the loop condition which decides whether to do another iteration.
     with loop.add_if(result, loop_data) as if_:
         flipped = if_.add(quantum.X(if_.input_node[0]))
         tagged_cont = if_.add(ops.Break(either_ty)(flipped))
@@ -49,7 +49,7 @@ with circ.add_tail_loop([data], []) as loop:
 # Set the final loop output as the output of the DFG.
 circ.set_outputs(*loop.outputs())
 
-# Validation and visualisation.
+# Validation and visualization.
 package = Package(modules=[circ.hugr], extensions=tket_exts.tket_registry().extensions)
 cli.validate(package.to_bytes())
 

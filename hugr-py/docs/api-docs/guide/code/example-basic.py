@@ -9,7 +9,7 @@ from hugr.package import Package
 quantum = ext.quantum
 measure = ext.measurement
 
-# Initialise a DFG (dataflow graph) that is able to track wires by indices.
+# Initialize a DFG (dataflow graph) that is able to track wires by indices.
 circ = TrackedDfg()
 
 # Add operations that allocate qubits and track the resulting wires.
@@ -26,7 +26,7 @@ circ.extend(quantum.measure_free(0), measure.read(0))
 # Connect all tracked wires to the output of the DFG.
 circ.set_tracked_outputs()
 
-# Validation and visualisation.
+# Validation and visualization.
 package = Package(modules=[circ.hugr], extensions=tket_exts.tket_registry().extensions)
 cli.validate(package.to_bytes())
 

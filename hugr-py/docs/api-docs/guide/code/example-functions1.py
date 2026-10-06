@@ -59,7 +59,7 @@ with circ.add_tail_loop([data], []) as loop:
 
 circ.set_outputs(*loop.outputs())
 
-# Validation and visualisation.
+# Validation and visualization.
 package = Package(modules=[circ.hugr], extensions=tket_exts.tket_registry().extensions)
 cli.validate(package.to_bytes())
 
