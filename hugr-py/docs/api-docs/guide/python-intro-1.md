@@ -170,6 +170,7 @@ with circ.add_tail_loop([data], []) as loop:
 We now build the same conditional again, but instead of simply setting the qubit as its output, we tag it by using `Break` or `Continue` operations (which are convenient ways in the standard library for constructing `Right` and `Left` tags):
 
 ```py
+# Inside the loop context:
 with loop.add_if(result, loop_data) as if_:
     flipped = if_.add(quantum.X(if_.input_node[0]))
     tagged_cont = if_.add(ops.Break(either_ty)(flipped))
@@ -182,6 +183,7 @@ with if_.add_else() as else_:
 Finally, set the loop outputs to be the output of the conditional, and the DFG outputs to be the output of the loop and the graph is done!
 
 ```py
+# Inside the loop context:
 loop.set_loop_outputs(if_.conditional_node[0])
 ```
 
@@ -220,10 +222,10 @@ Now they can be used from inside the DFG, through call nodes. Note that we alway
 
 ```py
 ...
-# Inside the loop builder:
+# Inside the loop context:
 loop_data, ancilla = loop.call(prepare.parent_node, loop_data, ancilla)
 ...
-# Inside the if branch:
+# Inside the if branch context:
 flipped = if_.call(correct.parent_node, if_.input_node[0])
 ...
 ```
@@ -236,6 +238,79 @@ One final HUGR feature we will look at in this introduction is polymorphism: the
 
 To demonstrate this, let's add a `correct_all` function which operates on an array of qubits instead of only one qubit, and applies an `X` gate to all of them.
 
-[TODO: Finish code, diagram, and text for polymorphic example]
+In contrast to the TKET extension we have used so far, the array extension does not provide a Python interface that allows us to use its operations directly. 
+
+```py
+def new_array_op(elem_ty: tys.Type, length: int) -> ops.ExtOp:
+    length_arg = tys.BoundedNatArg(length)
+    elem_arg = tys.TypeTypeArg(elem_ty)
+    arr_ty = Array(elem_ty, length)
+    return ARRAY_EXTENSION.get_op("new_array").instantiate(
+        [length_arg, elem_arg], tys.FunctionType([elem_ty] * length, [arr_ty])
+    )
+```
+
+```py
+def array_scan_op(
+    elem_ty: tys.Type, new_elem_ty: tys.Type, length: int | tys.TypeArg
+) -> ops.ExtOp:
+    length_arg = tys.BoundedNatArg(length) if isinstance(length, int) else length
+    ty_args = [
+        length_arg,
+        tys.TypeTypeArg(elem_ty),
+        tys.TypeTypeArg(new_elem_ty),
+        tys.ListArg([]),
+    ]
+    ins = [Array(elem_ty, length_arg), tys.FunctionType([elem_ty], [new_elem_ty])]
+    outs = [Array(new_elem_ty, length_arg)]
+    return ARRAY_EXTENSION.get_op("scan").instantiate(
+        ty_args, tys.FunctionType(ins, outs)
+    )
+```
+
+```py
+def array_unpack_op(elem_ty: tys.Type, length: int) -> ops.ExtOp:
+    length_arg = tys.BoundedNatArg(length)
+    elem_arg = tys.TypeTypeArg(elem_ty)
+    arr_ty = Array(elem_ty, length)
+    return ARRAY_EXTENSION.get_op("unpack").instantiate(
+        [length_arg, elem_arg], tys.FunctionType([arr_ty], [elem_ty] * length)
+    )
+```
+
+```py
+n_param = tys.BoundedNatParam()
+
+with module.define_function(
+    "correct_all",
+    [Array(tys.Qubit, tys.VariableArg(0, n_param))],
+    type_params=[n_param],
+) as correct_all:
+    (qs,) = correct_all.inputs()
+    correct_fn = correct_all.load_function(correct.parent_node)
+    qs = correct_all.add_op(
+        array_scan_op(tys.Qubit, tys.Qubit, tys.VariableArg(0, n_param)), qs, correct_fn
+    )
+    correct_all.set_outputs(qs)
+```
+
+```py
+one_qubit_arr_ty = Array(tys.Qubit, 1)
+
+arr = if_.add_op(new_array_op(tys.Qubit, 1), if_.input_node[0])
+arr = if_.call(
+    correct_all.parent_node,
+    arr,
+    instantiation=tys.FunctionType([one_qubit_arr_ty], [one_qubit_arr_ty]),
+    type_args=[tys.BoundedNatArg(1)],
+)
+(flipped,) = if_.add_op(array_unpack_op(tys.Qubit, 1), arr)
+
+tagged_cont = if_.add(ops.Break(either_ty)(flipped))
+if_.set_outputs(tagged_cont)
+```
+
+
+![](images/functions2.svg)
 
 You can see the full example code [here](code/example-functions2.py).

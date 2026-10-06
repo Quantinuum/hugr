@@ -15,13 +15,14 @@ circ = TrackedDfg()
 module = circ.module_root_builder()
 
 # Define the quantum functions that will be used within the loop.
+# If output types are not provided, they can be inferred after the function is built.
 with module.define_function("prepare", [tys.Qubit, tys.Qubit]) as prepare:
     # As with other subgraphs, we first retrieve the input wires.
     p_data, p_ancilla = prepare.inputs()
     # Add the operations to the function body.
     p_ancilla = prepare.add(quantum.H(p_ancilla))
     p_data, p_ancilla = prepare.add(quantum.CX(p_data, p_ancilla))
-    # As with other subgrapghs, we set the outputs at the end of the function.
+    # As with other subgraphs, we set the outputs at the end of the function.
     prepare.set_outputs(p_data, p_ancilla)
 
 with module.define_function("correct", [tys.Qubit]) as correct:
@@ -29,7 +30,7 @@ with module.define_function("correct", [tys.Qubit]) as correct:
     c_data = correct.add(quantum.X(c_data))
     correct.set_outputs(c_data)
 
-# Then build the tail loop as before.
+# Build the tail loop as before.
 data = circ.add(quantum.qAlloc())
 either_ty = tys.Either([tys.Qubit], [tys.Qubit])
 
