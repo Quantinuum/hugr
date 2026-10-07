@@ -2,6 +2,11 @@
 
 The goal of this guide is to give a practical introduction to constructing HUGR graphs using the Python interface, demonstrating how various HUGR features lend themselves well to representing quantum algorithms.
 
+To follow along with the examples, you will need to install `hugr` and `tket` in your environment:
+```
+pip install hugr tket
+```
+
 ## Translating a basic circuit into HUGR
 
 Consider this circuit that constructs a Bell pair from two qubits and then measures one of them.
@@ -29,7 +34,7 @@ Visualizing the HUGR results in the following diagram:
 
 ![](images/basic1.svg)
 
-> You can visualize HUGRs by using the `render_dot()` method.
+> You can visualize HUGRs by using the `render_dot()` method. Calling `circ.render_dot()` will give you a graphviz Digraph which you can input into your preferred graphviz viewer to see the graph.
 
 While we haven't added any nodes to the graph ourselves yet, we can already notice the similarity between dataflow graph edges of type `Qubit` and wires in a circuit representing qubit values.
 
@@ -67,7 +72,7 @@ Of course a HUGR is more general than a circuit, with nodes and edges able to re
 
 An important concept for types in HUGR is **linearity**. All types in HUGR are either linear or copyable. Linear values are values that need to be used exactly once, so they cannot be dropped or copied. In terms of the graph, this means that output ports of linear types must have exactly one edge connecting them to the input port of another node. The principal example of a linear type is the qubit. Here linearity expresses the no-clone and no-delete properties of qubits.
 
-We can demonstrate this concept by looking at the outputs of our DFG. As mentioned before, `set_tracked_outputs()` connects all wires to the output automatically. If we instead set the outputs manually by index, we need to be careful not to drop any linear values. For example, if we connected only the first wire using `circ.set_indexed_outputs(0)` and then tried to validate the resulting HUGR, we would get the following error, as `Qubit` is a linear type:
+We can demonstrate this concept by looking at the outputs of our DFG. As mentioned before, `set_tracked_outputs()` connects all wires to the output automatically. If we instead set the outputs manually by index, we need to be careful not to drop any linear values. For example, if we connected only the first wire using `circ.set_indexed_outputs(0)` and then tried to validate the resulting HUGR, we would get an error, as `Qubit` is a linear type:
 
 ```
 hugr._hugr.model.HugrCliError: Error validating HUGR.
@@ -77,11 +82,19 @@ Caused by:
     1: Node(8) has an unconnected port Port(Outgoing, 1) of type qubit.
 ```
 
-> You can validate HUGRs either using the CLI tool or by calling `hugr.cli.validate` with a package containing the module you want to check.
+To validate a HUGR, we first need to package it up in order to serialize it (passing any used extensions; `tket_registry()` is a useful collection of extensions commonly requires in quantum HUGRs). It can then be validated through `cli.validate():`
+
+```py
+from hugr import cli
+import tket_exts
+
+package = Package(modules=[circ.hugr], extensions=tket_exts.tket_registry().extensions)
+cli.validate(package.to_bytes())
+```
 
 If we only connected the second wire, with `circ.set_indexed_outputs(1)`, the HUGR would be valid, as `Bool` is a copyable type that can be dropped.
 
-> For debugging this kind of validation error visually, it may be useful to pass a `RenderConfig` with `display_node_id` set to `True` to `render_dot`.
+> In order to see node identifiers in the graph visualization (which can help with debugging errors such as the one above) you can pass a `RenderConfig` to `render_dot()`. A `RenderConfig` can take various flags that will configure the renderer: in this case you want to set `display_node_id` to `True`.
 
 It was mentioned earlier that for this HUGR to be executable, the `main` entrypoint must not have any inputs. Let's ensure this by allocating the qubits instead of accepting them as inputs. We will now also assign and pass around some wires directly as variables instead of using indices.
 
@@ -134,7 +147,7 @@ with if_.add_else() as else_:
 circ.set_outputs(if_.conditional_node[0])
 ```
 
-It is possible to not use context managers and instead assign the results of `add_if` and `add_else` to builder variables (and then it is also possible to convert those builders into tracked versions). However using `with` blocks is a useful way of keeping track of the hierarchy, as each block represents a new subgraph inside a node in the dataflow graph, visualized here as new regions:
+Using `with` blocks is a useful way of keeping track of the hierarchy, as each block represents a new subgraph inside a node in the dataflow graph, visualized here as new regions:
 
 ![](images/control-flow1.svg)
 
@@ -150,7 +163,9 @@ Tail loops decide whether to keep iterating or exit the loop based on a **sum ty
 either_ty = tys.Either([tys.Qubit], [tys.Qubit])
 ```
 
-We can now add the loop node, with the data qubit being allocated once before we start iterating and the ancilla allocation and state preparation happening inside the loop:
+For this next example we will add a tail loop around a conditional. Inside the loop we will prepare the Bell state as we've done before, and then decide whether to keep iterating or not based on the outcome of the conditional: either the measurement is successful, we correct the qubit and exit the loop, or it isn't and we keep iterating.
+
+We start by adding the tail loop builder. The data qubit is allocated once before we start iterating, while ancilla allocation and state preparation get repeated inside the loop:
 
 ```py
 from hugr import ops
@@ -167,7 +182,7 @@ with circ.add_tail_loop([data], []) as loop:
     result = loop.add(measure.read(measurement))
 ```
 
-We now build the same conditional again, but instead of simply setting the qubit as its output, we tag it by using `Break` or `Continue` operations (which are convenient ways in the standard library for constructing `Right` and `Left` tags):
+We now build the same conditional as in the previous example, but instead of simply setting the qubit as its output, we tag it by using `Break` or `Continue` operations (which are convenient ways in the standard library for constructing `Right` and `Left` tags):
 
 ```py
 # Inside the loop context:
@@ -309,7 +324,7 @@ with module.define_function(
     correct_all.set_outputs(qs)
 ```
 
-To finish this example, we now just need to replace the `if` branch of the conditional. We create a new array of length 1 containing the qubit we intend to correct, pass this array to the `correct_all` function and then unpack the resulting array to get a single qubit again. As `correct_all` is polymorphic, we need to pass a concrete function signature and the type argument instantiating the parameter in the signature to it:
+To finish this example, we now just need to replace the `if` branch of the conditional. We create a new array of length `1` containing the qubit we intend to correct, pass this array to the `correct_all` function and then unpack the resulting array to get a single qubit again. As `correct_all` is polymorphic, we need to pass a concrete function signature and the type argument instantiating the parameter in the signature to the `call` operation:
 
 ```py
 one_qubit_arr_ty = Array(tys.Qubit, 1)
