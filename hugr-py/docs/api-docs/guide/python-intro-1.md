@@ -57,7 +57,7 @@ measure = ext.measurement
 circ.extend(quantum.measure_free(0), measure.read(0))
 ```
 
- Connecting the outputs as before with `set_tracked_outputs()` to finish, we now get the following graph:
+Connecting the outputs as before with `set_tracked_outputs()` to finish, we now get the following graph:
 
 ![](images/basic2.svg)
 
@@ -81,7 +81,7 @@ Caused by:
 
 If we only connected the second wire, with `circ.set_indexed_outputs(1)`, the HUGR would be valid, as `Bool` is a copyable type that can be dropped.
 
-> For debugging this kind of validation error visually, it may be be useful to pass a `RenderConfig` with `display_node_id` set to `True` to `render_dot`.
+> For debugging this kind of validation error visually, it may be useful to pass a `RenderConfig` with `display_node_id` set to `True` to `render_dot`.
 
 It was mentioned earlier that for this HUGR to be executable, the `main` entrypoint must not have any inputs. Let's ensure this by allocating the qubits instead of accepting them as inputs. We will now also assign and pass around some wires directly as variables instead of using indices.
 
@@ -144,7 +144,7 @@ More complex control flow is present in repeat-until-success algorithms, where w
 
 This can be represented in HUGR with a `TailLoop` node.
 
-Tail loops decide whether to keep iterating or exit the loop based on a **sum type** value. Sum types are types whose values belong to exactly one of several variants, with each value consisting of a tag signifying which variant it is, plus whatever data the variant carries. For example, the `Bool` type in HUGR is a sum of two unit variants (with the unit type having only a single value). A more general two-variant sum type is `Either`, with `Left` and `Right` tags which can carry some data. In the example below we will use this type as the  condition for our loop, carrying a qubit as data in both cases:
+Tail loops decide whether to keep iterating or exit the loop based on a **sum type** value. Sum types are types whose values belong to exactly one of several variants, with each value consisting of a tag signifying which variant it is, plus whatever data the variant carries. For example, the `Bool` type in HUGR is a sum of two unit variants (with the unit type having only a single value). A more general two-variant sum type is `Either`, with `Left` and `Right` tags which can carry some data. In the example below we will use this type as the condition for our loop, carrying a qubit as data in both cases:
 
 ```py
 either_ty = tys.Either([tys.Qubit], [tys.Qubit])
@@ -173,12 +173,12 @@ We now build the same conditional again, but instead of simply setting the qubit
 # Inside the loop context:
 with loop.add_if(result, loop_data) as if_:
     flipped = if_.add(quantum.X(if_.input_node[0]))
-    tagged_cont = if_.add(ops.Break(either_ty)(flipped))
-    if_.set_outputs(tagged_cont)
+    tagged_break = if_.add(ops.Break(either_ty)(flipped))
+    if_.set_outputs(tagged_break)
 
 with if_.add_else() as else_:
-    tagged_break = else_.add(ops.Continue(either_ty)(else_.input_node[0]))
-    else_.set_outputs(tagged_break)
+    tagged_cont = else_.add(ops.Continue(either_ty)(else_.input_node[0]))
+    else_.set_outputs(tagged_cont)
 ```
 Finally, set the loop outputs to be the output of the conditional, and the DFG outputs to be the output of the loop and the graph is done!
 
@@ -234,11 +234,20 @@ flipped = if_.call(correct.parent_node, if_.input_node[0])
 
 We can use this same pattern to define more complicated and useful preparation and correction gadgets in those functions.
 
-One final HUGR feature we will look at in this introduction is polymorphism: the ability to define functions that work for different types or parameters.
+One final HUGR feature we will look at in this introduction is **polymorphism**: the ability to define functions that work for different types or parameters.
 
 To demonstrate this, let's add a `correct_all` function which operates on an array of qubits instead of only one qubit, and applies an `X` gate to all of them.
 
-In contrast to the TKET extension we have used so far, the array extension does not provide a Python interface that allows us to use its operations directly. 
+For this we will need the array extension, which can be found as part of the standard collections libraries in HUGR:
+
+```py
+from hugr.std.collections.array import EXTENSION as ARRAY_EXTENSION
+from hugr.std.collections.array import Array
+```
+
+In contrast to the TKET extensions we have used so far, the array extension does not provide a Python interface that allows us to use its operations directly (it does have a Python wrapper for the type, `Array`). Instead we have to retrieve any operations we require by name. As the array type is generic in type and length, we also need to instantiate each of its generic operation definitions with type arguments. For this it is useful to create wrapper functions which take a type and integer and return a concrete array operation.
+
+The `new_array` operation allows us to create a new array. After getting the operation definition through `get_op()`, we instantiate it by passing arguments for each type parameter and a concrete function type signature to `instantiate()`. Note how we pass a `BoundedNatArg` to represent the length of this array and a `TypeTypeArg` to represent the element type:
 
 ```py
 def new_array_op(elem_ty: tys.Type, length: int) -> ops.ExtOp:
@@ -249,6 +258,8 @@ def new_array_op(elem_ty: tys.Type, length: int) -> ops.ExtOp:
         [length_arg, elem_arg], tys.FunctionType([elem_ty] * length, [arr_ty])
     )
 ```
+
+The `scan` operation allows us to map a function over the whole array. This means we need to pass arguments for both the initial element type and the new element type after the function has been applied (there is also the option to accumulate values, however we will leave the accumulator argument empty in this example). We allow both an integer or a `TypeArg` for the length in this case for convenience:
 
 ```py
 def array_scan_op(
@@ -268,6 +279,8 @@ def array_scan_op(
     )
 ```
 
+The final operation we will require is `unpack`, which splits an array back into its individual elements. This also consumes the array, which is something we have to keep in mind as arrays in HUGR are linear regardless of element type:
+
 ```py
 def array_unpack_op(elem_ty: tys.Type, length: int) -> ops.ExtOp:
     length_arg = tys.BoundedNatArg(length)
@@ -277,6 +290,8 @@ def array_unpack_op(elem_ty: tys.Type, length: int) -> ops.ExtOp:
         [length_arg, elem_arg], tys.FunctionType([arr_ty], [elem_ty] * length)
     )
 ```
+
+We now define another function on the module, `correct_all`. It not only takes a name and input types, but also requires a parameter, making it polymorphic. We can utilize this parameter in the type signature by creating a type variable `VariableArg` that refers to the parameter with de Bruijn indices (since we only have one in this case, this is just 0 here). Inside of the function block we load the `correct` function and apply it to all the elements of the input array using `array_scan_op`:
 
 ```py
 n_param = tys.BoundedNatParam()
@@ -294,6 +309,8 @@ with module.define_function(
     correct_all.set_outputs(qs)
 ```
 
+To finish this example, we now just need to replace the `if` branch of the conditional. We create a new array of length 1 containing the qubit we intend to correct, pass this array to the `correct_all` function and then unpack the resulting array to get a single qubit again. As `correct_all` is polymorphic, we need to pass a concrete function signature and the type argument instantiating the parameter in the signature to it:
+
 ```py
 one_qubit_arr_ty = Array(tys.Qubit, 1)
 
@@ -306,10 +323,9 @@ arr = if_.call(
 )
 (flipped,) = if_.add_op(array_unpack_op(tys.Qubit, 1), arr)
 
-tagged_cont = if_.add(ops.Break(either_ty)(flipped))
-if_.set_outputs(tagged_cont)
+tagged_break = if_.add(ops.Break(either_ty)(flipped))
+if_.set_outputs(tagged_break)
 ```
-
 
 ![](images/functions2.svg)
 

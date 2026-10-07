@@ -49,12 +49,12 @@ with circ.add_tail_loop([data], []) as loop:
     with loop.add_if(result, loop_data) as if_:
         # Instead of adding an X operation here, call the "correct" function.
         flipped = if_.call(correct.parent_node, if_.input_node[0])
-        tagged_cont = if_.add(ops.Break(either_ty)(flipped))
-        if_.set_outputs(tagged_cont)
+        tagged_break = if_.add(ops.Break(either_ty)(flipped))
+        if_.set_outputs(tagged_break)
 
     with if_.add_else() as else_:
-        tagged_break = else_.add(ops.Continue(either_ty)(else_.input_node[0]))
-        else_.set_outputs(tagged_break)
+        tagged_cont = else_.add(ops.Continue(either_ty)(else_.input_node[0]))
+        else_.set_outputs(tagged_cont)
 
     loop.set_loop_outputs(if_.conditional_node[0])
 

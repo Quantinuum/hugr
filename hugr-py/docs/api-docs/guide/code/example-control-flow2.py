@@ -35,12 +35,12 @@ with circ.add_tail_loop([data], []) as loop:
     # use it in the loop condition which decides whether to do another iteration.
     with loop.add_if(result, loop_data) as if_:
         flipped = if_.add(quantum.X(if_.input_node[0]))
-        tagged_cont = if_.add(ops.Break(either_ty)(flipped))
-        if_.set_outputs(tagged_cont)
+        tagged_break = if_.add(ops.Break(either_ty)(flipped))
+        if_.set_outputs(tagged_break)
 
     with if_.add_else() as else_:
-        tagged_break = else_.add(ops.Continue(either_ty)(else_.input_node[0]))
-        else_.set_outputs(tagged_break)
+        tagged_cont = else_.add(ops.Continue(either_ty)(else_.input_node[0]))
+        else_.set_outputs(tagged_cont)
 
     # Set the conditional output (the data qubit tagged with either `Continue` or
     # `Break`).
