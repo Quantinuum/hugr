@@ -43,6 +43,8 @@ However there are also differences. Notably, the HUGR consists of multiple **reg
 - Each module needs at least one function definition that acts as an entrypoint to the graph. (For the module to be executable, the function must take no inputs.) In this case we have a `FuncDefn` node called `main` by default.
 - Finally, the function definition contains the `DFG` we created, so far only containing an input and an output node. Note how each port on a node is indexed and ordered.
 
+### Adding quantum gates
+
 Let's try to further copy the circuit by adding operations representing quantum gates to the graph, using the `add` method. This requires the use of a HUGR **extension**. An extension is a collection of custom types and operations. Here we use the `tket.quantum` extension, which contains common quantum operations.
 
 ```py
@@ -67,6 +69,8 @@ Connecting the outputs as before with `set_tracked_outputs()` to finish, we now 
 ![](images/basic2.svg)
 
 We now have a HUGR representing the circuit described above, with nodes corresponding to gates, and wires corresponding to edges!
+
+### Making sure your HUGR is valid
 
 Of course a HUGR is more general than a circuit, with nodes and edges able to represent classical values and operations too. All nodes and edges in a HUGR are **statically typed**, meaning that edges can only be connected to ports with matching types according to the signature of a node.
 
@@ -119,6 +123,8 @@ You can find the full example code [here](code/example-basic.py).
 
 ## Adding control flow around dynamic measurements
 
+### Conditionals
+
 So far all the data in our HUGR has followed a fixed path through it. What if we now wanted to do something depending on the outcome of a measurement?
 
 We still start with a `TrackedDfg` with no inputs as before. To make it easier to follow what happens with each qubit, let's rename `q0` and `q1` to `data` and `ancilla`, and also give the measurement result a name.
@@ -150,6 +156,8 @@ circ.set_outputs(if_.conditional_node[0])
 Using `with` blocks is a useful way of keeping track of the hierarchy, as each block represents a new subgraph inside a node in the dataflow graph, visualized here as new regions:
 
 ![](images/control-flow1.svg)
+
+### Loops
 
 More complex control flow is present in repeat-until-success algorithms, where we need to prepare a state over and over again until it satisfies a certain condition.
 
@@ -212,6 +220,8 @@ You can find the full example code [here](code/example-control-flow2.py).
 
 ## Generalizing through functions and polymorphism
 
+### Functions
+
 You might want to generalize the loop we constructed to work for different `prepare` and `correct` sequences. Or you might want to avoid adding the same gate sequences repeatedly to a graph. The best way to do this is by using **functions**.
 
 Functions can be defined as children of the module node using `define_function()`, alongside the `main` function we have already seen. The method takes a function name and type signature and returns a builder, to which we can add nodes, just as we have done with DFG, conditional, or loop builders.
@@ -248,6 +258,8 @@ flipped = if_.call(correct.parent_node, if_.input_node[0])
 ![](images/functions1.svg)
 
 We can use this same pattern to define more complicated and useful preparation and correction gadgets in those functions.
+
+### Polymorphism
 
 One final HUGR feature we will look at in this introduction is **polymorphism**: the ability to define functions that work for different types or parameters.
 
