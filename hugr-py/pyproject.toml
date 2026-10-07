@@ -71,3 +71,9 @@ profile = "release-py"
 [tool.pyright]
 # Rust bindings have typing stubs but no python source code.
 reportMissingModuleSource = "none"
+
+[dependency-groups]
+docs = [
+    "tket>=0.15.10",
+    "tket-exts>=0.14.3",
+]

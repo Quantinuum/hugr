@@ -401,6 +401,12 @@ pytket = [
     { name = "pytket" },
 ]
 
+[package.dev-dependencies]
+docs = [
+    { name = "tket" },
+    { name = "tket-exts" },
+]
+
 [package.metadata]
 requires-dist = [
     { name = "furo", marker = "extra == 'docs'" },
@@ -417,6 +423,12 @@ requires-dist = [
     { name = "typing-extensions", specifier = "~=4.16" },
 ]
 provides-extras = ["docs", "pytket"]
+
+[package.metadata.requires-dev]
+docs = [
+    { name = "tket", specifier = ">=0.15.10" },
+    { name = "tket-exts", specifier = ">=0.14.3" },
+]
 
 [[package]]
 name = "identify"

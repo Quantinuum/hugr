@@ -2,9 +2,9 @@
 
 The goal of this guide is to give a practical introduction to constructing HUGR graphs using the Python interface, demonstrating how various HUGR features lend themselves well to representing quantum algorithms.
 
-To follow along with the examples, you will need to install `hugr` and `tket` in your environment:
+To follow along with the examples, you will need to install `hugr`, `tket` and `tket_exts` in your environment:
 ```
-pip install hugr tket
+pip install hugr tket tket_exts
 ```
 
 ## Translating a basic circuit into HUGR
