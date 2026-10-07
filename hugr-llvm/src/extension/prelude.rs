@@ -30,7 +30,7 @@ use crate::{
     types::TypingSession,
 };
 
-/// A helper trait for customising the lowering [`hugr_core::extension::prelude`]
+/// A helper trait for customizing the lowering [`hugr_core::extension::prelude`]
 /// types, [`CustomConst`]s, and ops.
 ///
 /// All methods have sensible defaults provided, and [`DefaultPreludeCodegen`] is
@@ -89,11 +89,11 @@ pub trait PreludeCodegen: Clone {
         emit_libc_printf(ctx, &[format_str.into(), text.into()])
     }
 
-    /// Emit instructions to materialise an LLVM value representing `err`.
+    /// Emit instructions to materialize an LLVM value representing `err`.
     ///
     /// The type of the returned value must match [`Self::error_type`].
     ///
-    /// The default implementation materialises an LLVM struct with the
+    /// The default implementation materializes an LLVM struct with the
     /// [`ConstError::signal`] and [`ConstError::message`] of `err`.
     fn emit_const_error<'c, H: HugrView<Node = Node>>(
         &self,
@@ -194,7 +194,7 @@ pub trait PreludeCodegen: Clone {
         self.emit_panic(ctx, err)
     }
 
-    /// Emit instructions to materialise an LLVM value representing `str`.
+    /// Emit instructions to materialize an LLVM value representing `str`.
     ///
     /// The type of the returned value must match [`Self::string_type`].
     ///

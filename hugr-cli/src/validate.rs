@@ -9,7 +9,7 @@ use tracing::info;
 use crate::CliError;
 use crate::hugr_io::HugrInputArgs;
 
-/// Validate and visualise a HUGR file.
+/// Validate and visualize a HUGR file.
 #[derive(Parser, Debug)]
 #[clap(version = "1.0", long_about = None)]
 #[clap(about = "Validate a HUGR.")]

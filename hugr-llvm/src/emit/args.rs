@@ -25,7 +25,7 @@ impl<'hugr, OT, H> EmitOpArgs<'_, 'hugr, OT, H> {
 }
 
 impl<'c, 'hugr, H: HugrView<Node = Node>> EmitOpArgs<'c, 'hugr, OpType, H> {
-    /// Attempt to specialise the internal [`FatNode`].
+    /// Attempt to specialize the internal [`FatNode`].
     pub fn try_into_ot<OT>(self) -> Result<EmitOpArgs<'c, 'hugr, OT, H>, Self>
     where
         for<'a> &'a OpType: TryInto<&'a OT>,
@@ -49,7 +49,7 @@ impl<'c, 'hugr, H: HugrView<Node = Node>> EmitOpArgs<'c, 'hugr, OpType, H> {
         }
     }
 
-    /// Specialise the internal [`FatNode`].
+    /// Specialize the internal [`FatNode`].
     ///
     /// Panics if `OT` is not the [`HugrView::get_optype`] of the internal
     /// [`hugr_core::Node`].

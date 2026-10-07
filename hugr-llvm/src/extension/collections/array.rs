@@ -12,7 +12,7 @@
 //! [`decompose_array_fat_pointer`] to work with array fat pointers.
 //!
 //! The [`DefaultArrayCodegen`] extension allocates all arrays on the heap using the
-//! standard libc `malloc` and `free` functions. This behaviour can be customised
+//! standard libc `malloc` and `free` functions. This behaviour can be customized
 //! by providing a different implementation for [`ArrayCodegen::emit_allocate_array`]
 //! and [`ArrayCodegen::emit_free_array`].
 use std::iter;
@@ -59,7 +59,7 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     }
 }
 
-/// A helper trait for customising the lowering of [`hugr_core::std_extensions::collections::array`]
+/// A helper trait for customizing the lowering of [`hugr_core::std_extensions::collections::array`]
 /// types, [`hugr_core::ops::constant::CustomConst`]s, and ops.
 ///
 /// An `array<n, T>` is now lowered to a fat pointer `{ptr, usize}` that is allocated
@@ -71,7 +71,7 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
 /// pointer when the array is discarded after a pop.
 ///
 /// By default, all arrays are allocated on the heap using the standard libc `malloc`
-/// and `free` functions. This behaviour can be customised by providing a different
+/// and `free` functions. This behaviour can be customized by providing a different
 /// implementation for [`ArrayCodegen::emit_allocate_array`] and
 /// [`ArrayCodegen::emit_free_array`].
 pub trait ArrayCodegen: Clone {
@@ -346,7 +346,7 @@ pub fn decompose_array_fat_pointer<'c>(
 ///
 /// Returns a pointer and a struct: The pointer points to the first element of the
 /// array, and the struct (aka fat array pointer) contains that pointer and an offset
-/// (initialised to 0).
+/// (initialized to 0).
 pub fn build_array_alloc<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ccg: &impl ArrayCodegen,

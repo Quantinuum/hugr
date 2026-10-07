@@ -41,7 +41,7 @@ def link_packages(*packages: bytes) -> bytes:
     packages.
 
     Args:
-        *packages: The packages to link, serialised as bytes.
+        *packages: The packages to link, serialized as bytes.
 
     Returns:
         A new package containing the modules and extensions of all packages.

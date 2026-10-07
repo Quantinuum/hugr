@@ -270,13 +270,13 @@ impl DataflowOpTrait for ExtensionOp {
 
 /// An opaquely-serialized op that refers to an as-yet-unresolved [`OpDef`].
 ///
-/// [`ExtensionOp`]s are serialised as `OpaqueOp`s.
+/// [`ExtensionOp`]s are serialized as `OpaqueOp`s.
 ///
 /// The signature of a [`ExtensionOp`] always includes that op's extension. We do not
 /// require that the `signature` field of [`OpaqueOp`] contains `extension`,
 /// instead we are careful to add it whenever we look at the `signature` of an
-/// `OpaqueOp`. This is a small efficiency in serialisation and allows us to
-/// be more liberal in deserialisation.
+/// `OpaqueOp`. This is a small efficiency in serialization and allows us to
+/// be more liberal in deserialization.
 #[derive(Clone, Debug, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 #[cfg_attr(test, derive(Arbitrary))]
 pub struct OpaqueOp {

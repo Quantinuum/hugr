@@ -1,4 +1,4 @@
-//! Serialisation of [`SimpleReplacement`]
+//! Serialization of [`SimpleReplacement`]
 
 use super::*;
 

@@ -70,7 +70,7 @@ below).
 
 ### `arithmetic.int.types`
 
-The `int<N>` type is parametrized by its width `N`, which is a positive
+The `int<N>` type is parameterized by its width `N`, which is a positive
 integer.
 
 The possible values of `N` are 2^i for i in the range [0,6].
@@ -194,6 +194,28 @@ except where stated.
 [^2]: The exact specification of the float-to-string conversion is
 implementation-dependent.
 
+### `arithmetic.math`
+
+This extension provides math operations on `arithmetic.float.types.float64`. All 
+angles, including the results of inverse trigonometric operations, are in radians.
+
+| Name    | Inputs               | Outputs   | Meaning                                                                                                                                   |
+| ------- | -------------------- | --------- |-------------------------------------------------------------------------------------------------------------------------------------------|
+| `sin`   | `float64`            | `float64` | sine                                                                                                                                      |
+| `cos`   | `float64`            | `float64` | cosine                                                                                                                                    |
+| `tan`   | `float64`            | `float64` | tangent                                                                                                                                   |
+| `asin`  | `float64`            | `float64` | inverse sine                                                                                                                              |
+| `acos`  | `float64`            | `float64` | inverse cosine                                                                                                                            |
+| `atan`  | `float64`            | `float64` | inverse tangent                                                                                                                           |
+| `atan2` | `float64`, `float64` | `float64` | four-quadrant inverse tangent, with inputs in the order `(y, x)`                                                                          |
+| `exp`   | `float64`            | `float64` | natural exponential, $e^x$                                                                                                                |
+| `exp2`  | `float64`            | `float64` | base-2 exponential, $2^x$                                                                                                                 |
+| `log`   | `float64`            | `float64` | natural logarithm                                                                                                                         |
+| `log2`  | `float64`            | `float64` | base-2 logarithm                                                                                                                          |
+| `log10` | `float64`            | `float64` | base-10 logarithm                                                                                                                         |
+| `pow`   | `float64`, `float64` | `float64` | first input raised to the power of the second, with inputs `(base, exponent)`                                                             |
+| `fmod`  | `float64`, `float64` | `float64` | remainder of the first input divided by the second, using a quotient truncated toward zero; the remainder has the sign of the first input |
+
 ### `arithmetic.conversions`
 
 Conversions between integers and floats:
@@ -211,10 +233,10 @@ Conversions between integers and floats:
 
 There are multiple extensions defining types, values and operations to work with collections of data:
 
-- `collections.array`: The standard linear and fixed-length array type, parametrized by length and element type.
-- `collections.borrow_arr`: A linear and fixed-length array type that provides additional unsafe operations for borrowing elements from the array, parametrized by length and element type.
-- `collections.static_array`: An array type for modeling globally available constant arrays of copyable values, parametrized only by element type.
-- `collections.list`: A variable-length list type, parametrized by element type.
+- `collections.array`: The standard linear and fixed-length array type, parameterized by length and element type.
+- `collections.borrow_arr`: A linear and fixed-length array type that provides additional unsafe operations for borrowing elements from the array, parameterized by length and element type.
+- `collections.static_array`: An array type for modelling globally available constant arrays of copyable values, parameterized only by element type.
+- `collections.list`: A variable-length list type, parameterized by element type.
 
 
 ### `collections.array`
@@ -234,7 +256,7 @@ This extension provides the `array` type and value with the following operations
 | `discard`       | `array<SIZE, elemty>` | `()`  | Discard an array with **copyable** elements. |
 | `clone`         | `array<SIZE, elemty>` | `array<SIZE, elemty>`, `array<SIZE, elemty>` | Clone an array with **copyable** elements. |
 | `unpack`        | `array<SIZE, elemty>` | `elemty^SIZE` | Unpack an array into its individual elements. `SIZE` must be statically known (not a variable). |
-| `repeat`        | `(() -> elemty)` | `array<SIZE, elemty>` | Create a new array whose elements are initialised by calling the given function `SIZE` times. |
+| `repeat`        | `(() -> elemty)` | `array<SIZE, elemty>` | Create a new array whose elements are initialized by calling the given function `SIZE` times. |
 | `scan`          | `array<SIZE, elemty_src>`,  `(elemty_src, list<acc_ty> -> elemty_dest, list<acc_ty>)`, `list<acc_ty>` | `array<SIZE, elemty_dest>`, `list<acc_ty>`  | A combination of map and foldl. Apply a function to each element of the array with an accumulator that is passed through from start to finish. Return the resulting array and the final state of the accumulator. |
 
 

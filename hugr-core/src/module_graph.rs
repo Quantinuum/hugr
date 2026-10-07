@@ -112,7 +112,7 @@ impl<N: HugrNode> ModuleGraph<N> {
     /// Returns an iterator over the out-edges from the given Node, i.e.
     /// edges to the functions/constants called/loaded by it.
     ///
-    /// If the node is not recognised as a function or the entrypoint,
+    /// If the node is not recognized as a function or the entrypoint,
     /// for example if it is a [`Const`](OpType::Const), the iterator will be empty.
     pub fn out_edges(&self, n: N) -> impl Iterator<Item = (&StaticEdge<N>, &StaticNode<N>)> {
         let g = self.graph();
@@ -129,7 +129,7 @@ impl<N: HugrNode> ModuleGraph<N> {
     /// Returns an iterator over the in-edges to the given Node, i.e.
     /// edges from the (necessarily) functions that call/load it.
     ///
-    /// If the node is not recognised as a function or constant,
+    /// If the node is not recognized as a function or constant,
     /// for example if it is a non-function entrypoint, the iterator will be empty.
     pub fn in_edges(&self, n: N) -> impl Iterator<Item = (&StaticNode<N>, &StaticEdge<N>)> {
         let g = self.graph();

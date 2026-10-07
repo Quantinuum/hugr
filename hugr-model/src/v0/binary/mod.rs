@@ -1,6 +1,6 @@
 //! Binary format based on capnproto.
 //!
-//! The binary format is optimised for fast serialization and deserialization of
+//! The binary format is optimized for fast serialization and deserialization of
 //! hugr modules in the [table] representation. It is the preferred format to
 //! communicate hugr graphs between machines. When a hugr module is to be
 //! written or read by humans, the [text] format can be used instead.

@@ -241,7 +241,7 @@ You can use [`release-plz`](https://release-plz.ieni.dev/) to automatically gene
 # If you have cargo-semver-checks installed,
 # release-plz will ensure your changes don't break the semver rules.
 cargo install cargo-semver-checks --locked
-# Analyze the new comments to generate the changelogs / bump the versions
+# Analyse the new comments to generate the changelogs / bump the versions
 release-plz update
 ```
 

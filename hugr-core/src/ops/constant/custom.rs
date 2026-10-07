@@ -110,7 +110,7 @@ pub trait TryHash {
     /// * `equal_consts` always returning `false`, or
     /// * `try_hash` always behaving the same (e.g. returning `false`, as it does by default)
     ///
-    /// Note: uses `dyn` rather than being parametrized by `<H: Hasher>` to be object-safe.
+    /// Note: uses `dyn` rather than being parameterized by `<H: Hasher>` to be object-safe.
     fn try_hash(&self, _state: &mut dyn Hasher) -> bool {
         false
     }

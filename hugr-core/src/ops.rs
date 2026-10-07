@@ -1,7 +1,7 @@
 //! The operation types for the HUGR.
 //!
 //! Operations represent the nodes in a HUGR graph. Each operation has a type
-//! ([`OpType`]), which determines its behavior, signature, and what kind of
+//! ([`OpType`]), which determines its behaviour, signature, and what kind of
 //! edges can connect to it. We may have different operations:
 //! - Unified representation: All operations are represented by the [`OpType`] enum
 //! - Dataflow operations: Operations like [`DFG`], [`Call`], and [`Input`]/[`Output`]

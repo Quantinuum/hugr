@@ -29,7 +29,7 @@
 
 …and the converse: we want `Conditional` and `TailLoop` *as well* as
 `CFG` because we believe they are much easier to work with conceptually
-e.g. for authors of "rewrite rules" and other optimisations.
+e.g. for authors of "rewrite rules" and other optimizations.
 
 ## Alternative representations considered but rejected
 

@@ -548,7 +548,7 @@ fn test_try_add_commit(test_state_space: TestStateSpace) {
     }
 }
 
-/// A Hugr that serialises with no extensions
+/// A Hugr that serializes with no extensions
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize, From, Into)]
 pub(crate) struct WrappedHugr {
     #[serde(with = "serial")]

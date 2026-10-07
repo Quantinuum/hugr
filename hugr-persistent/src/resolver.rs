@@ -53,12 +53,12 @@ impl<N, E: Clone> EquivalenceResolver<N, E> for PointerEqResolver {
 }
 
 /// A resolver that considers two nodes equivalent if the hashes of their
-/// serialisation is the same.
+/// serialization is the same.
 ///
 /// ### Generic type parameter
 ///
-/// This is parametrised over a serializable type `H`, which must implement
-/// [`From<Hugr>`]. This type is used to serialise the commit data before
+/// This is parameterized over a serializable type `H`, which must implement
+/// [`From<Hugr>`]. This type is used to serialize the commit data before
 /// hashing it.
 ///
 /// Resolvers determine when two patches are equivalent and should be merged

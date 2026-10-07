@@ -15,7 +15,7 @@
 //! [`decompose_barray_fat_pointer`] to work with borrow-array fat pointers.
 //!
 //! The [`DefaultBorrowArrayCodegen`] extension allocates all arrays on the heap using the
-//! standard libc `malloc` and `free` functions. This behaviour can be customised
+//! standard libc `malloc` and `free` functions. This behaviour can be customized
 //! by providing a different implementation for [`BorrowArrayCodegen::emit_allocate_array`]
 //! and [`BorrowArrayCodegen::emit_free_array`].
 use std::iter;
@@ -94,11 +94,11 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
     }
 }
 
-/// A helper trait for customising the lowering of [`borrow_array`], including its
+/// A helper trait for customizing the lowering of [`borrow_array`], including its
 /// types, [`hugr_core::ops::constant::CustomConst`]s, and ops.
 ///
 /// By default, all arrays are allocated on the heap using the standard libc `malloc`
-/// and `free` functions. This behaviour can be customised by providing a different
+/// and `free` functions. This behaviour can be customized by providing a different
 /// implementation for [`BorrowArrayCodegen::emit_allocate_array`] and
 /// [`BorrowArrayCodegen::emit_free_array`].
 ///
@@ -488,7 +488,7 @@ fn alloc_typed_array<'c, H: HugrView<Node = Node>>(
 ///
 /// Returns a pointer and a struct:
 /// * The pointer points to the first element of the array (i.e. it is of type `elem_ty.ptr_type()`).
-/// * The struct is the fat pointer that stores also the pointer to the mask and an additional offset (initialised to 0).
+/// * The struct is the fat pointer that stores also the pointer to the mask and an additional offset (initialized to 0).
 pub fn build_barray_alloc<'c, H: HugrView<Node = Node>>(
     ctx: &mut EmitFuncContext<'c, '_, H>,
     ccg: &impl BorrowArrayCodegen,
