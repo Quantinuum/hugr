@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import tket.extensions as ext
 import tket_exts
 
@@ -37,8 +39,11 @@ def array_scan_op(
         tys.TypeTypeArg(new_elem_ty),
         tys.ListArg([]),  # We ignore the accumulators.
     ]
-    ins = [Array(elem_ty, length_arg), tys.FunctionType([elem_ty], [new_elem_ty])]
-    outs = [Array(new_elem_ty, length_arg)]
+    ins: list[tys.Type] = [
+        Array(elem_ty, length_arg),
+        tys.FunctionType([elem_ty], [new_elem_ty]),
+    ]
+    outs: list[tys.Type] = [Array(new_elem_ty, length_arg)]
     return ARRAY_EXTENSION.get_op("scan").instantiate(
         ty_args, tys.FunctionType(ins, outs)
     )
@@ -60,13 +65,13 @@ module = circ.module_root_builder()
 
 with module.define_function("prepare", [tys.Qubit, tys.Qubit]) as prepare:
     p_data, p_ancilla = prepare.inputs()
-    p_ancilla = prepare.add(quantum.H(p_ancilla))
+    p_ancilla = prepare.add(quantum.H(p_ancilla)).out(0)
     p_data, p_ancilla = prepare.add(quantum.CX(p_data, p_ancilla))
     prepare.set_outputs(p_data, p_ancilla)
 
 with module.define_function("correct", [tys.Qubit]) as correct:
     (c_data,) = correct.inputs()
-    c_data = correct.add(quantum.X(c_data))
+    c_data = correct.add(quantum.X(c_data)).out(0)
     correct.set_outputs(c_data)
 
 n_param = tys.BoundedNatParam()
@@ -82,7 +87,7 @@ with module.define_function(
     correct_fn = correct_all.load_function(correct.parent_node)
     qs = correct_all.add_op(
         array_scan_op(tys.Qubit, tys.Qubit, tys.VariableArg(0, n_param)), qs, correct_fn
-    )
+    ).out(0)
     correct_all.set_outputs(qs)
 
 
@@ -91,7 +96,7 @@ either_ty = tys.Either([tys.Qubit], [tys.Qubit])
 
 with circ.add_tail_loop([data], []) as loop:
     [loop_data] = loop.inputs()
-    ancilla = loop.add(quantum.qAlloc())
+    ancilla = loop.add(quantum.qAlloc()).out(0)
 
     loop_data, ancilla = loop.call(prepare.parent_node, loop_data, ancilla)
 
@@ -125,8 +130,10 @@ with circ.add_tail_loop([data], []) as loop:
 circ.set_outputs(*loop.outputs())
 
 # Validation and visualization.
-package = Package(modules=[circ.hugr], extensions=tket_exts.tket_registry().extensions)
+package = Package(
+    modules=[circ.hugr], extensions=list(tket_exts.tket_registry().extensions)
+)
 cli.validate(package.to_bytes())
 
-with open("example-functions2.dot", "w") as f:
+with Path("example-functions2.dot").open("w") as f:
     f.write(str(circ.hugr.render_dot()))

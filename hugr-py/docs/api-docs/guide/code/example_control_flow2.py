@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import tket.extensions as ext
 import tket_exts
 
@@ -24,8 +26,8 @@ either_ty = tys.Either([tys.Qubit], [tys.Qubit])
 with circ.add_tail_loop([data], []) as loop:
     [loop_data] = loop.inputs()
     # Allocate a fresh ancilla in each iteration and entangle it with the data qubit.
-    ancilla = loop.add(quantum.qAlloc())
-    ancilla = loop.add(quantum.H(ancilla))
+    ancilla = loop.add(quantum.qAlloc()).out(0)
+    ancilla = loop.add(quantum.H(ancilla)).out(0)
     loop_data, ancilla = loop.add(quantum.CX(loop_data, ancilla))
 
     measurement = loop.add(quantum.measure_free(ancilla))
@@ -50,8 +52,10 @@ with circ.add_tail_loop([data], []) as loop:
 circ.set_outputs(*loop.outputs())
 
 # Validation and visualization.
-package = Package(modules=[circ.hugr], extensions=tket_exts.tket_registry().extensions)
+package = Package(
+    modules=[circ.hugr], extensions=list(tket_exts.tket_registry().extensions)
+)
 cli.validate(package.to_bytes())
 
-with open("example-control-flow2.dot", "w") as f:
+with Path("example-control-flow2.dot").open("w") as f:
     f.write(str(circ.hugr.render_dot()))

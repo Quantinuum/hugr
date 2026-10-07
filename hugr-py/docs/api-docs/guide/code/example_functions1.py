@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import tket.extensions as ext
 import tket_exts
 
@@ -20,14 +22,14 @@ with module.define_function("prepare", [tys.Qubit, tys.Qubit]) as prepare:
     # As with other subgraphs, we first retrieve the input wires.
     p_data, p_ancilla = prepare.inputs()
     # Add the operations to the function body.
-    p_ancilla = prepare.add(quantum.H(p_ancilla))
+    p_ancilla = prepare.add(quantum.H(p_ancilla)).out(0)
     p_data, p_ancilla = prepare.add(quantum.CX(p_data, p_ancilla))
     # As with other subgraphs, we set the outputs at the end of the function.
     prepare.set_outputs(p_data, p_ancilla)
 
 with module.define_function("correct", [tys.Qubit]) as correct:
     (c_data,) = correct.inputs()
-    c_data = correct.add(quantum.X(c_data))
+    c_data = correct.add(quantum.X(c_data)).out(0)
     correct.set_outputs(c_data)
 
 # Build the tail loop as before.
@@ -36,7 +38,7 @@ either_ty = tys.Either([tys.Qubit], [tys.Qubit])
 
 with circ.add_tail_loop([data], []) as loop:
     [loop_data] = loop.inputs()
-    ancilla = loop.add(quantum.qAlloc())
+    ancilla = loop.add(quantum.qAlloc()).out(0)
 
     # Instead of adding H and CX operations here, call the "prepare" function.
     # The `FuncDefn` node we need to pass to `call` is always the parent node of
@@ -61,8 +63,10 @@ with circ.add_tail_loop([data], []) as loop:
 circ.set_outputs(*loop.outputs())
 
 # Validation and visualization.
-package = Package(modules=[circ.hugr], extensions=tket_exts.tket_registry().extensions)
+package = Package(
+    modules=[circ.hugr], extensions=list(tket_exts.tket_registry().extensions)
+)
 cli.validate(package.to_bytes())
 
-with open("example-functions1.dot", "w") as f:
+with Path("example-functions1.dot").open("w") as f:
     f.write(str(circ.hugr.render_dot()))

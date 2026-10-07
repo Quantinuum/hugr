@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import tket.extensions as ext
 import tket_exts
 
@@ -12,9 +14,9 @@ measure = ext.measurement
 circ = TrackedDfg()
 
 # Allocate and entangle qubits, passing wires by name instead of index.
-data = circ.add(quantum.qAlloc())
-ancilla = circ.add(quantum.qAlloc())
-ancilla = circ.add(quantum.H(ancilla))
+data = circ.add(quantum.qAlloc()).out(0)
+ancilla = circ.add(quantum.qAlloc()).out(0)
+ancilla = circ.add(quantum.H(ancilla)).out(0)
 data, ancilla = circ.add(quantum.CX(data, ancilla))
 
 # Measure the ancilla qubit to get a `Bool` wire that can be used in the conditional.
@@ -36,8 +38,10 @@ with if_.add_else() as else_:
 circ.set_outputs(if_.conditional_node[0])
 
 # Validation and visualization.
-package = Package(modules=[circ.hugr], extensions=tket_exts.tket_registry().extensions)
+package = Package(
+    modules=[circ.hugr], extensions=list(tket_exts.tket_registry().extensions)
+)
 cli.validate(package.to_bytes())
 
-with open("example-control-flow1.dot", "w") as f:
+with Path("example-control-flow1.dot").open("w") as f:
     f.write(str(circ.hugr.render_dot()))

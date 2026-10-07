@@ -1,3 +1,5 @@
+from pathlib import Path
+
 import tket.extensions as ext
 import tket_exts
 
@@ -27,8 +29,10 @@ circ.extend(quantum.measure_free(0), measure.read(0))
 circ.set_tracked_outputs()
 
 # Validation and visualization.
-package = Package(modules=[circ.hugr], extensions=tket_exts.tket_registry().extensions)
+package = Package(
+    modules=[circ.hugr], extensions=list(tket_exts.tket_registry().extensions)
+)
 cli.validate(package.to_bytes())
 
-with open("example-basic.dot", "w") as f:
+with Path("example-basic.dot").open("w") as f:
     f.write(str(circ.hugr.render_dot()))

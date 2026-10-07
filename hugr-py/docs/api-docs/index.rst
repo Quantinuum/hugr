@@ -11,11 +11,13 @@ compilation and encodes runnable programs.
 HUGR guide
 ----------
 
+This is a collection of informal, conceptual guides to HUGR aimed at those who wish to
+work directly with this structure and understand the motivations behind it.
+
 .. toctree::
-   :caption: Guide
    :maxdepth: 1
 
-   guide/python-intro-1
+   guide/guide_index.md
 
 Python API v\ |hugr_py_version| reference
 -----------------------------------------

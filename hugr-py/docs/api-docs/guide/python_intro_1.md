@@ -9,6 +9,8 @@ pip install hugr tket
 
 ## Translating a basic circuit into HUGR
 
+### Creating a dataflow graph
+
 Consider this circuit that constructs a Bell pair from two qubits and then measures one of them.
 
 ![](images/bell-pair-circuit.png)
@@ -92,7 +94,9 @@ To validate a HUGR, we first need to package it up in order to serialize it (pas
 from hugr import cli
 import tket_exts
 
-package = Package(modules=[circ.hugr], extensions=tket_exts.tket_registry().extensions)
+package = Package(
+    modules=[circ.hugr], extensions=list(tket_exts.tket_registry().extensions)
+)
 cli.validate(package.to_bytes())
 ```
 
@@ -109,6 +113,8 @@ circ = TrackedDfg()
 ```
 
 Then use the `qAlloc` operation to get two qubit wires, and optionally register them as being tracked wires if you still want to refer to them by index (as opposed to using the `q0` and `q1` variables).
+
+> Note that `add()` returns a `Node`, which in many cases can be used directly as a `Wire`, however using `out()` allows you to be more explicit in case of multiple outports and is sometimes required to satisfy type-checking.
 
 ```py
 circ = TrackedDfg()
@@ -130,10 +136,10 @@ So far all the data in our HUGR has followed a fixed path through it. What if we
 We still start with a `TrackedDfg` with no inputs as before. To make it easier to follow what happens with each qubit, let's rename `q0` and `q1` to `data` and `ancilla`, and also give the measurement result a name.
 
 ```py
-data = circ.add(quantum.qAlloc())
-ancilla = circ.add(quantum.qAlloc())
+data = circ.add(quantum.qAlloc()).out(0)
+ancilla = circ.add(quantum.qAlloc()).out(0)
 
-ancilla = circ.add(quantum.H(ancilla))
+ancilla = circ.add(quantum.H(ancilla)).out(0)
 data, ancilla = circ.add(quantum.CX(data, ancilla))
 
 measurement = circ.add(quantum.measure_free(ancilla))
@@ -182,8 +188,8 @@ data = circ.add(quantum.qAlloc())
 
 with circ.add_tail_loop([data], []) as loop:
     [loop_data] = loop.inputs()
-    ancilla = loop.add(quantum.qAlloc())
-    ancilla = loop.add(quantum.H(ancilla))
+    ancilla = loop.add(quantum.qAlloc()).out(0)
+    ancilla = loop.add(quantum.H(ancilla)).out(0)
     loop_data, ancilla = loop.add(quantum.CX(loop_data, ancilla))
 
     measurement = loop.add(quantum.measure_free(ancilla))
@@ -233,13 +239,13 @@ module = circ.module_root_builder()
 
 with module.define_function("prepare", [tys.Qubit, tys.Qubit]) as prepare:
     p_data, p_ancilla = prepare.inputs()
-    p_ancilla = prepare.add(quantum.H(p_ancilla))
+    p_ancilla = prepare.add(quantum.H(p_ancilla)).out(0)
     p_data, p_ancilla = prepare.add(quantum.CX(p_data, p_ancilla))
     prepare.set_outputs(p_data, p_ancilla)
 
 with module.define_function("correct", [tys.Qubit]) as correct:
     (c_data,) = correct.inputs()
-    c_data = correct.add(quantum.X(c_data))
+    c_data = correct.add(quantum.X(c_data)).out(0)
     correct.set_outputs(c_data)
 ```
 
@@ -299,8 +305,8 @@ def array_scan_op(
         tys.TypeTypeArg(new_elem_ty),
         tys.ListArg([]),
     ]
-    ins = [Array(elem_ty, length_arg), tys.FunctionType([elem_ty], [new_elem_ty])]
-    outs = [Array(new_elem_ty, length_arg)]
+    ins: list[tys.Type] = [Array(elem_ty, length_arg), tys.FunctionType([elem_ty], [new_elem_ty])]
+    outs: list[tys.Type] = [Array(new_elem_ty, length_arg)]
     return ARRAY_EXTENSION.get_op("scan").instantiate(
         ty_args, tys.FunctionType(ins, outs)
     )
@@ -332,7 +338,7 @@ with module.define_function(
     correct_fn = correct_all.load_function(correct.parent_node)
     qs = correct_all.add_op(
         array_scan_op(tys.Qubit, tys.Qubit, tys.VariableArg(0, n_param)), qs, correct_fn
-    )
+    ).out(0)
     correct_all.set_outputs(qs)
 ```
 
