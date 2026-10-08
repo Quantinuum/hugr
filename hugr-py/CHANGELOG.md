@@ -1,5 +1,25 @@
 # Changelog
 
+## [0.18.8](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.7...hugr-py-v0.18.8) (2026-10-05)
+
+
+### Features
+
+* Add `arithmetic.math` to standard extension registry ([#3291](https://github.com/Quantinuum/hugr/issues/3291)) ([9cf29ad](https://github.com/Quantinuum/hugr/commit/9cf29adcde3af6cc70a117bc797137e73e744f55))
+
+## [0.18.7](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.6...hugr-py-v0.18.7) (2026-10-01)
+
+
+### Features
+
+* Add `math` extension with LLVM intrinsic lowering  ([#3277](https://github.com/Quantinuum/hugr/issues/3277)) ([ae203a3](https://github.com/Quantinuum/hugr/commit/ae203a3a542a1a794be3c6f8b3558e2fa859c28b))
+* Improve extension resolution errors ([#3247](https://github.com/Quantinuum/hugr/issues/3247)) ([3c7f736](https://github.com/Quantinuum/hugr/commit/3c7f7360b0ef220222822f4fa7a73ff8c6aa54bf))
+
+
+### Documentation
+
+* Use Oxford spelling consistently in public documentation ([#3273](https://github.com/Quantinuum/hugr/issues/3273)) ([c4740ba](https://github.com/Quantinuum/hugr/commit/c4740ba0bee8f9cc1034e4dc4d0b5646e96e2d82))
+
 ## [0.18.6](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.5...hugr-py-v0.18.6) (2026-09-04)
 
 
