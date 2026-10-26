@@ -2,13 +2,13 @@
 
 The Hierarchical Unified Graph Representation (HUGR, pronounced hugger 🫂) is usually described as an [intermediate representation](https://en.wikipedia.org/wiki/Intermediate_representation) (IR), designed specifically for the representation of programs that work with quantum (as well as classical) data.
 
-In practice, what we mean by HUGR can be a little ambiguous. The [formal specification](https://quantinuum.github.io/hugr/specification/index.html) defines it as a mathematical structure. The [Python](https://quantinuum.github.io/hugr/generated/hugr.html) and [Rust](https://docs.rs/hugr/latest/hugr/) implementations define it as an in-memory representation. Finally, there are multiple serialized representations. These are closest to a true "IR" and are most useful as interchange formats, but they cannot practically be manipulated except by going through one of the in-memory forms.
+In practice, what we mean by HUGR may depend on the context. The [formal specification](https://quantinuum.github.io/hugr/specification/index.html) defines it as a mathematical structure. The [Python](https://quantinuum.github.io/hugr/generated/hugr.html) and [Rust](https://docs.rs/hugr/latest/hugr/) implementations define it as an in-memory representation. Finally, there are multiple serialized representations. These are closest to a true "IR" and are most useful as interchange formats, but they cannot practically be manipulated except by going through one of the in-memory forms.
 
-Additionally, HUGR is also used informally as a noun to refer to instances of graphs adhering to the HUGR specification.
+HUGR is also used informally as a noun to refer to instances of graphs adhering to the HUGR specification.
 
 ## In-memory representations
 
-There are two standalone implementations of the HUGR specification with corresponding APIs for manipulating HUGRs, one in Python and one in Rust.
+The HUGR [repository](https://github.com/Quantinuum/hugr) contains two standalone implementations of the HUGR specification with corresponding APIs for manipulating HUGRs, one in Python and one in Rust.
 
 The `hugr` Python package provides a high-level API for constructing HUGRs from basic operations. If you are just getting started with HUGR or are only looking to use it for relatively simple tasks, we recommend looking at the [introductory Python guide](python_intro_1.md) to begin with.
 
@@ -23,11 +23,11 @@ To save HUGRs or share them between libraries, both the Python and Rust interfac
 
 For serialization, one or more HUGRs are grouped into a package together with any extension definitions they need. The package is then converted to the `hugr-model` representation.
 
-The `hugr-model` representation sits between runtime HUGR objects and serialized payloads and is a key component in ensuring stable serialization logic. It is a table representation that stores package data in tables and uses IDs to refer between objects. It can be encoded into two different types of payload:
+The `hugr-model` representation sits between runtime HUGR objects and serialized payloads and is a key component in ensuring stable serialization logic. It stores package data in tables and uses IDs to refer between objects. It can be encoded into two different types of payload:
 - **Cap’n Proto binary payload**: This encodes the table representation directly in a compact way and is the preferred format for storage, transfer, and any workflows where conversion speed is more important than readability.
 - **AST representation and textual S-expression payload**: This is a human-readable representation intended for debugging, snapshots, tests, and review.
 
-Payloads are also wrapped in an **envelope**, which records the payload format and optional compression settings.
+Payloads are wrapped in an **envelope**, which records the payload format and optional compression settings.
 
 > Note that extension definitions are still encoded as JSON, although JSON serialization of HUGR graphs is deprecated in general.
 

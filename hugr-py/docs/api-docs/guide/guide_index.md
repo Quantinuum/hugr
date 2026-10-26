@@ -5,6 +5,6 @@ This is a collection of informal, conceptual guides to HUGR aimed at those who w
 ```{toctree}
 :maxdepth: 0
 
-intro.md
+representations.md
 python_intro_1.md
 ```
