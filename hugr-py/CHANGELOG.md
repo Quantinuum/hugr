@@ -1,5 +1,28 @@
 # Changelog
 
+## [0.19.0](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.8...hugr-py-v0.19.0) (2026-10-30)
+
+
+### ⚠ BREAKING CHANGES
+
+* Raise errors in bad calls to `OpDef.instantiate`
+
+### Features
+
+* Reject early bad calls to `OpDef.instantiate` ([#3200](https://github.com/Quantinuum/hugr/issues/3200)) ([ccdfc53](https://github.com/Quantinuum/hugr/commit/ccdfc530183abfe23211c5f6bbca9889d693d4c4))
+
+
+### Bug Fixes
+
+* **python:** preserve CFG block shared outputs on model import ([#3300](https://github.com/Quantinuum/hugr/issues/3300)) ([924113b](https://github.com/Quantinuum/hugr/commit/924113b5df3279f65a6064ad94788e541618cc3d))
+
+
+### Documentation
+
+* Add examples for beginner HUGR guide ([#3305](https://github.com/Quantinuum/hugr/issues/3305)) ([9fcfd3b](https://github.com/Quantinuum/hugr/commit/9fcfd3bddd9f792a3fceaae0a3e9f1b62664f223))
+* Add informal beginner HUGR construction guide ([#3272](https://github.com/Quantinuum/hugr/issues/3272)) ([7d2024a](https://github.com/Quantinuum/hugr/commit/7d2024a5f771c6944c8d503303f2f503566e9b83))
+* Add section on representations to guides ([#3312](https://github.com/Quantinuum/hugr/issues/3312)) ([811eb23](https://github.com/Quantinuum/hugr/commit/811eb237b10273ea1eedf6a7f2ffef1606b46ff3))
+
 ## [0.18.8](https://github.com/Quantinuum/hugr/compare/hugr-py-v0.18.7...hugr-py-v0.18.8) (2026-10-05)
 
 
