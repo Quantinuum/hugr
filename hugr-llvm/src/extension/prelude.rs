@@ -118,12 +118,18 @@ pub trait PreludeCodegen: Clone {
     ///
     /// The type of the returned value must match [`Self::error_type`].
     ///
+    /// `const_message` is provided when the message input is loaded directly
+    /// from a HUGR [`ConstString`]. It does not require a constant signal.
+    /// Backends can use it to encode error messages without inspecting LLVM IR.
+    /// Other message inputs are passed as `None`.
+    ///
     /// The default implementation constructs a struct with the given signal and message.
     fn emit_make_error<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         signal: BasicValueEnum<'c>,
         message: BasicValueEnum<'c>,
+        _const_message: Option<&ConstString>,
     ) -> Result<BasicValueEnum<'c>> {
         let builder = ctx.builder();
 
@@ -381,7 +387,20 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
                         .as_basic_type_enum(),
                 signal.get_type() == pcg.usize_type(&context.typing_session()).into()
             );
-            let err = pcg.emit_make_error(context, signal, message)?;
+            let const_message = (|| {
+                let node = args.node();
+                let hugr = node.hugr();
+                let (load, _) = hugr.single_linked_output(node.node(), 1)?;
+                if !hugr.get_optype(load).is_load_constant() {
+                    return None;
+                }
+                let source = hugr.static_source(load)?;
+                let hugr_core::ops::OpType::Const(constant) = hugr.get_optype(source) else {
+                    return None;
+                };
+                constant.value().get_custom_value::<ConstString>()
+            })();
+            let err = pcg.emit_make_error(context, signal, message, const_message)?;
             args.outputs.finish(context.builder(), [err])
         }
     })
@@ -455,9 +474,10 @@ mod test {
 
     use crate::check_emission;
     use crate::custom::CodegenExtsBuilder;
-    use crate::emit::test::SimpleHugrConfig;
+    use crate::emit::test::{Emission, SimpleHugrConfig, TEST_EMIT_DEBUG};
     use crate::test::{TestContext, exec_ctx, llvm_ctx};
     use crate::types::HugrType;
+    use crate::utils::fat::FatExt as _;
 
     use super::*;
 
@@ -687,6 +707,51 @@ mod test {
             });
 
         check_emission!(hugr, prelude_llvm_ctx);
+    }
+
+    #[rstest]
+    #[case::literal(Some("Error!"))]
+    #[case::dynamic(None)]
+    fn make_error_const_message(#[case] expected: Option<&'static str>, mut llvm_ctx: TestContext) {
+        #[derive(Clone)]
+        struct CheckMessage(Option<&'static str>);
+        impl PreludeCodegen for CheckMessage {
+            fn emit_make_error<'c, H: HugrView<Node = Node>>(
+                &self,
+                ctx: &mut EmitFuncContext<'c, '_, H>,
+                signal: BasicValueEnum<'c>,
+                message: BasicValueEnum<'c>,
+                const_message: Option<&ConstString>,
+            ) -> Result<BasicValueEnum<'c>> {
+                assert_eq!(const_message.map(ConstString::value), self.0);
+                DefaultPreludeCodegen.emit_make_error(ctx, signal, message, const_message)
+            }
+        }
+        llvm_ctx.add_extensions(move |ceb| ceb.add_prelude_extensions(CheckMessage(expected)));
+        let hugr = SimpleHugrConfig::new()
+            .with_ins([usize_t(), prelude::string_type()])
+            .with_outs([error_type()])
+            .finish(|mut builder| {
+                let [signal, dynamic_message] = builder.input_wires_arr();
+                let message = expected.map_or(dynamic_message, |text| {
+                    builder.add_load_value(ConstString::new(text.into()))
+                });
+                let make_error = PRELUDE
+                    .instantiate_extension_op(&MAKE_ERROR_OP_ID, [])
+                    .unwrap();
+                let err = builder
+                    .add_dataflow_op(make_error, [signal, message])
+                    .unwrap()
+                    .out_wire(0);
+                builder.finish_hugr_with_outputs([err]).unwrap()
+            });
+        let emission = Emission::emit_hugr(
+            hugr.fat_root().unwrap(),
+            llvm_ctx.get_emit_hugr(),
+            TEST_EMIT_DEBUG,
+        )
+        .unwrap();
+        emission.verify().unwrap();
     }
 
     #[rstest]
