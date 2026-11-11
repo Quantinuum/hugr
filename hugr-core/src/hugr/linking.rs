@@ -748,7 +748,7 @@ pub type LinkActions<SN, TN> = BTreeMap<SN, LinkAction<TN>>;
 
 /// Checked transfers between source and target nodes.
 ///
-/// Ordered maps keep subtree deletion and subsequent node allocation deterministic.
+/// Ordered maps keep subtree deletion and subsequent node reuse deterministic.
 /// Invariant: no `SourceNode` can be in both maps (by type of [NodeLinkingDirective])
 /// `TargetNode`s can be (in RHS of multiple directives)
 struct Transfers<SourceNode, TargetNode> {
@@ -787,8 +787,8 @@ fn check_directives<SRC: HugrView, TN: HugrNode>(
         }
     }
     let mut trns = Transfers {
-        replace: BTreeMap::new(),
-        use_existing: BTreeMap::new(),
+        replace: BTreeMap::default(),
+        use_existing: BTreeMap::default(),
     };
     for (&sn, dirv) in children {
         if other.get_parent(sn) != Some(other.module_root()) {

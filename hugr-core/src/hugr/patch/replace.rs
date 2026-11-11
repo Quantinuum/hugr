@@ -406,7 +406,7 @@ impl<HostNode: HugrNode> PatchHugrMut for Replacement<HostNode> {
         // 6. Transfer to keys of `transfers` children of the corresponding values.
         #[expect(
             clippy::iter_over_hash_type,
-            reason = "adoptions move disjoint child sets, so order cannot affect the result. Repeated values return an error."
+            reason = "adoptions move disjoint child sets; duplicate values are rejected before mutation"
         )]
         for (new_parent, &old_parent) in &self.adoptions {
             let new_parent = node_map.get(new_parent).unwrap();
