@@ -100,6 +100,7 @@ pub mod custom;
 pub mod dataflow;
 pub mod handle;
 pub mod module;
+mod sealed;
 pub mod sum;
 pub mod tag;
 pub mod validate;
@@ -566,8 +567,10 @@ pub trait StaticTag {
 }
 
 #[enum_dispatch]
-/// Trait implemented by all `OpType` variants.
-pub trait OpTrait: Sized + Clone {
+/// Trait implemented by [`OpType`] and its variants.
+///
+/// This trait is sealed.
+pub trait OpTrait: sealed::Sealed + Sized + Clone {
     /// A human-readable description of the operation.
     fn description(&self) -> &str;
 

@@ -16,7 +16,9 @@ use crate::{Direction, IncomingPort, Port, PortIndex, type_row};
 use {crate::types::proptest_utils::any_serde_type_arg_vec, proptest_derive::Arbitrary};
 
 /// Trait implemented by all dataflow operations.
-pub trait DataflowOpTrait: Sized {
+///
+/// This trait is sealed.
+pub trait DataflowOpTrait: super::sealed::Sealed + Sized {
     /// Tag identifying the operation.
     const TAG: OpTag;
 
