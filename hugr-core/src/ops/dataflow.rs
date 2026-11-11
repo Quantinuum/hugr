@@ -24,10 +24,7 @@ pub trait DataflowOpTrait: Sized {
     fn description(&self) -> &str;
 
     /// Returns a string representation of the operation.
-    fn render_str(&self, _config: RenderStringConfig) -> String {
-        // TODO: Remove this default implementation with the next breaking release.
-        unimplemented!("render_str default implementation is not yet implemented");
-    }
+    fn render_str(&self, config: RenderStringConfig) -> String;
 
     /// The signature of the operation.
     fn signature(&self) -> Cow<'_, Signature>;

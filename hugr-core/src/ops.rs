@@ -572,12 +572,7 @@ pub trait OpTrait: Sized + Clone {
     fn description(&self) -> &str;
 
     /// Returns an exhaustive string representation of the operation.
-    fn render_str(&self, _config: RenderStringConfig) -> String {
-        // TODO: Remove this default implementation with the next breaking release.
-        unimplemented!(
-            "This operation is relying on the default undefined render_str implementation, implement one."
-        )
-    }
+    fn render_str(&self, config: RenderStringConfig) -> String;
 
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag;
