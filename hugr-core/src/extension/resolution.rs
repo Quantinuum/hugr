@@ -182,40 +182,6 @@ pub enum ExtensionResolutionError<N: HugrNode = Node> {
 }
 
 impl<N: HugrNode> ExtensionResolutionError<N> {
-    /// Create an error for a missing legacy unversioned operation extension.
-    #[deprecated(since = "0.30.2", note = "use `unresolved_op_extension` instead")]
-    #[expect(deprecated)]
-    pub fn missing_op_extension(
-        node: Option<N>,
-        op: &OpType,
-        missing_extension: &ExtensionId,
-        extensions: &ExtensionRegistry,
-    ) -> Self {
-        Self::MissingOpExtension {
-            node,
-            op: NamedOp::name(op),
-            missing_extension: missing_extension.clone(),
-            available_extensions: extensions.ids().cloned().collect(),
-        }
-    }
-
-    /// Create an error for a missing legacy unversioned type extension.
-    #[deprecated(since = "0.30.2", note = "use `unresolved_type_extension` instead")]
-    #[expect(deprecated)]
-    pub fn missing_type_extension(
-        node: Option<N>,
-        ty: &TypeName,
-        missing_extension: &ExtensionId,
-        extensions: &WeakExtensionRegistry,
-    ) -> Self {
-        Self::MissingTypeExtension {
-            node,
-            ty: ty.clone(),
-            missing_extension: missing_extension.clone(),
-            available_extensions: extensions.ids().cloned().collect(),
-        }
-    }
-
     /// Create an error for a failed versioned operation extension lookup.
     pub fn unresolved_op_extension(
         node: Option<N>,
