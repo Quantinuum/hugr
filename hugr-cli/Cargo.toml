@@ -6,7 +6,6 @@ rust-version = { workspace = true }
 license = { workspace = true }
 readme = "README.md"
 documentation = "https://docs.rs/hugr-cli/"
-homepage = { workspace = true }
 repository = { workspace = true }
 description = "Compiler passes for Quantinuum's HUGR"
 keywords = ["Quantum", "Quantinuum"]

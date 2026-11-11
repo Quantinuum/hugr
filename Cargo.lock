@@ -1080,7 +1080,6 @@ dependencies = [
  "proptest",
  "proptest-derive",
  "regex",
- "relrc",
  "rstest",
  "rustc-hash",
  "schemars 1.2.3",
@@ -1164,7 +1163,6 @@ dependencies = [
  "serde_json",
  "serde_with",
  "thiserror 2.0.21",
- "wyhash",
 ]
 
 [[package]]
@@ -3365,15 +3363,6 @@ dependencies = [
  "serde_json",
  "unicode-xid",
  "wasmparser",
-]
-
-[[package]]
-name = "wyhash"
-version = "0.6.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "ca4d373340c479fd1e779f7a763acee85da3e423b1a9a9acccf97babcc92edbb"
-dependencies = [
- "rand_core 0.9.5",
 ]
 
 [[package]]
