@@ -1,12 +1,6 @@
 # Changelog
 
 
-## [0.31.0](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.30.3...hugr-model-v0.31.0) - 2026-11-11
-
-### New Features
-
-- *(model)* Parse const floats ([#3263](https://github.com/Quantinuum/hugr/pull/3263))
-
 ## [0.30.3](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.30.2...hugr-model-v0.30.3) - 2026-09-30
 
 ### Bug Fixes
