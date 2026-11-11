@@ -104,8 +104,8 @@ impl ValidateOp for super::Conditional {
                 return Err(ChildrenValidationError::ConditionalCaseSignature {
                     child,
                     case: i,
-                    cond_sig: (*self.signature()).clone(),
-                    child_sig: sig.clone().into_owned(),
+                    cond_sig: Box::new((*self.signature()).clone()),
+                    child_sig: Box::new(sig.clone().into_owned()),
                 });
             }
         }
@@ -200,8 +200,8 @@ pub enum ChildrenValidationError<N: HugrNode> {
     ConditionalCaseSignature {
         child: N,
         case: usize,
-        cond_sig: Signature,
-        child_sig: Signature,
+        cond_sig: Box<Signature>,
+        child_sig: Box<Signature>,
     },
     /// The conditional container's branching value does not match the number of children.
     #[error("The conditional container's branch Sum input should be a sum with {expected_count} elements, but it had {} elements. Sum rows: {actual_sum_rows:?}",
