@@ -301,7 +301,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> ModuleBuilder<T> {
 
 #[cfg(test)]
 mod test {
-    use std::collections::{HashMap, HashSet};
+    use std::collections::{BTreeMap, HashSet};
 
     use cool_asserts::assert_matches;
 
@@ -353,7 +353,7 @@ mod test {
         let added = mb
             .link_view_by_node(
                 &dfg,
-                HashMap::from([
+                BTreeMap::from([
                     (defn.node(), NodeLinkingDirective::add()),
                     (decl.node(), NodeLinkingDirective::add()),
                 ]),
@@ -375,7 +375,7 @@ mod test {
         );
         mb.link_hugr_by_node(
             dfg,
-            HashMap::from([
+            BTreeMap::from([
                 (main, NodeLinkingDirective::add()),
                 (decl.node(), NodeLinkingDirective::UseExisting(n_defn)),
                 (defn.node(), NodeLinkingDirective::replace([n_decl])),
