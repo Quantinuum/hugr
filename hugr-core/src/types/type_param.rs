@@ -60,7 +60,7 @@ pub type TypeParam = Term;
 /// The main entity in the static language (aka "type system") of Hugr.
 ///
 /// Terms include types (i.e. which describe sets of runtime values)
-/// but also other compile-time entities which can be used to parametrize
+/// but also other compile-time entities which can be used to parameterize
 /// and instantiate functions, ops, and types. (For example, array lengths
 /// are not types but they are static parameters of array types and ops.)
 ///

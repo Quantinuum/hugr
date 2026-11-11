@@ -1,4 +1,4 @@
-"""Visualise HUGR using graphviz."""
+"""Visualize HUGR using graphviz."""
 
 import html
 from collections.abc import Iterable

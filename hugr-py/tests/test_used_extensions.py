@@ -1,5 +1,7 @@
 # ruff: noqa: I001
 
+from pathlib import Path
+
 import hugr
 from hugr.ext import UsedExtensionResolver, ExtensionRegistry
 from hugr.package import Package
@@ -11,9 +13,20 @@ from hugr.build import Dfg
 from hugr.std.collections.list import List
 from hugr.std.float import FLOAT_TYPES_EXTENSION
 from hugr.std.int import CONVERSIONS_EXTENSION, INT_T, INT_TYPES_EXTENSION
+from hugr.std import _std_extensions
 import pytest
 
 from .conftest import H, QUANTUM_EXT, TEST_EXT, TEST_TYPE_OPAQUE, TEST_OP_OPAQUE
+
+
+def test_std_extensions_match_json_defs() -> None:
+    """The standard registry must include every bundled JSON extension."""
+    json_defs = Path(hugr.std.__file__).parent / "_json_defs"
+    bundled_extensions = {
+        ".".join(path.relative_to(json_defs).with_suffix("").parts)
+        for path in json_defs.rglob("*.json")
+    }
+    assert bundled_extensions == set(_std_extensions().ids())
 
 
 def test_extension_ops() -> None:

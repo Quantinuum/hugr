@@ -39,9 +39,15 @@ entry_block:                                      ; preds = %alloca_block
   %13 = mul i64 2, ptrtoint (ptr getelementptr (i64, ptr null, i32 1) to i64), !dbg !8
   call void @llvm.memcpy.p0.p0.i64(ptr %7, ptr %12, i64 %13, i1 false), !dbg !8
   %array_ptr6 = extractvalue { ptr, ptr, i64 } %11, 0, !dbg !9
+  %array_mask_ptr7 = extractvalue { ptr, ptr, i64 } %11, 1, !dbg !9
+  %array_offset8 = extractvalue { ptr, ptr, i64 } %11, 2, !dbg !9
   call void @free(ptr %array_ptr6), !dbg !9
-  %array_ptr8 = extractvalue { ptr, ptr, i64 } %4, 0, !dbg !10
-  call void @free(ptr %array_ptr8), !dbg !10
+  call void @free(ptr %array_mask_ptr7), !dbg !9
+  %array_ptr10 = extractvalue { ptr, ptr, i64 } %4, 0, !dbg !10
+  %array_mask_ptr11 = extractvalue { ptr, ptr, i64 } %4, 1, !dbg !10
+  %array_offset12 = extractvalue { ptr, ptr, i64 } %4, 2, !dbg !10
+  call void @free(ptr %array_ptr10), !dbg !10
+  call void @free(ptr %array_mask_ptr11), !dbg !10
   ret void
 }
 

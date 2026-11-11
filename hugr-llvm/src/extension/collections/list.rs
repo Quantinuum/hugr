@@ -109,7 +109,7 @@ impl From<ListOp> for ListRtFunc {
     }
 }
 
-/// A helper trait for customising the lowering of [`hugr_core::std_extensions::collections::list`]
+/// A helper trait for customizing the lowering of [`hugr_core::std_extensions::collections::list`]
 /// types, [`hugr_core::ops::constant::CustomConst`]s, and ops.
 pub trait ListCodegen: Clone {
     /// Return the llvm type of [`hugr_core::std_extensions::collections::list::LIST_TYPENAME`].

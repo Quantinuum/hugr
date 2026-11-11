@@ -50,7 +50,7 @@ class BaseOp(ABC, ConfiguredBaseModel):
         """Hook to insert type information from a child dataflow graph."""
 
     def display_name(self) -> str:
-        """Name of the op for visualisation."""
+        """Name of the op for visualization."""
         return self.__class__.__name__
 
     @abstractmethod

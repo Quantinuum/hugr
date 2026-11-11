@@ -1974,11 +1974,11 @@ impl<'a> Context<'a> {
     /// This method supports list terms that contain spliced sublists as long as
     /// the list can be recursively flattened to only contain individual items.
     ///
-    /// To allow for IR constructions that are parameterised by static
+    /// To allow for IR constructions that are parameterized by static
     /// parameters, open lists with spliced variables should be supported where
     /// possible. Closed lists might be required in some places of the IR that
-    /// are not supposed to be parameterised with variables or where such
-    /// parameterisation is not yet supported by the `hugr-core` structures that
+    /// are not supposed to be parameterized with variables or where such
+    /// parameterization is not yet supported by the `hugr-core` structures that
     /// we are importing into.
     fn import_closed_list(
         &mut self,

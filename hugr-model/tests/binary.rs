@@ -82,3 +82,35 @@ pub fn test_entrypoint() {
 pub fn test_versioned_symbols() {
     binary_roundtrip(include_str!("fixtures/model-versioned-symbols.edn"));
 }
+
+#[test]
+fn signed_zero_literals_preserve_their_sign() {
+    // Signed zeroes affect `atan2`: for example, `atan2(+0.0, -0.0)` is +π,
+    // whereas `atan2(+0.0, +0.0)` is +0.0. They must not be merged on round-trip.
+    for values in [[0.0_f64, -0.0_f64], [-0.0_f64, 0.0_f64]] {
+        let source = format!(
+            "(hugr 0) (mod) (meta {:?}) (meta {:?})",
+            values[0], values[1]
+        );
+        let package: ast::Package = source.parse().unwrap();
+        let bump = Bump::new();
+        let resolved = package.resolve(&bump).unwrap();
+        let bytes = model::binary::write_to_vec(&resolved);
+        let decoded = model::binary::read_from_slice(&bytes, &bump).unwrap();
+        let restored = decoded.as_ast().unwrap();
+
+        let actual: Vec<_> = restored.modules[0]
+            .root
+            .meta
+            .iter()
+            .map(|term| {
+                let ast::Term::Literal(model::Literal::Float(value)) = term else {
+                    panic!("expected float literal");
+                };
+                value.0.to_bits()
+            })
+            .collect();
+
+        assert_eq!(actual, values.map(f64::to_bits));
+    }
+}
