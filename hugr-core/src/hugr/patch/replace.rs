@@ -408,8 +408,9 @@ impl<HostNode: HugrNode> PatchHugrMut for Replacement<HostNode> {
             }
         }
 
-        // 7. Remove remaining nodes
-        for n in to_remove {
+        // 7. Remove remaining nodes in a stable order, as their indices may be
+        // reused by subsequent allocations.
+        for n in to_remove.into_iter().sorted() {
             h.remove_node(n);
         }
         Ok(node_map)
