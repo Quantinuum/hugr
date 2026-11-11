@@ -722,7 +722,6 @@ fn gather_existing<'a, H: HugrView + ?Sized>(h: &'a H) -> HashMap<&'a str, PubFu
 /// target Hugr.
 ///
 /// For use with [HugrLinking::insert_link_hugr_by_node] and [HugrLinking::insert_link_view_by_node].
-/// Directives are checked in source-node order.
 pub type NodeLinkingDirectives<SN, TN> = BTreeMap<SN, NodeLinkingDirective<TN>>;
 
 /// Details a concrete action to link a specific node from source Hugr into a specific target Hugr.
