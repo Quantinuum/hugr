@@ -214,12 +214,12 @@ impl<'a> TypeExtensionResolver<'a> {
                     self.extensions,
                 ),
                 #[expect(deprecated)]
-                None => ExtensionResolutionError::missing_type_extension(
+                None => ExtensionResolutionError::MissingTypeExtension {
                     node,
-                    custom.name(),
-                    ext_id,
-                    self.extensions,
-                ),
+                    ty: custom.name().clone(),
+                    missing_extension: ext_id.clone(),
+                    available_extensions: self.extensions.ids().cloned().collect(),
+                },
             })?;
 
         self.used_extensions

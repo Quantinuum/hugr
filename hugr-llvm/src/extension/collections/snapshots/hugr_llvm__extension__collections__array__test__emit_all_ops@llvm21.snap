@@ -45,6 +45,7 @@ entry_block:                                      ; preds = %alloca_block
   %15 = add i64 %array_offset, 1, !dbg !9
   %16 = getelementptr inbounds i64, ptr %array_ptr, i64 %15, !dbg !9
   %17 = load i64, ptr %16, align 4, !dbg !9
+  call void @free(ptr %array_ptr), !dbg !9
   %array_ptr9 = extractvalue { ptr, i64 } %3, 0, !dbg !10
   %array_offset10 = extractvalue { ptr, i64 } %3, 1, !dbg !10
   %18 = icmp ult i64 0, 2, !dbg !10
@@ -263,11 +264,11 @@ cond_exit_64:                                     ; preds = %cond_64_case_1, %co
 
 declare ptr @malloc(i64)
 
+declare void @free(ptr)
+
 declare i32 @printf(ptr, ...)
 
 declare void @abort()
-
-declare void @free(ptr)
 
 !llvm.module.flags = !{!0}
 !llvm.dbg.cu = !{!1}

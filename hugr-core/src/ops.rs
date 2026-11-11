@@ -100,6 +100,7 @@ pub mod custom;
 pub mod dataflow;
 pub mod handle;
 pub mod module;
+mod sealed;
 pub mod sum;
 pub mod tag;
 pub mod validate;
@@ -405,7 +406,6 @@ impl OpType {
     ///
     /// See [`OpType::value_input_ports`] and [`OpType::value_output_ports`].
     #[inline]
-    #[must_use]
     pub fn value_ports(&self, dir: Direction) -> impl DoubleEndedIterator<Item = Port> {
         (0..self.value_port_count(dir)).map(move |i| Port::new(dir, i))
     }
@@ -433,7 +433,6 @@ impl OpType {
 
     /// Return the dataflow value input ports for the given direction.
     #[inline]
-    #[must_use]
     pub fn value_input_ports(&self) -> impl DoubleEndedIterator<Item = IncomingPort> {
         self.value_ports(Direction::Incoming)
             .map(|p| p.as_incoming().unwrap())
@@ -441,7 +440,6 @@ impl OpType {
 
     /// Return the dataflow value output ports for the given direction.
     #[inline]
-    #[must_use]
     pub fn value_output_ports(&self) -> impl DoubleEndedIterator<Item = OutgoingPort> {
         self.value_ports(Direction::Outgoing)
             .map(|p| p.as_outgoing().unwrap())
@@ -569,18 +567,15 @@ pub trait StaticTag {
 }
 
 #[enum_dispatch]
-/// Trait implemented by all `OpType` variants.
-pub trait OpTrait: Sized + Clone {
+/// Trait implemented by [`OpType`] and its variants.
+///
+/// This trait is sealed.
+pub trait OpTrait: sealed::Sealed + Sized + Clone {
     /// A human-readable description of the operation.
     fn description(&self) -> &str;
 
     /// Returns an exhaustive string representation of the operation.
-    fn render_str(&self, _config: RenderStringConfig) -> String {
-        // TODO: Remove this default implementation with the next breaking release.
-        unimplemented!(
-            "This operation is relying on the default undefined render_str implementation, implement one."
-        )
-    }
+    fn render_str(&self, config: RenderStringConfig) -> String;
 
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag;

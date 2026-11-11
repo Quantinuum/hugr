@@ -40,8 +40,7 @@ pub trait HugrLinking: HugrMut {
         children: NodeLinkingDirectives<HN, Self::Node>,
     ) -> Result<InsertedForest<HN, Self::Node>, NodeLinkingError<HN, Self::Node>> {
         let transfers = check_directives(other, parent, &children)?;
-        // Make a fresh map here, so determinism is not affected by iteration order of the HashMap in `children`.
-        // (This may be slow for large numbers of module-children, but not total size of Hugr)
+        // Deduplicate descendants and preserve source-node order when copying.
         let mut nodes = BTreeSet::new();
         if parent.is_some() {
             nodes.extend(other.entry_descendants());
@@ -723,7 +722,7 @@ fn gather_existing<'a, H: HugrView + ?Sized>(h: &'a H) -> HashMap<&'a str, PubFu
 /// target Hugr.
 ///
 /// For use with [HugrLinking::insert_link_hugr_by_node] and [HugrLinking::insert_link_view_by_node].
-pub type NodeLinkingDirectives<SN, TN> = HashMap<SN, NodeLinkingDirective<TN>>;
+pub type NodeLinkingDirectives<SN, TN> = BTreeMap<SN, NodeLinkingDirective<TN>>;
 
 /// Details a concrete action to link a specific node from source Hugr into a specific target Hugr.
 ///
@@ -747,13 +746,17 @@ pub enum LinkAction<TN> {
 /// of actions (that arise from any [NameLinkingPolicy]) should not affect the linking itself.
 pub type LinkActions<SN, TN> = BTreeMap<SN, LinkAction<TN>>;
 
+/// Checked transfers between source and target nodes.
+///
+/// Ordered maps keep subtree deletion and subsequent node reuse deterministic.
 /// Invariant: no `SourceNode` can be in both maps (by type of [NodeLinkingDirective])
 /// `TargetNode`s can be (in RHS of multiple directives)
 struct Transfers<SourceNode, TargetNode> {
-    use_existing: HashMap<SourceNode, TargetNode>,
-    replace: HashMap<TargetNode, SourceNode>,
+    use_existing: BTreeMap<SourceNode, TargetNode>,
+    replace: BTreeMap<TargetNode, SourceNode>,
 }
 
+/// Validate node directives and collect the required edge transfers.
 fn check_directives<SRC: HugrView, TN: HugrNode>(
     other: &SRC,
     parent: Option<TN>,
@@ -784,8 +787,8 @@ fn check_directives<SRC: HugrView, TN: HugrNode>(
         }
     }
     let mut trns = Transfers {
-        replace: HashMap::default(),
-        use_existing: HashMap::default(),
+        replace: BTreeMap::default(),
+        use_existing: BTreeMap::default(),
     };
     for (&sn, dirv) in children {
         if other.get_parent(sn) != Some(other.module_root()) {
@@ -807,6 +810,7 @@ fn check_directives<SRC: HugrView, TN: HugrNode>(
     Ok(trns)
 }
 
+/// Transfer static edges and delete replaced subtrees in a deterministic order.
 fn link_by_node<SN: HugrNode, TGT: HugrLinking + ?Sized>(
     hugr: &mut TGT,
     transfers: Transfers<SN, TGT::Node>,
@@ -839,7 +843,7 @@ fn replace_static_src<H: HugrMut + ?Sized>(hugr: &mut H, old_src: H::Node, new_s
 
 #[cfg(test)]
 mod test {
-    use std::collections::HashMap;
+    use std::collections::{BTreeMap, HashMap};
 
     use cool_asserts::assert_matches;
     use itertools::Itertools;
@@ -879,7 +883,7 @@ mod test {
         // Specify which decls to transfer. No real "linking" here though.
         for (call1, call2) in [(false, false), (false, true), (true, false), (true, true)] {
             let (insert, defn, decl) = dfg_calling_defn_decl();
-            let mod_children = HashMap::from_iter(
+            let mod_children = BTreeMap::from_iter(
                 call1
                     .then_some((defn.node(), NodeLinkingDirective::add()))
                     .into_iter()
@@ -908,7 +912,7 @@ mod test {
             vec![OpTag::FuncDefn, OpTag::FuncDefn, OpTag::Function]
         );
         let insert = simple_dfg_hugr();
-        let dirvs = HashMap::from([(
+        let dirvs = BTreeMap::from([(
             insert
                 .children(insert.module_root())
                 .exactly_one()
@@ -932,7 +936,7 @@ mod test {
     fn insert_link_nodes_use_existing() {
         let (insert, defn, decl) = dfg_calling_defn_decl();
         let mut chmap =
-            HashMap::from([defn.node(), decl.node()].map(|n| (n, NodeLinkingDirective::add())));
+            BTreeMap::from([defn.node(), decl.node()].map(|n| (n, NodeLinkingDirective::add())));
         let (h, node_map) = {
             let mut h = simple_dfg_hugr();
             let res = h
@@ -993,7 +997,7 @@ mod test {
         let r = h.insert_link_view_by_node(
             Some(h.entrypoint()),
             &insert,
-            HashMap::from([(epp, NodeLinkingDirective::add())]),
+            BTreeMap::from([(epp, NodeLinkingDirective::add())]),
         );
         assert_eq!(
             r.err().unwrap(),
@@ -1005,7 +1009,7 @@ mod test {
         let r = h.insert_link_view_by_node(
             Some(h.entrypoint()),
             &insert,
-            HashMap::from([(inp, NodeLinkingDirective::add())]),
+            BTreeMap::from([(inp, NodeLinkingDirective::add())]),
         );
         assert_eq!(r.err().unwrap(), NodeLinkingError::NotChildOfRoot(inp));
         assert_eq!(h, backup);
@@ -1015,7 +1019,7 @@ mod test {
         let r = h.insert_link_view_by_node(
             Some(h.module_root()),
             &insert,
-            HashMap::from([(
+            BTreeMap::from([(
                 defn,
                 NodeLinkingDirective::UseExisting(h.get_parent(h.entrypoint()).unwrap()),
             )]),
@@ -1030,7 +1034,7 @@ mod test {
         let r = h.insert_link_hugr_by_node(
             Some(h.module_root()),
             insert,
-            HashMap::from([(decl, NodeLinkingDirective::add())]),
+            BTreeMap::from([(decl, NodeLinkingDirective::add())]),
         );
         assert_eq!(r.err().unwrap(), NodeLinkingError::ChildOfEntrypoint(decl));
         assert_eq!(h, backup);
@@ -1046,7 +1050,7 @@ mod test {
         let r = h.insert_link_hugr_by_node(
             Some(h.entrypoint()),
             insert,
-            HashMap::from([
+            BTreeMap::from([
                 (decl.node(), NodeLinkingDirective::replace([tmp])),
                 (defn.node(), NodeLinkingDirective::replace([tmp])),
             ]),
@@ -1055,7 +1059,7 @@ mod test {
             r.err().unwrap(),
             NodeLinkingError::NodeMultiplyReplaced(tn, sn1, sn2) => {
                 assert_eq!(tmp, tn);
-                assert_eq!([sn1,sn2].into_iter().sorted().collect_vec(), [defn.node(), decl.node()]);
+                assert_eq!([sn1, sn2], [defn.node(), decl.node()]);
         });
     }
 
@@ -1072,7 +1076,7 @@ mod test {
             .insert_link_hugr_by_node(
                 Some(h.entrypoint()),
                 insert,
-                HashMap::from([
+                BTreeMap::from([
                     (defn.node(), NodeLinkingDirective::replace([temp])),
                     (decl.node(), NodeLinkingDirective::UseExisting(temp)),
                 ]),

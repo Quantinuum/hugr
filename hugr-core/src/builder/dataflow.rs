@@ -466,7 +466,7 @@ impl<T> HugrBuilder for DFGWrapper<Hugr, T> {
 pub(crate) mod test {
     use cool_asserts::assert_matches;
     use rstest::rstest;
-    use std::collections::HashMap;
+    use std::collections::BTreeMap;
 
     use crate::builder::build_traits::DataflowHugr;
     use crate::builder::test::dfg_calling_defn_decl;
@@ -771,7 +771,7 @@ pub(crate) mod test {
         } else {
             NodeLinkingDirective::add()
         };
-        let link_spec = HashMap::from([
+        let link_spec = BTreeMap::from([
             (ins_defn.node(), NodeLinkingDirective::add()),
             (ins_decl.node(), decl_mode),
         ]);
