@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.30.3](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.30.2...hugr-llvm-v0.30.3) - 2026-09-30
+
+### Documentation
+
+- Use Oxford spelling consistently in public documentation ([#3273](https://github.com/Quantinuum/hugr/pull/3273))
+
+### New Features
+
+- Add `math` extension with LLVM intrinsic lowering  ([#3277](https://github.com/Quantinuum/hugr/pull/3277))
+
 ## [0.30.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.29.4...hugr-llvm-v0.30.0) - 2026-09-03
 
 ### Performance

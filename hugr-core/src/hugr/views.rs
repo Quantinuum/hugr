@@ -424,9 +424,6 @@ pub trait HugrView: HugrInternals {
     ///
     /// The hierarchy is represented using subgraphs. Edges are labelled with
     /// their source and target ports.
-    ///
-    /// For a more detailed representation, use the [`HugrView::dot_string`]
-    /// format instead.
     fn mermaid_string(&self) -> String {
         self.mermaid_string_with_formatter(self.mermaid_format())
     }
@@ -436,9 +433,6 @@ pub trait HugrView: HugrInternals {
     ///
     /// The hierarchy is represented using subgraphs. Edges are labelled with
     /// their source and target ports.
-    ///
-    /// For a more detailed representation, use the [`HugrView::dot_string`]
-    /// format instead.
     fn mermaid_string_with_formatter(&self, formatter: MermaidFormatter<Self>) -> String;
 
     /// Construct a mermaid representation of the underlying hierarchical graph.
@@ -448,16 +442,14 @@ pub trait HugrView: HugrInternals {
     ///
     /// The hierarchy is represented using subgraphs. Edges are labelled with
     /// their source and target ports.
-    ///
-    /// For a more detailed representation, use the [`HugrView::dot_string`]
-    /// format instead.
     fn mermaid_format(&self) -> MermaidFormatter<'_, Self> {
         MermaidFormatter::new(self).with_entrypoint(self.entrypoint())
     }
 
     /// Return the graphviz representation of the underlying graph and hierarchy side by side.
     ///
-    /// For a simpler representation, use the [`HugrView::mermaid_string`] format instead.
+    /// Deprecated, use the [`HugrView::mermaid_string`] format instead.
+    #[deprecated(since = "0.29.4", note = "Use `mermaid_string` instead.")]
     fn dot_string(&self) -> String
     where
         Self: Sized;

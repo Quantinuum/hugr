@@ -4,6 +4,7 @@ use std::borrow::Cow;
 
 use super::dataflow::DataflowOpTrait;
 use super::{OpTag, impl_op_name};
+use crate::hugr::views::render::RenderStringConfig;
 use crate::types::{EdgeKind, Signature, Type, TypeRow, TypeRowLike};
 use crate::{Direction, Port, PortIndex};
 
@@ -48,6 +49,29 @@ impl DataflowOpTrait for Tag {
     /// A human-readable description of the operation.
     fn description(&self) -> &'static str {
         "Tag Sum operation"
+    }
+
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        let content = match &self.variants[..] {
+            [val] => {
+                if val.is_empty() {
+                    "Unit"
+                } else {
+                    "Tuple"
+                }
+            }
+            [left, right] => {
+                if left.is_empty() && right.is_empty() {
+                    if self.tag == 0 { "False" } else { "True" }
+                } else if left.is_empty() {
+                    if self.tag == 0 { "None" } else { "Some" }
+                } else {
+                    if self.tag == 0 { "Left" } else { "Right" }
+                }
+            }
+            _ => &self.tag.to_string(),
+        };
+        "Tag(".to_string() + content + ")"
     }
 
     /// The signature of the operation.

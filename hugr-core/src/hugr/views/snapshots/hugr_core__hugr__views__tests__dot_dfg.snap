@@ -1,6 +1,6 @@
 ---
 source: hugr-core/src/hugr/views/tests.rs
-expression: h.dot_string()
+expression: dot
 ---
 digraph {
 0 [shape=plain label=<<table border="1"><tr><td align="text" border="0" colspan="1">(0) Module</td></tr></table>>]

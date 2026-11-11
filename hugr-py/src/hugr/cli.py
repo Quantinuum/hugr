@@ -49,7 +49,7 @@ def validate(
         hugr_bytes: The HUGR package as bytes.
         no_std: Don't use standard extensions when validating hugrs.
             Prelude is still used (default: False).
-        extensions: Paths to additional serialised extensions needed to load the HUGR.
+        extensions: Paths to additional serialized extensions needed to load the HUGR.
 
     Raises:
         HugrCliError: On validation failure or other CLI errors.
@@ -175,7 +175,7 @@ def describe_str(
             in module metadata (default: False).
         no_std: Don't use standard extensions when validating hugrs.
             Prelude is still used (default: False).
-        extensions: Paths to additional serialised extensions needed to load the HUGR.
+        extensions: Paths to additional serialized extensions needed to load the HUGR.
 
     Returns:
         Text description of the package.
@@ -225,7 +225,7 @@ def describe(
             in module metadata (default: False).
         no_std: Don't use standard extensions when validating hugrs.
             Prelude is still used (default: False).
-        extensions: Paths to additional serialised extensions needed to load the HUGR.
+        extensions: Paths to additional serialized extensions needed to load the HUGR.
 
     Returns:
         Structured package description as a PackageDesc object.
@@ -273,7 +273,7 @@ def convert(
             22 is best compression). (default None, uses the zstd default).
         no_std: Don't use standard extensions when validating hugrs.
             Prelude is still used (default: False).
-        extensions: Paths to additional serialised extensions needed to load the HUGR.
+        extensions: Paths to additional serialized extensions needed to load the HUGR.
 
     Returns:
         Converted package as bytes.
@@ -311,7 +311,7 @@ def mermaid(
             (default: False).
         no_std: Don't use standard extensions when validating hugrs.
             Prelude is still used (default: False).
-        extensions: Paths to additional serialised extensions needed to load the HUGR.
+        extensions: Paths to additional serialized extensions needed to load the HUGR.
 
     Returns:
         Mermaid diagram output as a string.

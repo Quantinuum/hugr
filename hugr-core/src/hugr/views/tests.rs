@@ -70,7 +70,9 @@ fn node_connections(
 #[case::module("dot_module", crate::builder::test::simple_module_hugr())]
 #[cfg_attr(miri, ignore)] // Opening files is not supported in (isolated) miri
 fn dot_string(#[case] test_name: &str, #[case] h: Hugr) {
-    insta::assert_snapshot!(test_name, h.dot_string());
+    #[expect(deprecated)]
+    let dot = h.dot_string();
+    insta::assert_snapshot!(test_name, dot);
 }
 
 /// Render some hugrs into mermaid format.

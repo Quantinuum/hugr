@@ -121,7 +121,7 @@ impl<'a, H: HugrView<Node = Node> + 'a> CodegenExtsBuilder<'a, H> {
         self
     }
 
-    /// Register a callback to materialise a constant implemented by `CC`.
+    /// Register a callback to materialize a constant implemented by `CC`.
     pub fn custom_const<CC: CustomConst>(
         mut self,
         handler: impl LoadConstantFn<'a, H, CC>,

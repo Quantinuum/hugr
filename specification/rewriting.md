@@ -271,7 +271,7 @@ having input wires and output wires of the same type can be achieved
 using `Replace` (with a set of `identity<T>` nodes) followed by
 `RemoveIdentity`.
 
-## Normalisation
+## Normalization
 
 We envisage that some kind of pass can be used after a rewrite or series
 of rewrites to automatically apply RemoveLoadConstant for any unused

@@ -1,7 +1,7 @@
 //! The operation types for the HUGR.
 //!
 //! Operations represent the nodes in a HUGR graph. Each operation has a type
-//! ([`OpType`]), which determines its behavior, signature, and what kind of
+//! ([`OpType`]), which determines its behaviour, signature, and what kind of
 //! edges can connect to it. We may have different operations:
 //! - Unified representation: All operations are represented by the [`OpType`] enum
 //! - Dataflow operations: Operations like [`DFG`], [`Call`], and [`Input`]/[`Output`]
@@ -112,6 +112,7 @@ use std::cmp::Ordering;
 
 use crate::extension::simple_op::MakeExtensionOp;
 use crate::extension::{ExtensionId, ExtensionRegistry};
+use crate::hugr::views::render::RenderStringConfig;
 use crate::types::{EdgeKind, Signature, Substitution, Type};
 use crate::{Direction, Node, OutgoingPort, Port};
 use crate::{IncomingPort, PortIndex};
@@ -404,7 +405,6 @@ impl OpType {
     ///
     /// See [`OpType::value_input_ports`] and [`OpType::value_output_ports`].
     #[inline]
-    #[must_use]
     pub fn value_ports(&self, dir: Direction) -> impl DoubleEndedIterator<Item = Port> {
         (0..self.value_port_count(dir)).map(move |i| Port::new(dir, i))
     }
@@ -432,7 +432,6 @@ impl OpType {
 
     /// Return the dataflow value input ports for the given direction.
     #[inline]
-    #[must_use]
     pub fn value_input_ports(&self) -> impl DoubleEndedIterator<Item = IncomingPort> {
         self.value_ports(Direction::Incoming)
             .map(|p| p.as_incoming().unwrap())
@@ -440,7 +439,6 @@ impl OpType {
 
     /// Return the dataflow value output ports for the given direction.
     #[inline]
-    #[must_use]
     pub fn value_output_ports(&self) -> impl DoubleEndedIterator<Item = OutgoingPort> {
         self.value_ports(Direction::Outgoing)
             .map(|p| p.as_outgoing().unwrap())
@@ -572,6 +570,14 @@ pub trait StaticTag {
 pub trait OpTrait: Sized + Clone {
     /// A human-readable description of the operation.
     fn description(&self) -> &str;
+
+    /// Returns an exhaustive string representation of the operation.
+    fn render_str(&self, _config: RenderStringConfig) -> String {
+        // TODO: Remove this default implementation with the next breaking release.
+        unimplemented!(
+            "This operation is relying on the default undefined render_str implementation, implement one."
+        )
+    }
 
     /// Tag identifying the operation.
     fn tag(&self) -> OpTag;

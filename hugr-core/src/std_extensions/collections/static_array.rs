@@ -3,7 +3,7 @@
 //! The extension `collections.static_arrays` models globally available constant
 //! arrays of [`TypeBound::Copyable`] values.
 //!
-//! The type `static_array<T>` is parameterised by its element type. Note that
+//! The type `static_array<T>` is parameterized by its element type. Note that
 //! unlike `collections.array.array` the length of a static array is not tracked
 //! in type args.
 //!

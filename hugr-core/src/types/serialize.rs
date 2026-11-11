@@ -223,7 +223,7 @@ impl From<TermSer> for Term {
     }
 }
 
-/// Helper type that serialises lists as JSON arrays for compatibility.
+/// Helper type that serializes lists as JSON arrays for compatibility.
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub(super) enum ArrayOrTermSer {

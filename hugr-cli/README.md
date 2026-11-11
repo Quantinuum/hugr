@@ -9,7 +9,7 @@ hugr-cli
 [![codecov][]](https://codecov.io/gh/quantinuum/hugr)
 
 `hugr` CLI tool for common tasks on serialized HUGR (e.g. validation,
-visualisation).
+visualization).
 
 Refer to the [main HUGR crate](http://crates.io/crates/hugr) for more information.
 

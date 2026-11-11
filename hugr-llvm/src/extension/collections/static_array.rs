@@ -153,7 +153,7 @@ fn build_read_len<'c>(
     Ok(builder.build_load(len_ty, len_ptr, "")?.into_int_value())
 }
 
-/// A helper trait for customising the lowering of [`hugr_core::std_extensions::collections::static_array`]
+/// A helper trait for customizing the lowering of [`hugr_core::std_extensions::collections::static_array`]
 /// types, [`hugr_core::ops::constant::CustomConst`]s, and ops.
 pub trait StaticArrayCodegen: Clone {
     /// Emit a
