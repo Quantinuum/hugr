@@ -133,6 +133,8 @@ entry_block:                                      ; preds = %alloca_block
   call void @__barray_mask_check_not_borrowed(ptr %array_mask_ptr, i64 %17), !dbg !12
   %18 = getelementptr inbounds i64, ptr %array_ptr, i64 %17, !dbg !12
   %19 = load i64, ptr %18, align 4, !dbg !12
+  call void @free(ptr %array_ptr), !dbg !12
+  call void @free(ptr %array_mask_ptr), !dbg !12
   store i64 %16, ptr %"14_0", align 4, !dbg !12
   store i64 %19, ptr %"14_1", align 4, !dbg !12
   store i64 0, ptr %"8_0", align 4
