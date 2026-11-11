@@ -1016,6 +1016,8 @@ class ModelImport:
 
     def import_value(self, term: model.Term) -> val.Value:
         match term:
+            case model.Literal(value) if isinstance(value, float):
+                return FloatVal(value)
             case model.Apply(
                 "arithmetic.int.const",
                 [

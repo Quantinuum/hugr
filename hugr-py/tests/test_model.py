@@ -99,3 +99,33 @@ def test_block_import_requires_sum_output(block_model, outputs: list[tys.Type]):
         ModelImportError, match="expects a sum as its first output type"
     ):
         Package.from_model(package)
+
+
+def test_import_const(block_model):
+    model_str = """(hugr 0)
+(mod)
+
+(define-func public example.const_literals
+  (core.fn [] [prelude.usize prelude.string arithmetic.float.types.float64])
+  (dfg [] [%0 %1 %2 %3]
+   (signature (core.fn [] [prelude.usize
+                           prelude.string
+                           arithmetic.float.types.float64
+                           arithmetic.float.types.float64
+                          ]
+              )
+   )
+
+   ((core.load_const prelude.string "hello") [] [%1]
+    (signature (core.fn [] [prelude.string])))
+   ((core.load_const prelude.usize 42) [] [%0]
+    (signature (core.fn [] [prelude.usize])))
+   ((core.load_const arithmetic.float.types.float64 3.14) [] [%2]
+    (signature (core.fn [] [arithmetic.float.types.float64])))
+   ((core.load_const 3.14) [] [%3]
+    (signature (core.fn [] [arithmetic.float.types.float64])))
+  )
+)
+"""
+    # Shouldn't panic
+    model.Package.from_str(model_str)
