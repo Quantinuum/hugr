@@ -517,9 +517,12 @@ pub trait Dataflow: Container {
     }
 
     /// Return a builder for a [`crate::ops::TailLoop`] node.
-    /// The `inputs` must be an iterable over pairs of the type of the input and
-    /// the corresponding wire.
-    /// The `output_types` are the types of the outputs.
+    /// `just_inputs` contains the types and wires for inputs that are not
+    /// loop-carried.
+    /// `inputs_outputs` contains the types and wires for loop-carried inputs
+    /// and outputs.
+    /// `just_out_types` contains the types of outputs that are not
+    /// loop-carried.
     ///
     /// # Errors
     ///
