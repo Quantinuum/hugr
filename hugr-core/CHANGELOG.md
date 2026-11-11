@@ -1,6 +1,29 @@
 # Changelog
 
 
+## [0.31.0](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.30.3...hugr-core-v0.31.0) - 2026-11-11
+
+### Bug Fixes
+
+- [**breaking**] Show correct child signature in conditional error ([#3299](https://github.com/Quantinuum/hugr/pull/3299))
+- Replace non-deterministic iterations on hash maps ([#3055](https://github.com/Quantinuum/hugr/pull/3055))
+- [**breaking**] order linking transfers and rely on early adoption validation ([#3331](https://github.com/Quantinuum/hugr/pull/3331))
+- Fix mismatched ListValue serialization format ([#3250](https://github.com/Quantinuum/hugr/pull/3250))
+
+### Documentation
+
+- Update `tail_loop_builder` argument documentation ([#3328](https://github.com/Quantinuum/hugr/pull/3328))
+
+### New Features
+
+- *(model)* Parse const floats ([#3263](https://github.com/Quantinuum/hugr/pull/3263))
+
+### Refactor
+
+- [**breaking**] use ordered node linking directives ([#3332](https://github.com/Quantinuum/hugr/pull/3332))
+- [**breaking**] Seal the `OpTrait` trait ([#3334](https://github.com/Quantinuum/hugr/pull/3334))
+- [**breaking**] remove deprecated extension error constructors ([#3333](https://github.com/Quantinuum/hugr/pull/3333))
+
 ## [0.30.3](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.30.2...hugr-core-v0.30.3) - 2026-09-30
 
 ### Bug Fixes

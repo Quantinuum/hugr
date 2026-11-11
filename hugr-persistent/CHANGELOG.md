@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.7.13](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.7.12...hugr-persistent-v0.7.13) - 2026-11-11
+
+### Bug Fixes
+
+- Replace non-deterministic iterations on hash maps ([#3055](https://github.com/Quantinuum/hugr/pull/3055))
+
 ## [0.7.12](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.7.11...hugr-persistent-v0.7.12) - 2026-09-30
 
 ### Documentation

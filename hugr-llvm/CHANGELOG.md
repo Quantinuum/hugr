@@ -1,6 +1,14 @@
 # Changelog
 
 
+## [0.31.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.30.3...hugr-llvm-v0.31.0) - 2026-11-11
+
+### Bug Fixes
+
+- *(hugr-llvm)* free borrow array mask on discard ([#3321](https://github.com/Quantinuum/hugr/pull/3321))
+- *(hugr-llvm)* free borrow mask when converting to an array ([#3322](https://github.com/Quantinuum/hugr/pull/3322))
+- *(hugr-llvm)* free arrays after unpacking ([#3324](https://github.com/Quantinuum/hugr/pull/3324))
+
 ## [0.30.3](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.30.2...hugr-llvm-v0.30.3) - 2026-09-30
 
 ### Documentation
