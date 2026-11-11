@@ -100,6 +100,10 @@ impl OperationDeclaration {
             extension_ref,
         )?;
 
+        #[expect(
+            clippy::iter_over_hash_type,
+            reason = "copying independent map entries is deterministic"
+        )]
         for (k, v) in &self.misc {
             op_def.add_misc(k, v.clone());
         }

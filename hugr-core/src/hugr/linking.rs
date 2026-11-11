@@ -746,13 +746,17 @@ pub enum LinkAction<TN> {
 /// of actions (that arise from any [NameLinkingPolicy]) should not affect the linking itself.
 pub type LinkActions<SN, TN> = BTreeMap<SN, LinkAction<TN>>;
 
+/// Checked transfers between source and target nodes.
+///
+/// Ordered maps keep subtree deletion and subsequent node allocation deterministic.
 /// Invariant: no `SourceNode` can be in both maps (by type of [NodeLinkingDirective])
 /// `TargetNode`s can be (in RHS of multiple directives)
 struct Transfers<SourceNode, TargetNode> {
-    use_existing: HashMap<SourceNode, TargetNode>,
-    replace: HashMap<TargetNode, SourceNode>,
+    use_existing: BTreeMap<SourceNode, TargetNode>,
+    replace: BTreeMap<TargetNode, SourceNode>,
 }
 
+/// Validate node directives and collect the required edge transfers.
 fn check_directives<SRC: HugrView, TN: HugrNode>(
     other: &SRC,
     parent: Option<TN>,
@@ -783,8 +787,8 @@ fn check_directives<SRC: HugrView, TN: HugrNode>(
         }
     }
     let mut trns = Transfers {
-        replace: HashMap::default(),
-        use_existing: HashMap::default(),
+        replace: BTreeMap::new(),
+        use_existing: BTreeMap::new(),
     };
     for (&sn, dirv) in children {
         if other.get_parent(sn) != Some(other.module_root()) {
@@ -806,6 +810,7 @@ fn check_directives<SRC: HugrView, TN: HugrNode>(
     Ok(trns)
 }
 
+/// Transfer static edges and delete replaced subtrees in a deterministic order.
 fn link_by_node<SN: HugrNode, TGT: HugrLinking + ?Sized>(
     hugr: &mut TGT,
     transfers: Transfers<SN, TGT::Node>,

@@ -32,8 +32,9 @@ use crate::{
 };
 use hugr_model::v0::table;
 use hugr_model::v0::{self as model};
+use indexmap::IndexMap;
 use itertools::{Either, Itertools};
-use rustc_hash::FxHashMap;
+use rustc_hash::{FxBuildHasher, FxHashMap};
 use serde::Deserialize as _;
 use smol_str::{SmolStr, ToSmolStr};
 use thiserror::Error;
@@ -299,7 +300,7 @@ struct Context<'a> {
 
     /// The ports that are part of each link. This is used to connect the ports at the end of the
     /// import process.
-    link_ports: FxHashMap<(table::RegionId, table::LinkIndex), Vec<(Node, Port)>>,
+    link_ports: IndexMap<(table::RegionId, table::LinkIndex), Vec<(Node, Port)>, FxBuildHasher>,
 
     /// Pairs of nodes that should be connected by a static edge.
     /// These are collected during the import process and connected at the end.
@@ -465,7 +466,7 @@ impl<'a> Context<'a> {
             module,
             hugr: Hugr::with_capacity(ModuleOp::new(), capacity.hugr_nodes, capacity.hugr_ports)
                 .expect("a module is always a supported HUGR root"),
-            link_ports: FxHashMap::with_capacity_and_hasher(capacity.link_map, Default::default()),
+            link_ports: IndexMap::with_capacity_and_hasher(capacity.link_map, Default::default()),
             static_edges: Vec::with_capacity(capacity.static_edges),
             extensions,
             nodes: FxHashMap::with_capacity_and_hasher(capacity.node_map, Default::default()),
