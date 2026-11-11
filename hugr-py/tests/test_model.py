@@ -107,9 +107,10 @@ def test_import_const(block_model):
 
 (define-func public example.const_literals
   (core.fn [] [prelude.usize prelude.string arithmetic.float.types.float64])
-  (dfg [] [%0 %1 %2]
+  (dfg [] [%0 %1 %2 %3]
    (signature (core.fn [] [prelude.usize
                            prelude.string
+                           arithmetic.float.types.float64
                            arithmetic.float.types.float64
                           ]
               )
@@ -120,6 +121,8 @@ def test_import_const(block_model):
    ((core.load_const prelude.usize 42) [] [%0]
     (signature (core.fn [] [prelude.usize])))
    ((core.load_const arithmetic.float.types.float64 3.14) [] [%2]
+    (signature (core.fn [] [arithmetic.float.types.float64])))
+   ((core.load_const 3.14) [] [%3]
     (signature (core.fn [] [arithmetic.float.types.float64])))
   )
 )
