@@ -410,12 +410,6 @@ impl<HostNode: HugrNode> PatchHugrMut for Replacement<HostNode> {
         )]
         for (new_parent, &old_parent) in &self.adoptions {
             let new_parent = node_map.get(new_parent).unwrap();
-
-            if h.children(old_parent).next().is_none() {
-                // `old_parent` appeared more than once on the right-hand side of `adoptions`.
-                return Err(ReplaceError::RepeatedAdoptee { node: old_parent });
-            }
-
             while let Some(ch) = h.first_child(old_parent) {
                 h.set_parent(ch, *new_parent);
             }
@@ -507,7 +501,7 @@ pub enum ReplaceError<HostNode = Node> {
     /// [`Replacement::replacement`]
     #[error("Node {0} was not an empty container node in the replacement")]
     InvalidAdoptingParent(Node),
-    /// Some values in [`Replacement::adoptions`] were either descendants of other
+    /// Some values in [`Replacement::adoptions`] were repeated, descendants of other
     /// values, or not descendants of the [`Replacement::removal`]. The nodes
     /// are indicated on a best-effort basis.
     #[error("Nodes not free to be moved into new locations: {0:?}")]
@@ -522,12 +516,6 @@ pub enum ReplaceError<HostNode = Node> {
     /// The [`NewEdgeKind`] was not applicable for the source/target node(s)
     #[error("The edge kind was not applicable to the {0:?} node: {1:?}")]
     BadEdgeKind(Direction, WhichEdgeSpec<HostNode>),
-    /// Some value in [`Replacement::adoptions`] was repeated for multiple parents. The nodes are indicated on a best-effort basis.
-    #[error("Node {node:?} adopted by multiple new parents")]
-    RepeatedAdoptee {
-        /// The node that was repeated
-        node: HostNode,
-    },
 }
 
 /// The three kinds of [`NewEdgeSpec`] that may appear in a [`ReplaceError`]
