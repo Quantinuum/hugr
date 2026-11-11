@@ -1,6 +1,6 @@
 //! Implementation of the `Replace` operation.
 
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::{BTreeSet, HashMap, VecDeque};
 
 use itertools::Itertools;
 use thiserror::Error;
@@ -146,7 +146,7 @@ impl<HostNode: HugrNode, N: Clone> NewEdgeSpec<N, HostNode> {
     fn check_existing_edge(
         &self,
         h: &impl HugrView<Node = HostNode>,
-        legal_src_ancestors: &HashSet<HostNode>,
+        legal_src_ancestors: &BTreeSet<HostNode>,
         err_edge: impl Fn(Self) -> WhichEdgeSpec<HostNode>,
     ) -> Result<(), ReplaceError<HostNode>> {
         if let NewEdgeKind::Static { tgt_pos, .. } | NewEdgeKind::Value { tgt_pos, .. } = self.kind
@@ -202,7 +202,7 @@ impl<HostNode: HugrNode> Replacement<HostNode> {
     fn get_removed_nodes(
         &self,
         h: &impl HugrView<Node = HostNode>,
-    ) -> Result<HashSet<HostNode>, ReplaceError<HostNode>> {
+    ) -> Result<BTreeSet<HostNode>, ReplaceError<HostNode>> {
         // Check the keys of the transfer map too, the values we'll use imminently
         self.adoptions.keys().try_for_each(|&n| {
             (self.replacement.contains_node(n)
@@ -211,7 +211,7 @@ impl<HostNode: HugrNode> Replacement<HostNode> {
             .then_some(())
             .ok_or(ReplaceError::InvalidAdoptingParent(n))
         })?;
-        let mut transferred: HashSet<HostNode> = self.adoptions.values().copied().collect();
+        let mut transferred: BTreeSet<HostNode> = self.adoptions.values().copied().collect();
         if transferred.len() != self.adoptions.values().len() {
             return Err(ReplaceError::AdopteesNotSeparateDescendants(
                 self.adoptions
@@ -222,7 +222,7 @@ impl<HostNode: HugrNode> Replacement<HostNode> {
             ));
         }
 
-        let mut removed = HashSet::new();
+        let mut removed = BTreeSet::new();
         let mut queue = VecDeque::from_iter(self.removal.iter().copied());
         while let Some(n) = queue.pop_front() {
             let new = removed.insert(n);
@@ -410,7 +410,7 @@ impl<HostNode: HugrNode> PatchHugrMut for Replacement<HostNode> {
 
         // 7. Remove remaining nodes in a stable order, as their indices may be
         // reused by subsequent allocations.
-        for n in to_remove.into_iter().sorted() {
+        for n in to_remove {
             h.remove_node(n);
         }
         Ok(node_map)
@@ -423,7 +423,7 @@ fn transfer_edges<'a, SrcNode, TgtNode, HostNode>(
     trans_src: impl Fn(SrcNode) -> Option<HostNode>,
     trans_tgt: impl Fn(TgtNode) -> Option<HostNode>,
     err_spec: impl Fn(NewEdgeSpec<SrcNode, TgtNode>) -> WhichEdgeSpec<HostNode>,
-    legal_src_ancestors: Option<&HashSet<HostNode>>,
+    legal_src_ancestors: Option<&BTreeSet<HostNode>>,
 ) -> Result<(), ReplaceError<HostNode>>
 where
     SrcNode: 'a + HugrNode,
