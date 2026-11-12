@@ -399,7 +399,7 @@ flowchart TB
  2["Output"]
  0 -- #Input --> TailLoop
  1 -- #Extra --> TailLoop
- TailLoop -- #Output --> 2
+ TailLoop -- #Output:#Extra --> 2
  TI0 -- #Return --> TIT
  TIT -- #Input --> TO0
  TI1 -- #Continue --> TIT1
