@@ -118,18 +118,12 @@ pub trait PreludeCodegen: Clone {
     ///
     /// The type of the returned value must match [`Self::error_type`].
     ///
-    /// `const_message` is provided when the message input is loaded directly
-    /// from a HUGR [`ConstString`]. It does not require a constant signal.
-    /// Backends can use it to encode error messages without inspecting LLVM IR.
-    /// Other message inputs are passed as `None`.
-    ///
     /// The default implementation constructs a struct with the given signal and message.
     fn emit_make_error<'c, H: HugrView<Node = Node>>(
         &self,
         ctx: &mut EmitFuncContext<'c, '_, H>,
         signal: BasicValueEnum<'c>,
         message: BasicValueEnum<'c>,
-        _const_message: Option<&ConstString>,
     ) -> Result<BasicValueEnum<'c>> {
         let builder = ctx.builder();
 
@@ -149,6 +143,25 @@ pub trait PreludeCodegen: Clone {
             .into_struct_value();
 
         Ok(err_complete.into())
+    }
+
+    /// Construct an error, with its constant message available when known.
+    ///
+    /// `const_message` is provided when the message input is loaded directly
+    /// from a HUGR [`ConstString`], independently of whether the signal is
+    /// constant. Other message inputs are passed as `None`.
+    ///
+    /// The default implementation delegates to [`Self::emit_make_error`],
+    /// preserving existing overrides. Backends may override this method to
+    /// encode constant error messages without inspecting LLVM IR.
+    fn emit_make_error_with_const_message<'c, H: HugrView<Node = Node>>(
+        &self,
+        ctx: &mut EmitFuncContext<'c, '_, H>,
+        signal: BasicValueEnum<'c>,
+        message: BasicValueEnum<'c>,
+        _const_message: Option<&ConstString>,
+    ) -> Result<BasicValueEnum<'c>> {
+        self.emit_make_error(ctx, signal, message)
     }
 
     /// Emit instructions to halt execution with the error `err`.
@@ -400,7 +413,8 @@ pub fn add_prelude_extensions<'a, H: HugrView<Node = Node> + 'a>(
                 };
                 constant.value().get_custom_value::<ConstString>()
             })();
-            let err = pcg.emit_make_error(context, signal, message, const_message)?;
+            let err =
+                pcg.emit_make_error_with_const_message(context, signal, message, const_message)?;
             args.outputs.finish(context.builder(), [err])
         }
     })
@@ -716,7 +730,7 @@ mod test {
         #[derive(Clone)]
         struct CheckMessage(Option<&'static str>);
         impl PreludeCodegen for CheckMessage {
-            fn emit_make_error<'c, H: HugrView<Node = Node>>(
+            fn emit_make_error_with_const_message<'c, H: HugrView<Node = Node>>(
                 &self,
                 ctx: &mut EmitFuncContext<'c, '_, H>,
                 signal: BasicValueEnum<'c>,
@@ -724,16 +738,48 @@ mod test {
                 const_message: Option<&ConstString>,
             ) -> Result<BasicValueEnum<'c>> {
                 assert_eq!(const_message.map(ConstString::value), self.0);
-                DefaultPreludeCodegen.emit_make_error(ctx, signal, message, const_message)
+                DefaultPreludeCodegen.emit_make_error(ctx, signal, message)
             }
         }
         llvm_ctx.add_extensions(move |ceb| ceb.add_prelude_extensions(CheckMessage(expected)));
+        check_make_error_emission(&llvm_ctx, expected);
+    }
+
+    #[rstest]
+    #[case::literal(Some("Error!"))]
+    #[case::dynamic(None)]
+    fn make_error_existing_override(#[case] message: Option<&str>, mut llvm_ctx: TestContext) {
+        use std::{cell::Cell, rc::Rc};
+
+        #[derive(Clone)]
+        struct ExistingCodegen(Rc<Cell<usize>>);
+        impl PreludeCodegen for ExistingCodegen {
+            // Keep the original hook signature: existing backends must compile
+            // and their overrides must still be called by the default new hook.
+            fn emit_make_error<'c, H: HugrView<Node = Node>>(
+                &self,
+                ctx: &mut EmitFuncContext<'c, '_, H>,
+                signal: BasicValueEnum<'c>,
+                message: BasicValueEnum<'c>,
+            ) -> Result<BasicValueEnum<'c>> {
+                self.0.set(self.0.get() + 1);
+                DefaultPreludeCodegen.emit_make_error(ctx, signal, message)
+            }
+        }
+        let calls = Rc::new(Cell::new(0));
+        let codegen = ExistingCodegen(calls.clone());
+        llvm_ctx.add_extensions(move |ceb| ceb.add_prelude_extensions(codegen.clone()));
+        check_make_error_emission(&llvm_ctx, message);
+        assert_eq!(calls.get(), 1);
+    }
+
+    fn check_make_error_emission(llvm_ctx: &TestContext, message: Option<&str>) {
         let hugr = SimpleHugrConfig::new()
             .with_ins([usize_t(), prelude::string_type()])
             .with_outs([error_type()])
             .finish(|mut builder| {
                 let [signal, dynamic_message] = builder.input_wires_arr();
-                let message = expected.map_or(dynamic_message, |text| {
+                let message = message.map_or(dynamic_message, |text| {
                     builder.add_load_value(ConstString::new(text.into()))
                 });
                 let make_error = PRELUDE
