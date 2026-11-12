@@ -25,7 +25,7 @@ def test_import_version_text():
 
 def test_symbol_escaped_name_text_roundtrip():
     name = "tests.integration.test_basic.test_implicit_return.<locals>.ret"
-    sig = model.Apply("core.fn", [model.List([]), model.List([])])
+    sig = model.Apply("core.fn", (model.List(()), model.List(())))
     symbol = model.Symbol(name, "Public", signature=sig)
 
     text = str(symbol)
@@ -90,10 +90,10 @@ def test_block_import_requires_sum_output(block_model, outputs: list[tys.Type]):
     package, block = block_model
     block.regions[0].signature = model.Apply(
         "core.fn",
-        [
-            model.List([tys.Qubit.to_model()]),
-            model.List([t.to_model() for t in outputs]),
-        ],
+        (
+            model.List((tys.Qubit.to_model(),)),
+            model.List(tuple(t.to_model() for t in outputs)),
+        ),
     )
     with pytest.raises(
         ModelImportError, match="expects a sum as its first output type"

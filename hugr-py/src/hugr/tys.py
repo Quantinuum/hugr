@@ -302,7 +302,7 @@ class ListParam(TypeParam):
 
     def to_model(self) -> model.Term:
         item_type = self.param.to_model()
-        return model.Apply("core.list", [item_type])
+        return model.Apply("core.list", (item_type,))
 
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
@@ -323,8 +323,8 @@ class TupleParam(TypeParam):
         return f"({comma_sep_str(self.params)})"
 
     def to_model(self) -> model.Term:
-        item_types = model.List([param.to_model() for param in self.params])
-        return model.Apply("core.tuple", [item_types])
+        item_types = model.List(tuple(param.to_model() for param in self.params))
+        return model.Apply("core.tuple", (item_types,))
 
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
@@ -351,7 +351,7 @@ class ConstParam(TypeParam):
 
     def to_model(self) -> model.Term:
         ty = cast(model.Term, self.ty.to_model())
-        return model.Apply("core.const", [ty])
+        return model.Apply("core.const", (ty,))
 
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
@@ -487,7 +487,7 @@ class ListArg(TypeArg):
         return f"[{elems}]"
 
     def to_model(self) -> model.Term:
-        return model.List([elem.to_model() for elem in self.elems])
+        return model.List(tuple(elem.to_model() for elem in self.elems))
 
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
@@ -526,7 +526,9 @@ class ListConcatArg(TypeArg):
 
     def to_model(self) -> model.Term:
         return model.List(
-            [model.Splice(cast(model.Term, elem.to_model())) for elem in self.lists]
+            tuple(
+                model.Splice(cast(model.Term, elem.to_model())) for elem in self.lists
+            )
         )
 
     def flatten(self) -> TypeArg:
@@ -572,7 +574,7 @@ class TupleArg(TypeArg):
         return f"({elems})"
 
     def to_model(self) -> model.Term:
-        return model.Tuple([elem.to_model() for elem in self.elems])
+        return model.Tuple(tuple(elem.to_model() for elem in self.elems))
 
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
@@ -611,7 +613,9 @@ class TupleConcatArg(TypeArg):
 
     def to_model(self) -> model.Term:
         return model.Tuple(
-            [model.Splice(cast(model.Term, elem.to_model())) for elem in self.tuples]
+            tuple(
+                model.Splice(cast(model.Term, elem.to_model())) for elem in self.tuples
+            )
         )
 
     def flatten(self) -> TypeArg:
@@ -818,9 +822,12 @@ class Sum(Type):
 
     def to_model(self) -> model.Term:
         variants = model.List(
-            [model.List([typ.to_model() for typ in row]) for row in self.variant_rows]
+            tuple(
+                model.List(tuple(typ.to_model() for typ in row))
+                for row in self.variant_rows
+            )
         )
-        return model.Apply("core.adt", [variants])
+        return model.Apply("core.adt", (variants,))
 
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
@@ -1066,9 +1073,9 @@ class FunctionType(Type):
         return f"{inputs} -> {outputs}"
 
     def to_model(self) -> model.Term:
-        inputs = model.List([input.to_model() for input in self.input])
-        outputs = model.List([output.to_model() for output in self.output])
-        return model.Apply("core.fn", [inputs, outputs])
+        inputs = model.List(tuple(inp.to_model() for inp in self.input))
+        outputs = model.List(tuple(out.to_model() for out in self.output))
+        return model.Apply("core.fn", (inputs, outputs))
 
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None
@@ -1268,7 +1275,7 @@ class Opaque(Type):
     def to_model(self) -> model.Term:
         # This cast is only necessary because `Type` can both be an
         # actual type or a row variable.
-        args = [cast(model.Term, arg.to_model()) for arg in self.args]
+        args = tuple(cast(model.Term, arg.to_model()) for arg in self.args)
 
         if self.extension_version is None:
             name = f"{self.extension}.{self.id}"
@@ -1331,7 +1338,7 @@ class _QubitDef(Type):
         return "Qubit"
 
     def to_model(self) -> model.Term:
-        return model.Apply("prelude.qubit", [])
+        return model.Apply("prelude.qubit")
 
     def _resolve_used_extensions(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None

@@ -38,4 +38,4 @@ class FloatVal(val.ExtensionValue):
         resolver.register(FLOAT_TYPES_EXTENSION)
 
     def to_model(self) -> model.Term:
-        return model.Apply("arithmetic.float.const_f64", [model.Literal(self.v)])
+        return model.Apply("arithmetic.float.const_f64", (model.Literal(self.v),))

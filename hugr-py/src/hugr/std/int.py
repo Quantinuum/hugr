@@ -105,7 +105,7 @@ class IntVal(val.ExtensionValue):
     def to_model(self) -> model.Term:
         unsigned = _to_unsigned(self.v, 1 << self.width)
         return model.Apply(
-            "arithmetic.int.const", [model.Literal(self.width), model.Literal(unsigned)]
+            "arithmetic.int.const", (model.Literal(self.width), model.Literal(unsigned))
         )
 
 
