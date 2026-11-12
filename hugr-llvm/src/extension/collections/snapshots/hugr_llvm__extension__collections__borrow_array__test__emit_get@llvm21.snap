@@ -44,7 +44,10 @@ entry_block:                                      ; preds = %alloca_block
 14:                                               ; preds = %8, %9
   %"0.0" = phi { i1, i64 } [ %13, %9 ], [ { i1 false, i64 poison }, %8 ], !dbg !8
   %array_ptr8 = extractvalue { ptr, ptr, i64 } %4, 0, !dbg !9
+  %array_mask_ptr9 = extractvalue { ptr, ptr, i64 } %4, 1, !dbg !9
+  %array_offset10 = extractvalue { ptr, ptr, i64 } %4, 2, !dbg !9
   call void @free(ptr %array_ptr8), !dbg !9
+  call void @free(ptr %array_mask_ptr9), !dbg !9
   ret void
 }
 

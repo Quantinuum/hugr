@@ -16,7 +16,9 @@ use crate::{Direction, IncomingPort, Port, PortIndex, type_row};
 use {crate::types::proptest_utils::any_serde_type_arg_vec, proptest_derive::Arbitrary};
 
 /// Trait implemented by all dataflow operations.
-pub trait DataflowOpTrait: Sized {
+///
+/// This trait is sealed.
+pub trait DataflowOpTrait: super::sealed::Sealed + Sized {
     /// Tag identifying the operation.
     const TAG: OpTag;
 
@@ -24,10 +26,7 @@ pub trait DataflowOpTrait: Sized {
     fn description(&self) -> &str;
 
     /// Returns a string representation of the operation.
-    fn render_str(&self, _config: RenderStringConfig) -> String {
-        // TODO: Remove this default implementation with the next breaking release.
-        unimplemented!("render_str default implementation is not yet implemented");
-    }
+    fn render_str(&self, config: RenderStringConfig) -> String;
 
     /// The signature of the operation.
     fn signature(&self) -> Cow<'_, Signature>;

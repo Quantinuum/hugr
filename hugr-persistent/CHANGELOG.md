@@ -1,5 +1,21 @@
 # Changelog
 
+## [0.7.13](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.7.12...hugr-persistent-v0.7.13) - 2026-11-11
+
+### Bug Fixes
+
+- Make replacement conflict checks deterministic
+  ([#3055](https://github.com/Quantinuum/hugr/pull/3055)).
+
+## [0.7.12](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.7.11...hugr-persistent-v0.7.12) - 2026-09-30
+
+### Documentation
+
+- Use Oxford spelling consistently in public documentation ([#3273](https://github.com/Quantinuum/hugr/pull/3273))
+
+### New Features
+
+- Add configuration settings to mermaid renderer ([#3207](https://github.com/Quantinuum/hugr/pull/3207))
 
 ## [0.7.0](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.6.1...hugr-persistent-v0.7.0) - 2026-06-05
 

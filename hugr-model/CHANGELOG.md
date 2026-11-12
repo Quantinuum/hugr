@@ -1,6 +1,16 @@
 # Changelog
 
 
+## [0.30.3](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.30.2...hugr-model-v0.30.3) - 2026-09-30
+
+### Bug Fixes
+
+- *(hugr-model)* Preserve signed zero float literals during serialization ([#3278](https://github.com/Quantinuum/hugr/pull/3278))
+
+### Documentation
+
+- Use Oxford spelling consistently in public documentation ([#3273](https://github.com/Quantinuum/hugr/pull/3273))
+
 ## [0.30.0](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.29.4...hugr-model-v0.30.0) - 2026-09-03
 
 ### New Features

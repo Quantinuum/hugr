@@ -1,5 +1,54 @@
 # Changelog
 
+## [0.31.0](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.30.3...hugr-core-v0.31.0) - 2026-11-11
+
+### Bug Fixes
+
+- [**breaking**] Report the actual case and conditional signatures in
+  `ChildrenValidationError::ConditionalCaseSignature`. Replace its `optype` field
+  with `case`, `cond_sig`, and `child_sig` ([#3299](https://github.com/Quantinuum/hugr/pull/3299)).
+- Make graph mutation, linking, and model import deterministic ([#3055](https://github.com/Quantinuum/hugr/pull/3055)).
+- Avoid a debug assertion when `Replacement::adoptions` includes an empty container
+  ([#3055](https://github.com/Quantinuum/hugr/pull/3055)).
+- Accept both legacy Python mappings and canonical sequence payloads for `ListValue`
+  constants ([#3250](https://github.com/Quantinuum/hugr/pull/3250)).
+
+### Documentation
+
+- Correct the `tail_loop_builder` argument documentation
+  ([#3328](https://github.com/Quantinuum/hugr/pull/3328)).
+- Document the equivalence of `arithmetic.math.pow` and `arithmetic.float.fpow`
+  ([#3304](https://github.com/Quantinuum/hugr/pull/3304)).
+
+### New Features
+
+- Import bare floating-point literals as `ConstF64` constants from the model format
+  ([#3263](https://github.com/Quantinuum/hugr/pull/3263)).
+
+### Refactor
+
+- [**breaking**] Use `BTreeMap` for `NodeLinkingDirectives` and the node-linking builder
+  arguments ([#3332](https://github.com/Quantinuum/hugr/pull/3332)).
+- [**breaking**] Seal `OpTrait` and `DataflowOpTrait` and remove their panicking default
+  `render_str` implementations
+  ([#3334](https://github.com/Quantinuum/hugr/pull/3334)).
+- [**breaking**] Remove the deprecated `ExtensionResolutionError::missing_op_extension`
+  and `ExtensionResolutionError::missing_type_extension` constructors ([#3333](https://github.com/Quantinuum/hugr/pull/3333)).
+
+## [0.30.3](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.30.2...hugr-core-v0.30.3) - 2026-09-30
+
+### Bug Fixes
+
+- Avoid encoding panic for invalid hugrs with no i/o nodes ([#3274](https://github.com/Quantinuum/hugr/pull/3274))
+
+### Documentation
+
+- Use Oxford spelling consistently in public documentation ([#3273](https://github.com/Quantinuum/hugr/pull/3273))
+
+### New Features
+
+- Add configuration settings to mermaid renderer ([#3207](https://github.com/Quantinuum/hugr/pull/3207))
+- Add `math` extension with LLVM intrinsic lowering  ([#3277](https://github.com/Quantinuum/hugr/pull/3277))
 
 ## [0.30.2](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.30.1...hugr-core-v0.30.2) - 2026-09-04
 

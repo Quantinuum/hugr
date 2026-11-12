@@ -1,14 +1,13 @@
 use crate::extension::prelude::MakeTuple;
 use crate::hugr::ValidationError;
 use crate::hugr::hugrmut::InsertionResult;
-use crate::hugr::linking::{HugrLinking, NameLinkingPolicy, NodeLinkingDirective};
+use crate::hugr::linking::{HugrLinking, NameLinkingPolicy, NodeLinkingDirectives};
 use crate::hugr::views::HugrView;
 use crate::metadata::Metadata;
 use crate::ops::{self, OpType, Tag, TailLoop};
 use crate::utils::collect_array;
 use crate::{Extension, IncomingPort, Node, OutgoingPort};
 
-use std::collections::HashMap;
 use std::iter;
 use std::sync::Arc;
 
@@ -282,7 +281,7 @@ pub trait Dataflow: Container {
         &mut self,
         hugr: Hugr,
         input_wires: impl IntoIterator<Item = Wire>,
-        defns: HashMap<Node, NodeLinkingDirective>,
+        defns: NodeLinkingDirectives<Node, Node>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let parent = Some(self.container_node());
         let ep = hugr.entrypoint();
@@ -345,7 +344,7 @@ pub trait Dataflow: Container {
         &mut self,
         hugr: &H,
         input_wires: impl IntoIterator<Item = Wire>,
-        defns: HashMap<H::Node, NodeLinkingDirective>,
+        defns: NodeLinkingDirectives<H::Node, Node>,
     ) -> Result<BuildHandle<DataflowOpID>, BuildError> {
         let parent = Some(self.container_node());
         let node = self
@@ -517,9 +516,10 @@ pub trait Dataflow: Container {
     }
 
     /// Return a builder for a [`crate::ops::TailLoop`] node.
-    /// The `inputs` must be an iterable over pairs of the type of the input and
-    /// the corresponding wire.
-    /// The `output_types` are the types of the outputs.
+    /// `just_inputs` contains the types and wires for inputs that are not
+    /// modified during the iteration.
+    /// `inputs_outputs` contains the types and wires for inputs that may be updated on each iteration.
+    /// `just_out_types` contains the types that are the final outputs from the loop.
     ///
     /// # Errors
     ///

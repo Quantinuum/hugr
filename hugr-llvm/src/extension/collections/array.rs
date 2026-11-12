@@ -484,6 +484,7 @@ pub fn emit_array_op<'c, H: HugrView<Node = Node>>(
                 result.push(elem_v);
             }
 
+            ccg.emit_free_array(ctx, array_ptr)?;
             outputs.finish(ctx.builder(), result)
         }
         ArrayOpDef::get => {

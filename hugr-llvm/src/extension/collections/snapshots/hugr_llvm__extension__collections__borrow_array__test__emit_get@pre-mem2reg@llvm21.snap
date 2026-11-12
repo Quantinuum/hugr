@@ -66,7 +66,10 @@ entry_block:                                      ; preds = %alloca_block
   store { ptr, ptr, i64 } %"16", ptr %"9_1", align 8, !dbg !7
   %"9_17" = load { ptr, ptr, i64 }, ptr %"9_1", align 8
   %array_ptr8 = extractvalue { ptr, ptr, i64 } %"9_17", 0, !dbg !9
+  %array_mask_ptr9 = extractvalue { ptr, ptr, i64 } %"9_17", 1, !dbg !9
+  %array_offset10 = extractvalue { ptr, ptr, i64 } %"9_17", 2, !dbg !9
   call void @free(ptr %array_ptr8), !dbg !9
+  call void @free(ptr %array_mask_ptr9), !dbg !9
   ret void
 }
 
