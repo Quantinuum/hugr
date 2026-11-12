@@ -105,11 +105,11 @@ class BorrowArrayVal(val.ExtensionValue):
     def to_model(self) -> model.Term:
         return model.Apply(
             "collections.borrow_array.const",
-            (
+            [
                 model.Literal(len(self.v)),
                 cast(model.Term, self.ty.ty.to_model()),
-                model.List(tuple(value.to_model() for value in self.v)),
-            ),
+                model.List([value.to_model() for value in self.v]),
+            ],
         )
 
     def _resolve_used_extensions_inplace(

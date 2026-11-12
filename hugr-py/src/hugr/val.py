@@ -149,24 +149,24 @@ class Sum(Value):
         )
 
     def to_model(self) -> model.Term:
-        variants = tuple(
-            model.List(tuple(t.to_model() for t in row))
+        variants = [
+            model.List([type.to_model() for type in row])
             for row in self.typ.variant_rows
-        )
-        types = tuple(
-            model.Apply("core.const", (cast(model.Term, t),))
-            for t in variants[self.tag].parts
-        )
-        values = tuple(value.to_model() for value in self.vals)
+        ]
+        types = [
+            model.Apply("core.const", [cast(model.Term, type)])
+            for type in variants[self.tag].parts
+        ]
+        values = [value.to_model() for value in self.vals]
 
         return model.Apply(
             "core.const.adt",
-            (
+            [
                 model.List(variants),
                 model.List(types),
                 model.Literal(self.tag),
                 model.Tuple(values),
-            ),
+            ],
         )
 
     def _resolve_used_extensions_inplace(
@@ -386,7 +386,7 @@ class Extension(Value):
     def to_model(self) -> model.Term:
         type = cast(model.Term, self.typ.to_model())
         json = sops.CustomConst(c=self.name, v=self.val).model_dump_json()
-        return model.Apply("compat.const_json", (type, model.Literal(json)))
+        return model.Apply("compat.const_json", [type, model.Literal(json)])
 
     def _resolve_used_extensions_inplace(
         self, resolver: UsedExtensionResolver, registry: ExtensionRegistry | None = None

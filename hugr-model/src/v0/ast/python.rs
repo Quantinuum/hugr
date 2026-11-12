@@ -9,7 +9,7 @@ use super::{
 use pyo3::{
     PyAny,
     exceptions::PyTypeError,
-    types::{PyAnyMethods, PyStringMethods as _, PyTuple, PyTypeMethods as _},
+    types::{PyAnyMethods, PyStringMethods as _, PyTypeMethods as _},
 };
 
 /// Convert a Python semver value to the AST's compact `major.minor.patch` version.
@@ -138,11 +138,11 @@ impl<'py> pyo3::IntoPyObject<'py> for &Term {
             }
             Term::Apply(symbol_name, terms) => {
                 let py_class = py_module.getattr("Apply")?;
-                py_class.call1((symbol_name, PyTuple::new(py, terms.iter())?))
+                py_class.call1((symbol_name, terms.as_ref()))
             }
             Term::List(parts) => {
                 let py_class = py_module.getattr("List")?;
-                py_class.call1((PyTuple::new(py, parts.iter())?,))
+                py_class.call1((parts.as_ref(),))
             }
             Term::Literal(literal) => {
                 let py_class = py_module.getattr("Literal")?;
@@ -150,7 +150,7 @@ impl<'py> pyo3::IntoPyObject<'py> for &Term {
             }
             Term::Tuple(parts) => {
                 let py_class = py_module.getattr("Tuple")?;
-                py_class.call1((PyTuple::new(py, parts.iter())?,))
+                py_class.call1((parts.as_ref(),))
             }
             Term::Func(region) => {
                 let py_class = py_module.getattr("Func")?;

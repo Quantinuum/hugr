@@ -75,7 +75,7 @@ class ModelExport:
 
         # Add an order hint key to the node if necessary
         if _has_order_links(self.hugr, node):
-            meta.append(model.Apply("core.order_hint.key", (model.Literal(node.idx),)))
+            meta.append(model.Apply("core.order_hint.key", [model.Literal(node.idx)]))
 
         match node_data.op:
             case DFG() as op:
@@ -94,9 +94,7 @@ class ModelExport:
                 name = _versioned_symbol(
                     f"{op.extension}.{op.op_name}", op.extension_version
                 )
-                args = cast(
-                    tuple[model.Term, ...], tuple(arg.to_model() for arg in op.args)
-                )
+                args = cast(list[model.Term], [arg.to_model() for arg in op.args])
                 signature = op.signature.to_model()
 
                 return model.Node(
@@ -112,7 +110,9 @@ class ModelExport:
                 name = _versioned_symbol(
                     op_def.qualified_name(), op_def.get_extension().version
                 )
-                args = tuple(cast(model.Term, arg.to_model()) for arg in op.type_args())
+                args = cast(
+                    list[model.Term], [arg.to_model() for arg in op.type_args()]
+                )
                 signature = op.outer_signature().to_model()
 
                 return model.Node(
@@ -160,7 +160,7 @@ class ModelExport:
                 region = self.export_region_dfg(node)
 
                 if op.visibility == "Private":
-                    meta.append(model.Apply("core.title", (model.Literal(op.f_name),)))
+                    meta.append(model.Apply("core.title", [model.Literal(op.f_name)]))
 
                 return model.Node(
                     operation=model.DefineFunc(symbol), regions=[region], meta=meta
@@ -173,7 +173,7 @@ class ModelExport:
                 )
 
                 if op.visibility == "Private":
-                    meta.append(model.Apply("core.title", (model.Literal(op.f_name),)))
+                    meta.append(model.Apply("core.title", [model.Literal(op.f_name)]))
 
                 return model.Node(operation=model.DeclareFunc(symbol), meta=meta)
 
@@ -200,10 +200,12 @@ class ModelExport:
                 )
 
             case Call() as op:
-                input_types = tuple(t.to_model() for t in op.instantiation.input)
-                output_types = tuple(t.to_model() for t in op.instantiation.output)
+                input_types = [type.to_model() for type in op.instantiation.input]
+                output_types = [type.to_model() for type in op.instantiation.output]
                 signature = op.instantiation.to_model()
-                func_args = tuple(cast(model.Term, t.to_model()) for t in op.type_args)
+                func_args = cast(
+                    list[model.Term], [type.to_model() for type in op.type_args]
+                )
                 func_name = self.find_func_input(node)
 
                 if func_name is None:
@@ -221,11 +223,11 @@ class ModelExport:
                     operation=model.CustomOp(
                         model.Apply(
                             "core.call",
-                            (
+                            [
                                 model.List(input_types),
                                 model.List(output_types),
                                 func,
-                            ),
+                            ],
                         )
                     ),
                     signature=signature,
@@ -237,7 +239,9 @@ class ModelExport:
             case LoadFunc() as op:
                 signature = op.outer_signature().to_model()
                 instantiation = op.instantiation.to_model()
-                func_args = tuple(cast(model.Term, t.to_model()) for t in op.type_args)
+                func_args = cast(
+                    list[model.Term], [type.to_model() for type in op.type_args]
+                )
                 func_name = self.find_func_input(node)
 
                 if func_name is None:
@@ -248,7 +252,7 @@ class ModelExport:
 
                 return model.Node(
                     operation=model.CustomOp(
-                        model.Apply("core.load_const", (instantiation, func))
+                        model.Apply("core.load_const", [instantiation, func])
                     ),
                     signature=signature,
                     inputs=[],
@@ -257,23 +261,31 @@ class ModelExport:
                 )
 
             case CallIndirect() as op:
-                input_types = tuple(t.to_model() for t in op.signature.input)
-                output_types = tuple(t.to_model() for t in op.signature.output)
+                input_types = [type.to_model() for type in op.signature.input]
+                output_types = [type.to_model() for type in op.signature.output]
 
-                inner_func_io = (model.List(input_types), model.List(output_types))
-                func = model.Apply("core.fn", inner_func_io)
+                func = model.Apply(
+                    "core.fn",
+                    [model.List(input_types), model.List(output_types)],
+                )
 
                 signature = model.Apply(
                     "core.fn",
-                    (
-                        model.List((func, *input_types)),
+                    [
+                        model.List([func, *input_types]),
                         model.List(output_types),
-                    ),
+                    ],
                 )
 
                 return model.Node(
                     operation=model.CustomOp(
-                        model.Apply("core.call_indirect", inner_func_io)
+                        model.Apply(
+                            "core.call_indirect",
+                            [
+                                model.List(input_types),
+                                model.List(output_types),
+                            ],
+                        )
                     ),
                     signature=signature,
                     inputs=inputs,
@@ -288,12 +300,12 @@ class ModelExport:
                     error = f"LoadConst node {node} is not connected to a constant."
                     raise ValueError(error)
 
-                type_ = cast(model.Term, op.type_.to_model())
+                type = cast(model.Term, op.type_.to_model())
                 signature = op.outer_signature().to_model()
 
                 return model.Node(
                     operation=model.CustomOp(
-                        model.Apply("core.load_const", (type_, value))
+                        model.Apply("core.load_const", [type, value])
                     ),
                     signature=signature,
                     inputs=[],
@@ -320,20 +332,22 @@ class ModelExport:
             case DataflowBlock() as op:
                 region = self.export_region_dfg(node)
 
-                input_types = (model.List(tuple(t.to_model() for t in op.inputs)),)
-                output_types = tuple(
+                input_types = [model.List([type.to_model() for type in op.inputs])]
+
+                other_output_types = [type.to_model() for type in op.other_outputs]
+                output_types = [
                     model.List(
-                        (
-                            *(t.to_model() for t in row),
-                            *(t.to_model() for t in op.other_outputs),
-                        ),
+                        [
+                            *[type.to_model() for type in row],
+                            *other_output_types,
+                        ]
                     )
                     for row in op.sum_ty.variant_rows
-                )
+                ]
 
                 signature = model.Apply(
                     "core.ctrl",
-                    (model.List(input_types), model.List(output_types)),
+                    [model.List(input_types), model.List(output_types)],
                 )
 
                 return model.Node(
@@ -347,14 +361,14 @@ class ModelExport:
 
             case Tag() as op:
                 variants = model.List(
-                    tuple(
-                        model.List(tuple(t.to_model() for t in row))
+                    [
+                        model.List([type.to_model() for type in row])
                         for row in op.sum_ty.variant_rows
-                    ),
+                    ]
                 )
 
                 types = model.List(
-                    tuple(t.to_model() for t in op.sum_ty.variant_rows[op.tag])
+                    [type.to_model() for type in op.sum_ty.variant_rows[op.tag]]
                 )
 
                 tag = model.Literal(op.tag)
@@ -362,7 +376,7 @@ class ModelExport:
 
                 return model.Node(
                     operation=model.CustomOp(
-                        model.Apply("core.make_adt", (variants, types, tag))
+                        model.Apply("core.make_adt", [variants, types, tag])
                     ),
                     inputs=inputs,
                     outputs=outputs,
@@ -385,7 +399,7 @@ class ModelExport:
             meta.append(
                 model.Apply(
                     "compat.meta_json",
-                    (model.Literal(meta_name), model.Literal(meta_json)),
+                    [model.Literal(meta_name), model.Literal(meta_json)],
                 )
             )
 
@@ -431,7 +445,7 @@ class ModelExport:
 
             match child_data.op:
                 case Input() as op:
-                    source_types = model.List(tuple(t.to_model() for t in op.types))
+                    source_types = model.List([type.to_model() for type in op.types])
                     sources = [
                         self.link_name(OutPort(child, i))
                         for i in range(child_data._num_outs)
@@ -440,12 +454,12 @@ class ModelExport:
                     if _has_order_links(self.hugr, child):
                         meta.append(
                             model.Apply(
-                                "core.order_hint.input_key", (model.Literal(child.idx),)
+                                "core.order_hint.input_key", [model.Literal(child.idx)]
                             )
                         )
 
                 case Output() as op:
-                    target_types = model.List(tuple(t.to_model() for t in op.types))
+                    target_types = model.List([type.to_model() for type in op.types])
                     targets = [
                         self.link_name(InPort(child, i))
                         for i in range(child_data._num_inps)
@@ -454,8 +468,7 @@ class ModelExport:
                     if _has_order_links(self.hugr, child):
                         meta.append(
                             model.Apply(
-                                "core.order_hint.output_key",
-                                (model.Literal(child.idx),),
+                                "core.order_hint.output_key", [model.Literal(child.idx)]
                             )
                         )
 
@@ -470,12 +483,12 @@ class ModelExport:
             meta += [
                 model.Apply(
                     "core.order_hint.order",
-                    (model.Literal(child.idx), model.Literal(successor.idx)),
+                    [model.Literal(child.idx), model.Literal(successor.idx)],
                 )
                 for successor in self.hugr.outgoing_order_links(child)
             ]
 
-        signature = model.Apply("core.fn", (source_types, target_types))
+        signature = model.Apply("core.fn", [source_types, target_types])
 
         return model.Region(
             kind=model.RegionKind.DATA_FLOW,
@@ -503,7 +516,7 @@ class ModelExport:
             match child_data.op:
                 case ExitBlock() as op:
                     target_types = model.List(
-                        tuple(t.to_model() for t in op.cfg_outputs)
+                        [type.to_model() for type in op.cfg_outputs]
                     )
                     targets = [
                         self.link_name(InPort(child, i))
@@ -512,7 +525,7 @@ class ModelExport:
                 case DataflowBlock() as op:
                     if source is None:
                         source_types = model.List(
-                            tuple(t.to_model() for t in op.inputs)
+                            [type.to_model() for type in op.inputs]
                         )
 
                         child_node = self.export_node(child)
@@ -541,10 +554,10 @@ class ModelExport:
 
         signature = model.Apply(
             "core.ctrl",
-            (
-                model.List((source_types,)),
-                model.List((target_types,)),
-            ),
+            [
+                model.List([source_types]),
+                model.List([target_types]),
+            ],
         )
 
         return model.Region(
@@ -575,7 +588,7 @@ class ModelExport:
             match param_type:
                 case TypeTypeParam(bound=TypeBound.Copyable):
                     constraints.append(
-                        model.Apply("core.nonlinear", (model.Var(param_name),))
+                        model.Apply("core.nonlinear", [model.Var(param_name)])
                     )
                 case _:
                     pass

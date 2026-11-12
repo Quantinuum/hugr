@@ -72,7 +72,7 @@ class Apply(Term):
     """Symbol application."""
 
     symbol: str
-    args: tuple[Term, ...] = ()
+    args: Sequence[Term] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
@@ -89,14 +89,14 @@ SeqPart = Term | Splice
 class List(Term):
     """List of static data."""
 
-    parts: tuple[SeqPart, ...] = ()
+    parts: Sequence[SeqPart] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
 class Tuple(Term):
     """Tuple of static data."""
 
-    parts: tuple[SeqPart, ...] = ()
+    parts: Sequence[SeqPart] = field(default_factory=list)
 
 
 @dataclass(frozen=True)
