@@ -1,5 +1,6 @@
 # Changelog
 
+
 ## [0.7.13](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.7.12...hugr-persistent-v0.7.13) - 2026-11-11
 
 ### Bug Fixes
