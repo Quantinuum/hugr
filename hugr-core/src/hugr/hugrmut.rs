@@ -382,23 +382,29 @@ pub trait HugrMut: HugrMutInternals {
         rw.apply(self)
     }
 
-    /// Registers a new extension in the set used by the hugr, keeping the one
-    /// most recent one if the extension already exists.
+    /// Registers a new extension in the set used by the hugr.
+    ///
+    /// For each extension ID, incompatible versions are retained together.
+    /// Within each semver-compatible group, only the highest version is retained.
+    /// If the same ID and version are already registered, the supplied definition
+    /// replaces the existing one.
     ///
     /// These can be queried using [`HugrView::extensions`].
     ///
     /// See [`ExtensionRegistry::register`] for more information.
     fn use_extension(&mut self, extension: impl Into<Arc<Extension>>);
 
-    /// Extend the set of extensions used by the hugr with the extensions in the
+    /// Extends the set of extensions used by the hugr with the extensions in the
     /// registry.
     ///
-    /// For each extension, keeps the most recent version if the id already
-    /// exists.
+    /// For each extension ID, incompatible versions are retained together.
+    /// Within each semver-compatible group, only the highest version is retained.
+    /// If the same ID and version are already registered, the existing definition
+    /// is kept.
     ///
     /// These can be queried using [`HugrView::extensions`].
     ///
-    /// See [`ExtensionRegistry::register`] for more information.
+    /// See [`ExtensionRegistry::register_if_new`] for more information.
     fn use_extensions<Reg>(&mut self, registry: impl IntoIterator<Item = Reg>)
     where
         ExtensionRegistry: Extend<Reg>;
