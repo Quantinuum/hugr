@@ -1139,7 +1139,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Args:
             config: The envelope configuration. Defaults to
                 ``EnvelopeConfig.TEXT``, using uncompressed S-expressions with
-                extensions. Use an uncompressed text format for string output.
+                extensions.
             include_extensions:
                 If not None, the extensions to embed in the encoded envelope.
                 If None, uses the registry returned by :meth:`used_extensions`.

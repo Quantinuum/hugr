@@ -227,7 +227,7 @@ impl SignatureFunc {
     ///
     /// # Errors
     ///
-    /// This function will return an error if the type arguments are invalid
+    /// Returns an error if the type arguments are invalid
     /// (including too few static arguments for a [`SignatureFunc::CustomFunc`]),
     /// the signature computation function is missing, or type computation fails.
     pub fn compute_signature(

@@ -140,7 +140,7 @@ class TrackedDfg(Dfg):
 
         Args:
             com: Command to append.
-            metadata: Currently ignored; no metadata is attached to the new node.
+            metadata: Metadata to attach to the function definition. Defaults to None.
 
         Returns:
             The new node.

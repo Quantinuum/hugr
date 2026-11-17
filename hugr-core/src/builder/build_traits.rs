@@ -113,8 +113,6 @@ pub trait Container {
 
     /// Add metadata to a child node.
     ///
-    /// The node need not be a direct child of this container.
-    ///
     /// # Panics
     ///
     /// Panics if `child` is not in the HUGR.

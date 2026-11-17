@@ -39,7 +39,6 @@ def link_packages(*packages: bytes) -> bytes:
     """Link serialized packages into a new package.
 
     Combines their extensions and links their modules into a single module.
-    If the inputs contain no modules, the output has none.
 
     Args:
         *packages: The packages to link, serialized as bytes.
@@ -173,7 +172,7 @@ class Package:
         Args:
             config: The envelope configuration. Defaults to
                 ``EnvelopeConfig.TEXT``, using uncompressed S-expressions with
-                extensions. Use an uncompressed text format for string output.
+                extensions.
         """
         config = config or EnvelopeConfig.TEXT
         return _make_envelope_str(self, config)

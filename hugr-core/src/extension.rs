@@ -357,8 +357,7 @@ pub enum ExtensionRegisterResult {
     },
     /// An exact version entry was replaced.
     ReplacedExact,
-    /// A newer compatible version was kept, or an exact version was kept by
-    /// [`ExtensionRegistry::register_if_new`] or [`ExtensionVersions::register_if_new`].
+    /// An equal or newer compatible version was kept.
     KeptExisting {
         /// The version that was kept.
         version: Version,
