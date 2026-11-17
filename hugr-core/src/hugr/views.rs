@@ -395,10 +395,10 @@ pub trait HugrView: HugrInternals {
 
     /// Returns the function type defined by this dataflow HUGR.
     ///
-    /// If the root of the Hugr is a
+    /// If the entrypoint of the HUGR is a
     /// [`DataflowParent`][crate::ops::DataflowParent] operation, report the
-    /// signature corresponding to the input and output node of its sibling
-    /// graph. Otherwise, returns `None`.
+    /// signature declared by that operation for its child dataflow graph.
+    /// Otherwise, returns `None`.
     ///
     /// In contrast to [`poly_func_type`][HugrView::poly_func_type], this
     /// method always return a concrete [`Signature`].
@@ -406,7 +406,7 @@ pub trait HugrView: HugrInternals {
         self.entrypoint_optype().inner_function_type()
     }
 
-    /// Returns the function type defined by this HUGR, i.e. `Some` iff the root is
+    /// Returns the function type defined by this HUGR, i.e. `Some` iff the entrypoint is
     /// a [`FuncDecl`][crate::ops::FuncDecl] or [`FuncDefn`][crate::ops::FuncDefn].
     fn poly_func_type(&self) -> Option<PolyFuncType> {
         match self.entrypoint_optype() {

@@ -20,15 +20,14 @@ use super::{ExtensionCollectionError, ExtensionResolutionError, WeakExtensionReg
 impl ExtensionRegistry {
     /// Given a list of extensions that has been deserialized, create a new
     /// registry while updating any internal `Weak<Extension>` reference to
-    /// point to the newly created [`Arc`]s in the registry.
+    /// point to the newly created [`Arc`]s in the registry or to extensions in
+    /// `other_extensions`.
     ///
     /// # Errors
     ///
-    /// - If an opaque operation cannot be resolved to an extension operation.
-    /// - If an extension operation references an extension that is missing from
-    ///   the registry.
-    /// - If a custom type references an extension that is missing from the
-    ///   registry.
+    /// - If a type or operation definition's owning extension cannot be resolved.
+    /// - If a custom type in an operation signature requires an extension version
+    ///   that cannot be resolved from either registry.
     pub fn new_with_extension_resolution(
         extensions: impl IntoIterator<Item = Extension>,
         other_extensions: &WeakExtensionRegistry,

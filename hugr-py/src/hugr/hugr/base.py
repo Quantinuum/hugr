@@ -227,7 +227,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return self.items()
 
     def sorted_region_nodes(self, parent: Node) -> Iterator[Node]:
-        """Iterator over a topological ordering of all the hugr nodes.
+        """Iterator over a topological ordering of the direct children of `parent`.
 
         Note that the sort is performed within a hugr region and non-local
         edges are ignored.
@@ -312,10 +312,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return self[node].children
 
     def descendants(self, node: ToNode | None = None) -> Iterable[Node]:
-        """Iterator over all the descendants of the hugr entrypoint.
+        """Iterate over a node and all its descendants, including the node itself.
 
         Traverses the HUGR graph in a breadth-first manner, starting from
-        the entrypoint.
+        `node`, or the entrypoint if `node` is not provided.
 
         To get all the nodes in the HUGR, use `nodes()`.
 
@@ -323,7 +323,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             node: Parent node. Defaults to the HUGR entrypoint.
 
         Returns:
-            List of child nodes.
+            Iterable of the starting node followed by its descendants.
         """
         queue: Queue[Node] = Queue()
         queue.put(node.to_node() if node is not None else self.entrypoint)
@@ -448,7 +448,10 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
             node: Node to delete.
 
         Returns:
-            The deleted node data, or None if the node was not found.
+            The deleted node data.
+
+        Raises:
+            KeyError: If the node was not found.
 
         Examples:
             >>> h = Hugr()
@@ -545,7 +548,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         self._links.delete_link(src, dst)
 
     def entrypoint_op(self) -> OpVarCov:
-        """The operation of the root node.
+        """The operation of the entrypoint node, which need not be the module root.
 
         Examples:
             >>> h = Hugr()
@@ -570,7 +573,7 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Not necessarily the number of connected ports - if port `i` is
         connected, then all ports `0..i` are assumed to exist.
 
-        This value includes order ports.
+        This value does not include order ports.
 
         Args:
             node: Node to query.
@@ -841,8 +844,11 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         return self[port.node].op.port_kind(port)
 
     def port_type(self, port: InPort | OutPort) -> Type | None:
-        """The type of a `port`, if the kind is
-        :class:`ValueKind <hugr.tys.ValueKind>`, else None.
+        """Return a dataflow port's type, or None for non-dataflow ports.
+
+        Raises:
+            ValueError: If `port` is an order port on a dataflow operation.
+            ops.InvalidPort: If a dataflow port is outside the operation's signature.
 
         Examples:
             >>> df = dfg.Dfg(tys.Bool)
@@ -866,7 +872,8 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
 
         Args:
             hugr: HUGR to insert.
-            parent: Parent for root of inserted HUGR. Defaults to None.
+            parent: Parent for the inserted entrypoint. Defaults to this HUGR's
+                entrypoint.
 
         Returns:
             Mapping from node indices in inserted HUGR to their new indices
@@ -1107,7 +1114,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
 
         Args:
-            config: The envelope configuration.
+            config: The envelope configuration. Defaults to
+                ``EnvelopeConfig.BINARY``, using the binary model format with
+                extensions and zstd compression.
             include_extensions:
                 If not None, the extensions to embed in the encoded envelope.
                 If None, uses the registry returned by :meth:`used_extensions`.
@@ -1128,7 +1137,9 @@ class Hugr(Mapping[Node, NodeData], Generic[OpVarCov]):
         See :meth:`to_bytes` for a more general method.
 
         Args:
-            config: The envelope configuration.
+            config: The envelope configuration. Defaults to
+                ``EnvelopeConfig.TEXT``, using uncompressed S-expressions with
+                extensions. Use an uncompressed text format for string output.
             include_extensions:
                 If not None, the extensions to embed in the encoded envelope.
                 If None, uses the registry returned by :meth:`used_extensions`.

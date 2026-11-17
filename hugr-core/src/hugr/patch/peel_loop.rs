@@ -1,5 +1,6 @@
-//! Rewrite to peel one iteration of a [TailLoop], creating a [DFG] containing a copy of
-//! the loop body, and a [Conditional] containing the original `TailLoop` node.
+//! Rewrite to peel one iteration of a [TailLoop], replacing it with a [DFG]
+//! containing the original loop body and a [Conditional] whose continue case
+//! contains a new `TailLoop` with a copy of the body.
 use derive_more::{Display, Error};
 
 use crate::core::HugrNode;

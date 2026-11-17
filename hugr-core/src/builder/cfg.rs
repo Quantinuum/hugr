@@ -186,7 +186,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     }
 
     /// Return a builder for a non-entry [`DataflowBlock`] child graph with `inputs`
-    /// and `outputs` and the variants of the branching Sum value
+    /// and `other_outputs` and the variants of the branching Sum value
     /// specified by `sum_rows`.
     ///
     /// # Errors
@@ -269,7 +269,7 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
     ///
     /// # Errors
     ///
-    /// This function will return an error if there is an error adding the node.
+    /// This function will return an error if an entry block has already been built.
     pub fn simple_entry_builder(
         &mut self,
         outputs: TypeRow,
@@ -285,9 +285,10 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>> CFGBuilder<B> {
 
     /// Set the `branch` index `successor` block of `predecessor`.
     ///
-    /// # Errors
+    /// # Panics
     ///
-    /// This function will return an error if there is an error connecting the blocks.
+    /// Panics if either block is not in the HUGR, or if `branch` is not an
+    /// output port of `predecessor` or `successor` has no input port.
     pub fn branch(
         &mut self,
         predecessor: &BasicBlockID,

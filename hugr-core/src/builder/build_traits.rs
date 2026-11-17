@@ -75,11 +75,6 @@ pub trait Container {
     /// Add a constant value to the container and return a handle to it.
     ///
     /// Adds the extensions required by the op to the HUGR, if they are not already present.
-    ///
-    /// # Errors
-    ///
-    /// This function will return an error if there is an error in adding the
-    /// [`OpType::Const`] node.
     fn add_constant(&mut self, constant: impl Into<ops::Const>) -> ConstID {
         self.add_child_node(constant.into()).into()
     }
@@ -118,7 +113,11 @@ pub trait Container {
 
     /// Add metadata to a child node.
     ///
-    /// Returns an error if the specified `child` is not a child of this container
+    /// The node need not be a direct child of this container.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `child` is not in the HUGR.
     fn set_child_metadata<M: Metadata>(&mut self, child: Node, meta: <M as Metadata>::Type<'_>) {
         self.hugr_mut().set_metadata::<M>(child, meta);
     }
@@ -385,7 +384,7 @@ pub trait Dataflow: Container {
     }
 
     /// Return a builder for a [`crate::ops::DFG`] node, i.e. a nested dataflow subgraph,
-    /// given a signature describing its input and output types and extension delta,
+    /// given a signature describing its input and output types,
     /// and the input wires (which must match the input types)
     ///
     /// # Errors
@@ -516,10 +515,13 @@ pub trait Dataflow: Container {
     }
 
     /// Return a builder for a [`crate::ops::TailLoop`] node.
-    /// `just_inputs` contains the types and wires for inputs that are not
-    /// modified during the iteration.
-    /// `inputs_outputs` contains the types and wires for inputs that may be updated on each iteration.
-    /// `just_out_types` contains the types that are the final outputs from the loop.
+    /// `just_inputs` contains the types and initial wires for values carried
+    /// by the continue variant, but not returned when the loop exits.
+    /// `inputs_outputs` contains the types and initial wires for values passed
+    /// through every iteration and returned when the loop exits.
+    /// Both groups of values may be updated on each iteration.
+    /// `just_out_types` contains the types carried by the break variant,
+    /// returned before the `inputs_outputs` values when the loop exits.
     ///
     /// # Errors
     ///
@@ -600,7 +602,13 @@ pub trait Dataflow: Container {
         self.add_other_wire(before.node(), after.node());
     }
 
-    /// Get the type of a Value [`Wire`]. If not valid port or of Value kind, returns None.
+    /// Get the type of a value [`Wire`].
+    ///
+    /// Returns [`BuildError::WireNotFound`] if the port is not a value port.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the wire's node is not in the HUGR.
     fn get_wire_type(&self, wire: Wire) -> Result<Type, BuildError> {
         let kind = self.hugr().get_optype(wire.node()).port_kind(wire.source());
 
@@ -655,7 +663,7 @@ pub trait Dataflow: Container {
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
-    /// "Continue" variant of a [`ops::TailLoop`] with `loop_signature`.
+    /// "Continue" variant of `tail_loop`.
     ///
     /// Packs the values in to a tuple and tags appropriately to generate a
     /// value of Sum type.
@@ -676,7 +684,7 @@ pub trait Dataflow: Container {
     }
 
     /// Use the wires in `values` to return a wire corresponding to the
-    /// "Break" variant of a [`ops::TailLoop`] with `loop_signature`.
+    /// "Break" variant of `loop_op`.
     ///
     /// Packs the values in to a tuple and tags appropriately to generate a
     /// value of Sum type.

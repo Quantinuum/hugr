@@ -83,8 +83,8 @@ impl WeakExtensionVersions {
 
     /// Register a new extension in the versions for this id.
     ///
-    /// Returns `true` if the extension was added.
-    /// Returns `false` if the same version, or a later compatible one was already present.
+    /// Returns `true` if the extension was inserted or replaced an older or
+    /// equal version. Returns `false` if a newer compatible version was kept.
     fn register(&mut self, version: Version, ext: Weak<Extension>) -> bool {
         #[cfg(debug_assertions)]
         {
@@ -156,7 +156,7 @@ impl WeakExtensionRegistry {
         res
     }
 
-    /// Gets the Extension with the given name
+    /// Gets the latest retained Extension with the given name and its version.
     #[must_use]
     pub fn get_latest(&self, name: &str) -> Option<(&Version, &Weak<Extension>)> {
         self.exts.get(name).map(WeakExtensionVersions::latest)
@@ -165,8 +165,9 @@ impl WeakExtensionRegistry {
     /// Gets the Extension satisfying an optional serialized version
     /// requirement.
     ///
-    /// If found a matching extension, returns a Weak reference to it along with
-    /// its version. If no matching extension is found, returns None.
+    /// Returns the version and weak reference for an exact or newer
+    /// semver-compatible extension when `version` is `Some`, or the latest
+    /// retained extension when it is `None`. Returns `None` if no match is found.
     #[must_use]
     pub fn get_req(
         &self,
@@ -184,7 +185,9 @@ impl WeakExtensionRegistry {
 
     /// Register a new extension in the registry.
     ///
-    /// Returns `true` if the extension was added, `false` if it was already present.
+    /// Returns `true` if the extension was inserted or replaced an older or
+    /// equal version. Returns `false` if a newer compatible version was kept.
+    /// Incompatible versions are retained side by side.
     pub fn register(
         &mut self,
         id: ExtensionId,
@@ -203,7 +206,7 @@ impl WeakExtensionRegistry {
         }
     }
 
-    /// Returns an iterator over the weak references in the registry and their ids.
+    /// Returns the latest retained version and weak reference for each extension id.
     pub fn iter(&self) -> impl Iterator<Item = (&ExtensionId, &Version, &Weak<Extension>)> {
         self.exts.iter().map(|(id, versions)| {
             let (version, ext) = versions.latest();
@@ -220,7 +223,8 @@ impl WeakExtensionRegistry {
         })
     }
 
-    /// Returns an iterator over the weak references in the registry.
+    /// Returns the latest retained version and weak reference for each extension id,
+    /// omitting the ids.
     pub fn extensions(&self) -> impl Iterator<Item = (&Version, &Weak<Extension>)> {
         self.exts.values().map(WeakExtensionVersions::latest)
     }

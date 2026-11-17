@@ -117,7 +117,7 @@ class Cfg(ParentBuilder[ops.CFG], AbstractContextManager):
         Args:
             input_types: The input types for the CFG.
             hugr: The HUGR instance this CFG is part of.
-            parent: The parent node for the CFG: defaults to the root of the HUGR
+            parent: The parent node for the CFG: defaults to the entrypoint of the HUGR
                 instance.
 
         Returns:
@@ -144,7 +144,7 @@ class Cfg(ParentBuilder[ops.CFG], AbstractContextManager):
         Examples:
             >>> cfg = Cfg(tys.Bool)
             >>> cfg.entry
-            Node(1)
+            Node(5)
         """
         return self._entry_block.parent_node
 

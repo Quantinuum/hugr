@@ -105,10 +105,9 @@ impl Hugr {
     ///
     /// # Error
     ///
-    /// Returns [`HugrError::UnsupportedEntrypoint`] if the entrypoint operation
-    /// requires additional context to be defined. This is the case for
-    /// [`OpType::Case`], [`OpType::DataflowBlock`], and [`OpType::ExitBlock`]
-    /// since they are context-specific definitions.
+    /// Returns [`HugrError::UnsupportedEntrypoint`] unless the operation is a
+    /// [`OpType::Module`], [`OpType::FuncDefn`], [`OpType::DFG`],
+    /// [`OpType::CFG`], [`OpType::TailLoop`], or [`OpType::Conditional`].
     pub fn new_with_entrypoint(entrypoint_op: impl Into<OpType>) -> Result<Self, HugrError> {
         Self::with_capacity(entrypoint_op, 0, 0)
     }
@@ -116,16 +115,15 @@ impl Hugr {
     /// Create a new Hugr, with a given entrypoint operation and preallocated capacity.
     ///
     /// If the optype is [`OpType::Module`], the HUGR module root will match the
-    /// entrypoint node. Otherwise, the entrypoint will be a child of the a
+    /// entrypoint node. Otherwise, the entrypoint will be a descendant of a
     /// module initialized at the node hierarchy root. The specific HUGR created
     /// depends on the operation type.
     ///
     /// # Error
     ///
-    /// Returns [`HugrError::UnsupportedEntrypoint`] if the entrypoint operation
-    /// requires additional context to be defined. This is the case for
-    /// [`OpType::Case`], [`OpType::DataflowBlock`], and [`OpType::ExitBlock`]
-    /// since they are context-specific definitions.
+    /// Returns [`HugrError::UnsupportedEntrypoint`] unless the operation is a
+    /// [`OpType::Module`], [`OpType::FuncDefn`], [`OpType::DFG`],
+    /// [`OpType::CFG`], [`OpType::TailLoop`], or [`OpType::Conditional`].
     pub fn with_capacity(
         entrypoint_op: impl Into<OpType>,
         nodes: usize,
@@ -238,7 +236,7 @@ impl Hugr {
     /// Store the HUGR in an Envelope encoded in a string.
     ///
     /// Note that not all Envelopes are valid strings. In the general case,
-    /// it is recommended to use [`Hugr::store_str`] with a bytearray instead.
+    /// it is recommended to use [`Hugr::store_with_exts`] with a byte buffer instead.
     /// See [`EnvelopeFormat::ascii_printable`][crate::envelope::EnvelopeFormat::ascii_printable].
     ///
     /// The Envelope will embed the definitions of the extensions in the

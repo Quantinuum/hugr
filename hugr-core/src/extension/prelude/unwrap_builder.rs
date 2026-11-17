@@ -47,12 +47,13 @@ pub trait UnwrapBuilder: Dataflow {
     /// Build an unwrap operation for a sum type to extract the variant at the given tag
     /// or panic with given message if the tag is not the expected value.
     ///
-    /// `error` is a function that takes the actual tag and returns the error message
-    /// for cases where the tag is not the expected value.
+    /// At construction time, `error` is called once for each unexpected variant
+    /// tag to produce the error value embedded in that branch.
     ///
     /// # Panics
     ///
-    /// If `tag` is greater than the number of variants in the sum type.
+    /// If `tag` is greater than or equal to the number of variants in the sum
+    /// type, or `N` does not match the number of outputs of the selected variant.
     ///
     /// # Errors
     ///

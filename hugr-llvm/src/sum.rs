@@ -112,8 +112,8 @@ impl<'c> LLVMSumType<'c> {
     /// Constructs a new [`LLVMSumType`] from a [`HugrSumType`], using `session` to
     /// determine the types of the fields.
     ///
-    /// Returns an error if the type of any field cannot be converted by
-    /// `session`, or if `sum_type` has no variants.
+    /// Returns an error if a variant is not a concrete type row or the type of
+    /// any field cannot be converted by `session`. Sums with no variants are supported.
     pub fn try_from_hugr_type(
         session: &TypingSession<'c, '_>,
         sum_type: HugrSumType,
@@ -132,7 +132,7 @@ impl<'c> LLVMSumType<'c> {
     /// Constructs a new [`LLVMSumType`] from a `Vec` of variants.
     /// Each variant is a `Vec` of LLVM types each corresponding to a field in the sum.
     ///
-    /// Returns an error if `variant_types` is empty;
+    /// An empty `variant_types` represents a sum with no variants.
     pub fn try_new(
         context: &'c Context,
         variant_types: impl Into<Vec<Vec<BasicTypeEnum<'c>>>>,

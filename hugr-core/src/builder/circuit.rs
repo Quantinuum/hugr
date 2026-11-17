@@ -78,7 +78,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     ///
     /// # Panics
     ///
-    /// If the number of outputs does not match `N`.
+    /// If the number of tracked units does not match `N`.
     #[must_use]
     pub fn tracked_units_arr<const N: usize>(&self) -> [usize; N] {
         collect_array(self.tracked_units())
@@ -87,8 +87,8 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     #[inline]
     /// Append an op to the wires in the inner vector with given `indices`.
     /// The outputs of the operation become the new wires at those indices.
-    /// Only valid for operations that have the same input type row as output
-    /// type row.
+    /// Each selected input port must have a corresponding output port.
+    /// Any additional outputs are discarded from the return value.
     /// Returns a handle to self to allow chaining.
     pub fn append(
         &mut self,
@@ -99,8 +99,8 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     }
 
     #[inline]
-    /// The same as [`CircuitBuilder::append_with_outputs`] except it assumes no outputs and
-    /// instead returns a reference to self to allow chaining.
+    /// The same as [`CircuitBuilder::append_with_outputs`] except it discards
+    /// the untracked outputs and returns a reference to self to allow chaining.
     pub fn append_and_consume<A: Into<CircuitUnit>>(
         &mut self,
         op: impl Into<OpType>,
@@ -113,12 +113,13 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     /// Append an `op` with some inputs being the stored wires.
     /// Any inputs of the form [`CircuitUnit::Linear`] are used to index the
     /// stored wires.
-    /// The outputs at those indices are used to replace the stored wire.
+    /// The output at each such input's port offset replaces its stored wire.
     /// The remaining outputs are returned.
     ///
     /// # Errors
     ///
-    /// Returns an error on an invalid input unit.
+    /// Returns an error on an invalid tracked-wire index, if a tracked input
+    /// has no corresponding output, or if adding the operation fails.
     pub fn append_with_outputs<A: Into<CircuitUnit>>(
         &mut self,
         op: impl Into<OpType>,
@@ -181,16 +182,16 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     /// Append an `op` with some inputs being the stored wires.
     /// Any inputs of the form [`CircuitUnit::Linear`] are used to index the
     /// stored wires.
-    /// The outputs at those indices are used to replace the stored wire.
+    /// The output at each such input's port offset replaces its stored wire.
     /// The remaining outputs are returned as an array.
     ///
     /// # Errors
     ///
-    /// Returns an error on an invalid input unit.
+    /// Returns the same errors as [`CircuitBuilder::append_with_outputs`].
     ///
     /// # Panics
     ///
-    /// If the number of outputs does not match `N`.
+    /// If the number of untracked outputs does not match `N`.
     pub fn append_with_outputs_arr<const N: usize, A: Into<CircuitUnit>>(
         &mut self,
         op: impl Into<OpType>,
@@ -215,8 +216,6 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
 
     /// Stops tracking a linear unit, and returns the last wire corresponding to it.
     ///
-    /// Returns the new unit index.
-    ///
     /// # Errors
     ///
     /// Returns a [`CircuitBuildError::InvalidWireIndex`] if the index is invalid.
@@ -232,7 +231,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
 
     #[inline]
     /// Finish building the circuit region and return the dangling wires
-    /// that correspond to the initially provided wires.
+    /// that are still tracked, in unit-index order.
     #[must_use]
     pub fn finish(self) -> Vec<Wire> {
         self.wires.into_iter().flatten().collect()

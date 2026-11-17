@@ -48,7 +48,9 @@ use serde::{Deserialize, Serialize};
 
 /// Load a set of extensions from a YAML string into a registry.
 ///
-/// Any required extensions must already be present in the registry.
+/// Extensions listed in `imports` must already be present in the registry.
+/// The prelude is automatically made available, and declarations can reference
+/// extensions defined earlier in the same YAML document.
 pub fn load_extensions(
     yaml: &str,
     registry: &mut ExtensionRegistry,
@@ -59,7 +61,9 @@ pub fn load_extensions(
 
 /// Load a set of extensions from a file into a registry.
 ///
-/// Any required extensions must already be present in the registry.
+/// Extensions listed in `imports` must already be present in the registry.
+/// The prelude is automatically made available, and declarations can reference
+/// extensions defined earlier in the same YAML document.
 pub fn load_extensions_file(
     path: &Path,
     registry: &mut ExtensionRegistry,

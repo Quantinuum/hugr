@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class ExplicitBound:
-    """An explicit type bound on an :class:`OpDef`.
+    """An explicit type bound on a :class:`TypeDef`.
 
 
     Examples:
@@ -54,7 +54,7 @@ class ExplicitBound:
 
 @dataclass
 class FromParamsBound:
-    """Calculate the type bound of an :class:`OpDef` from the join of its parameters at
+    """Calculate the type bound of a :class:`TypeDef` from the join of its parameters at
     the given indices.
 
 
@@ -261,8 +261,9 @@ class OpDef(ExtensionObject):
 
         Args:
             args: Type arguments corresponding to the type parameters of the definition.
-            concrete_signature: Concrete function type of the operation, only required
-                if the operation is polymorphic.
+            concrete_signature: Concrete function type of the operation. Required
+                when type arguments are supplied or no static signature is available.
+                This method does not compute signatures.
 
         Raises:
             ValueError: if a `concrete_signature` arg is not provided to a `OpDef`
@@ -667,8 +668,6 @@ class ExtensionRegistry:
         Returns:
             The latest extension in the registry compatible with the given one.
 
-        Raises:
-            ExtensionExists: If an extension with the same name already exists.
         """
         if extension.name not in self.versioned_extensions:
             self.versioned_extensions[extension.name] = ExtensionVersions(extension)
@@ -708,8 +707,9 @@ class ExtensionRegistry:
     def extend(self, other: ExtensionRegistry) -> None:
         """Add a registry of extensions to this registry.
 
-        If an extension with the same name already exists, the one with the
-        higher version is kept.
+        Semver-compatible versions are coalesced, keeping the latest version in
+        each compatibility group. Incompatible versions of the same extension
+        are retained.
 
         Args:
             other: The extension registry to add.

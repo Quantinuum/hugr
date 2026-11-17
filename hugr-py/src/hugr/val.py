@@ -215,7 +215,7 @@ def bool_value(b: bool) -> UnitSum:
     return UnitSum(int(b), 2)
 
 
-#: HUGR unit type. Sum with a single empty row variant.
+#: HUGR unit value. Sum with a single empty row variant.
 Unit = UnitSum(0, 1)
 #: HUGR true value.
 TRUE = bool_value(True)

@@ -367,7 +367,8 @@ impl PersistentHugr {
 
     /// Apply all commits in `self` to the base HUGR.
     ///
-    /// Also returns a map from the nodes of the base HUGR to the nodes of the
+    /// Also returns a map from surviving nodes of the base HUGR and inserted
+    /// replacement nodes, identified by [`PatchNode`], to nodes of the
     /// materialized HUGR.
     pub fn apply_all(&self) -> (Hugr, HashMap<PatchNode, Node>) {
         let mut hugr = self.base_hugr().clone();
@@ -413,13 +414,8 @@ impl PersistentHugr {
         (hugr, node_map)
     }
 
-    /// Get the set of nodes of `commit_id` that are invalidated by the patches
+    /// Get the nodes of `commit_id` that are deleted by the patches
     /// in the children commits of `commit_id`.
-    ///
-    /// The invalidation set must include all nodes that are deleted by the
-    /// children commits (as returned by [`Self::deleted_nodes`]), but may
-    /// also include further nodes to enforce stricter exclusivity constraints
-    /// between patches.
     pub fn deleted_nodes<'a>(&'a self, commit_id: CommitId) -> impl Iterator<Item = Node> + 'a {
         self.children_commits(commit_id).flat_map(move |child_id| {
             let all_invalidated = self.get_commit(child_id).deleted_parent_nodes();
