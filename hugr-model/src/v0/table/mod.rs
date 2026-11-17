@@ -98,8 +98,8 @@ impl<'a> Module<'a> {
 
     /// Return the term data for a given term id.
     ///
-    /// Returns [`Term::Wildcard`] for the sentinel ID for which
-    /// [`TermId::is_valid`] is false, and `None` for other out-of-bounds IDs.
+    /// Returns [`Term::Wildcard`] for the invalid sentinel ID, and `None` for
+    /// other out-of-bounds IDs. See [`TermId::is_valid`].
     #[inline]
     #[must_use]
     pub fn get_term(&self, term_id: TermId) -> Option<&Term<'a>> {

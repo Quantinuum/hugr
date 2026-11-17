@@ -118,7 +118,7 @@ impl<'a, T: Dataflow + ?Sized> CircuitBuilder<'a, T> {
     ///
     /// # Errors
     ///
-    /// Returns an error on an invalid tracked-wire index, if a tracked input
+    /// Returns an error if a tracked wire index is invalid, if a tracked input
     /// has no corresponding output, or if adding the operation fails.
     pub fn append_with_outputs<A: Into<CircuitUnit>>(
         &mut self,

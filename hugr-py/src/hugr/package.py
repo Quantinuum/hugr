@@ -36,21 +36,21 @@ __all__ = [
 
 
 def link_packages(*packages: bytes) -> bytes:
-    """Link all packages, returning a new package containing the extensions of all
-    packages, as well as a single module created from linking their modules, if any.
+    """Link serialized packages into a new package.
 
-    Module-linking failures raise ``hugr._hugr.linking.HugrLinkingError``, including
-    when more than one module has a non-module entrypoint.
+    Combines their extensions and links their modules into a single module.
+    If the inputs contain no modules, the output has none.
 
     Args:
         *packages: The packages to link, serialized as bytes.
 
     Returns:
-        Serialized envelope bytes containing the combined extensions and at most
-        one linked module. If the inputs contain no modules, the output has none.
+        The linked package, serialized as envelope bytes.
 
     Raises:
         ValueError: If an input envelope cannot be loaded.
+        hugr._hugr.linking.HugrLinkingError: If the modules cannot be linked,
+            including when more than one module has a non-module entrypoint.
     """
     pkg = list(packages)
     return link_packages_binding(pkg)
@@ -157,8 +157,9 @@ class Package:
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
 
         Args:
-            config: Defaults to ``EnvelopeConfig.BINARY``, using the binary
-                model format with extensions and zstd compression.
+            config: The envelope configuration. Defaults to
+                ``EnvelopeConfig.BINARY``, using the binary model format with
+                extensions and zstd compression.
         """
         config = config or EnvelopeConfig.BINARY
         return _make_envelope(self, config)
@@ -170,9 +171,9 @@ class Package:
         See :meth:`to_bytes` for a more general method.
 
         Args:
-            config: Defaults to ``EnvelopeConfig.TEXT``, using uncompressed
-                S-expressions with extensions. Use an uncompressed text format
-                for string output.
+            config: The envelope configuration. Defaults to
+                ``EnvelopeConfig.TEXT``, using uncompressed S-expressions with
+                extensions. Use an uncompressed text format for string output.
         """
         config = config or EnvelopeConfig.TEXT
         return _make_envelope_str(self, config)
@@ -245,9 +246,10 @@ class Package:
         return self
 
     def link(self, *other: Package):
-        """Link this package with other packages, returning a new package containing the
-        extensions of all packages, as well as a single module created from linking
-        their modules, if any.
+        """Link this package with other packages, returning a new package.
+
+        Combines their extensions and links their modules into a single module.
+        If the inputs contain no modules, the output has none.
 
         Args:
             *other: Other packages to link with.

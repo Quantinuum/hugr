@@ -1221,8 +1221,9 @@ class ExtType(Type):
 
 @dataclass
 class Opaque(Type):
-    """Opaque type, identified by `id` and a required type bound, with optional
-    type arguments and extension information.
+    """An opaque type identified by `id`, with a required type bound.
+
+    Type arguments and extension information are optional.
     """
 
     id: str

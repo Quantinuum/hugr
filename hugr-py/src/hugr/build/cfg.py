@@ -117,8 +117,7 @@ class Cfg(ParentBuilder[ops.CFG], AbstractContextManager):
         Args:
             input_types: The input types for the CFG.
             hugr: The HUGR instance this CFG is part of.
-            parent: The parent node for the CFG: defaults to the entrypoint of the HUGR
-                instance.
+            parent: The parent node for the CFG. Defaults to the HUGR entrypoint.
 
         Returns:
             The new CFG builder.

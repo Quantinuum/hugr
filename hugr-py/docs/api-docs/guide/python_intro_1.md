@@ -36,13 +36,13 @@ Visualizing the HUGR results in the following diagram:
 
 ![](images/basic1.svg)
 
-> You can visualize HUGRs by using the `render_dot()` method on the builder's HUGR. Calling `circ.hugr.render_dot()` will give you a graphviz Digraph which you can input into your preferred graphviz viewer to see the graph.
+> To visualize the HUGR, call `circ.hugr.render_dot()`. This returns a graphviz `Digraph` that you can display in your preferred graphviz viewer.
 
 While we haven't added any nodes to the graph ourselves yet, we can already notice the similarity between dataflow graph edges of type `Qubit` and wires in a circuit representing qubit values.
 
 However there are also differences. Notably, the HUGR consists of multiple **regions**, with each region container having its own input and output nodes. This is why a HUGR is "hierarchical". Certain types of node can contain subgraphs as their children. In our graph we can see some of those nodes:
 - The `Module` node is a top-level node whose children can be function definitions, function declarations, constants, or type alias definitions and declarations.
-- Creating this DFG automatically wraps it in a `FuncDefn` node called `main`, inside the module. The DFG is the HUGR entrypoint; the module root and entrypoint need not be the same node. For `main` to be executable without arguments, it must take no inputs.
+- The `FuncDefn` node called `main` is created automatically when we build the DFG. The DFG is the HUGR entrypoint, which can differ from the module root. To run `main` without arguments, it must take no inputs.
 - Finally, the function definition contains the `DFG` we created, so far only containing an input and an output node. Note how each port on a node is indexed and ordered.
 
 ### Adding quantum gates

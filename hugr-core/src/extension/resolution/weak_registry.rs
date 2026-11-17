@@ -206,7 +206,8 @@ impl WeakExtensionRegistry {
         }
     }
 
-    /// Returns the latest retained version and weak reference for each extension id.
+    /// Returns an iterator over each extension id, its latest retained version,
+    /// and a weak reference to that extension.
     pub fn iter(&self) -> impl Iterator<Item = (&ExtensionId, &Version, &Weak<Extension>)> {
         self.exts.iter().map(|(id, versions)| {
             let (version, ext) = versions.latest();
@@ -223,8 +224,8 @@ impl WeakExtensionRegistry {
         })
     }
 
-    /// Returns the latest retained version and weak reference for each extension id,
-    /// omitting the ids.
+    /// Returns an iterator over the latest retained version and weak reference
+    /// for each extension id.
     pub fn extensions(&self) -> impl Iterator<Item = (&Version, &Weak<Extension>)> {
         self.exts.values().map(WeakExtensionVersions::latest)
     }

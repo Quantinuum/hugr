@@ -300,9 +300,14 @@ pub trait MakeRegisteredOp: MakeExtensionOp {
 
     /// Convert this operation into an [`ExtensionOp`].
     ///
+    /// # Errors
+    ///
     /// Returns an error if the type arguments are invalid or signature
-    /// computation fails. Panics if the defining extension does not contain
-    /// this operation.
+    /// computation fails.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the defining extension does not contain this operation.
     fn to_extension_op(self) -> Result<ExtensionOp, SignatureError>
     where
         Self: Sized,

@@ -415,7 +415,6 @@ class AsExtOp(DataflowOp, Protocol):
         If successful, returns the singleton, else None.
 
         Non-singleton types should override this method.
-
         """
         default = cls()
         if default.ext_op == ext_op:

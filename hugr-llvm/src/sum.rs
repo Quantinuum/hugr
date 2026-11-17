@@ -113,7 +113,8 @@ impl<'c> LLVMSumType<'c> {
     /// determine the types of the fields.
     ///
     /// Returns an error if a variant is not a concrete type row or the type of
-    /// any field cannot be converted by `session`. Sums with no variants are supported.
+    /// any field cannot be converted by `session`.
+    /// Sums with no variants are supported.
     pub fn try_from_hugr_type(
         session: &TypingSession<'c, '_>,
         sum_type: HugrSumType,

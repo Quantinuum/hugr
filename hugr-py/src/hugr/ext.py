@@ -54,9 +54,9 @@ class ExplicitBound:
 
 @dataclass
 class FromParamsBound:
-    """Calculate the type bound of a :class:`TypeDef` from the join of its parameters at
-    the given indices.
+    """A type bound computed from a :class:`TypeDef`'s parameters.
 
+    The bound is the join of the bounds of the parameters at the given indices.
 
     Examples:
         >>> FromParamsBound(indices=[0, 1])
@@ -259,11 +259,12 @@ class OpDef(ExtensionObject):
     ) -> ops.ExtOp:
         """Instantiate an operation from this definition.
 
+        This method does not compute signatures. If type arguments are supplied
+        or no static signature is available, `concrete_signature` is required.
+
         Args:
             args: Type arguments corresponding to the type parameters of the definition.
-            concrete_signature: Concrete function type of the operation. Required
-                when type arguments are supplied or no static signature is available.
-                This method does not compute signatures.
+            concrete_signature: Concrete function type of the operation.
 
         Raises:
             ValueError: if a `concrete_signature` arg is not provided to a `OpDef`
@@ -667,7 +668,6 @@ class ExtensionRegistry:
 
         Returns:
             The latest extension in the registry compatible with the given one.
-
         """
         if extension.name not in self.versioned_extensions:
             self.versioned_extensions[extension.name] = ExtensionVersions(extension)
@@ -707,9 +707,8 @@ class ExtensionRegistry:
     def extend(self, other: ExtensionRegistry) -> None:
         """Add a registry of extensions to this registry.
 
-        Semver-compatible versions are coalesced, keeping the latest version in
-        each compatibility group. Incompatible versions of the same extension
-        are retained.
+        Keeps the latest version in each semver-compatible group, along with
+        any incompatible versions of the same extension. See :meth:`register`.
 
         Args:
             other: The extension registry to add.

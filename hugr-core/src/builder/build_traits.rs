@@ -515,11 +515,13 @@ pub trait Dataflow: Container {
     }
 
     /// Return a builder for a [`crate::ops::TailLoop`] node.
+    ///
     /// `just_inputs` contains the types and initial wires for values carried
     /// by the continue variant, but not returned when the loop exits.
     /// `inputs_outputs` contains the types and initial wires for values passed
     /// through every iteration and returned when the loop exits.
     /// Both groups of values may be updated on each iteration.
+    ///
     /// `just_out_types` contains the types carried by the break variant,
     /// returned before the `inputs_outputs` values when the loop exits.
     ///
@@ -603,6 +605,8 @@ pub trait Dataflow: Container {
     }
 
     /// Get the type of a value [`Wire`].
+    ///
+    /// # Errors
     ///
     /// Returns [`BuildError::WireNotFound`] if the port is not a value port.
     ///
