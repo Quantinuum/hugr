@@ -9,6 +9,16 @@ from hugr.std.logic import Not
 from .conftest import CX, QUANTUM_EXT, H, Measure, Rz, validate
 
 
+def test_add_metadata():
+    dfg = TrackedDfg(tys.Bool, track_inputs=True)
+    wire = dfg.inputs()[0]
+    metadata = {"name": "not"}
+
+    node = dfg.add(Not(wire), metadata=metadata)
+
+    assert dfg.hugr[node].metadata.as_dict() == metadata
+
+
 def test_track_wire():
     dfg = TrackedDfg(tys.Bool, tys.Unit)
     inds = dfg.track_inputs()

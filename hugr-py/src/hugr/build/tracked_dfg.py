@@ -139,7 +139,7 @@ class TrackedDfg(Dfg):
 
         Args:
             com: Command to append.
-            metadata: Metadata to attach to the function definition. Defaults to None.
+            metadata: Metadata to attach to the new operation node. Defaults to None.
 
         Returns:
             The new node.
@@ -157,7 +157,7 @@ class TrackedDfg(Dfg):
             [OutPort(Node(3), 0)]
         """
         wires = self._to_wires(com.incoming)
-        n = self.add_op(com.op, *wires)
+        n = self.add_op(com.op, *wires, metadata=metadata)
 
         for port_offset, com_wire in enumerate(com.incoming):
             if isinstance(com_wire, int):
