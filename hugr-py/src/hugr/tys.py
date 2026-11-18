@@ -1325,6 +1325,14 @@ class _QubitDef(Type):
         self, *, extension_version: bool = False, qualified_name: bool = False
     ) -> str:
         """Render the qubit type."""
+        if qualified_name:
+            rendered = "prelude.qubit"
+        else:
+            rendered = repr(self)
+        if extension_version:
+            from hugr.std.prelude import PRELUDE_EXTENSION
+
+            rendered += "@" + str(PRELUDE_EXTENSION.version)
         return repr(self)
 
     def __repr__(self) -> str:

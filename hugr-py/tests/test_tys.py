@@ -10,6 +10,7 @@ from hugr.std.collections.list import List, ListVal
 from hugr.std.collections.static_array import StaticArray, StaticArrayVal
 from hugr.std.float import FLOAT_T
 from hugr.std.int import INT_T, _int_tv
+from hugr.std.prelude import PRELUDE_EXTENSION
 from hugr.tys import (
     Alias,
     Bool,
@@ -179,6 +180,13 @@ def test_render_qualified_extension_name() -> None:
             qualified_name=True,
         )
         == f"arithmetic.int.types.int<5>@{INT_T.get_extension_version()}"
+    )
+
+def test_qubit_render_qualified_extension_name() -> None:
+    assert Qubit.render(qualified_name=True) == "prelude.Qubit"
+    assert (
+            Qubit.render(extension_version=True, qualified_name=True)
+            == f"prelude.Qubit@{PRELUDE_EXTENSION.version}"
     )
 
 
