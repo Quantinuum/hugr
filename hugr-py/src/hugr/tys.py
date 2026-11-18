@@ -1330,7 +1330,7 @@ class _QubitDef(Type):
             from hugr.std.prelude import PRELUDE_EXTENSION
 
             rendered += "@" + str(PRELUDE_EXTENSION.version)
-        return repr(self)
+        return rendered
 
     def __repr__(self) -> str:
         return "Qubit"
