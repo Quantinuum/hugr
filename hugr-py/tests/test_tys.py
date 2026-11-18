@@ -182,11 +182,12 @@ def test_render_qualified_extension_name() -> None:
         == f"arithmetic.int.types.int<5>@{INT_T.get_extension_version()}"
     )
 
+
 def test_qubit_render_qualified_extension_name() -> None:
-    assert Qubit.render(qualified_name=True) == "prelude.Qubit"
+    assert Qubit.render(qualified_name=True) == "prelude.qubit"
     assert (
-            Qubit.render(extension_version=True, qualified_name=True)
-            == f"prelude.Qubit@{PRELUDE_EXTENSION.version}"
+        Qubit.render(extension_version=True, qualified_name=True)
+        == f"prelude.qubit@{PRELUDE_EXTENSION.version}"
     )
 
 
