@@ -62,7 +62,7 @@ pub(crate) use hidden::CommitData;
 
 /// The set of all current commits, assigning every commit a unique ID.
 ///
-/// A [`CommitStateSpace`] always has a unique base commit (the root of the
+/// A non-empty [`CommitStateSpace`] has a unique base commit (the root of the
 /// graph). All other commits are [`PersistentReplacement`]s that apply on top
 /// of it. Commits are stored as [`relrc::RelRc`]s: they are reference-counted
 /// pointers to the patch data that also maintain strong references to the

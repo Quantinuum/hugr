@@ -19,7 +19,7 @@ class TrackedDfg(Dfg):
     Examples:
         >>> dfg = TrackedDfg(tys.Bool, tys.Unit, track_inputs=True)
         >>> dfg.tracked
-        [OutPort(Node(1), 0), OutPort(Node(1), 1)]
+        [OutPort(Node(5), 0), OutPort(Node(5), 1)]
     """
 
     #: Tracked wires. None if index is no longer tracked.
@@ -127,10 +127,11 @@ class TrackedDfg(Dfg):
     def add(self, com: Command, *, metadata: dict[str, Any] | None = None) -> Node:
         """Add a command to the DFG.
 
-        Overrides :meth:`Dfg.add <hugr.dfg.Dfg.add>` to allow Command inputs
-        to be either :class:`Wire <hugr.node_port.Wire>` or indices to tracked wires.
+        Overrides :meth:`Dfg.add <hugr.build.dfg.Dfg.add>` to allow Command inputs
+        to be either :class:`Wire <hugr.hugr.node_port.Wire>` or indices to
+        tracked wires.
 
-        Any incoming :class:`Wire <hugr.node_port.Wire>` will
+        Any incoming :class:`Wire <hugr.hugr.node_port.Wire>` will
         be connected directly, while any integer will be treated as a reference
         to the tracked wire at that index.
 
@@ -150,11 +151,11 @@ class TrackedDfg(Dfg):
         Examples:
             >>> dfg = TrackedDfg(tys.Bool, track_inputs=True)
             >>> dfg.tracked
-            [OutPort(Node(1), 0)]
+            [OutPort(Node(5), 0)]
             >>> dfg.add(ops.Noop()(0))
-            Node(3)
+            Node(7)
             >>> dfg.tracked
-            [OutPort(Node(3), 0)]
+            [OutPort(Node(7), 0)]
         """
         wires = self._to_wires(com.incoming)
         n = self.add_op(com.op, *wires, metadata=metadata)
@@ -175,7 +176,7 @@ class TrackedDfg(Dfg):
         )
 
     def set_indexed_outputs(self, *in_wires: ComWire) -> None:
-        """Set the Dfg outputs, using either :class:`Wire <hugr.node_port.Wire>` or
+        """Set the Dfg outputs, using either :class:`Wire <hugr.hugr.node_port.Wire>` or
         indices to tracked wires.
 
         Args:

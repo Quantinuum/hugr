@@ -998,9 +998,7 @@ class Alias(Type):
 
 @dataclass(frozen=True)
 class FunctionType(Type):
-    """A function type, defined by input types,
-    output types and extension requirements.
-    """
+    """A function type, defined by input and output types."""
 
     input: TypeRow
     output: TypeRow
@@ -1223,7 +1221,10 @@ class ExtType(Type):
 
 @dataclass
 class Opaque(Type):
-    """Opaque type, identified by `id` and with optional type arguments and bound."""
+    """An opaque type identified by `id`, with a required type bound.
+
+    Type arguments and extension information are optional.
+    """
 
     id: str
     bound: TypeBound

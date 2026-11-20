@@ -10,7 +10,7 @@ use hugr::HugrView;
 use hugr::hugr::views::render::NodeLabel;
 use hugr::metadata::DEBUGINFO_META_KEY;
 
-/// Dump the standard extensions.
+/// Render Mermaid diagrams for the modules in a HUGR package.
 #[derive(Parser, Debug)]
 #[clap(version = "1.0", long_about = None)]
 #[clap(about = "Render mermaid diagrams..")]

@@ -357,7 +357,7 @@ pub enum ExtensionRegisterResult {
     },
     /// An exact version entry was replaced.
     ReplacedExact,
-    /// A newer compatible version was already present and was kept.
+    /// An equal or newer compatible version was kept.
     KeptExisting {
         /// The version that was kept.
         version: Version,
@@ -380,7 +380,38 @@ pub(crate) fn semver_compatible(candidate: &Version, requested: &Version) -> boo
 }
 
 impl ExtensionRegistry {
-    /// Create a new empty extension registry.
+    /// Create an extension registry from the supplied extensions.
+    ///
+    /// Extensions are added in iteration order using [`Self::register`].
+    /// The highest version in each semver-compatible group is kept, along with
+    /// any incompatible versions. For an exact version match, the last definition
+    /// replaces the earlier one.
+    ///
+    /// Use [`Self::default`] to create an empty registry.
+    ///
+    /// ```
+    /// use std::sync::Arc;
+    /// use hugr_core::extension::{Extension, ExtensionId, ExtensionRegistry, Version};
+    ///
+    /// let id = ExtensionId::new_unchecked("example");
+    /// let older = Arc::new(Extension::new(id.clone(), Version::new(1, 0, 0)));
+    /// let newer = Arc::new(Extension::new(id.clone(), Version::new(1, 1, 0)));
+    /// let incompatible = Arc::new(Extension::new(id, Version::new(2, 0, 0)));
+    /// let registry = ExtensionRegistry::new([older, newer, incompatible]);
+    /// assert_eq!(registry.len(), 1);
+    /// assert_eq!(registry.len_all_versions(), 2);
+    /// assert_eq!(
+    ///     registry.get("example").unwrap().version(),
+    ///     &Version::new(2, 0, 0),
+    /// );
+    /// assert_eq!(
+    ///     registry
+    ///         .get_compatible("example", &Version::new(1, 0, 0))
+    ///         .unwrap()
+    ///         .version(),
+    ///     &Version::new(1, 1, 0),
+    /// );
+    /// ```
     pub fn new(extensions: impl IntoIterator<Item = Arc<Extension>>) -> Self {
         let mut res = Self::default();
         for ext in extensions {
@@ -393,7 +424,7 @@ impl ExtensionRegistry {
     ///
     /// After deserialization, updates all the internal `Weak<Extension>`
     /// references to point to the newly created [`Arc`]s in the registry,
-    /// or extensions in the `additional_extensions` parameter.
+    /// or extensions in the `other_extensions` parameter.
     pub fn load_json(
         reader: impl io::Read,
         other_extensions: &ExtensionRegistry,
@@ -424,7 +455,7 @@ impl ExtensionRegistry {
         writer.write_all(b"]").map_err(serde_json::Error::io)
     }
 
-    /// Gets the Extension with the given name
+    /// Gets the latest retained Extension with the given name.
     pub fn get(&self, name: &str) -> Option<&Arc<Extension>> {
         self.exts.get(name).map(ExtensionVersions::latest)
     }
@@ -442,6 +473,9 @@ impl ExtensionRegistry {
     }
 
     /// Gets the Extension matching an optional serialized version requirement.
+    ///
+    /// Returns an exact or newer semver-compatible version when `version` is
+    /// `Some`, or the latest retained version when it is `None`.
     pub fn get_req(&self, name: &str, version: Option<&Version>) -> Option<&Arc<Extension>> {
         self.exts.get(name).and_then(|ext| ext.get_req(version))
     }
@@ -513,7 +547,9 @@ impl ExtensionRegistry {
         result
     }
 
-    /// Returns the number of extensions in the registry.
+    /// Returns the number of distinct extension ids in the registry.
+    ///
+    /// Use [`Self::len_all_versions`] to count all retained versions.
     pub fn len(&self) -> usize {
         self.exts.len()
     }
@@ -1027,6 +1063,15 @@ impl Extension {
     }
 
     /// Instantiate an [`ExtensionOp`] which references an [`OpDef`] in this extension.
+    ///
+    /// # Panics
+    ///
+    /// Panics if this extension has no operation with the given `name`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the type arguments are invalid or signature
+    /// computation fails.
     pub fn instantiate_extension_op(
         &self,
         name: &OpNameRef,

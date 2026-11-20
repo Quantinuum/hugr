@@ -35,7 +35,7 @@ if TYPE_CHECKING:
 
 @dataclass
 class ExplicitBound:
-    """An explicit type bound on an :class:`OpDef`.
+    """An explicit type bound on a :class:`TypeDef`.
 
 
     Examples:
@@ -54,9 +54,9 @@ class ExplicitBound:
 
 @dataclass
 class FromParamsBound:
-    """Calculate the type bound of an :class:`OpDef` from the join of its parameters at
-    the given indices.
+    """A type bound computed from a :class:`TypeDef`'s parameters.
 
+    The bound is the join of the bounds of the parameters at the given indices.
 
     Examples:
         >>> FromParamsBound(indices=[0, 1])
@@ -259,10 +259,12 @@ class OpDef(ExtensionObject):
     ) -> ops.ExtOp:
         """Instantiate an operation from this definition.
 
+        This method does not compute signatures. If type arguments are supplied
+        or no static signature is available, `concrete_signature` is required.
+
         Args:
             args: Type arguments corresponding to the type parameters of the definition.
-            concrete_signature: Concrete function type of the operation, only required
-                if the operation is polymorphic.
+            concrete_signature: Concrete function type of the operation.
 
         Raises:
             ValueError: if a `concrete_signature` arg is not provided to a `OpDef`
@@ -666,9 +668,6 @@ class ExtensionRegistry:
 
         Returns:
             The latest extension in the registry compatible with the given one.
-
-        Raises:
-            ExtensionExists: If an extension with the same name already exists.
         """
         if extension.name not in self.versioned_extensions:
             self.versioned_extensions[extension.name] = ExtensionVersions(extension)
@@ -708,8 +707,8 @@ class ExtensionRegistry:
     def extend(self, other: ExtensionRegistry) -> None:
         """Add a registry of extensions to this registry.
 
-        If an extension with the same name already exists, the one with the
-        higher version is kept.
+        Keeps the latest version in each semver-compatible group, along with
+        any incompatible versions of the same extension. See :meth:`register`.
 
         Args:
             other: The extension registry to add.

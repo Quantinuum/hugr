@@ -47,10 +47,10 @@ pub trait DataflowOpTrait: super::sealed::Sealed + Sized {
         self.signature().port_count(dir)
     }
 
-    /// The edge kind for the non-dataflow or constant inputs of the operation,
+    /// The edge kind for the non-dataflow inputs of the operation,
     /// not described by the signature.
     ///
-    /// If not None, a single extra output multiport of that kind will be
+    /// If not None, a single extra input multiport of that kind will be
     /// present.
     #[inline]
     fn other_input(&self) -> Option<EdgeKind> {

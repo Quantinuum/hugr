@@ -188,8 +188,7 @@ class GlobalScope(PassScopeBase, Enum, metaclass=ABCEnumMeta):
     """Optimization passes must preserve interface and behaviour of every module child,
     as well as the entrypoint.
 
-    - `preserve_interface`: every public function defined in the module,
-       and the entrypoint."""
+    - `preserve_interface`: the module root, every module child, and the entrypoint."""
 
     PRESERVE_PUBLIC = "GlobalPublic"
     """Optimization passes must preserve interface and behaviour of all public
@@ -201,8 +200,8 @@ class GlobalScope(PassScopeBase, Enum, metaclass=ABCEnumMeta):
 
     Thus, appropriate for a Hugr that will be linked as a library.
 
-    - `preserve_interface`: Every public function defined in the module', plus
-      the entrypoint."""
+    - `preserve_interface`: the module root, every public function definition or
+      declaration in the module, and the entrypoint."""
 
     PRESERVE_ENTRYPOINT = "GlobalEntrypoint"
     """Run the pass on the whole Hugr, but preserving behaviour only of the entrypoint.
@@ -210,10 +209,11 @@ class GlobalScope(PassScopeBase, Enum, metaclass=ABCEnumMeta):
     Thus, appropriate for a Hugr that will be run as an executable, with the entrypoint
     indicating where execution will begin.
 
-    If the entrypoint is the module root, then the same as [Self::Public].
+    If the entrypoint is the module root, this is the same as `PRESERVE_PUBLIC`.
 
-    - `preserve_interface`: if the entrypoint node is the module root, then all
-       children of the module root; otherwise, just the entrypoint node."""
+    - `preserve_interface`: the module root and, if the entrypoint is the module
+      root, every public function definition or declaration; otherwise, the
+      entrypoint node."""
 
     def root(self, hugr: Hugr) -> Node:
         return hugr.module_root

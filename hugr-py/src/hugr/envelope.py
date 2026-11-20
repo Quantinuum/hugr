@@ -10,9 +10,9 @@ Payload formats
 The envelope may encode the HUGR in different formats, listed in
 :class:`hugr.envelope.EnvelopeFormat`. The payload may also be compressed with zstd.
 
-Some formats can be represented as ASCII, as indicated by the
+Some formats can be represented as text, as indicated by the
 :meth:`hugr.envelope.EnvelopeFormat.ascii_printable` method. When this is the case, the
-whole envelope can be stored in a string.
+whole envelope can be stored in a string if compression is disabled.
 
 Envelope header
 ---------------
@@ -306,7 +306,6 @@ class EnvelopeHeader:
     Attributes:
         format: The format used to encode the HUGR.
         zstd: Whether the payload is compressed with zstd.
-            The compression level is detected from the payload.
     """
 
     format: EnvelopeFormat

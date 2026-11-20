@@ -61,7 +61,7 @@ class If(_IfElse):
     """Build the 'if' branch of a conditional branching on a boolean value.
 
     Examples:
-        >>> from hugr.dfg import Dfg
+        >>> from hugr.build.dfg import Dfg
         >>> dfg = Dfg(tys.Qubit)
         >>> (q,) = dfg.inputs()
         >>> if_ = dfg.add_if(dfg.load(val.TRUE), q)
@@ -207,7 +207,9 @@ class Conditional(ParentBuilder[ops.Conditional], AbstractContextManager):
             The new case builder.
 
         Raises:
-            ConditionalError: If the case index is out of range.
+            ConditionalError: If the case index is at least the number of cases,
+                or the case has already been built.
+            IndexError: If a negative case index is outside the Python list bounds.
 
         Examples:
             >>> cond = Conditional(tys.Bool, [tys.Qubit])

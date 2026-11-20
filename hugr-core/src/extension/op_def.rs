@@ -21,9 +21,7 @@ mod serialize_signature_func;
 
 /// Trait necessary for binary computations of `OpDef` signature
 pub trait CustomSignatureFunc: Send + Sync {
-    /// Compute signature of node given
-    /// values for the type parameters,
-    /// the operation definition and the extension registry.
+    /// Compute a node's signature from its type arguments and operation definition.
     fn compute_signature<'o, 'a: 'o>(
         &'a self,
         arg_values: &[TypeArg],
@@ -63,9 +61,7 @@ impl<T: SignatureFromArgs> CustomSignatureFunc for T {
 /// Trait for validating type arguments to a `PolyFuncTypeRV` beyond conformation to
 /// declared type parameter (which should have been checked beforehand).
 pub trait ValidateTypeArgs: Send + Sync {
-    /// Validate the type arguments of node given
-    /// values for the type parameters,
-    /// the operation definition and the extension registry.
+    /// Validate a node's type arguments against its operation definition.
     fn validate<'o, 'a: 'o>(
         &self,
         arg_values: &[TypeArg],
@@ -227,17 +223,13 @@ impl SignatureFunc {
         }
     }
 
-    /// Compute the concrete signature ([`FuncValueType`]).
-    ///
-    /// # Panics
-    ///
-    /// Panics if `self` is a [`SignatureFunc::CustomFunc`] and there are not enough type
-    /// arguments provided to match the number of static parameters.
+    /// Compute the concrete dataflow [`Signature`].
     ///
     /// # Errors
     ///
-    /// This function will return an error if the type arguments are invalid or
-    /// there is some error in type computation.
+    /// Returns an error if the type arguments are invalid
+    /// (including too few static arguments for a [`SignatureFunc::CustomFunc`]),
+    /// the signature computation function is missing, or type computation fails.
     pub fn compute_signature(
         &self,
         def: &OpDef,
@@ -588,7 +580,7 @@ impl Extension {
     /// (defined by a [`PolyFuncTypeRV`]), a type scheme along with binary
     /// validation for type arguments ([`CustomValidator`]), or a custom binary
     /// function for computing the signature given type arguments (implementing
-    /// `[CustomSignatureFunc]`).
+    /// [`CustomSignatureFunc`]).
     ///
     /// This method requires a [`Weak`] reference to the [`Arc`] containing the
     /// extension being defined. The intended way to call this method is inside

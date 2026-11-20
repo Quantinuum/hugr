@@ -30,7 +30,7 @@ impl From<TypeBound> for TypeDefBound {
 }
 
 impl TypeDefBound {
-    /// Create a new [`TypeDefBound::Explicit`] with the `Any` bound.
+    /// Create a new [`TypeDefBound::Explicit`] with the [`TypeBound::Linear`] bound.
     #[must_use]
     pub fn any() -> Self {
         TypeDefBound::Explicit {

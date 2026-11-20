@@ -212,8 +212,8 @@ impl<'a> Walker<'a> {
     /// Repeatedly calling `expand` on a wire will progressively pin all its
     /// endpoints. The multiple alternative [`Walker`]s returned then form
     /// a branching search space to be explored by the user. When a wire is
-    /// fully pinned in the specified direction, i.e. `wire.is_complete(dir)` is
-    /// true, then an empty iterator is returned.
+    /// fully pinned in the specified direction, i.e. `self.is_complete(wire, dir)`
+    /// is true, the iterator contains only the current walker unchanged.
     pub fn expand<'b>(
         &'b self,
         wire: &'b PersistentWire,

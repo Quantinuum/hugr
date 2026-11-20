@@ -98,7 +98,8 @@ impl<'a> Module<'a> {
 
     /// Return the term data for a given term id.
     ///
-    /// Returns [`Term::Wildcard`] when the term id is invalid.
+    /// Returns [`Term::Wildcard`] for the invalid sentinel ID, and `None` for
+    /// other out-of-bounds IDs. See [`TermId::is_valid`].
     #[inline]
     #[must_use]
     pub fn get_term(&self, term_id: TermId) -> Option<&Term<'a>> {
@@ -426,7 +427,8 @@ macro_rules! define_index {
             ///
             /// # Panics
             ///
-            /// Panics if the index is 2^32 or larger.
+            /// Panics if the index is `u32::MAX` or larger; `u32::MAX` is reserved
+            /// as the invalid-index sentinel.
             #[must_use] pub fn new(index: usize) -> Self {
                 assert!(index < u32::MAX as usize, "index out of bounds");
                 Self(index as u32)
