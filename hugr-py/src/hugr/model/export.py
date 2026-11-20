@@ -49,6 +49,9 @@ class ModelExport:
         self.link_names: dict[InPort | OutPort, str] = {}
         self.link_next = 0
 
+        # A cache for repeated usage of constant nodes
+        self.const_node_cache: dict[Node, model.Term] = {}
+
         for a, b in self.hugr.links():
             self.link_ports.union(a, b)
 
@@ -639,8 +642,13 @@ class ModelExport:
 
         match self.hugr[const_node].op:
             case Const() as op:
-                return op.val.to_model()
-            case op:
+                if const_node in self.const_node_cache:
+                    val = self.const_node_cache[const_node]
+                else:
+                    val = op.val.to_model()
+                    self.const_node_cache[const_node] = val
+                return val
+            case _:
                 return None
 
 
