@@ -32,8 +32,10 @@ To setup the environment manually you will need:
 - Rust `>=1.89`: <https://www.rust-lang.org/tools/install>
 - cargo-nextest: <https://nexte.st/docs/installation/pre-built-binaries/>
 - uv `>=0.9`: <https://docs.astral.sh/uv/getting-started/installation>
-- Optional: capnproto `>=1.0`: <https://capnproto.org/install.html>
-    Required when modifying the `hugr-model` serialization schema.
+- Optional: capnproto `>=1.1`: <https://capnproto.org/install.html>
+    Run `just update-model-capnp` to regenerate the Rust bindings after changing
+    the `hugr-model` serialization schema or updating the `capnp` runtime.
+    The recipe installs the matching `capnpc` Rust generator.
 - Optional: [llvm](https://llvm.org/) `== 21.1`. The "llvm" feature (backed by the sub-crate `hugr-llvm`)
   requires LLVM 21.1 installed. We use the rust bindings from
   [llvm-sys](https://crates.io/crates/llvm-sys).

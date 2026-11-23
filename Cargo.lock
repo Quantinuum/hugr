@@ -262,9 +262,9 @@ checksum = "1fd0f2584146f6f2ef48085050886acf353beff7305ebd1ae69500e27c67f64b"
 
 [[package]]
 name = "capnp"
-version = "0.27.3"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "98216f4102645406ce4dbb0d2b3511cae502537885bae5662812ccc1fe6b04e7"
+checksum = "da8a6b90513bfc04aa5360e5278e0582b98c30460b1ea64b7d5d4971f449cd5f"
 dependencies = [
  "embedded-io",
 ]
