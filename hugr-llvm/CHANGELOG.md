@@ -4,7 +4,11 @@
 
 ### Documentation
 
-- Fix out-of-date public docstrings ([#3352](https://github.com/Quantinuum/hugr/pull/3352))
+- Fix outdated API documentation ([#3352](https://github.com/Quantinuum/hugr/pull/3352))
+
+### Dependencies
+
+- Allow `inkwell` 0.11 ([#3359](https://github.com/Quantinuum/hugr/pull/3359))
 
 ## [0.31.0](https://github.com/Quantinuum/hugr/compare/hugr-llvm-v0.30.3...hugr-llvm-v0.31.0) - 2026-11-11
 

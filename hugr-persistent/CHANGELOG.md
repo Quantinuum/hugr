@@ -4,7 +4,7 @@
 
 ### Documentation
 
-- Fix out-of-date public docstrings ([#3352](https://github.com/Quantinuum/hugr/pull/3352))
+- Fix outdated API documentation ([#3352](https://github.com/Quantinuum/hugr/pull/3352))
 
 ## [0.7.13](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.7.12...hugr-persistent-v0.7.13) - 2026-11-11
 

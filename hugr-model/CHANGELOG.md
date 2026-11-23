@@ -1,11 +1,15 @@
 # Changelog
 
-
 ## [0.31.1](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.31.0...hugr-model-v0.31.1) - 2026-11-23
 
 ### Documentation
 
-- Fix out-of-date public docstrings ([#3352](https://github.com/Quantinuum/hugr/pull/3352))
+- Fix outdated API documentation ([#3352](https://github.com/Quantinuum/hugr/pull/3352))
+
+### Dependencies
+
+- Update to `capnp` 0.28 ([#3362](https://github.com/Quantinuum/hugr/pull/3362))
+- Allow PyO3 0.30 with the `pyo3` feature ([#3341](https://github.com/Quantinuum/hugr/pull/3341))
 
 ## [0.30.3](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.30.2...hugr-model-v0.30.3) - 2026-09-30
 
