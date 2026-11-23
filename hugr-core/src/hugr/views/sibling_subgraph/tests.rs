@@ -498,6 +498,12 @@ fn convex_multiport_with_internal_and_external_consumers() {
         BTreeSet::from(nodes)
     );
     assert_eq!(subgraph.validate_default(&hugr), Ok(()));
+    assert_eq!(subgraph.validate_skip_convexity(&hugr), Ok(()));
+    let checker = LineConvexChecker::from_entrypoint(&hugr);
+    assert_eq!(
+        subgraph.validate_with_checker(&hugr, Some(&checker)),
+        Ok(())
+    );
 }
 
 #[test]
@@ -809,6 +815,10 @@ fn test_validate() {
     );
     assert_eq!(sub.validate_skip_convexity(&func), Ok(()));
     assert_eq!(sub.validate_default(&func), Err(InvalidSubgraph::NotConvex));
+    assert_eq!(
+        SiblingSubgraph::try_from_nodes([not1, not3], &func),
+        Err(InvalidSubgraph::NotConvex)
+    );
     assert_eq!(
         sub.validate_with_checker(&func, Some(&checker)),
         Err(InvalidSubgraph::NotConvex)
