@@ -7,6 +7,7 @@ use std::sync::Arc;
 
 use crate::envelope::description::{ExtensionDesc, GeneratorDesc, ModuleDesc};
 use crate::extension::prelude::{ConstString, ConstUsize};
+use crate::hugr::views::render::RenderStringConfig;
 use crate::metadata::{self, Metadata, RawMetadataValue};
 use crate::types::type_param::{SeqPart, TermKindError, TypeParam};
 use crate::types::{
@@ -1349,6 +1350,25 @@ impl<'a> Context<'a> {
         })
     }
 
+    /// Check the load's type argument if it was given explicitly.
+    fn check_load_const_type(
+        &mut self,
+        runtime_type: table::TermId,
+        expected: &Type,
+    ) -> Result<(), ImportErrorInner> {
+        if !matches!(self.get_term(runtime_type)?, table::Term::Wildcard) {
+            let declared = self.import_type(runtime_type)?;
+            if &declared != expected {
+                return Err(error_invalid!(
+                    "`core.load_const` type argument is {}, expected {}",
+                    render_load_const_type(&declared),
+                    render_load_const_type(expected)
+                ));
+            }
+        }
+        Ok(())
+    }
+
     /// Import a node with a custom operation.
     ///
     /// A custom operation in `hugr-model` is referred to by a symbol
@@ -1429,7 +1449,7 @@ impl<'a> Context<'a> {
             return Ok(node);
         }
 
-        if let Some([_, value]) = self.match_symbol(operation, model::CORE_LOAD_CONST)? {
+        if let Some([runtime_type, value]) = self.match_symbol(operation, model::CORE_LOAD_CONST)? {
             // If the constant refers directly to a function, import this as the `LoadFunc` operation.
             if let table::Term::Apply(symbol, args) = self.get_term(value)? {
                 let func_node_data = self.get_node(*symbol)?;
@@ -1443,14 +1463,25 @@ impl<'a> Context<'a> {
                         .map(|term| self.import_term(*term))
                         .collect::<Result<Vec<TypeArg>, _>>()?;
 
+                    let load = LoadFunction::try_new(func_sig, type_args)?;
+                    let datatype = Type::new_function(load.instantiation.clone());
+                    self.check_load_const_type(runtime_type, &datatype)?;
+                    if let Some(signature) = node_data.signature
+                        && !matches!(self.get_term(signature)?, table::Term::Wildcard)
+                    {
+                        let declared = self.get_node_signature(node_id)?;
+                        let expected = Signature::new([], [datatype]);
+                        if declared != expected {
+                            return Err(error_invalid!(
+                                "`core.load_const` signature is {}, expected {}",
+                                render_load_const_type(&Type::new_function(declared)),
+                                render_load_const_type(&Type::new_function(expected))
+                            ));
+                        }
+                    }
+
                     self.static_edges.push((*symbol, node_id));
-
-                    let optype = OpType::LoadFunction(
-                        LoadFunction::try_new(func_sig, type_args)
-                            .map_err(ImportErrorInner::Signature)?,
-                    );
-
-                    let node = self.make_node(node_id, optype, parent)?;
+                    let node = self.make_node(node_id, OpType::LoadFunction(load), parent)?;
                     return Ok(node);
                 }
             }
@@ -1459,20 +1490,26 @@ impl<'a> Context<'a> {
             let signature = node_data
                 .signature
                 .ok_or_else(|| error_uninferred!("node signature"))?;
-            let [_, outputs] = self.get_func_type(signature)?;
+            let [inputs, outputs] = self.get_func_type(signature)?;
+            if !self.import_closed_list(inputs)?.is_empty() {
+                return Err(error_invalid!(
+                    "`core.load_const` signature expects no inputs"
+                ));
+            }
             let outputs = self.import_closed_list(outputs)?;
-            let output = outputs.first().ok_or_else(|| {
-                error_invalid!("`{}` expects a single output", model::CORE_LOAD_CONST)
-            })?;
+            let [output] = outputs.as_slice() else {
+                return Err(error_invalid!(
+                    "`core.load_const` signature expects a single output"
+                ));
+            };
             let datatype = self.import_type(*output)?;
+            self.check_load_const_type(runtime_type, &datatype)?;
 
             let imported_value = self.import_value(value, *output)?;
 
             let load_const_node = self.make_node(
                 node_id,
-                OpType::LoadConstant(LoadConstant {
-                    datatype: datatype.clone(),
-                }),
+                OpType::LoadConstant(LoadConstant { datatype }),
                 parent,
             )?;
 
@@ -2401,6 +2438,16 @@ impl LocalVar {
     }
 }
 
+/// Helper function to render a load constant type
+/// with extension names and versions in an error message.
+fn render_load_const_type(ty: &Type) -> String {
+    ty.render_str(
+        RenderStringConfig::new()
+            .with_extension_version(true)
+            .with_print_type_args(true),
+    )
+}
+
 #[cfg(test)]
 mod test {
     use std::str::FromStr;
@@ -2477,5 +2524,31 @@ mod test {
         let content = std::fs::read(&case).expect("could not read case file");
         // Smoke test importing the HUGR
         assert!(Hugr::load(content.as_slice(), None).is_ok());
+    }
+
+    /// Reject each inconsistent declaration independently of graph validation.
+    #[rstest]
+    #[case::type_argument("(core.fn [] [])", "", "type argument")]
+    #[case::signature("_", "(signature (core.fn [] [prelude.string]))", "signature")]
+    fn load_function_type_mismatch(
+        #[case] datatype: &str,
+        #[case] signature: &str,
+        #[case] diagnostic: &str,
+    ) {
+        let source = include_str!("../../hugr-model/tests/fixtures/model-call.edn").replacen(
+            "((core.load_const _ example.caller) [] [%5])",
+            &format!("((core.load_const {datatype} example.caller) [] [%5] {signature})"),
+            1,
+        );
+        let bump = model::bumpalo::Bump::new();
+        let ast = model::ast::Package::from_str(&source).unwrap();
+        let package = ast.resolve(&bump).unwrap();
+        let err = super::import_hugr(&package.modules[0], &std_reg())
+            .expect_err("the load's explicit type should be rejected");
+        let err = anyhow::Error::new(err);
+        assert!(
+            format!("{err:#}").contains(&format!("`core.load_const` {diagnostic} is")),
+            "{err:#}"
+        );
     }
 }
