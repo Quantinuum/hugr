@@ -479,6 +479,28 @@ fn convex_multiport_with_unused_consumer() {
 }
 
 #[test]
+fn convex_multiport_with_internal_and_external_consumers() {
+    let mut builder = DFGBuilder::new(Signature::new_endo([bool_t()])).unwrap();
+    let source = builder
+        .add_dataflow_op(LogicOp::Not, builder.input_wires())
+        .unwrap();
+    let unused = builder
+        .add_dataflow_op(LogicOp::Not, source.outputs())
+        .unwrap();
+    let hugr = builder.finish_hugr_with_outputs(source.outputs()).unwrap();
+
+    // The source port feeds both the internal consumer and the DFG output.
+    // The internal consumer has no boundary port of its own.
+    let nodes = [source.node(), unused.node()];
+    let subgraph = SiblingSubgraph::try_from_nodes(nodes, &hugr).unwrap();
+    assert_eq!(
+        subgraph.nodes().iter().copied().collect::<BTreeSet<_>>(),
+        BTreeSet::from(nodes)
+    );
+    assert_eq!(subgraph.validate_default(&hugr), Ok(()));
+}
+
+#[test]
 fn invalid_boundary() {
     let (hugr, func_root) = build_hugr().unwrap();
     let func = hugr.with_entrypoint(func_root);
