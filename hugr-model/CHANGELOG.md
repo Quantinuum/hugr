@@ -1,6 +1,12 @@
 # Changelog
 
 
+## [0.31.1](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.31.0...hugr-model-v0.31.1) - 2026-11-23
+
+### Documentation
+
+- Fix out-of-date public docstrings ([#3352](https://github.com/Quantinuum/hugr/pull/3352))
+
 ## [0.30.3](https://github.com/Quantinuum/hugr/compare/hugr-model-v0.30.2...hugr-model-v0.30.3) - 2026-09-30
 
 ### Bug Fixes

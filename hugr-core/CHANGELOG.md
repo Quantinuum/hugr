@@ -1,5 +1,16 @@
 # Changelog
 
+## [0.31.1](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.31.0...hugr-core-v0.31.1) - 2026-11-23
+
+### Bug Fixes
+
+- Validate types when importing LoadFunction/LoadConstant ([#3367](https://github.com/Quantinuum/hugr/pull/3367))
+
+### Documentation
+
+- clarify HugrMut extension version retention ([#3351](https://github.com/Quantinuum/hugr/pull/3351))
+- Fix out-of-date public docstrings ([#3352](https://github.com/Quantinuum/hugr/pull/3352))
+
 ## [0.31.0](https://github.com/Quantinuum/hugr/compare/hugr-core-v0.30.3...hugr-core-v0.31.0) - 2026-11-11
 
 ### Bug Fixes
