@@ -270,7 +270,7 @@ jobs:
       - name: Get cargo binstall
         uses: cargo-bins/cargo-binstall@main
       - name: Install capnproto-rust plugin
-        run: cargo binstall capnpc
+        run: cargo binstall capnpc --version 0.28.1 --locked
       - name: Regenerate the capnp code
         run: |
           capnp compile \
@@ -279,8 +279,9 @@ jobs:
             hugr-model/capnp/hugr-v0.capnp
       - name: Check if the generated capnproto code is up to date
         run: |
-          git diff --exit-code --name-only hugr-model/capnp/
-          if [ $? -ne 0 ]; then
+          # Local builds may use a different version of the capnp compiler,
+          # But the generated code should still match the committed version.
+          if ! git diff --exit-code -I '^// capnp binary version:' -- hugr-model/src/capnp/; then
             echo "The capnp generated code is not up to date"
             echo "Please run 'just update-model-capnp' and commit the changes"
             exit 1
