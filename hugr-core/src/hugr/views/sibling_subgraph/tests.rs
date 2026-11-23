@@ -454,6 +454,30 @@ fn convex_multiports() {
     assert_eq!(subgraph.nodes(), [not1, not2]);
 }
 
+/// Regression for <https://github.com/Quantinuum/hugr/issues/3368>.
+#[test]
+fn convex_multiport_with_unused_consumer() {
+    let mut builder = DFGBuilder::new(Signature::new_endo([bool_t()])).unwrap();
+    let source = builder
+        .add_dataflow_op(LogicOp::Not, builder.input_wires())
+        .unwrap();
+    let used = builder
+        .add_dataflow_op(LogicOp::Not, source.outputs())
+        .unwrap();
+    let unused = builder
+        .add_dataflow_op(LogicOp::Not, source.outputs())
+        .unwrap();
+    let hugr = builder.finish_hugr_with_outputs(used.outputs()).unwrap();
+
+    // Both consumers are in the subgraph, including the one with no output edge.
+    let nodes = [source.node(), used.node(), unused.node()];
+    let subgraph = SiblingSubgraph::try_from_nodes(nodes, &hugr).unwrap();
+    assert_eq!(
+        subgraph.nodes().iter().copied().collect::<BTreeSet<_>>(),
+        BTreeSet::from(nodes)
+    );
+}
+
 #[test]
 fn invalid_boundary() {
     let (hugr, func_root) = build_hugr().unwrap();
