@@ -1,5 +1,10 @@
 # Changelog
 
+## [0.31.1](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.31.0...hugr-cli-v0.31.1) - 2026-11-23
+
+### Documentation
+
+- Fix outdated API documentation ([#3352](https://github.com/Quantinuum/hugr/pull/3352))
 
 ## [0.30.3](https://github.com/Quantinuum/hugr/compare/hugr-cli-v0.30.2...hugr-cli-v0.30.3) - 2026-09-30
 
