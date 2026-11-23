@@ -68,9 +68,9 @@ update-schema:
 
 # Update the `hugr-model` capnproto definitions.
 update-model-capnp:
-    # Always use the latest version of capnproto-rust
-    cargo install capnpc
-    @# When modifying the schema version, update the `ci-rs.yml` file too.
+    # Keep the generator version in sync with `ci-rs.yml` and the `capnp` runtime series.
+    cargo install capnpc --version '=0.28.1' --locked
+    @# When modifying the schema version, update `ci-rs.yml` too.
     capnp compile -orust:hugr-model/src --src-prefix=hugr-model hugr-model/capnp/hugr-v0.capnp
 
 # Update snapshots used in the pytest -n auto tests.

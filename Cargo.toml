@@ -42,7 +42,7 @@ renamed_and_removed_lints = "warn"
 [workspace.dependencies]
 anyhow = "1.0.101"
 insta = { version = "1.47.2" }
-capnp = "0.27.0"
+capnp = "0.28.0"
 cgmath = "0.18.0"
 cool_asserts = "2.0.4"
 delegate = "0.13.5"
