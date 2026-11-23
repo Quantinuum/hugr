@@ -167,10 +167,10 @@ pub trait MakeExtensionOp {
     ///
     /// This identifier must be unique within the extension with which the
     /// [`OpDef`] is registered. An [`ExtensionOp`] instantiating this [`OpDef`] will
-    /// report `self.opdef_id()` as its [`ExtensionOp::unqualified_id`].
+    /// report `self.op_id()` as its [`ExtensionOp::unqualified_id`].
     fn op_id(&self) -> OpName;
 
-    /// Try to load one of the operations of this set from an [`OpDef`].
+    /// Try to load one of the operations of this set from an [`ExtensionOp`].
     fn from_extension_op(ext_op: &ExtensionOp) -> Result<Self, OpLoadError>
     where
         Self: Sized;
@@ -188,8 +188,8 @@ pub trait MakeExtensionOp {
     /// Any type args which define this operation.
     fn type_args(&self) -> Vec<TypeArg>;
 
-    /// Given the ID of the extension this operation is defined in, and a
-    /// registry containing that extension, return a [`RegisteredOp`].
+    /// Given the ID and shared definition of the extension this operation is
+    /// defined in, return a [`RegisteredOp`].
     fn to_registered(
         self,
         extension_id: ExtensionId,
@@ -244,13 +244,13 @@ where
     Ok(op)
 }
 
-/// Wrap an [`MakeExtensionOp`] with an extension registry to allow type computation.
+/// Wrap a [`MakeExtensionOp`] with its defining extension to allow type computation.
 /// Generate from [`MakeExtensionOp::to_registered`]
 #[derive(Clone, Debug)]
 pub struct RegisteredOp<T> {
     /// The name of the extension these ops belong to.
     pub extension_id: ExtensionId,
-    /// A registry of all extensions, used for type computation.
+    /// The defining extension, used for type computation.
     extension: Arc<Extension>,
     /// The inner [`MakeExtensionOp`]
     op: T,
@@ -264,7 +264,11 @@ impl<T> RegisteredOp<T> {
 }
 
 impl<T: MakeExtensionOp> RegisteredOp<T> {
-    /// Generate an [`OpType`].
+    /// Generate an [`ExtensionOp`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the defining extension does not contain this operation.
     pub fn to_extension_op(&self) -> Result<ExtensionOp, SignatureError> {
         let op_def = self.extension.get_op(&self.op_id()).unwrap_or_else(|| {
             panic!(
@@ -286,7 +290,7 @@ impl<T: MakeExtensionOp> RegisteredOp<T> {
 }
 
 /// Trait for operations that can self report the extension ID they belong to
-/// and the registry required to compute their types.
+/// and the extension definition required to compute their types.
 /// Allows conversion to [`ExtensionOp`]
 pub trait MakeRegisteredOp: MakeExtensionOp {
     /// The ID of the extension this op belongs to.
@@ -294,8 +298,16 @@ pub trait MakeRegisteredOp: MakeExtensionOp {
     /// A reference to the [Extension] which defines this operation.
     fn extension_ref(&self) -> Arc<Extension>;
 
-    /// Convert this operation in to an [`ExtensionOp`]. Returns None if the type
-    /// cannot be computed.
+    /// Convert this operation into an [`ExtensionOp`].
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the type arguments are invalid or signature
+    /// computation fails.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the defining extension does not contain this operation.
     fn to_extension_op(self) -> Result<ExtensionOp, SignatureError>
     where
         Self: Sized,

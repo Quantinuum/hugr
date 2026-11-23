@@ -375,7 +375,8 @@ class AsExtOp(DataflowOp, Protocol):
     def ext_op(self) -> ExtOp:
         """:class:`ExtOp` operation that this type represents.
 
-        Computed once using :meth:`op_def` :meth:`type_args` and :meth:`type_args`.
+        Computed once using :meth:`op_def`, :meth:`type_args` and
+        :meth:`cached_signature`.
         Each of those methods should be deterministic.
         """
         return self.op_def().instantiate(self.type_args(), self.cached_signature())
@@ -409,15 +410,11 @@ class AsExtOp(DataflowOp, Protocol):
 
 
         By default assumes the type of `cls` is a singleton,
-        and compares the result of :meth:`to_ext` with the given `ext_op`.
+        and compares its :attr:`ext_op` with the given `ext_op`.
 
         If successful, returns the singleton, else None.
 
         Non-singleton types should override this method.
-
-        Raises:
-            InvalidCustomOp: If the given `ext_op` does not match the expected one for a
-            given extension/operation name.
         """
         default = cls()
         if default.ext_op == ext_op:
@@ -498,7 +495,8 @@ class Custom(DataflowOp):
     def resolve(self, registry: ext.ExtensionRegistry) -> ExtOp | Custom:
         """Resolve the custom operation to an :class:`ExtOp`.
 
-        If extension or operation is not found, returns itself.
+        If the extension or operation is not found, returns a new :class:`Custom`,
+        resolving any nested types and type arguments that can be resolved.
         """
         from hugr.ext import UsedExtensionResolver
 
@@ -1610,7 +1608,7 @@ class Call(_CallOrLoad, DataflowOp):
 
     Raises:
         NoConcreteFunc: If the signature is polymorphic and no instantiation
-            is provided.
+            is provided, or the number of type arguments does not match its parameters.
     """
 
     def _to_serial(self, parent: Node) -> sops.Call:
@@ -1718,7 +1716,7 @@ class LoadFunc(_CallOrLoad, DataflowOp):
 
     Raises:
         NoConcreteFunc: If the signature is polymorphic and no instantiation
-            is provided.
+            is provided, or the number of type arguments does not match its parameters.
     """
 
     @property

@@ -24,7 +24,7 @@ llvm21-1 = ["inkwell/llvm21-1"]
 workspace = true
 
 [dependencies]
-inkwell = { version = ">=0.9.0, <0.11", default-features = false }
+inkwell = { version = ">=0.9.0, <0.12", default-features = false }
 hugr-core = { path = "../hugr-core", version = "0.31.0" }
 anyhow.workspace = true
 itertools.workspace = true

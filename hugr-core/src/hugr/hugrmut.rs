@@ -59,6 +59,8 @@ pub trait HugrMut: HugrMutInternals {
 
     /// Returns a metadata entry associated with a node.
     ///
+    /// Inserts a JSON null value if the key is not already present.
+    ///
     /// # Panics
     ///
     /// If the node is not in the graph.
@@ -149,14 +151,14 @@ pub trait HugrMut: HugrMutInternals {
     ///
     /// # Panics
     ///
-    /// If the node is not in the graph, or if the node is the root node.
+    /// If the node is not in the graph, or if the node is the entrypoint.
     fn remove_node(&mut self, node: Self::Node) -> OpType;
 
     /// Remove a node from the graph, along with all its descendants in the hierarchy.
     ///
     /// # Panics
     ///
-    /// If the node is not in the graph, or is the root (this would leave an empty Hugr).
+    /// If the node is not in the graph, or if the subtree contains the entrypoint.
     fn remove_subtree(&mut self, node: Self::Node);
 
     /// Copies the strict descendants of `root` to under the `new_parent`, optionally applying a
@@ -218,14 +220,15 @@ pub trait HugrMut: HugrMutInternals {
     /// Adds a non-dataflow edge between two nodes. The kind is given by the
     /// operation's [`OpTrait::other_input`] or [`OpTrait::other_output`].
     ///
-    /// Returns the offsets of the new input and output ports.
+    /// Returns the existing output and input ports used for the edge, in that order.
     ///
     /// [`OpTrait::other_input`]: crate::ops::OpTrait::other_input
     /// [`OpTrait::other_output`]: crate::ops::OpTrait::other_output
     ///
     /// # Panics
     ///
-    /// If the node is not in the graph, or if the port is invalid.
+    /// If either node is not in the graph, or if the source has no non-dataflow
+    /// output port or the destination has no non-dataflow input port.
     fn add_other_edge(&mut self, src: Self::Node, dst: Self::Node) -> (OutgoingPort, IncomingPort);
 
     /// Insert another hugr into this one, under a given parent node. Edges into the

@@ -78,7 +78,7 @@ class Module(DefinitionBuilder[ops.Module]):
             The node representing the function declaration.
 
         Examples:
-            >>> from hugr.function import Module
+            >>> from hugr.build.function import Module
             >>> m = Module()
             >>> sig = tys.PolyFuncType([], tys.FunctionType.empty())
             >>> m.declare_function("f", sig)

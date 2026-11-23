@@ -300,7 +300,7 @@ impl OpType {
     /// The edge kind for the static ports of the operation, not described by
     /// the dataflow signature.
     ///
-    /// If not None, an extra input port of that kind will be present on the
+    /// If not None, an extra port of that kind will be present in the
     /// given direction after any dataflow ports and before any
     /// [`OpType::other_port_kind`] ports.
     #[inline]
@@ -342,7 +342,7 @@ impl OpType {
     /// The non-dataflow port for the operation, not described by the signature.
     /// See `[OpType::other_port_kind]`.
     ///
-    /// Returns None if there is no such port, or if the operation defines multiple non-dataflow ports.
+    /// Returns the first such port, or `None` if there are no non-dataflow ports.
     #[must_use]
     pub fn other_port(&self, dir: Direction) -> Option<Port> {
         let df_count = self.value_port_count(dir);
@@ -375,7 +375,7 @@ impl OpType {
             .map(|p| p.as_outgoing().unwrap())
     }
 
-    /// If the op has a static port, the port of that input.
+    /// If the op has a static port in `dir`, return that port.
     ///
     /// See [`OpType::static_input_port`] and [`OpType::static_output_port`].
     #[inline]

@@ -154,13 +154,13 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
 
     /// Add a new output to the function being constructed.
     ///
-    /// Updates the parent's optype to include the new input type, if possible.
+    /// Updates the parent's optype to include the new output type, if possible.
     /// If the container optype is not a [`FuncDefn`], [`DFG`], or dataflow
     /// block, the optype will not be updated.
     ///
     /// # Errors
     ///
-    /// - [`DFGAddPortError::ParentOpNotSupported`] if the container optype is not a [`FuncDefn`], [`DFG`], or dataflow block so we cannot add an input.
+    /// - [`DFGAddPortError::ParentOpNotSupported`] if the container optype is not a [`FuncDefn`], [`DFG`], or dataflow block so we cannot add an output.
     ///   In this case, the Hugr will not be updated.
     pub fn add_output(&mut self, output_type: Type) -> Result<(), DFGAddPortError> {
         let [_, out_node] = self.io();
@@ -245,8 +245,7 @@ impl<T: AsMut<Hugr> + AsRef<Hugr>> DFGBuilder<T> {
 }
 
 impl DFGBuilder<Hugr> {
-    /// Begin building a new DFG-rooted HUGR given its inputs, outputs,
-    /// and extension delta.
+    /// Begin building a new HUGR with a DFG entrypoint given its input and output types.
     ///
     /// # Errors
     ///
@@ -324,8 +323,8 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>, T> DFGWrapper<B, T> {
     /// Add a new input to the dataflow being constructed.
     ///
     /// Updates the parent's optype to include the new input type, if possible.
-    /// If the container optype is not a [`FuncDefn`] or a [`DFG`], the optype
-    /// will not be updated.
+    /// If the container optype is not a [`FuncDefn`], [`DFG`], or dataflow
+    /// block, the HUGR will not be updated and an error is returned.
     ///
     /// # Returns
     ///
@@ -343,14 +342,14 @@ impl<B: AsMut<Hugr> + AsRef<Hugr>, T> DFGWrapper<B, T> {
     /// Add a new output to the dataflow being constructed.
     ///
     /// Updates the parent's optype to include the new output type, if possible.
-    /// If the container optype is not a [`FuncDefn`] or a [`DFG`], the optype
-    /// will not be updated.
+    /// If the container optype is not a [`FuncDefn`], [`DFG`], or dataflow
+    /// block, the HUGR will not be updated and an error is returned.
     ///
     /// # Errors
     ///
     /// - [`DFGAddPortError::ParentOpNotSupported`] if the container optype is
     ///   not a [`FuncDefn`], [`DFG`], or dataflow block so we cannot add an
-    ///   input. In this case, the Hugr will not be updated.
+    ///   output. In this case, the Hugr will not be updated.
     pub fn add_output(&mut self, output_type: Type) -> Result<(), DFGAddPortError> {
         self.0.add_output(output_type)
     }

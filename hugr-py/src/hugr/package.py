@@ -36,15 +36,20 @@ __all__ = [
 
 
 def link_packages(*packages: bytes) -> bytes:
-    """Link all packages, returning a new package containing the extensions of all
-    packages, as well as a single module created from linking the modules from all
-    packages.
+    """Link serialized packages into a new package.
+
+    Combines their extensions and links their modules into a single module.
 
     Args:
         *packages: The packages to link, serialized as bytes.
 
     Returns:
-        A new package containing the modules and extensions of all packages.
+        The linked package, serialized as envelope bytes.
+
+    Raises:
+        ValueError: If an input envelope cannot be loaded.
+        hugr._hugr.linking.HugrLinkingError: If the modules cannot be linked,
+            including when more than one module has a non-module entrypoint.
     """
     pkg = list(packages)
     return link_packages_binding(pkg)
@@ -149,6 +154,11 @@ class Package:
         """Serialize the package to a HUGR envelope byte string.
 
         Some envelope formats can be encoded into a string. See :meth:`to_str`.
+
+        Args:
+            config: The envelope configuration. Defaults to
+                ``EnvelopeConfig.BINARY``, using the binary model format with
+                extensions and zstd compression.
         """
         config = config or EnvelopeConfig.BINARY
         return _make_envelope(self, config)
@@ -158,6 +168,11 @@ class Package:
 
         Not all envelope formats can be encoded into a string.
         See :meth:`to_bytes` for a more general method.
+
+        Args:
+            config: The envelope configuration. Defaults to
+                ``EnvelopeConfig.TEXT``, using uncompressed S-expressions with
+                extensions.
         """
         config = config or EnvelopeConfig.TEXT
         return _make_envelope_str(self, config)
@@ -230,15 +245,17 @@ class Package:
         return self
 
     def link(self, *other: Package):
-        """Link this package with other packages, returning a new package containing the
-        extensions of all packages, as well as a single module created from linking the
-        modules from all packages.
+        """Link this package with other packages, returning a new package.
+
+        Combines their extensions and links their modules into a single module.
+        If the inputs contain no modules, the output has none.
 
         Args:
             *other: Other packages to link with.
 
         Returns:
-            A new package containing the modules and extensions of all packages.
+            A new package containing the combined extensions and at most one
+            linked module.
         """
         return Package.from_bytes(
             link_packages(*[pkg.to_bytes() for pkg in (self, *other)])

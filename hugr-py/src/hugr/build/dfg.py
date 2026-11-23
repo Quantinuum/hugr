@@ -160,7 +160,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
                 Defaults to the host HUGR's entrypoint.
 
         Example:
-            >>> hugr = Hugr(ops.DFG([]))
+            >>> hugr = Dfg(tys.Bool).hugr
             >>> dfg = Dfg._new_existing(hugr)
             >>> dfg.parent_node
             Node(4)
@@ -196,7 +196,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
         Example:
             >>> dfg = Dfg(tys.Bool)
             >>> dfg.inputs()
-            [OutPort(Node(1), 0)]
+            [OutPort(Node(5), 0)]
         """
         return [self.input_node.out(i) for i in range(len(self._input_op().types))]
 
@@ -212,7 +212,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
         Args:
             op: The operation to add.
             args: The input wires to the operation.
-            metadata: Metadata to attach to the function definition. Defaults to None.
+            metadata: Metadata to attach to the new operation node. Defaults to None.
 
         Returns:
             The node holding the new operation.
@@ -220,7 +220,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
         Example:
             >>> dfg = Dfg(tys.Bool)
             >>> dfg.add_op(ops.Noop(), dfg.inputs()[0])
-            Node(3)
+            Node(7)
         """
         try:
             num_outs = op.num_out
@@ -240,13 +240,13 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
 
         Args:
             com: The command to add.
-            metadata: Metadata to attach to the function definition. Defaults to None.
+            metadata: Metadata to attach to the new operation node. Defaults to None.
 
         Example:
             >>> dfg = Dfg(tys.Bool)
             >>> (i,) = dfg.inputs()
             >>> dfg.add(ops.Noop()(i))
-            Node(3)
+            Node(7)
 
         """
 
@@ -271,13 +271,14 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             List of the new nodes in the same order as the commands.
 
         Raises:
-            IndexError: If any input index is not a tracked wire.
+            ValueError: If a command contains integer wire indices rather than wires.
+                Subclasses that support tracked wires may accept indices instead.
 
         Examples:
             >>> dfg = Dfg(tys.Bool, tys.Unit)
             >>> (b, u) = dfg.inputs()
             >>> dfg.extend(ops.Noop()(b), ops.Noop()(u))
-            [Node(3), Node(4)]
+            [Node(7), Node(8)]
         """
         return [self.add(com) for com in coms]
 
@@ -301,7 +302,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             >>> dfg = Dfg(tys.Bool)
             >>> dfg2 = Dfg(tys.Bool)
             >>> dfg.insert_nested(dfg2, dfg.inputs()[0])
-            Node(3)
+            Node(7)
         """
         return self._insert_nested_impl(dfg, *args)
 
@@ -321,7 +322,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             >>> dfg = Dfg(tys.Bool)
             >>> with dfg.add_nested(dfg.inputs()[0]) as dfg2:\
                    dfg2.parent_node
-            Node(3)
+            Node(7)
         """
         from .dfg import Dfg
 
@@ -368,11 +369,11 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             The root node of the inserted CFG.
 
         Example:
-            >>> from hugr.cfg import Cfg
+            >>> from hugr.build.cfg import Cfg
             >>> dfg = Dfg(tys.Bool)
             >>> cfg = Cfg(tys.Bool)
             >>> dfg.insert_cfg(cfg, dfg.inputs()[0])
-            Node(3)
+            Node(7)
         """
         return self._insert_nested_impl(cfg, *args)
 
@@ -393,7 +394,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             >>> (cond, unit) = dfg.inputs()
             >>> cond = dfg.add_conditional(cond, unit)
             >>> cond.parent_node
-            Node(3)
+            Node(7)
         """
         from .cond_loop import Conditional
 
@@ -421,7 +422,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             The root node of the inserted conditional.
 
         Example:
-            >>> from hugr.cond_loop import Conditional
+            >>> from hugr.build.cond_loop import Conditional
             >>> cond = Conditional(tys.Bool, [])
             >>> dfg = Dfg(tys.Bool)
             >>> cond_n = dfg.insert_conditional(cond, dfg.inputs()[0])
@@ -499,7 +500,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             The root node of the inserted tail loop.
 
         Example:
-            >>> from hugr.cond_loop import TailLoop
+            >>> from hugr.build.cond_loop import TailLoop
             >>> tl = TailLoop([tys.Bool], [tys.Bool])
             >>> dfg = Dfg(tys.Bool)
             >>> (b,) = dfg.inputs()
@@ -553,7 +554,7 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
             >>> df = dfg.Dfg()
             >>> df.add_state_order(df.input_node, df.output_node)
             >>> list(df.hugr.outgoing_order_links(df.input_node))
-            [Node(2)]
+            [Node(6)]
         """
         # adds edge to the right of all existing edges
         self.hugr.add_order_link(src, dst)
@@ -577,8 +578,8 @@ class DfBase(ParentBuilder[DP], DefinitionBuilder, AbstractContextManager):
         Example:
             >>> dfg = Dfg()
             >>> const_n = dfg.load(val.TRUE)
-            >>> len(dfg.hugr) # parent, input, output, const, load
-            5
+            >>> len(dfg.hugr) # module, function and I/O, DFG and I/O, const, load
+            9
             >>> dfg.hugr[const_n].op
             LoadConst(Bool)
         """
@@ -735,7 +736,7 @@ class Function(DfBase[ops.FuncDefn]):
     Examples:
         >>> f = Function("f", [tys.Bool])
         >>> f.parent_op
-        FuncDefn(f_name='f', inputs=[Bool], params=[])
+        FuncDefn(f_name='f', inputs=[Bool], params=[], visibility='Private')
     """
 
     def __init__(

@@ -20,7 +20,7 @@ use crate::extension::SignatureError;
 use crate::hugr::views::render::RenderStringConfig;
 use crate::types::{CustomType, FuncValueType, SumType};
 
-/// The upper non-inclusive bound of a [`TypeParam::BoundedNat`]
+/// The exclusive upper bound of a [`Term::BoundedNatKind`].
 // A None inner value implies the maximum bound: u64::MAX + 1 (all u64 values valid)
 #[derive(
     Clone, Debug, PartialEq, Eq, Hash, derive_more::Display, serde::Deserialize, serde::Serialize,
@@ -157,9 +157,10 @@ pub enum Term {
         _0.iter().map(|tuple| format!("... {tuple}")).join(",")
     })]
     TupleConcat(Vec<TypeArg>),
-    /// Variable (used in type schemes or inside polymorphic functions),
-    /// but not a runtime type (not even a row variable i.e. list of runtime types)
-    /// - see [`Term::new_var_use`]
+    /// Variable used in type schemes or inside polymorphic functions.
+    /// Its declared kind determines whether it represents a runtime type,
+    /// a row of runtime types, or another static entity.
+    /// See [`Term::new_var_use`].
     #[display("{_0}")]
     Variable(TermVar),
 
@@ -226,7 +227,7 @@ impl Term {
         Self::BoundedNatKind(UpperBound(None))
     }
 
-    /// Creates a [`Term::BoundedNatKind`] with the stated upper bound (non-exclusive).
+    /// Creates a [`Term::BoundedNatKind`] with the stated exclusive upper bound.
     #[must_use]
     pub const fn bounded_nat_kind(upper_bound: NonZeroU64) -> Self {
         Self::BoundedNatKind(UpperBound(Some(upper_bound)))

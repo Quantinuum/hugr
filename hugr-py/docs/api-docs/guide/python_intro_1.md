@@ -42,7 +42,7 @@ While we haven't added any nodes to the graph ourselves yet, we can already noti
 
 However there are also differences. Notably, the HUGR consists of multiple **regions**, with each region container having its own input and output nodes. This is why a HUGR is "hierarchical". Certain types of node can contain subgraphs as their children. In our graph we can see some of those nodes:
 - The `Module` node is a top-level node whose children can only be function definitions, function declarations, or constants.
-- Each module needs at least one function definition that acts as an entrypoint to the graph. (For the module to be executable, the function must take no inputs.) In this case we have a `FuncDefn` node called `main` by default.
+- Each module may have at most one function definition that acts as an entrypoint to the graph. (For the module to be executable, the function must take no inputs.) In this case we have a `FuncDefn` node called `main` by default.
 - Finally, the function definition contains the `DFG` we created, so far only containing an input and an output node. Note how each port on a node is indexed and ordered.
 
 ### Adding quantum gates
@@ -92,6 +92,7 @@ To validate a HUGR, we first need to package it up in order to serialize it (pas
 
 ```py
 from hugr import cli
+from hugr.package import Package
 import tket_exts
 
 package = Package(

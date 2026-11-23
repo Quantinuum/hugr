@@ -1012,9 +1012,9 @@ checksum = "7f24254aa9a54b5c858eaee2f5bccdb46aaf0e486a595ed5fd8f86ba55232a70"
 
 [[package]]
 name = "html-escape"
-version = "0.2.15"
+version = "0.3.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c9356095b4b41197bba32173600e1582792cda618f65d12f68e2e77d273413c5"
+checksum = "d45ed4d99334da2a2f221504e8ffc8ad09baf2a452b154465a976bfde697b004"
 
 [[package]]
 name = "hugr"
@@ -1263,9 +1263,9 @@ dependencies = [
 
 [[package]]
 name = "inkwell"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30932a1258d02e3c7344618abcdbb5dca03e0f8d2ad34496067d1f371cfceda6"
+checksum = "a8fa0d01d313de5e4f9eea445cf5f6f3e20206491aca9cf0b1e0eb5108f07cd8"
 dependencies = [
  "bitflags 2.11.0",
  "inkwell_internals",
@@ -1276,9 +1276,9 @@ dependencies = [
 
 [[package]]
 name = "inkwell_internals"
-version = "0.15.0"
+version = "0.16.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "04a85f1cf8de4f1df2ebd93b6afe957fa2acd0081c97dabfa41651eeeb44756e"
+checksum = "6cd70b3f0fa226688d0daeb53f4049272c65354d1f29b169ffdfa522146ded74"
 dependencies = [
  "proc-macro2",
  "quote",
@@ -1510,9 +1510,9 @@ checksum = "32a66949e030da00e8c7d4434b251670a91556f4144941d37452769c25d58a53"
 
 [[package]]
 name = "llvm-sys"
-version = "211.0.0"
+version = "211.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "108b3ad2b2eaf2a561fc74196273b20e3436e4a688b8b44e250d83974dc1b2e2"
+checksum = "aaee56c721bdfbf4adffffa0756a34bd65df4b0aaf65a2539082a5650e521028"
 dependencies = [
  "anyhow",
  "cc",
