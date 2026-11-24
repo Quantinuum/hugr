@@ -599,7 +599,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
             return Err(InvalidSubgraph::InvalidNodeSet);
         }
         validate_boundary_connections(hugr, &nodes, boundary())?;
-        Ok(())
+        validate_function_calls(hugr, &self.function_calls)
     }
 
     /// Check the validity of the subgraph, as described in the docs of
@@ -1398,8 +1398,14 @@ fn validate_boundary<H: HugrView>(
         Err(InvalidSubgraphBoundary::MismatchedTypes(i))?;
     }
 
-    // Check that all function calls are other ports of edge kind
-    // [EdgeKind::Function].
+    validate_function_calls(hugr, function_calls)
+}
+
+/// Check that each function-call group links to a single function.
+fn validate_function_calls<N: HugrNode>(
+    hugr: &impl HugrView<Node = N>,
+    function_calls: &IncomingPorts<N>,
+) -> Result<(), InvalidSubgraph<N>> {
     for calls in function_calls {
         if !calls
             .iter()
@@ -1411,7 +1417,9 @@ fn validate_boundary<H: HugrView>(
         }
         for &(n, p) in calls {
             let op = hugr.get_optype(n);
-            if op.static_input_port() != Some(p) {
+            if op.static_input_port() != Some(p)
+                || !op.static_input().is_some_and(|kind| kind.is_function())
+            {
                 return Err(InvalidSubgraph::UnsupportedEdgeKind(n, p.into()));
             }
         }

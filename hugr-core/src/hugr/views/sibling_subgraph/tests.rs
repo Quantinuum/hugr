@@ -10,8 +10,8 @@ use crate::builder::{endo_sig, inout_sig};
 use crate::extension::prelude::{MakeTuple, UnpackTuple};
 use crate::hugr::Patch;
 use crate::hugr::internal::HugrMutInternals;
-use crate::ops::Const;
 use crate::ops::handle::DataflowParentID;
+use crate::ops::{Const, Value};
 use crate::std_extensions::arithmetic::float_types::ConstF64;
 use crate::std_extensions::logic::LogicOp;
 use crate::type_row;
@@ -865,6 +865,28 @@ fn test_validate_skip_convexity_rejects_internal_boundary_port() {
     );
 }
 
+#[test]
+fn test_validate_rejects_non_function_call_ports() {
+    let mut builder = DFGBuilder::new(Signature::new(type_row![], [bool_t()])).unwrap();
+    let loaded = builder.add_load_value(Value::true_val());
+    let not = builder.add_dataflow_op(LogicOp::Not, [loaded]).unwrap();
+    let hugr = builder.finish_hugr_with_outputs(not.outputs()).unwrap();
+
+    // Neither the static constant input nor the Boolean value input is a function call.
+    for node in [loaded.node(), not.node()] {
+        let port = IncomingPort::from(0);
+        let subgraph = SiblingSubgraph::new_unchecked(
+            vec![],
+            vec![(node, 0.into())],
+            vec![vec![(node, port)]],
+            vec![node],
+        );
+        let expected = Err(InvalidSubgraph::UnsupportedEdgeKind(node, port.into()));
+        assert_eq!(subgraph.validate_skip_convexity(&hugr), expected);
+        assert_eq!(subgraph.validate_default(&hugr), expected);
+    }
+}
+
 #[fixture]
 pub(crate) fn hugr_call_subgraph() -> Hugr {
     let mut builder = ModuleBuilder::new();
@@ -913,6 +935,7 @@ fn test_call_subgraph_from_nodes(hugr_call_subgraph: Hugr) {
     let subg = SiblingSubgraph::try_from_nodes(call_nodes.clone(), &hugr_call_subgraph).unwrap();
     assert_eq!(subg.function_calls.len(), 1);
     assert_eq!(subg.function_calls[0].len(), 2);
+    subg.validate_skip_convexity(&hugr_call_subgraph).unwrap();
 
     let subg =
         SiblingSubgraph::try_from_nodes(call_nodes[0..1].to_owned(), &hugr_call_subgraph).unwrap();
