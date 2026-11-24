@@ -581,7 +581,8 @@ impl<N: HugrNode> SiblingSubgraph<N> {
 
     /// Check the validity of the subgraph, as described in the docs of
     /// [`SiblingSubgraph::try_new`], but do not check convexity.
-    /// Only edges within the region are considered when checking the boundary.
+    /// Every declared boundary port must link outside the subgraph. Edges that
+    /// cross the boundary within the region must be declared.
     pub fn validate_skip_convexity(
         &self,
         hugr: &impl HugrView<Node = N>,
@@ -597,6 +598,7 @@ impl<N: HugrNode> SiblingSubgraph<N> {
         {
             return Err(InvalidSubgraph::InvalidNodeSet);
         }
+        validate_boundary_connections(hugr, &nodes, boundary())?;
         Ok(())
     }
 
@@ -1293,6 +1295,23 @@ fn has_complete_boundary<N: HugrNode>(
     })
 }
 
+/// Check that every declared boundary port links to a node outside the subgraph.
+fn validate_boundary_connections<N: HugrNode>(
+    hugr: &impl HugrView<Node = N>,
+    nodes: &HashSet<N>,
+    boundary: impl IntoIterator<Item = (N, Port)>,
+) -> Result<(), InvalidSubgraphBoundary<N>> {
+    if let Some((node, port)) = boundary.into_iter().find(|&(node, port)| {
+        hugr.linked_ports(node, port)
+            .all(|(other, _)| nodes.contains(&other))
+    }) {
+        return Err(InvalidSubgraphBoundary::DisconnectedBoundaryPort(
+            node, port,
+        ));
+    }
+    Ok(())
+}
+
 /// Whether a subgraph is valid.
 ///
 /// Verifies that each partition of `inputs` is linked to exactly one port outside of the subgraph;
@@ -1329,13 +1348,7 @@ fn validate_boundary<H: HugrView>(
     if let Some(&(n, p)) = boundary_ports.iter().find(|(n, _)| !node_set.contains(n)) {
         Err(InvalidSubgraphBoundary::PortNodeNotInSet(n, p))?;
     }
-    // Check that every inside port has at least one linked port outside.
-    if let Some(&(n, p)) = boundary_ports.iter().find(|&&(n, p)| {
-        hugr.linked_ports(n, p)
-            .all(|(n1, _)| node_set.contains(&n1))
-    }) {
-        Err(InvalidSubgraphBoundary::DisconnectedBoundaryPort(n, p))?;
-    }
+    validate_boundary_connections(hugr, &node_set, boundary_ports.iter().copied())?;
 
     if !has_complete_boundary(hugr, nodes, boundary_ports, |node| {
         !node_set.contains(&node)

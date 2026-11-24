@@ -841,6 +841,30 @@ fn test_validate() {
     );
 }
 
+#[test]
+fn test_validate_skip_convexity_rejects_internal_boundary_port() {
+    let mut builder = DFGBuilder::new(Signature::new_endo(type_row![])).unwrap();
+    let tuple = builder
+        .add_dataflow_op(MakeTuple::new(type_row![]), [])
+        .unwrap();
+    let unpack = builder
+        .add_dataflow_op(UnpackTuple::new(type_row![]), tuple.outputs())
+        .unwrap();
+    let hugr = builder.finish_hugr_with_outputs([]).unwrap();
+
+    let port = IncomingPort::from(0);
+    let subgraph = SiblingSubgraph::new_unchecked(
+        vec![vec![(unpack.node(), port)]],
+        vec![],
+        vec![],
+        vec![tuple.node(), unpack.node()],
+    );
+    assert_eq!(
+        subgraph.validate_skip_convexity(&hugr),
+        Err(InvalidSubgraphBoundary::DisconnectedBoundaryPort(unpack.node(), port.into()).into())
+    );
+}
+
 #[fixture]
 pub(crate) fn hugr_call_subgraph() -> Hugr {
     let mut builder = ModuleBuilder::new();
@@ -955,6 +979,7 @@ fn test_nonlocal_edge_excluding_target() {
     // Does not include the DFG as does not follow the Syn edge
     assert_eq!(ss.nodes, &[not_op.node()]);
     ss.validate_default(&h).unwrap();
+    ss.validate_skip_convexity(&h).unwrap();
 
     // We can't "not" follow the Order edge....
     let ss2 = SiblingSubgraph::try_new(
