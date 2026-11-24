@@ -664,6 +664,8 @@ fn singleton_disconnected_subgraph() {
         subg.signature(&h).io(),
         Signature::new_endo(type_row![]).io()
     );
+    assert_eq!(subg.validate_default(&h), Ok(()));
+    assert_eq!(subg.validate_skip_convexity(&h), Ok(()));
 }
 
 /// Run `try_from_nodes` including some complete graph components.
@@ -695,6 +697,8 @@ fn partially_connected_subgraph() {
         subg.signature(&h).io(),
         Signature::new(type_row![], vec![tuple_t]).io()
     );
+    assert_eq!(subg.validate_default(&h), Ok(()));
+    assert_eq!(subg.validate_skip_convexity(&h), Ok(()));
 }
 
 #[test]
