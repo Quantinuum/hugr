@@ -1,5 +1,6 @@
 # Changelog
 
+
 ## [0.31.1](https://github.com/Quantinuum/hugr/compare/hugr-v0.31.0...hugr-v0.31.1) - 2026-11-23
 
 ### Bug Fixes
