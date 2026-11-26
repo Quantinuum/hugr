@@ -10,8 +10,8 @@ use crate::builder::{endo_sig, inout_sig};
 use crate::extension::prelude::{MakeTuple, UnpackTuple};
 use crate::hugr::Patch;
 use crate::hugr::internal::HugrMutInternals;
-use crate::ops::Const;
 use crate::ops::handle::DataflowParentID;
+use crate::ops::{Const, Value};
 use crate::std_extensions::arithmetic::float_types::ConstF64;
 use crate::std_extensions::logic::LogicOp;
 use crate::type_row;
@@ -454,6 +454,58 @@ fn convex_multiports() {
     assert_eq!(subgraph.nodes(), [not1, not2]);
 }
 
+/// Regression for <https://github.com/Quantinuum/hugr/issues/3368>.
+#[test]
+fn convex_multiport_with_unused_consumer() {
+    let mut builder = DFGBuilder::new(Signature::new_endo([bool_t()])).unwrap();
+    let source = builder
+        .add_dataflow_op(LogicOp::Not, builder.input_wires())
+        .unwrap();
+    let used = builder
+        .add_dataflow_op(LogicOp::Not, source.outputs())
+        .unwrap();
+    let unused = builder
+        .add_dataflow_op(LogicOp::Not, source.outputs())
+        .unwrap();
+    let hugr = builder.finish_hugr_with_outputs(used.outputs()).unwrap();
+
+    // Both consumers are in the subgraph, including the one with no output edge.
+    let nodes = [source.node(), used.node(), unused.node()];
+    let subgraph = SiblingSubgraph::try_from_nodes(nodes, &hugr).unwrap();
+    assert_eq!(
+        subgraph.nodes().iter().copied().collect::<BTreeSet<_>>(),
+        BTreeSet::from(nodes)
+    );
+}
+
+#[test]
+fn convex_multiport_with_internal_and_external_consumers() {
+    let mut builder = DFGBuilder::new(Signature::new_endo([bool_t()])).unwrap();
+    let source = builder
+        .add_dataflow_op(LogicOp::Not, builder.input_wires())
+        .unwrap();
+    let unused = builder
+        .add_dataflow_op(LogicOp::Not, source.outputs())
+        .unwrap();
+    let hugr = builder.finish_hugr_with_outputs(source.outputs()).unwrap();
+
+    // The source port feeds both the internal consumer and the DFG output.
+    // The internal consumer has no boundary port of its own.
+    let nodes = [source.node(), unused.node()];
+    let subgraph = SiblingSubgraph::try_from_nodes(nodes, &hugr).unwrap();
+    assert_eq!(
+        subgraph.nodes().iter().copied().collect::<BTreeSet<_>>(),
+        BTreeSet::from(nodes)
+    );
+    assert_eq!(subgraph.validate_default(&hugr), Ok(()));
+    assert_eq!(subgraph.validate_skip_convexity(&hugr), Ok(()));
+    let checker = LineConvexChecker::from_entrypoint(&hugr);
+    assert_eq!(
+        subgraph.validate_with_checker(&hugr, Some(&checker)),
+        Ok(())
+    );
+}
+
 #[test]
 fn invalid_boundary() {
     let (hugr, func_root) = build_hugr().unwrap();
@@ -612,6 +664,8 @@ fn singleton_disconnected_subgraph() {
         subg.signature(&h).io(),
         Signature::new_endo(type_row![]).io()
     );
+    assert_eq!(subg.validate_default(&h), Ok(()));
+    assert_eq!(subg.validate_skip_convexity(&h), Ok(()));
 }
 
 /// Run `try_from_nodes` including some complete graph components.
@@ -643,6 +697,8 @@ fn partially_connected_subgraph() {
         subg.signature(&h).io(),
         Signature::new(type_row![], vec![tuple_t]).io()
     );
+    assert_eq!(subg.validate_default(&h), Ok(()));
+    assert_eq!(subg.validate_skip_convexity(&h), Ok(()));
 }
 
 #[test]
@@ -764,6 +820,10 @@ fn test_validate() {
     assert_eq!(sub.validate_skip_convexity(&func), Ok(()));
     assert_eq!(sub.validate_default(&func), Err(InvalidSubgraph::NotConvex));
     assert_eq!(
+        SiblingSubgraph::try_from_nodes([not1, not3], &func),
+        Err(InvalidSubgraph::NotConvex)
+    );
+    assert_eq!(
         sub.validate_with_checker(&func, Some(&checker)),
         Err(InvalidSubgraph::NotConvex)
     );
@@ -779,6 +839,52 @@ fn test_validate() {
         sub.validate_skip_convexity(&func),
         Err(InvalidSubgraph::InvalidNodeSet)
     );
+}
+
+#[test]
+fn test_validate_skip_convexity_rejects_internal_boundary_port() {
+    let mut builder = DFGBuilder::new(Signature::new_endo(type_row![])).unwrap();
+    let tuple = builder
+        .add_dataflow_op(MakeTuple::new(type_row![]), [])
+        .unwrap();
+    let unpack = builder
+        .add_dataflow_op(UnpackTuple::new(type_row![]), tuple.outputs())
+        .unwrap();
+    let hugr = builder.finish_hugr_with_outputs([]).unwrap();
+
+    let port = IncomingPort::from(0);
+    let subgraph = SiblingSubgraph::new_unchecked(
+        vec![vec![(unpack.node(), port)]],
+        vec![],
+        vec![],
+        vec![tuple.node(), unpack.node()],
+    );
+    assert_eq!(
+        subgraph.validate_skip_convexity(&hugr),
+        Err(InvalidSubgraphBoundary::DisconnectedBoundaryPort(unpack.node(), port.into()).into())
+    );
+}
+
+#[test]
+fn test_validate_rejects_non_function_call_ports() {
+    let mut builder = DFGBuilder::new(Signature::new(type_row![], [bool_t()])).unwrap();
+    let loaded = builder.add_load_value(Value::true_val());
+    let not = builder.add_dataflow_op(LogicOp::Not, [loaded]).unwrap();
+    let hugr = builder.finish_hugr_with_outputs(not.outputs()).unwrap();
+
+    // Neither the static constant input nor the Boolean value input is a function call.
+    for node in [loaded.node(), not.node()] {
+        let port = IncomingPort::from(0);
+        let subgraph = SiblingSubgraph::new_unchecked(
+            vec![],
+            vec![(node, 0.into())],
+            vec![vec![(node, port)]],
+            vec![node],
+        );
+        let expected = Err(InvalidSubgraph::UnsupportedEdgeKind(node, port.into()));
+        assert_eq!(subgraph.validate_skip_convexity(&hugr), expected);
+        assert_eq!(subgraph.validate_default(&hugr), expected);
+    }
 }
 
 #[fixture]
@@ -829,6 +935,7 @@ fn test_call_subgraph_from_nodes(hugr_call_subgraph: Hugr) {
     let subg = SiblingSubgraph::try_from_nodes(call_nodes.clone(), &hugr_call_subgraph).unwrap();
     assert_eq!(subg.function_calls.len(), 1);
     assert_eq!(subg.function_calls[0].len(), 2);
+    subg.validate_skip_convexity(&hugr_call_subgraph).unwrap();
 
     let subg =
         SiblingSubgraph::try_from_nodes(call_nodes[0..1].to_owned(), &hugr_call_subgraph).unwrap();
@@ -895,6 +1002,7 @@ fn test_nonlocal_edge_excluding_target() {
     // Does not include the DFG as does not follow the Syn edge
     assert_eq!(ss.nodes, &[not_op.node()]);
     ss.validate_default(&h).unwrap();
+    ss.validate_skip_convexity(&h).unwrap();
 
     // We can't "not" follow the Order edge....
     let ss2 = SiblingSubgraph::try_new(
