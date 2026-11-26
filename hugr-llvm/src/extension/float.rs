@@ -103,36 +103,31 @@ fn emit_float_op<'c, H: HugrView<Node = Node>>(
                     .as_basic_value_enum(),
             ])
         }),
-        FloatOps::fround => emit_custom_unary_op(context, args, |ctx, v, _| {
-            let float_ty = ctx.iw_context().f64_type().as_basic_type_enum();
-            let func = get_intrinsic(ctx.get_current_module(), "llvm.round.f64", [float_ty])?;
-            Ok(vec![
-                ctx.builder()
-                    .build_call(func, &[v.into()], "")?
-                    .try_as_basic_value()
-                    .unwrap_basic()
-                    .as_basic_value_enum(),
-            ])
-        }),
-        FloatOps::froundeven => emit_custom_unary_op(context, args, |ctx, v, _| {
-            let float_ty = ctx.iw_context().f64_type().as_basic_type_enum();
-            let func = get_intrinsic(ctx.get_current_module(), "llvm.roundeven.f64", [float_ty])?;
-            Ok(vec![
-                ctx.builder()
-                    .build_call(func, &[v.into()], "")?
-                    .try_as_basic_value()
-                    .unwrap_basic()
-                    .as_basic_value_enum(),
-            ])
-        }),
-        // Missing ops, not supported by inkwell
-        FloatOps::fmax
-        | FloatOps::fmin
-        | FloatOps::fabs
+        FloatOps::fabs
         | FloatOps::ffloor
         | FloatOps::fceil
-        | FloatOps::ftostring
-        | _ => {
+        | FloatOps::fround
+        | FloatOps::froundeven => emit_custom_unary_op(context, args, |ctx, v, _| {
+            let name = match op {
+                FloatOps::fabs => "llvm.fabs.f64",
+                FloatOps::ffloor => "llvm.floor.f64",
+                FloatOps::fceil => "llvm.ceil.f64",
+                FloatOps::fround => "llvm.round.f64",
+                FloatOps::froundeven => "llvm.roundeven.f64",
+                _ => unreachable!(),
+            };
+            let float_ty = ctx.iw_context().f64_type().as_basic_type_enum();
+            let func = get_intrinsic(ctx.get_current_module(), name, [float_ty])?;
+            Ok(vec![
+                ctx.builder()
+                    .build_call(func, &[v.into()], "")?
+                    .try_as_basic_value()
+                    .unwrap_basic()
+                    .as_basic_value_enum(),
+            ])
+        }),
+        // Missing ops.
+        FloatOps::fmax | FloatOps::fmin | FloatOps::ftostring | _ => {
             let name: &str = op.into();
             Err(anyhow!("FloatOpEmitter: unimplemented op: {name}"))
         }
@@ -239,6 +234,9 @@ mod test {
     #[case::fmul(FloatOps::fmul)]
     #[case::fdiv(FloatOps::fdiv)]
     #[case::fpow(FloatOps::fpow)]
+    #[case::fabs(FloatOps::fabs)]
+    #[case::ffloor(FloatOps::ffloor)]
+    #[case::fceil(FloatOps::fceil)]
     #[case::fround(FloatOps::fround)]
     #[case::froundeven(FloatOps::froundeven)]
     fn float_operations(mut llvm_ctx: TestContext, #[case] op: FloatOps) {
@@ -267,6 +265,15 @@ mod test {
     #[case::fmul(FloatOps::fmul, &[2., 3.], 6.)]
     #[case::fdiv(FloatOps::fdiv, &[7., 2.], 3.5)]
     #[case::fpow(FloatOps::fpow, &[0.5, 3.], 0.125)]
+    #[case::fabs_positive(FloatOps::fabs, &[42.42], 42.42)]
+    #[case::fabs_negative(FloatOps::fabs, &[-42.42], 42.42)]
+    #[case::fabs_zero(FloatOps::fabs, &[0.], 0.)]
+    #[case::ffloor_positive(FloatOps::ffloor, &[42.42], 42.)]
+    #[case::ffloor_negative(FloatOps::ffloor, &[-42.42], -43.)]
+    #[case::ffloor_integer(FloatOps::ffloor, &[42.], 42.)]
+    #[case::fceil_positive(FloatOps::fceil, &[42.42], 43.)]
+    #[case::fceil_negative(FloatOps::fceil, &[-42.42], -42.)]
+    #[case::fceil_integer(FloatOps::fceil, &[42.], 42.)]
     #[case::fround(FloatOps::fround, &[42.42], 42.)]
     #[case::froundeven_tie_down(FloatOps::froundeven, &[42.5], 42.)]
     #[case::froundeven_tie_up(FloatOps::froundeven, &[43.5], 44.)]
