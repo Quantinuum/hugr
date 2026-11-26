@@ -1,5 +1,6 @@
 # Changelog
 
+
 ## [0.7.14](https://github.com/Quantinuum/hugr/compare/hugr-persistent-v0.7.13...hugr-persistent-v0.7.14) - 2026-11-23
 
 ### Documentation
